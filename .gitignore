@@ -1,0 +1,12 @@
+node_modules
+.next
+dist
+.turbo
+.wrangler
+.env
+.env.local
+.dev.vars
+apps/jobs/.env.production
+.DS_Store
+apps/api/exports/photographer-accounts/
+data/legacy/

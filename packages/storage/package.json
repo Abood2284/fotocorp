@@ -1,0 +1,6 @@
+{
+  "name": "@fotocorp/storage",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts"
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "contributor_upload_batches" ADD COLUMN "asset_type" text DEFAULT 'IMAGE' NOT NULL;

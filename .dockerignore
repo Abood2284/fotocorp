@@ -1,0 +1,16 @@
+# Monorepo Docker build context (apps/jobs image)
+.git
+**/.git
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/.wrangler
+**/.env
+**/.env.local
+apps/jobs/.env.production
+**/.dev.vars
+**/.DS_Store
+**/coverage
+**/*.log
+apps/api/exports

@@ -1,0 +1,26 @@
+{
+  "name": "fotocorp",
+  "private": true,
+  "packageManager": "pnpm@10.33.1",
+  "scripts": {
+    "dev:web": "pnpm -C apps/web dev",
+    "dev:api": "pnpm -C apps/api exec wrangler dev --port 8787",
+    "dev:jobs": "pnpm --dir apps/jobs dev",
+    "dev": "concurrently -n web,api -c auto \"pnpm dev:web\" \"pnpm dev:api\"",
+    "db:generate": "pnpm --dir apps/api db:generate",
+    "db:migrate": "pnpm --dir apps/api db:migrate",
+    "db:studio": "pnpm --dir apps/api db:studio",
+    "media:generate-derivatives": "pnpm --dir apps/api media:generate-derivatives",
+    "legacy:import": "pnpm --dir apps/api legacy:import",
+    "legacy:import:chunks": "pnpm --dir apps/api legacy:import:chunks"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.39",
+    "@types/pg": "^8.20.0",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.21.0"
+  },
+  "dependencies": {
+    "pg": "^8.20.0"
+  }
+}

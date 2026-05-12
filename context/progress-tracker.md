@@ -1,0 +1,207 @@
+# Progress Tracker
+
+Update this file after every meaningful implementation change.
+
+## Current Phase
+
+- Client-side catalog/subscriber experience and API architecture cleanup.
+
+## Current Goal
+
+- Fix subscriber download/auth-state/no-refresh UX, then clean the web internal API client and migrate API routes to Hono incrementally.
+
+## Completed
+
+- PR-16E — **`apps/jobs` Docker + direct VPS deployment:** Added `apps/jobs/Dockerfile` (Node 22 bookworm-slim, Corepack pnpm, `libvips42`, non-root `node` user, default `publish:worker`), root `docker-compose.jobs.yml` (`fotocorp-jobs`, no published ports, log rotation, production env defaults), `apps/jobs/.env.production.example`, gitignore for `apps/jobs/.env.production`, monorepo `.dockerignore`, **`--worker`** poll loop + `publish:worker` script, clearer batch missing-env errors / dry-run warnings, operator runbook [`docs/db-revamp/jobs-direct-vps-deployment-runbook.md`](../docs/db-revamp/jobs-direct-vps-deployment-runbook.md), report [`docs/db-revamp/reports/pr-16e-jobs-docker-vps-deployment-report.md`](../docs/db-revamp/reports/pr-16e-jobs-docker-vps-deployment-report.md). Enables private Raff-style VPS runs without DNS/CapRover; browser never calls jobs.
+- Contributor portal: capped `getContributorEvents` `limit` to 100 in web (API max), fixed `Button` `asChild` via `@radix-ui/react-slot`, simplified contributor dashboard (contribution summary + top downloads only), refreshed shell (password banner contrast, profile menu with change password / logout, prominent Uploads + “New batch” shortcut); extended `GET /api/v1/contributor/analytics/summary` with `uploadsThisWeek`, `submissionsThisWeek`, `submissionsThisMonth` and dashboard triple rows for downloads (today / month / all time), images added (week / month / all time), and in-review-or-private pipeline (week / month / right now).
+- PR-16A — Converted `apps/jobs` from Wrangler Worker scaffold to a **Node CLI** package (`tsx` entry, dry-run / once modes, typed `loadJobsEnv`, `ImagePublishWorker` skeleton, Sharp isolated to `apps/jobs` with `smoke:sharp`). Removed Worker `fetch`, `wrangler.jsonc`, and fixture ingestion modules. Root `dev` no longer runs jobs via Wrangler; `dev:jobs` runs the jobs dry-run CLI. Docs: [`docs/db-revamp/image-processing-runtime-notes.md`](../docs/db-revamp/image-processing-runtime-notes.md), [`docs/db-revamp/fotokey-publish-pipeline.md`](../docs/db-revamp/fotokey-publish-pipeline.md), report [`docs/db-revamp/reports/pr-16a-jobs-node-runtime-report.md`](../docs/db-revamp/reports/pr-16a-jobs-node-runtime-report.md); architecture table updated for `apps/jobs`.
+- PR-15.DOCS — DB revamp docs reorganized: created clean [`docs/db-revamp/README.md`](../docs/db-revamp/README.md) entrypoint and top-level operating runbooks; moved historical PR reports into [`docs/db-revamp/reports/`](../docs/db-revamp/reports/); documented future doc structure rule in the README.
+- Marketing homepage Editorial → Latest uses search-style `PublicAssetCard` grid (hover title, caption, save) and loads 50 newest public assets.
+- Marketing homepage trimmed to hero + `HomeCategorySection`; footer revamped to align with header nav (Explore / Browse / Company) and shared brand treatment.
+- Role/subscription model foundation in `app_user_profiles`.
+- Secure preview foundation with watermarked derivative checks.
+- Media derivative generator and derivative metadata model.
+- Public catalog API for DB-backed list/detail/filter/collection routes.
+- Public web integration for homepage/search/category/event/detail surfaces.
+- Admin mutations, publish-state updates, and audit surfaces.
+- Admin route cleanup and catalog management pages.
+- Admin original/preview tunnels.
+- Admin filters and subscription controls.
+- Homepage/search/client route UX.
+- Asset detail page with preview, metadata, Fotobox, and gated actions.
+- Subscriber download foundation with same-origin web route and internal API route.
+- Fotobox and download history account pages plus internal API routes.
+- URL-driven search filters.
+- API routing audit in `apps/api/docs/api-routing-audit.md`.
+- PR-19 Hono shell for `/health` and subscriber download/check routes.
+- PR-20 context documentation populated in `context/*` and root `AGENTS.md` updated.
+- PR-21 centralized web internal API client in `apps/web/src/lib/server/internal-api` and migrated subscriber download, account/Fotobox/download-history, and admin catalog helpers to it.
+- PR-19.1 improved subscriber download preflight/no-refresh UX, aligned asset detail auth state with the canonical app-user helper, and relaxed internal download UUID validation to canonical UUID shape.
+- PR-22 migrated internal account Fotobox and download-history routes to Hono-native route modules and removed their manual `index.ts` router blocks.
+- PR-23 migrated internal admin routes to Hono-native route modules and removed their manual `index.ts` router blocks.
+- PR-24 migrated public catalog routes to Hono-native route modules and removed their manual `index.ts` router blocks.
+- PR-25 migrated the public media preview route to a Hono-native route module and removed its manual `index.ts` router block.
+- PR-26 isolated legacy/fixture routes in a Hono route module and shrank `apps/api/src/index.ts` to a thin Hono entrypoint.
+- PR-27 added `apps/api/docs/runtime-smoke-tests.md` and `npm --prefix apps/api run smoke:hono-routes` for repeatable route smoke coverage after the Hono migration.
+- Landing page revamp with new hero design and Events grid, including `/api/v1/assets/events` API route.
+- Landing page category section with interactive tabs for Creative, Editorial, Video, and Collections.
+- Search page UI/UX revamp with fixed-on-scroll Getty-inspired Fotocorp search/filter band, URL-backed filter panel, masonry grid/card views, stronger grid hover copy, bottom-left save actions, and no duplicate header search bar.
+- Search page sticky behavior and masonry layout stability tightened: header scrolls away on search, the search/filter shell uses native top-of-viewport sticky positioning, and grid cards reserve preview aspect ratio before images load.
+- Search page search-row polish: smaller archive search input, softer shared row dividers, and no heavy input focus border treatment.
+- PR addendum: wiped legacy Better Auth users and user-linked test state on the Neon Development branch only, preserving catalog, media, import, category, event, and photographer data.
+- Replaced OAuth-oriented Better Auth foundation with API-owned Hono auth routes for email/password plus username auth, removed Google/social provider config and UI paths, and added username columns/constraints on the Development branch.
+- Added internal business-email validation for signup with hardcoded exact-email allowlist, email/domain overrides, free/disposable domain blocking, DNS-over-HTTPS MX checks, domain verdict caching, public pre-validation route, and Better Auth before-hook enforcement.
+- Added `fotocorp_user_profiles` for registration metadata outside Better Auth core tables, wired signup profile validation/creation through Better Auth hooks, and added `GET /api/v1/auth/me` through Hono.
+- Wired `apps/web` `/sign-in` split auth UI to Better Auth email/username sign-in and profile-aware registration, added debounced/blur business-email precheck UX against `/api/v1/auth/business-email/validate`, standardized auth redirects on `/sign-in`, and converted legacy `/auth/sign-in` + `/auth/sign-up` pages to compatibility redirects.
+- Fixed duplicate React key collisions in the `/sign-in` phone country-code select by deduplicating country options by `iso2 + callingCode` before rendering.
+- Added `context/backend-reference-architecture.md` as the backend north-star document for request lifecycle, module structure, validation, response normalization, and Fotocorp-specific invariants.
+- Added API request context middleware (`requestId`, request metadata, request-scoped db when available) and request-id-aware global Hono error/not-found responses.
+- Added shared route method guard helper at `apps/api/src/lib/route-errors.ts`.
+- Migrated Fotobox route ownership into `apps/api/src/modules/fotobox/{route,service,validators}.ts` with route-entry validation via `@hono/zod-validator`.
+- Added `apps/api/src/routes/hono/internalDownloadRoutes.ts` so subscriber download routes now share route-level internal auth middleware and param validation before existing business handlers.
+- Added same-origin web proxy route `apps/web/src/app/api/auth/business-email/validate/route.ts` and switched client business-email checks to this BFF route.
+- Fixed local Better Auth signup runtime failure in the API Worker by enabling `nodejs_compat` in `apps/api/wrangler.jsonc`, resolving missing `node:async_hooks` module errors seen on `POST /api/auth/sign-up/email`.
+- Improved `/sign-in` registration UX in `apps/web/src/components/auth/split-auth-page.tsx`: server-side signup validation failures now map to field-level inline errors (including caught fetch failures), and required auth/registration inputs now render `*` markers.
+- Fixed API signup validation edge case in `apps/api/src/routes/auth/services/business-email-validation.ts` where exact-email allowlist decisions omitted `domain`; Better Auth `/sign-up/email` now accepts allowlisted emails instead of throwing `ALLOW_BY_EMAIL_OVERRIDE` as a `400 BAD_REQUEST`.
+- Set `apps/api/wrangler.jsonc` Worker runtime limit `limits.cpu_ms=30000` to prevent remote/deployed auth signup password-hash flows from hitting Cloudflare `1102 Worker exceeded resource limits` during `POST /api/auth/sign-up/email`.
+- Hardened auth error UX in `apps/web/src/components/auth/split-auth-page.tsx` so Better Auth codes (`USERNAME_IS_ALREADY_TAKEN`, `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL`, `MISSING_OR_NULL_ORIGIN`) and network failures no longer surface as raw `Failed to fetch`; users now see clear field-level/signup notices.
+- Fixed signup `400 BAD_REQUEST` frontend handling in `apps/web/src/components/auth/split-auth-page.tsx` by parsing nested Better Auth/API error payloads (`code`, `message`, `status`) and mapping registration validation codes/messages to user-safe inline field notices instead of the generic connectivity fallback.
+- Hardened sign-in error handling in `apps/web/src/components/auth/split-auth-page.tsx` by adding `try/catch` around Better Auth sign-in calls, normalizing thrown errors through shared humanized messaging, mapping credential failures to inline `identifier/password` errors, and preserving clear fallback notices instead of uncaught `Failed to fetch`.
+- Hardened Worker auth DB request safety: removed cached Better Auth instances in `apps/api/src/auth/auth.ts` and replaced pooled cross-request profile upsert queries in `apps/api/src/auth/appUserProfiles.ts` with request-safe `createHttpDb` queries to prevent Cloudflare `Cannot perform I/O on behalf of a different request` failures on auth routes.
+- Added legacy fixture route disable policy via `LEGACY_FIXTURE_ROUTES_ENABLED` in `apps/api/src/routes/hono/legacyFixtureRoutes.ts`.
+- Migrated Fotobox and download-history business logic out of `apps/api/src/routes/internalAccount.ts` into module services under `apps/api/src/modules/fotobox` and `apps/api/src/modules/account-downloads`, then deleted `apps/api/src/routes/internalAccount.ts` after all references were removed.
+- Migrated internal admin route orchestration into `apps/api/src/modules/admin-catalog/{service,validators}.ts`, updated `apps/api/src/routes/hono/internalAdminRoutes.ts` to route-entry schema validation, and deleted `apps/api/src/routes/internalAdminCatalog.ts`.
+- Migrated internal subscriber download orchestration into `apps/api/src/modules/downloads/service.ts`, updated `apps/api/src/routes/hono/internalDownloadRoutes.ts` to module services, and deleted `apps/api/src/routes/internalDownloads.ts`.
+- Removed `apps/api/src/routes/hono/*` nesting and moved Hono route ownership under dedicated domain folders in `apps/api/src/routes/{auth,public,internal,legacy}` with updated `honoApp` imports.
+- In the same route-ownership cleanup, moved internal route validators (`account-downloads`, `fotobox`, `admin`) into `apps/api/src/routes/internal/*/validators.ts` to reduce `modules/*` coupling.
+- Completed second pass route-folder consolidation: removed `apps/api/src/modules/*`, moved route-owned services into `apps/api/src/routes/{auth,internal}`, and moved legacy/system single-route files into dedicated folders (`routes/legacy/*`, `routes/system/health`).
+- Rebuilt `apps/web/src/app/(marketing)/assets/[id]/page.tsx` to a Getty-inspired editorial detail information architecture with title/context above the stage, sticky entitlement-first access rail, grouped metadata sections, event-first related grid, and stronger keyword section treatment.
+- Updated `apps/web/src/components/assets/asset-detail-actions.tsx` with explicit access-rail states (`logged-out`, `non-subscriber`, `subscriber`, `profile-unavailable`) plus copy Fotokey/report utility actions while preserving same-origin preflight + hidden-iframe download flow.
+- Enhanced `apps/web/src/components/assets/keyword-chips.tsx` with card styling, keyboard-focus polish, and reversible overflow controls (`Show more` / `Show less`).
+- Fixed a detail-page metadata rendering bug in `apps/web/src/app/(marketing)/assets/[id]/page.tsx` where missing Fotokey data could create duplicate `Asset ID` rows and duplicate React keys; identification rows now use stable row ids and omit duplicate semantics.
+- Corrected Fotokey identity handling on the detail page and access panel: `Fotokey` now maps strictly to legacy image code data (`asset.fotokey`) and no longer falls back to internal `asset.id`; UI now shows unavailable state when legacy code is missing.
+- Reduced outer detail-page container spacing in `apps/web/src/app/(marketing)/assets/[id]/page.tsx` to a tight Getty-like frame (`px-1/1.5/2`, `py-1/2`) per QA request.
+- Fixed public catalog asset mapping so `legacy_imagecode` is selected and returned as `fotokey` from `apps/api/src/lib/assets/public-assets.ts` for both list and detail responses.
+- Upgraded related-content logic on asset detail to sequential fallback using existing APIs (`event -> category -> photographer -> newest`) with deduping/exclusion, and dynamic heading/browse-link source selection.
+- Applied detail-page UX polish per live browser feedback: replaced header `Report issue` link with Fotokey copy action, removed `Asset ID` metadata row, tightened gray stage to 24px image padding, increased displayed preview size, and added left inset to the heading block.
+- Revamped the public photo detail page per `context/feature-specs/04-design-detailed-photo-page.md`: added a compact detail search utility, Getty-inspired title/stage/access information architecture, sticky entitlement-first access rail, mobile-friendly CTA ordering, grouped metadata, stable related preview tiles, and conversion-focused utility actions without exposing storage internals.
+- Updated the asset detail related-preview section to reuse `PublicAssetMosaic`, aligning “More from this event” image presentation with the shared mosaic/card styling used across public catalog surfaces.
+- Revamped `AssetDetailActions` to present file-quality tiers to signed-out and signed-in visitors consistently, removed sign-in-first access rail copy, and added an in-rail metadata block (photographer/event/category/image date/created/updated) with public API DTO support for `createdAt` and `updatedAt`.
+- Refined detail-page stage and access rail UX: preview image frame now top-aligns with reduced top padding, removed the rail `Preview/Download/Plan` summary rows, changed metadata heading to `Details` with lighter non-all-caps typography, replaced the preview-link control with a `Download watermark` action, and expanded rail metadata with schema-backed asset fields (`status`, `visibility`, `mediaType`, `source`, `uploadedAt`).
+- Applied follow-up detail-page cleanup: removed the `Protected editorial preview` badge and auxiliary workflow/helper copy blocks, highlighted the Fotokey row with an accent surface, removed rail `Report issue` and rail `Copy Fotokey` actions, switched the watermark action to icon-first button styling, and added rail `Category ID` for stronger category context.
+- Moved asset caption copy from the lower details area into the top asset header so editorial context appears before the image stage, and removed the duplicate lower caption section.
+- Fixed the web same-origin Better Auth proxy so decoded upstream 400 responses no longer retain stale gzip/transport headers; signup validation errors now reach the frontend as structured Better Auth errors instead of fetch/decompression failures.
+- Auth proxy resilience: documented that `/api/auth/*` requires a reachable Worker at `INTERNAL_API_BASE_URL` (repo `pnpm dev` / `pnpm dev:api`, health check `curl http://127.0.0.1:8787/health`), aligned `INTERNAL_API_SECRET` / `BETTER_AUTH_SECRET` notes across `apps/web/.env.example`, `apps/api/.dev.vars.example`, `apps/web/README.md`, and `apps/api/README.md`. `proxyAuthRequest` now catches undici/Node connection failures and returns `502` with `AUTH_UPSTREAM_UNAVAILABLE` instead of an uncaught `TypeError`, with unit coverage for `isUpstreamUnreachableFetchError`.
+- Fixed Better Auth sign-in session-hook failures by aligning `app_user_profiles.id` with the real DB text type and explicitly supplying a profile id during auth profile upserts; the previous code inserted `id = null`, causing Postgres `23502` failures after successful credentials.
+- DB Revamp PR-01 added a clean `photographers` table, added typed `assets.legacy_photographer_id`, backfilled canonical `assets.photographer_profile_id`, added photographer normalization validation, and kept legacy `assets` / `photographer_profiles` tables in place without deletes or renames.
+- DB Revamp PR-02 added clean `photo_events` and `image_assets` tables, preserved old UUIDs from `asset_events` / `assets`, backfilled photographer and event links, added image-asset normalization validation, and kept API reads, derivatives, and download logs on old tables for later PRs.
+- DB Revamp PR-03 added clean `image_derivatives`, preserved derivative UUIDs from `asset_media_derivatives`, normalized variants to uppercase, added provider-neutral `storage_key`, and kept media routes, access logs, and download logs on old tables for later PRs.
+- DB Revamp PR-04 added clean `image_access_logs` and `image_download_logs`, preserved old log UUIDs, backfilled current access/download history, added image-log validation, and kept API/media/download writes on old log tables for later PRs.
+- DB Revamp PR-05 switched public catalog/search/detail, public media preview, subscriber download, account download history, and Fotobox image joins to clean image tables; media/download runtime logs now write `image_access_logs` and `image_download_logs`, with legacy import/admin compatibility paths deferred.
+- DB Revamp PR-06 switched internal admin catalog runtime reads and writes to clean image schema: admin list/detail/stats/filters/preview/original now read `image_assets`, `photo_events`, `photographers`, and `image_derivatives`, while editorial and publish-state mutations write `image_assets`.
+- DB Revamp PR-07 added an idempotent `legacy:sync-clean-schema` pipeline (photographers → photo_events → image_assets → image_derivatives) so legacy imports that write old tables can refresh clean tables, plus `db:validate:clean-sync`, chunked-import auto-sync (with `--no-sync-clean-schema` / `--sync-even-if-issues` overrides), and [`docs/db-revamp/reports/clean-schema-import-sync-report.md`](../docs/db-revamp/reports/clean-schema-import-sync-report.md).
+- DB Revamp PR-08 added `photographer_accounts` (FK to `photographers`, deterministic `ph_` usernames, scrypt `password_hash`, `must_change_password`), CLI `photographers:generate-accounts` with CSV export, `db:validate:photographer-accounts`, scrypt helpers, and [`docs/db-revamp/reports/photographer-accounts-report.md`](../docs/db-revamp/reports/photographer-accounts-report.md) (portal login/session deferred).
+- DB Revamp PR-09 added the photographer portal auth/session boundary: Worker-compatible `$scrypt$` verification via `@noble/hashes`, `photographer_sessions`, `fc_ph_session`, login/logout/me/change-password routes, a protected `/api/v1/photographer/images` ownership route, `db:validate:photographer-auth`, `smoke:photographer-auth`, and [`docs/db-revamp/reports/photographer-auth-boundary-report.md`](../docs/db-revamp/reports/photographer-auth-boundary-report.md) (full dashboard UI deferred).
+- DB Revamp PR-10 added the initial photographer portal web UI: same-origin `/api/photographer/*` proxy, portal login, forced password-change page, protected shell, dashboard overview, photographer-scoped image list, logout flow, and [`docs/db-revamp/reports/photographer-portal-ui-report.md`](../docs/db-revamp/reports/photographer-portal-ui-report.md).
+- Photographer portal: removed the `mustChangePassword` navigation trap (shell `useEffect` redirect, `requirePhotographerPasswordReady` server redirects, and login/post-login steering to `/photographer/change-password` only); users land on the dashboard and can browse all portal routes while a banner still prompts password update when the flag is set.
+- PR-10.1 fixed photographer login `Set-Cookie` propagation: Hono routes now use `c.json` so `fc_ph_session` is included on login; the web proxy forwards `Set-Cookie` via `getSetCookie`; smoke test reads cookies with `getSetCookie` when present.
+- DB Revamp PR-11 added photographer dashboard analytics: `GET /api/v1/photographer/analytics/summary` (session-scoped summary, top downloaded images with at least one completed log, recent uploads), portal dashboard stat cards and sections, `db:validate:photographer-analytics`, `smoke:photographer-analytics`, and [`docs/db-revamp/reports/photographer-analytics-report.md`](../docs/db-revamp/reports/photographer-analytics-report.md).
+- PR-11.1 marks successful subscriber downloads as `COMPLETED` in `image_download_logs` (after `STARTED`, when the attachment response is prepared), updates account download history to include `COMPLETED`, extends photographer analytics validation, and documents semantics in [`docs/db-revamp/reports/download-completion-logging-report.md`](../docs/db-revamp/reports/download-completion-logging-report.md).
+- PR-12 added photographer event provenance on `photo_events`, portal list/create/edit APIs and UI (`/photographer/events`), `db:validate:photographer-events`, `smoke:photographer-events`, and [`docs/db-revamp/reports/photographer-events-report.md`](../docs/db-revamp/reports/photographer-events-report.md) (bulk upload and admin approval still deferred).
+- PR-13 added photographer bulk upload **backend** foundation: `photographer_upload_batches` / `photographer_upload_items`, `image_assets` status `SUBMITTED` + initial `source` wiring (later **PR-14.1** sets `source = FOTOCORP` for catalog ownership), session-scoped upload APIs (batch CRUD-ish, prepare files, complete, submit), R2 presigned PUT helper + storage key namespace, `db:validate:photographer-uploads`, `smoke:photographer-uploads`, and [`docs/db-revamp/reports/photographer-bulk-upload-backend-report.md`](../docs/db-revamp/reports/photographer-bulk-upload-backend-report.md). Upload UI polish, admin live selection, and derivative generation for these assets remain deferred.
+- PR-13.1 hardened upload verification and smoke: `complete` can use S3 `HeadObject` when the Worker R2 binding is missing (local/Node parity with presigned PUT); smoke script supports `PHOTOGRAPHER_UPLOAD_SMOKE_REAL_R2=1` for PUT → complete → submit + DB assertions; `.dev.vars.example` and bulk-upload doc updated with env checklist and **R2 CORS** dashboard guidance for PR-14 browser uploads.
+- PR-14 added photographer **bulk upload UI**: `/photographer/uploads`, `/photographer/uploads/new`, `/photographer/uploads/[batchId]`; shell **Uploads** nav; dashboard upload card; client flow (event from `scope=available`, optional common metadata, drag/drop + picker, chunked prepare, browser PUT to signed URL without persisting URLs, complete + separate submit); API helpers in `photographer-api.ts`; [`docs/db-revamp/reports/photographer-bulk-upload-ui-report.md`](../docs/db-revamp/reports/photographer-bulk-upload-ui-report.md). Admin approval UI and derivatives still deferred.
+- PR-14.1 normalized photographer-uploaded **`image_assets.source`** to **`FOTOCORP`** (SUBMITTED + PRIVATE unchanged); upload provenance remains `photographer_upload_batches` / `photographer_upload_items`; migration backfills legacy `PHOTOGRAPHER_UPLOAD` rows; validation/smoke/docs updated. **`PHOTOGRAPHER_UPLOAD` is not written to `image_assets.source` going forward** (constraint may still list it as deprecated).
+- PR-15 added admin submitted photographer upload review queue: `GET /api/v1/internal/admin/photographer-uploads` (filters by status/event/photographer/batch/search/date/pagination), `GET .../:imageAssetId/original` (protected admin original tunnel, FOTOCORP+upload-linked only, no key/URL leakage), `POST .../approve` (bulk SUBMITTED+PRIVATE+FOTOCORP → ACTIVE+PUBLIC), same-origin admin proxies (`/admin/photographer-uploads/[imageAssetId]/original`, `/api/admin/photographer-uploads/approve`), admin UI page `/admin/photographer-uploads` with filters/table/review modal/bulk approve, sidebar nav link, `db:validate:admin-photographer-upload-review`, `smoke:admin-photographer-upload-review`, and [`docs/db-revamp/reports/admin-photographer-upload-review-report.md`](../docs/db-revamp/reports/admin-photographer-upload-review-report.md). Derivative generation, reject/delete, and approval audit/provenance remain deferred.
+- Fix: removed `/photographer/:path*` from the `apps/web/src/proxy.ts` middleware matcher. The Better Auth middleware was redirecting unauthenticated visitors of `/photographer/*` (including `/photographer/login` itself) to `/sign-in` even though the photographer portal uses its own `fc_ph_session` cookie. Photographer auth remains enforced by the photographer portal layout via `requirePhotographerPortalSession()`, which redirects to `/photographer/login`.
+- Refactor: consolidated photographer routes under `apps/web/src/app/photographer/` using inner route groups. Public auth pages live in `photographer/(auth)/` (no shell, no auth) and authenticated portal pages live in `photographer/(portal)/` (auth-gated layout that wraps `PhotographerShell`). The old top-level `apps/web/src/app/(photographer-auth)/` route group was removed; `/photographer/*` URLs are unchanged.
+- PR-15.1 introduced the photographer publish pipeline with Fotokey + staging bucket. Photographer upload presigned PUT now targets the new staging bucket (`fotocorp-2026-contributor-uploads`, binding `MEDIA_CONTRIBUTOR_UPLOADS_BUCKET`) under `staging/...`; canonical originals bucket holds Fotokey-named originals only. Added Fotokey columns on `image_assets` (`fotokey`, `fotokey_date`, `fotokey_sequence`, `fotokey_assigned_at`), allowed `APPROVED` status, added `fotokey_daily_counters` for transactional sequence allocation, and added `image_publish_jobs` / `image_publish_job_items` tables (migration `0021_complex_ikaris.sql`). Added `apps/api/src/lib/fotokey/{allocator,canonical-key}.ts`, R2 staging helpers in `apps/api/src/lib/r2-photographer-uploads.ts`, and a hard-delete guard at `apps/api/src/lib/assets/asset-delete-guard.ts` (error `ASSET_HAS_FOTOKEY`). Patched `POST /api/v1/internal/admin/photographer-uploads/approve` to allocate Fotokeys in admin input order, copy originals from staging → canonical bucket as `FCddmmyyNNN.<ext>` (`jpeg → jpg`), set `image_assets` to `APPROVED + PRIVATE` with Fotokey + canonical filename, and queue `image_publish_jobs`/items. Added the publish processor `apps/api/scripts/media/process-image-publish-jobs.ts` (variants `THUMB`/`CARD`/`DETAIL`, watermarked WebPs into `previews/watermarked/<variant>/<fotokey>.webp`) — only after all required derivatives are `READY` does the asset become `ACTIVE + PUBLIC`. Updated admin UI copy to "Approve & Queue Publish" with derivative-aware messaging and added the `APPROVED` status filter + Fotokey column. Added `db:validate:fotokey-publish` (`apps/api/scripts/db/validate-fotokey-publish-pipeline.ts`) and `smoke:fotokey-publish` (`apps/api/scripts/smoke/check-fotokey-publish-pipeline.ts`). Hard delete on Fotokey-bearing assets is blocked at the code level (no hard-delete endpoint exists today). Existing PR-15 validators were extended to allow the new `APPROVED+PRIVATE` lifecycle. See [`docs/db-revamp/reports/fotokey-publish-pipeline-report.md`](../docs/db-revamp/reports/fotokey-publish-pipeline-report.md).
+- Contributor domain rename (clean schema + runtime): follow-up pass aligned remaining web contributor components (`ContributorEvent*`, `ContributorUploadFlow`, `ChangeContributorPasswordForm`), admin contributor-upload filters (`filters.contributors`), approve BFF (`approveAdminContributorUploads`), and internal admin asset PATCH (`contributorId` in validators, route body, and `adminAssetUpdateService`); `pnpm exec tsc --noEmit` passes in `apps/web` and `apps/api`. Legacy import tables and historical PR bullets above still describe the original photographer naming where accurate.
+- Contributor login `500` on a fresh DB branch: root cause was migration `0022_contributor_domain_rename` not applied (`relation "contributor_accounts" does not exist`); run `pnpm run db:migrate` from `apps/api` (documented in `apps/api/README.md`).
+- Contributor portal routes moved from `apps/web/src/app/(marketing)/contributor/` to `app/(contributor)/contributor/` with a dedicated `(contributor)/layout.tsx` so `/contributor/*` no longer inherits the marketing `Header`/`Footer` (URLs unchanged).
+- **PR-16C — Staff auth separation:** Added `staff_accounts`, `staff_sessions`, `staff_audit_logs` (migration `0024_staff_auth.sql`); Hono staff auth routes `POST/GET /api/v1/staff/auth/login|logout|me` with HttpOnly cookie `fotocorp_staff_session`; web `/staff/login` + `/staff/dashboard`, same-origin `/api/staff/*` proxy; `/admin/*` protected by `requireStaff()` (no Better Auth admin gate); internal admin BFF uses `getStaffInternalAdminActorHeaders()`; admin shell logout calls staff API; marketing header shows staff tools when `staffBrief` is present; bootstrap CLI `pnpm --dir apps/api staff:bootstrap`. Docs: `docs/db-revamp/staff-auth-runbook.md`, report `docs/db-revamp/reports/pr-16c-staff-auth-separation-report.md`; `context/architecture.md` + `apps/api/docs/api-routing-audit.md` updated.
+
+## In Progress
+
+- Runtime QA for subscriber download attachment, quota increment, and download log creation.
+- Full subscriber download runtime E2E (authenticated active subscriber + attachment + quota + `image_download_logs` `COMPLETED`) is still pending.
+- Manual browser smoke for the contributor portal with a real generated CSV credential is pending; automated DB/API/web checks pass and HTTP contributor login smoke is skipped until smoke credentials are provided.
+
+## Next Up
+
+1. Verify subscriber download runtime E2E with an active subscriber and downloadable asset.
+2. Run manual photographer portal smoke with one generated credential row and no password disclosure.
+3. PR-15.1 ships the Fotokey publish pipeline (staging bucket, Fotokey allocator, `image_publish_jobs/items`, derivative processor, hard-delete guard); next slice runs the publish processor against real approvals and verifies derivatives + go-live end-to-end.
+4. Decide whether to delete, disable, or redirect legacy fixture routes after usage is verified.
+5. Add request-context middleware and response envelope metadata for JSON routes.
+
+## Known Bugs and Technical Debt
+
+- Asset detail auth state now uses the same canonical app-user helper as the marketing shell; verify in browser with real session state.
+- `INVALID_ASSET_ID` was traced to API route-param validation. The internal download route now accepts canonical UUID shape instead of only UUID versions 1-5.
+- Download button failures now use same-origin preflight and inline errors before hidden-iframe attachment start; direct URL navigation can still redirect for direct route access.
+- Full subscriber download E2E is pending.
+- `apps/api/src/index.ts` is now thin; legacy/fixture routes are isolated but still exist.
+- `apps/api/docs/runtime-smoke-tests.md` documents manual smoke commands, but full curl/browser QA still requires running local API and web servers.
+- Live QA rerun completed on 2026-05-07: API and web sampled routes returned expected statuses (`/health` 200, `/api/v1/assets` 200, unknown route 404, internal no-secret 401, web `/api/fotobox` logged-out 401).
+- Same-origin web business-email route returned `500` in the current local web server session; environment alignment for `NEXT_PUBLIC_API_BASE_URL` remains to be verified.
+- Same-origin Better Auth signup proxy previously returned decoded JSON with a stale `content-encoding: gzip` header, causing frontend fetch clients to throw `incorrect header check` and show a generic connectivity error; fixed in `apps/web/src/app/api/auth/[...all]/route.ts` with sanitized proxy headers.
+- Better Auth sign-in can fail after credentials pass if auth profile upsert code omits `app_user_profiles.id`; the live DB has `id text not null` with no default, so auth hooks must provide an id explicitly.
+- Internal admin routes are module-service owned under `apps/api/src/routes/internal/admin`; catalog data logic remains in `apps/api/src/lib/assets/admin-catalog.ts` and now uses clean image schema for runtime catalog operations. User data logic remains in `apps/api/src/lib/users/internal-admin-users.ts`.
+- Privileged internal API route construction is centralized, but future internal route changes must keep `apps/web/src/lib/server/internal-api/routes.ts` updated.
+- Public API base fallback has been removed from migrated privileged web internal helpers; keep safety greps in future PRs.
+- Legacy fixture routes still coexist with DB-backed `/api/v1` routes.
+- Better Auth route handling now lives in `apps/api` under `/api/auth/*`; `apps/web` keeps only auth UI, a same-origin proxy, and server-side session helpers.
+- Email verification and password reset email delivery are TODOs until a production mailer abstraction exists; the config is isolated in the auth modules and does not fake email delivery.
+- `app_user_profiles.id` real DB type is known to be text and must be verified/aligned before adding new references.
+
+## Open Questions
+
+- Exact production payment/checkout model and provider.
+- Final photographer upload/review/report workflow scope.
+- Final caption writer workflow scope.
+- Full legacy sitemap parity requirements for event/album browsing and published/unpublished event workflows.
+- Semantic/vector search provider and indexing strategy for a future phase.
+- Final operational policy for quota resets, subscription plan IDs, and download sizes.
+
+## Architecture Decisions
+
+- BFF pattern is valid: browser calls same-origin `apps/web` routes, and web server routes call internal `apps/api` routes.
+- `apps/api` owns DB/R2/catalog/media/download business logic.
+- Better Auth route handling is API-owned and Hono-mounted; web auth endpoints should remain same-origin proxies/session helpers.
+- Subscriber is an entitlement, not a role.
+- Fotokey/ImageCode is business identity; internal UUID is database identity.
+- Hono migration is incremental.
+- Internal API client and route construction must be centralized.
+- `apps/web/src/lib/server/internal-api` is the canonical web internal API contract layer for base URL, secret, route builders, JSON fetch, stream fetch, error parsing, and safe diagnostics.
+- Public catalog search is Phase 1 metadata/keyword search. Semantic/vector/AI search is future.
+- Public previews must be watermarked derivatives.
+- Clean originals must only flow through subscriber/admin server-side tunnels.
+- Legacy originals must not be renamed or moved unless mapping safety is proven.
+- Photographer normalization uses numeric legacy IDs only; name matching and `tempphotographer` are not valid primary mapping sources.
+- `photo_events.id` and `image_assets.id` preserve old table UUIDs during the DB revamp; category cleanup and clean import sync remain deferred.
+- `image_derivatives.id` preserves old derivative UUIDs; public media routes now read clean derivatives.
+- `image_access_logs.id` and `image_download_logs.id` preserve old log UUIDs; API/media/download runtime writes now target clean log tables.
+- Admin route URLs still use `/assets` for compatibility, but admin catalog runtime data operations now use `image_assets` and related clean image tables.
+
+## Session Notes
+
+- Context files live in `context/`.
+- Root `AGENTS.md` tells Codex to read all six context files before implementation.
+- Use `apps/api/docs/api-routing-audit.md` as the active route inventory before API routing work.
+- Use `apps/api/docs/runtime-smoke-tests.md` for the repeatable route smoke checklist after routing changes.
+- Hono currently handles all API route groups.
+- `npm --prefix apps/api run smoke:hono-routes` passed in PR-27 and covers route-level Hono dispatch basics without real DB/R2/auth data.
+- Public catalog route declarations now live in `apps/api/src/routes/hono/publicCatalogRoutes.ts`; reusable catalog query/DTO logic remains in `apps/api/src/lib/assets/public-assets.ts`.
+- Public media preview route declaration now lives in `apps/api/src/routes/hono/publicMediaRoutes.ts`; secure preview delivery logic remains in `apps/api/src/routes/secureMedia.ts`.
+- Legacy fixture route declarations now live in `apps/api/src/routes/hono/legacyFixtureRoutes.ts`; the underlying fixture/provisional handlers remain in `apps/api/src/routes/assets.ts`, `search.ts`, `media.ts`, and `admin.ts`.
+- Internal account route parsing now lives in `apps/api/src/routes/hono/internalAccountRoutes.ts`; reusable account business/query logic now lives in module services under `apps/api/src/modules/fotobox` and `apps/api/src/modules/account-downloads`.
+- Internal admin route declarations now live in `apps/api/src/routes/hono/internalAdminRoutes.ts`; reusable route orchestration now lives in `apps/api/src/modules/admin-catalog`.
+- Legacy routes such as `/assets`, `/search`, `/admin/assets`, `/admin/ingestion/runs`, and legacy `/media/*` are fixture/legacy surfaces and should not be treated as the production catalog contract.
+- Internal API cleanup now lives in `apps/web/src/lib/server/internal-api`; keep existing compatibility imports stable unless a focused cleanup PR moves callers.
+- Do not claim subscriber downloads are fully working until runtime QA verifies the same-origin route, internal API route, entitlement checks, quota behavior, and stream delivery.
+- PR-27 could not perform full curl/browser runtime QA because no API server was listening on `127.0.0.1:8787` and no web server was listening on `127.0.0.1:3000`.
+- Neon Development branch auth reset: inspected public tables and FKs to `public."user"` first, then deleted user-linked `asset_download_logs`, `asset_fotobox_items`, `app_user_profiles`, `session`, `verification`, `account`, and `user` rows in an ordered transaction. Post-wipe verification returned zero rows for Better Auth tables and app/user-linked test tables.
+- Better Auth route ownership now lives in `apps/api/src/routes/hono/authRoutes.ts`; `apps/web/src/app/api/auth/[...all]/route.ts` is only a same-origin proxy for browser auth requests.
+- Business-email pre-validation lives at `POST /api/v1/auth/business-email/validate`; do not treat it as the security boundary because Better Auth signup calls the same validation service in its before hook.
+- Registration profile fields live in `fotocorp_user_profiles`, keyed by Better Auth `user.id`; the table was created on the Neon Development branch only and verified with zero initial rows.

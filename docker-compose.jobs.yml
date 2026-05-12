@@ -1,0 +1,30 @@
+# Private Fotocorp jobs worker (Node + Sharp). No published ports.
+# Copy apps/jobs/.env.production.example → apps/jobs/.env.production on the VPS.
+#
+# Build (repo root):
+#   docker compose -f docker-compose.jobs.yml build fotocorp-jobs
+#
+# Optional: pass the same file to Compose for variable interpolation in this file.
+# Container env is loaded via `env_file` below.
+
+services:
+  fotocorp-jobs:
+    build:
+      context: .
+      dockerfile: apps/jobs/Dockerfile
+    image: fotocorp-jobs:latest
+    container_name: fotocorp-jobs
+    restart: unless-stopped
+    env_file:
+      - apps/jobs/.env.production
+    environment:
+      NODE_ENV: production
+      MALLOC_ARENA_MAX: "2"
+      UV_THREADPOOL_SIZE: "2"
+      IMAGE_PUBLISH_WORKER_CONCURRENCY: "1"
+      IMAGE_PUBLISH_POLL_INTERVAL_MS: "15000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,48 @@
+# keep Neon credentials secure: do not expose them to client-side code
+DATABASE_URL=postgresql://user:password@host:5432/database
+
+# Better Auth is mounted by this Worker under /api/auth/*.
+# Must match BETTER_AUTH_SECRET in apps/web `.env.local` (same DB + same secret for session cookies).
+BETTER_AUTH_SECRET=replace-with-at-least-32-characters
+BETTER_AUTH_URL=http://localhost:3000
+FOTOCORP_SUPER_ADMIN_EMAIL=admin@example.com
+
+# Required for signed preview URLs. Store real values in .dev.vars or Wrangler secrets.
+MEDIA_PREVIEW_TOKEN_SECRET=replace-with-at-least-32-random-characters
+MEDIA_PREVIEW_TOKEN_TTL_SECONDS=1800
+# Must match apps/web `.env.local` INTERNAL_API_SECRET. Web proxies /api/auth/* and internal routes here.
+INTERNAL_API_SECRET=replace-with-long-random-internal-secret
+
+# Runtime media delivery uses Worker R2 bindings in wrangler.jsonc:
+# - MEDIA_PREVIEWS_BUCKET for watermarked derivatives
+# - MEDIA_ORIGINALS_BUCKET for canonical Fotokey originals (admin tunnel + subscriber download)
+# - MEDIA_CONTRIBUTOR_UPLOADS_BUCKET for photographer pre-approval staging objects (PR-15.1+)
+# Node scripts use S3-compatible R2 credentials. Keep these server-side only.
+#
+# Bucket separation (PR-15.1):
+# - Photographer browser PUT presigned URLs sign against CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET ONLY.
+# - Canonical originals bucket holds Fotokey-named files (FCddmmyyNNN.<ext>) at root and is written
+#   server-side via R2 CopyObject during admin approval.
+# - Browser CORS is required on the photographer staging bucket (NOT on the canonical originals bucket).
+#   See ../../docs/db-revamp/reports/photographer-bulk-upload-backend-report.md for the dashboard CORS instructions.
+CLOUDFLARE_R2_ACCOUNT_ID=
+CLOUDFLARE_R2_ACCESS_KEY_ID=
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=
+CLOUDFLARE_R2_REGION=auto
+CLOUDFLARE_R2_ORIGINALS_BUCKET=fotocorp-2026-megafinal
+CLOUDFLARE_R2_PREVIEWS_BUCKET=fotocorp-2026-previews
+CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET=fotocorp-2026-contributor-uploads
+
+# Optional: bootstrap first staff user (never commit real passwords)
+# STAFF_BOOTSTRAP_USERNAME=super.admin
+# STAFF_BOOTSTRAP_PASSWORD=
+# STAFF_BOOTSTRAP_DISPLAY_NAME=Super Admin
+# STAFF_BOOTSTRAP_ROLE=SUPER_ADMIN
+# PHOTOGRAPHER_SMOKE_USERNAME=ph_000xxx
+# PHOTOGRAPHER_SMOKE_PASSWORD=
+# PHOTOGRAPHER_UPLOAD_SMOKE_REAL_R2=1
+# FOTOKEY_PUBLISH_SMOKE_APPROVE=1
+# ADMIN_PHOTOGRAPHER_UPLOAD_REVIEW_SMOKE_APPROVE=1
+
+# Deprecated: do not use for new code. Use explicit ORIGINALS/PREVIEWS/PHOTOGRAPHER_UPLOADS bucket vars.
+# CLOUDFLARE_R2_BUCKET=

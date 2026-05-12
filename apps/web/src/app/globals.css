@@ -1,0 +1,291 @@
+@import "tailwindcss";
+
+/* ── Design tokens ──────────────────────────────────────────── */
+:root {
+  /* Semantic colors */
+  --background: #ffffff;
+  --foreground: #0d0f1a;
+
+  --card: #ffffff;
+  --card-foreground: #0d0f1a;
+
+  --muted: #ede9e0;
+  --muted-foreground: #6b7280;
+  --foreground-caption: #9ca3af;
+
+  --border: #e5dfd3;
+  --input: #e5dfd3;
+  --ring: #1a2540;
+  --border-subtle: #ede9e0;
+  --border-strong: #c9c0b0;
+
+  --primary: #1a2540;
+  --primary-hover: #131c31;
+  --primary-muted: #263460;
+  --primary-wash: #eef1f8;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f4f5f7;
+  --secondary-foreground: #1a2540;
+
+  --accent: #c07c0a;
+  --accent-hover: #9a6108;
+  --accent-mid: #f0c96b;
+  --accent-wash: #fdf4e3;
+  --accent-foreground: #ffffff;
+
+  --destructive: #b91c1c;
+  --destructive-light: #fef2f2;
+  --destructive-foreground: #ffffff;
+  
+  --copyright: #b91c1c;
+
+  /* Nav surface */
+  --nav: #ffffff;
+  --nav-foreground: #111827;
+
+  /* Marketing surfaces */
+  --surface-warm: #faf8f5;
+  --surface-stone: #f3efe8;
+  --surface-elevated: #ffffff;
+  --hero-tint: #f5f3ff;
+  --foreground-body: #4b5563;
+
+  /* Radius */
+  --radius: 0.5rem;
+  --radius-sm: 0.25rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+.contributor-dark-theme {
+  --background: #0d0f1a;
+  --foreground: #ffffff;
+  --foreground-body: #d1d5db;
+  --foreground-caption: #9ca3af;
+  
+  --card: #131624;
+  --card-foreground: #ffffff;
+  
+  --muted: #1c223a;
+  --muted-foreground: #8f9bb3;
+  
+  --border: #263460;
+  --input: #263460;
+  --ring: #f0c96b;
+  --border-subtle: #1a2540;
+  --border-strong: #38466b;
+  
+  --primary: #ffffff;
+  --primary-hover: #f4f5f7;
+  --primary-foreground: #0d0f1a;
+  
+  --accent-wash: #2d1d04;
+  
+  --nav: #131624;
+  --nav-foreground: #ffffff;
+  
+  --surface-warm: #0a0b12;
+  --surface-stone: #131624;
+  --surface-elevated: #1a2540;
+}
+
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-foreground-caption: var(--foreground-caption);
+
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-muted: var(--primary-muted);
+  --color-primary-wash: var(--primary-wash);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-mid: var(--accent-mid);
+  --color-accent-wash: var(--accent-wash);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-light: var(--destructive-light);
+  --color-destructive-foreground: var(--destructive-foreground);
+  
+  --color-copyright: var(--copyright);
+
+  --color-nav: var(--nav);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-surface-warm: var(--surface-warm);
+  --color-surface-stone: var(--surface-stone);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-hero-tint: var(--hero-tint);
+
+  --font-body: var(--font-monument-grotesk);
+  --font-heading: var(--font-playfair-display);
+  --font-brand: var(--font-monument-grotesk);
+  --font-sans: var(--font-body);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+}
+
+/* ── Base ───────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  border-color: var(--border);
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground-body);
+  font-family: var(--font-body), system-ui, sans-serif;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
+}
+
+p {
+  font-family: var(--font-body), system-ui, sans-serif;
+  color: var(--foreground-body);
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-brand), system-ui, sans-serif;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+
+.fc-display {
+  font-family: var(--font-brand), system-ui, sans-serif;
+  font-size: clamp(2.5rem, 5vw, 4.75rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+
+.fc-heading-1 {
+  font-family: var(--font-brand), system-ui, sans-serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  font-weight: 500;
+}
+
+.fc-heading-2 {
+  font-family: var(--font-brand), system-ui, sans-serif;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}
+
+.fc-heading-3 {
+  font-family: var(--font-brand), system-ui, sans-serif;
+  font-size: clamp(1.25rem, 2.25vw, 1.75rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  font-weight: 500;
+}
+
+.fc-body-lg {
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 1.125rem;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  font-weight: 400;
+}
+
+.fc-body {
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  font-weight: 400;
+}
+
+.fc-body-sm {
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  letter-spacing: -0.004em;
+  font-weight: 400;
+}
+
+.fc-label {
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+}
+
+.fc-caption {
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+.fc-brand {
+  font-family: var(--font-brand), system-ui, sans-serif;
+}
+
+.public-grid-card:hover .public-grid-card-overlay,
+.public-grid-card:focus-within .public-grid-card-overlay {
+  opacity: 1;
+}
+
+.public-grid-card:hover .public-grid-card-overlay p,
+.public-grid-card:focus-within .public-grid-card-overlay p {
+  color: var(--primary-foreground);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* ── Focus ring ─────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
