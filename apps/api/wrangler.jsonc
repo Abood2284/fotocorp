@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fotocorp-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "limits": {
+    "cpu_ms": 30000
+  },
+  "observability": {
+    "enabled": true
+  },
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_ORIGINALS_BUCKET",
+      "bucket_name": "fotocorp-2026-megafinal",
+      "remote": true
+    },
+    {
+      "binding": "MEDIA_PREVIEWS_BUCKET",
+      "bucket_name": "fotocorp-2026-previews",
+      "remote": true
+    },
+    {
+      "binding": "MEDIA_CONTRIBUTOR_UPLOADS_BUCKET",
+      "bucket_name": "fotocorp-2026-contributor-uploads",
+      "remote": true
+    }
+  ],
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@fotocorp/jobs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts --dry-run",
+    "publish:dry-run": "tsx src/index.ts --dry-run",
+    "publish:once": "tsx src/index.ts --once",
+    "publish:worker": "tsx src/index.ts --worker",
+    "smoke:sharp": "tsx scripts/smoke/check-sharp-node.ts",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.39",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.3"
+  }
+}
