@@ -30,6 +30,7 @@ FC + DD + MM + YY + sequence
 
 ## Runtime: API processor vs Node `apps/jobs`
 
-- **Today’s processor CLI** (reads `image_publish_jobs`, writes derivatives): `pnpm --dir apps/api media:process-image-publish-jobs` (see [fotokey-publish-pipeline-report.md](./reports/fotokey-publish-pipeline-report.md) for flags and idempotency).
-- **`apps/jobs`** is a **Node CLI skeleton** (PR-16A): dry-run / once entrypoints, typed env loader, and placeholders for DB + R2 + Sharp. It is **not** a Cloudflare Worker. Native Sharp belongs here (or other Node contexts), not in the Worker bundle.
-- Long-term, heavy Sharp publish work is expected to run from `apps/jobs` (or similar Node infra), with queues and retries added in follow-up PRs.
+- **Today's image processor CLI** (reads `image_publish_jobs`, writes derivatives): `pnpm --dir apps/api media:process-image-publish-jobs` (see [fotokey-publish-pipeline-report.md](./reports/fotokey-publish-pipeline-report.md) for flags and idempotency). This is still the only path that actually generates derivatives and promotes assets to `ACTIVE + PUBLIC`.
+- **`apps/jobs`** is a **Node CLI** (PR-16A skeleton, PR-16E Dockerized for private VPS, PR-16F real DB polling). As of PR-16F it connects to Neon via `pg`, counts queued publish jobs, and — only when explicitly enabled — can safely claim one via `FOR UPDATE SKIP LOCKED`. It is **not** a Cloudflare Worker. Native Sharp belongs here (or other Node contexts), not in the Worker bundle.
+- PR-16F safety flag: **`IMAGE_PUBLISH_PROCESSING_ENABLED`** (default **`false`**). With the default, `apps/jobs` only logs queued counts; it does not claim jobs and does not mutate `image_assets`. With `true`, the worker runs a placeholder lifecycle (items + job → `FAILED` with `failure_code = PROCESSING_NOT_IMPLEMENTED`) for development testing only — no asset goes public.
+- Long-term, heavy Sharp publish work is expected to migrate from the API processor CLI into `apps/jobs`, with retries / DLQ / queues added in follow-up PRs.

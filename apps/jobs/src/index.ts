@@ -1,4 +1,5 @@
 import { loadJobsEnv } from "./config/env"
+import { closeJobsPool } from "./db/client"
 import { ImagePublishJobService } from "./services/imagePublishJobService"
 import { ImagePublishWorker } from "./workers/imagePublishWorker"
 
@@ -47,12 +48,17 @@ async function main() {
   const mode = parseMode(argv)
 
   console.log("[fotocorp-jobs] starting node worker")
-  console.log(`[fotocorp-jobs] mode=${mode}`)
 
   const dryRun = mode === "dry-run"
-  loadJobsEnv(dryRun)
+  const env = loadJobsEnv(dryRun)
 
-  const jobService = new ImagePublishJobService()
+  console.log(
+    `[fotocorp-jobs] mode=${mode} processingEnabled=${env.imagePublishProcessingEnabled}`
+  )
+
+  const skipDbAccess = env.databaseUrl === undefined
+  const jobService =
+    env.databaseUrl !== undefined ? new ImagePublishJobService(env.databaseUrl) : undefined
   const worker = new ImagePublishWorker(jobService)
 
   if (mode === "worker") {
@@ -62,23 +68,39 @@ async function main() {
       `[fotocorp-jobs] worker loop pollIntervalMs=${pollIntervalMs} concurrency=${concurrency} (concurrency reserved for future parallel item processing)`
     )
 
-    for (;;) {
-      try {
-        await worker.runOnce({ dryRun: false })
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error)
-        console.error(`[fotocorp-jobs] worker iteration failed: ${message}`)
-        console.error(error)
-        process.exitCode = 1
-        throw error
-      }
+    try {
+      for (;;) {
+        try {
+          await worker.runOnce({
+            skipDbAccess,
+            dryRun: false,
+            processingEnabled: env.imagePublishProcessingEnabled
+          })
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : String(error)
+          console.error(`[fotocorp-jobs] worker iteration failed: ${message}`)
+          console.error(error)
+          process.exitCode = 1
+          throw error
+        }
 
-      console.log(`[fotocorp-jobs] worker sleeping ${pollIntervalMs}ms`)
-      await sleep(pollIntervalMs)
+        console.log(`[fotocorp-jobs] worker sleeping ${pollIntervalMs}ms`)
+        await sleep(pollIntervalMs)
+      }
+    } finally {
+      await closeJobsPool()
     }
   }
 
-  await worker.runOnce({ dryRun })
+  try {
+    await worker.runOnce({
+      skipDbAccess,
+      dryRun,
+      processingEnabled: env.imagePublishProcessingEnabled
+    })
+  } finally {
+    await closeJobsPool()
+  }
 
   console.log("[fotocorp-jobs] done")
 }
@@ -86,4 +108,7 @@ async function main() {
 main().catch((error: unknown) => {
   console.error(error)
   process.exitCode = 1
+  closeJobsPool().catch(() => {
+    // best-effort cleanup; never mask the original error
+  })
 })

@@ -10,9 +10,10 @@ export interface JobsEnvConfig {
   r2AccountId: string | undefined
   r2AccessKeyId: string | undefined
   r2SecretAccessKey: string | undefined
-  r2PhotographerStagingBucket: string | undefined
+  r2ContributorStagingBucket: string | undefined
   r2OriginalsBucket: string | undefined
   r2PreviewsBucket: string | undefined
+  imagePublishProcessingEnabled: boolean
 }
 
 const ENV_DATABASE_URL = "DATABASE_URL"
@@ -22,6 +23,7 @@ const ENV_R2_SECRET_ACCESS_KEY = "R2_SECRET_ACCESS_KEY"
 const ENV_R2_CONTRIBUTOR_STAGING_BUCKET = "R2_CONTRIBUTOR_STAGING_BUCKET"
 const ENV_R2_ORIGINALS_BUCKET = "R2_ORIGINALS_BUCKET"
 const ENV_R2_PREVIEWS_BUCKET = "R2_PREVIEWS_BUCKET"
+const ENV_IMAGE_PUBLISH_PROCESSING_ENABLED = "IMAGE_PUBLISH_PROCESSING_ENABLED"
 
 const REQUIRED_SERVICE_ENV_NAMES = [
   ENV_DATABASE_URL,
@@ -51,10 +53,30 @@ function listMissingRequiredServiceEnvNames(): string[] {
 }
 
 /**
+ * IMAGE_PUBLISH_PROCESSING_ENABLED is a safety flag. Default is `false`: the worker may
+ * count pending publish jobs but must not claim them and must not mutate DB rows. Set to
+ * `true` only for controlled testing (placeholder lifecycle marks the job FAILED with
+ * `PROCESSING_NOT_IMPLEMENTED`; real Sharp/R2 work lands in a follow-up PR).
+ */
+function readImagePublishProcessingEnabled(): boolean {
+  const raw = readOptionalEnv(ENV_IMAGE_PUBLISH_PROCESSING_ENABLED)
+  if (raw === undefined) return false
+  const normalized = raw.trim().toLowerCase()
+  if (normalized === "true" || normalized === "1" || normalized === "yes") return true
+  if (normalized === "false" || normalized === "0" || normalized === "no") return false
+  console.log(
+    `[fotocorp-jobs] warn: invalid ${ENV_IMAGE_PUBLISH_PROCESSING_ENABLED}=${JSON.stringify(raw)}; using false`
+  )
+  return false
+}
+
+/**
  * Loads typed job configuration from process.env.
  * When dryRun is false, all service placeholders listed below must be present.
  */
 export function loadJobsEnv(dryRun: boolean): JobsEnvConfig {
+  const imagePublishProcessingEnabled = readImagePublishProcessingEnabled()
+
   if (dryRun) {
     const missing = listMissingRequiredServiceEnvNames()
     if (missing.length > 0)
@@ -68,9 +90,10 @@ export function loadJobsEnv(dryRun: boolean): JobsEnvConfig {
       r2AccountId: readOptionalEnv(ENV_R2_ACCOUNT_ID),
       r2AccessKeyId: readOptionalEnv(ENV_R2_ACCESS_KEY_ID),
       r2SecretAccessKey: readOptionalEnv(ENV_R2_SECRET_ACCESS_KEY),
-      r2PhotographerStagingBucket: readOptionalEnv(ENV_R2_CONTRIBUTOR_STAGING_BUCKET),
+      r2ContributorStagingBucket: readOptionalEnv(ENV_R2_CONTRIBUTOR_STAGING_BUCKET),
       r2OriginalsBucket: readOptionalEnv(ENV_R2_ORIGINALS_BUCKET),
-      r2PreviewsBucket: readOptionalEnv(ENV_R2_PREVIEWS_BUCKET)
+      r2PreviewsBucket: readOptionalEnv(ENV_R2_PREVIEWS_BUCKET),
+      imagePublishProcessingEnabled
     }
   }
 
@@ -86,8 +109,9 @@ export function loadJobsEnv(dryRun: boolean): JobsEnvConfig {
     r2AccountId: requireEnv(ENV_R2_ACCOUNT_ID),
     r2AccessKeyId: requireEnv(ENV_R2_ACCESS_KEY_ID),
     r2SecretAccessKey: requireEnv(ENV_R2_SECRET_ACCESS_KEY),
-    r2PhotographerStagingBucket: requireEnv(ENV_R2_CONTRIBUTOR_STAGING_BUCKET),
+    r2ContributorStagingBucket: requireEnv(ENV_R2_CONTRIBUTOR_STAGING_BUCKET),
     r2OriginalsBucket: requireEnv(ENV_R2_ORIGINALS_BUCKET),
-    r2PreviewsBucket: requireEnv(ENV_R2_PREVIEWS_BUCKET)
+    r2PreviewsBucket: requireEnv(ENV_R2_PREVIEWS_BUCKET),
+    imagePublishProcessingEnabled
   }
 }

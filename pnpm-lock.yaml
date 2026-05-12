@@ -88,6 +88,9 @@ importers:
 
   apps/jobs:
     dependencies:
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
@@ -95,6 +98,9 @@ importers:
       '@types/node':
         specifier: ^20.19.39
         version: 20.19.39
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
