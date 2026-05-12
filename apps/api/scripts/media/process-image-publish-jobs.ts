@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /**
- * PR-15.1 — Photographer publish job processor.
+ * PR-15.1 — Publish job processor (Node CLI in apps/api).
+ *
+ * **Production VPS path:** the same derivative + DB semantics are implemented in
+ * `apps/jobs` (`ImagePublishProcessor`) for private Docker workers. Keep this script for
+ * operator backfill / local runs against Neon + R2 when not using the jobs package.
  *
  * Reads queued items from `image_publish_jobs`/`image_publish_job_items`, generates required
  * watermarked WebP derivatives (THUMB/CARD/DETAIL) for each canonical Fotokey original, upserts

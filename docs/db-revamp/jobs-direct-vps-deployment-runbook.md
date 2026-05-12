@@ -7,9 +7,9 @@ This runbook covers running **`apps/jobs`** as a **private** Node worker on an U
 - **Inbound:** none for the worker container (firewall can stay SSH-only).
 - **Outbound:** Neon Postgres, Cloudflare R2, and (later) optional Cloudflare Queues.
 - **Work creation:** staff/admin flows hit **`apps/api`**, which writes publish rows in Neon; **`apps/jobs`** must never be called from **`apps/web`**.
-- **Current CLI behavior (PR-16F):** the worker now polls real `image_publish_jobs` rows from Neon. Behavior is gated by **`IMAGE_PUBLISH_PROCESSING_ENABLED`** (default **`false`**):
+- **Current worker behavior (PR-16F + PR-16G):** the worker polls real `image_publish_jobs` rows from Neon. **`IMAGE_PUBLISH_PROCESSING_ENABLED`** (default **`false`**) gates claiming and processing:
   - `false` → counts queued jobs, logs `processing disabled`, does **not** claim or mutate any row.
-  - `true` → claims one queued job per iteration via `FOR UPDATE SKIP LOCKED`, marks its items + job **`FAILED`** with `failure_code = PROCESSING_NOT_IMPLEMENTED`, never touches `image_assets`. Use only against development data — real Sharp/R2 processing lands in a follow-up PR.
+  - `true` → claims one queued job per iteration via `FOR UPDATE SKIP LOCKED`, runs `ImagePublishProcessor` (Sharp + R2) for contributor IMAGE items, reconciles job status from item outcomes. Assets stay `APPROVED+PRIVATE` until processing succeeds.
 
 ## Prerequisites on the VPS
 
@@ -144,25 +144,21 @@ One-off **`publish:once`** (exits after a single pass):
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs pnpm --dir apps/jobs publish:once
 ```
 
-## Known limitation (until a follow-up PR)
+## Known limitations
 
-`apps/jobs` does **not** perform real Sharp / R2 image processing yet. With `IMAGE_PUBLISH_PROCESSING_ENABLED=false` (the production default) `publish:once` / `publish:worker` only **count** queued publish jobs; they never claim them and never touch `image_assets`. Today's working processor remains the API-side CLI:
+- **Concurrency:** one claimed job per iteration; items processed sequentially (`IMAGE_PUBLISH_WORKER_CONCURRENCY` reserved for future parallel item work).
+- **Automatic retries:** failed job items are not auto-requeued; operators may re-approve or run the API backfill CLI after fixing data/R2.
+- **Backfill CLI:** `pnpm --dir apps/api media:process-image-publish-jobs` remains available for the same Neon + R2 semantics without the Docker worker.
 
-```bash
-pnpm --dir apps/api media:process-image-publish-jobs -- --limit 25
-```
-
-A follow-up PR will move that processor into `apps/jobs` so the VPS worker can produce derivatives natively. Until then, leave `IMAGE_PUBLISH_PROCESSING_ENABLED=false` for any database that contains real staff/contributor work.
-
-## PR-16F safety flag
+## `IMAGE_PUBLISH_PROCESSING_ENABLED`
 
 ```env
-IMAGE_PUBLISH_PROCESSING_ENABLED=false   # default; production-safe
-IMAGE_PUBLISH_PROCESSING_ENABLED=true    # controlled testing only — placeholder lifecycle marks jobs FAILED
+IMAGE_PUBLISH_PROCESSING_ENABLED=false   # default; production-safe (count only, no claims)
+IMAGE_PUBLISH_PROCESSING_ENABLED=true    # VPS: real Sharp + R2 publish after env validation
 ```
 
 The flag is also wired in `docker-compose.jobs.yml` (defaults to `"false"`). When `true`, the worker:
 
 - claims one queued job per iteration using `FOR UPDATE SKIP LOCKED`,
-- marks its items and the job `FAILED` with `failure_code = PROCESSING_NOT_IMPLEMENTED`,
-- does **not** mutate `image_assets`, does **not** promote anything to the public catalog.
+- processes contributor IMAGE `QUEUED` items (see PR-16G report),
+- never flips an asset to `ACTIVE+PUBLIC` until preview objects exist and the DB transaction succeeds.

@@ -30,7 +30,8 @@ FC + DD + MM + YY + sequence
 
 ## Runtime: API processor vs Node `apps/jobs`
 
-- **Today's image processor CLI** (reads `image_publish_jobs`, writes derivatives): `pnpm --dir apps/api media:process-image-publish-jobs` (see [fotokey-publish-pipeline-report.md](./reports/fotokey-publish-pipeline-report.md) for flags and idempotency). This is still the only path that actually generates derivatives and promotes assets to `ACTIVE + PUBLIC`.
-- **`apps/jobs`** is a **Node CLI** (PR-16A skeleton, PR-16E Dockerized for private VPS, PR-16F real DB polling). As of PR-16F it connects to Neon via `pg`, counts queued publish jobs, and — only when explicitly enabled — can safely claim one via `FOR UPDATE SKIP LOCKED`. It is **not** a Cloudflare Worker. Native Sharp belongs here (or other Node contexts), not in the Worker bundle.
-- PR-16F safety flag: **`IMAGE_PUBLISH_PROCESSING_ENABLED`** (default **`false`**). With the default, `apps/jobs` only logs queued counts; it does not claim jobs and does not mutate `image_assets`. With `true`, the worker runs a placeholder lifecycle (items + job → `FAILED` with `failure_code = PROCESSING_NOT_IMPLEMENTED`) for development testing only — no asset goes public.
-- Long-term, heavy Sharp publish work is expected to migrate from the API processor CLI into `apps/jobs`, with retries / DLQ / queues added in follow-up PRs.
+- **Derivative generation** runs in Node with Sharp. **Primary VPS path (PR-16G):** `apps/jobs` with `IMAGE_PUBLISH_PROCESSING_ENABLED=true` claims `image_publish_jobs`, reads originals (canonical bucket first, contributor staging fallback), writes watermarked WebP previews, upserts `image_derivatives`, then promotes `image_assets` to `ACTIVE + PUBLIC` only after all required derivatives succeed.
+- **Backfill / operator CLI:** `pnpm --dir apps/api media:process-image-publish-jobs` (same R2 keys and DB semantics as PR-15.1; see [fotokey-publish-pipeline-report.md](./reports/fotokey-publish-pipeline-report.md)).
+- **`apps/jobs`** is a **Node CLI** (PR-16A skeleton, PR-16E Dockerized for private VPS, PR-16F Neon polling + claim, PR-16G real processing). It is **not** a Cloudflare Worker. Native Sharp belongs here, not in the Worker bundle.
+- Safety flag: **`IMAGE_PUBLISH_PROCESSING_ENABLED`** (default **`false`**). With the default, `apps/jobs` only logs queued counts; it does not claim jobs. With `true` on the VPS, the worker performs real publish processing; keep `false` until R2 + Neon env on the worker is verified.
+- Retries / DLQ / queues remain future work.

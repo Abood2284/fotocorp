@@ -23,10 +23,8 @@ services:
       UV_THREADPOOL_SIZE: "2"
       IMAGE_PUBLISH_WORKER_CONCURRENCY: "1"
       IMAGE_PUBLISH_POLL_INTERVAL_MS: "15000"
-      # PR-16F safety flag: keep false unless intentionally exercising the placeholder
-      # claim/lifecycle path. When false the worker only counts queued publish jobs;
-      # it does not claim them. When true it claims one job, marks all items FAILED
-      # with PROCESSING_NOT_IMPLEMENTED, and never touches image_assets.
+      # PR-16G: set IMAGE_PUBLISH_PROCESSING_ENABLED=true on the VPS only when Neon + R2
+      # env is complete and you want real Sharp publish processing. Default false = count only.
       IMAGE_PUBLISH_PROCESSING_ENABLED: "false"
     logging:
       driver: json-file

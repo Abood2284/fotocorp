@@ -55,8 +55,8 @@ function listMissingRequiredServiceEnvNames(): string[] {
 /**
  * IMAGE_PUBLISH_PROCESSING_ENABLED is a safety flag. Default is `false`: the worker may
  * count pending publish jobs but must not claim them and must not mutate DB rows. Set to
- * `true` only for controlled testing (placeholder lifecycle marks the job FAILED with
- * `PROCESSING_NOT_IMPLEMENTED`; real Sharp/R2 work lands in a follow-up PR).
+ * `true` on the VPS when Sharp + R2 env is configured so the worker claims queued jobs and
+ * runs real contributor IMAGE publish processing (PR-16G).
  */
 function readImagePublishProcessingEnabled(): boolean {
   const raw = readOptionalEnv(ENV_IMAGE_PUBLISH_PROCESSING_ENABLED)

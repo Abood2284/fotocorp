@@ -14,9 +14,11 @@
  * Safety:
  *   - All claim/update work happens inside an explicit transaction with
  *     `FOR UPDATE SKIP LOCKED` so concurrent workers cannot claim the same job.
- *   - This service does not touch `image_assets`; that is reserved for the future
- *     real image-processing PR (Sharp + R2 promotion).
+ *   - PR-16G: `completeSuccessfulPublishItem` updates `image_assets` + `image_derivatives`
+ *     only after the worker has persisted all required preview objects to R2.
  */
+import { PREVIEW_MIME_TYPE } from "../media/publishImageDerivatives"
+import { CURRENT_WATERMARK_PROFILE } from "../lib/watermarkProfile"
 import type { PoolClient, QueryResultRow } from "../db/client"
 import { getJobsPool, withJobsTransaction } from "../db/client"
 
@@ -52,6 +54,32 @@ export interface ClaimedPublishJob {
   items: PublishJobItemRow[]
 }
 
+export interface AssetPublishGateRow {
+  id: string
+  mediaType: string
+  status: string
+  visibility: string
+  source: string
+  fotokey: string | null
+  originalStorageKey: string | null
+  hasContributorUploadItem: boolean
+}
+
+export interface PublishDerivativeRowInput {
+  variant: string
+  storageKey: string
+  width: number
+  height: number
+  byteSize: number
+  checksum: string
+}
+
+export interface CompletePublishItemInput {
+  itemId: string
+  imageAssetId: string
+  derivatives: PublishDerivativeRowInput[]
+}
+
 export interface MarkFailureInput {
   failureCode: string
   failureMessage: string
@@ -82,6 +110,17 @@ interface RawJobItemRow extends QueryResultRow {
   failure_message: string | null
   created_at: Date | string
   started_at: Date | string | null
+}
+
+interface RawGateRow extends QueryResultRow {
+  id: string
+  media_type: string
+  status: string
+  visibility: string
+  source: string
+  fotokey: string | null
+  original_storage_key: string | null
+  has_contributor_upload: boolean
 }
 
 function toDate(value: Date | string): Date {
@@ -127,6 +166,19 @@ function mapItemRow(row: RawJobItemRow): PublishJobItemRow {
     failureMessage: row.failure_message,
     createdAt: toDate(row.created_at),
     startedAt: toNullableDate(row.started_at)
+  }
+}
+
+function mapGateRow(row: RawGateRow): AssetPublishGateRow {
+  return {
+    id: row.id,
+    mediaType: row.media_type,
+    status: row.status,
+    visibility: row.visibility,
+    source: row.source,
+    fotokey: row.fotokey,
+    originalStorageKey: row.original_storage_key,
+    hasContributorUploadItem: Boolean(row.has_contributor_upload)
   }
 }
 
@@ -280,6 +332,208 @@ export class ImagePublishJobService {
       [jobId, input.failureCode, truncate(input.failureMessage, 500)]
     )
     return result.rowCount ?? 0
+  }
+
+  async fetchAssetPublishGate(imageAssetId: string): Promise<AssetPublishGateRow | null> {
+    const pool = getJobsPool(this.databaseUrl)
+    const result = await pool.query<RawGateRow>(
+      `
+        select
+          ia.id::text as id,
+          ia.media_type,
+          ia.status,
+          ia.visibility,
+          ia.source,
+          ia.fotokey,
+          ia.original_storage_key,
+          exists(
+            select 1 from contributor_upload_items cui where cui.image_asset_id = ia.id
+          ) as has_contributor_upload
+        from image_assets ia
+        where ia.id = $1::uuid
+        limit 1
+      `,
+      [imageAssetId]
+    )
+    const row = result.rows[0]
+    if (!row) return null
+    return mapGateRow(row)
+  }
+
+  async markItemRunning(itemId: string): Promise<boolean> {
+    const pool = getJobsPool(this.databaseUrl)
+    const result = await pool.query<{ id: string }>(
+      `
+        update image_publish_job_items
+        set status = 'RUNNING',
+            started_at = coalesce(started_at, now()),
+            updated_at = now()
+        where id = $1::uuid
+          and status = 'QUEUED'
+        returning id
+      `,
+      [itemId]
+    )
+    return Boolean(result.rows[0]?.id)
+  }
+
+  async completeSuccessfulPublishItem(input: CompletePublishItemInput): Promise<void> {
+    await withJobsTransaction(this.databaseUrl, async (client) => {
+      for (const derivative of input.derivatives) {
+        await client.query(
+          `
+            insert into image_derivatives (
+              image_asset_id,
+              variant,
+              storage_key,
+              mime_type,
+              width,
+              height,
+              size_bytes,
+              checksum,
+              is_watermarked,
+              watermark_profile,
+              generation_status,
+              generated_at,
+              source,
+              created_at,
+              updated_at
+            )
+            values (
+              $1::uuid,
+              $2,
+              $3,
+              $4,
+              $5,
+              $6,
+              $7,
+              $8,
+              true,
+              $9,
+              $10,
+              now(),
+              'GENERATED',
+              now(),
+              now()
+            )
+            on conflict (image_asset_id, variant) do update
+            set
+              storage_key = excluded.storage_key,
+              mime_type = excluded.mime_type,
+              width = excluded.width,
+              height = excluded.height,
+              size_bytes = excluded.size_bytes,
+              checksum = excluded.checksum,
+              is_watermarked = true,
+              watermark_profile = excluded.watermark_profile,
+              generation_status = excluded.generation_status,
+              generated_at = excluded.generated_at,
+              source = excluded.source,
+              updated_at = now()
+          `,
+          [
+            input.imageAssetId,
+            derivative.variant,
+            derivative.storageKey,
+            PREVIEW_MIME_TYPE,
+            derivative.width,
+            derivative.height,
+            derivative.byteSize,
+            derivative.checksum,
+            CURRENT_WATERMARK_PROFILE,
+            "READY"
+          ]
+        )
+      }
+
+      const assetUpdate = await client.query(
+        `
+          update image_assets
+          set status = 'ACTIVE',
+              visibility = 'PUBLIC',
+              original_exists_in_storage = true,
+              original_storage_checked_at = now(),
+              updated_at = now()
+          where id = $1::uuid
+            and status = 'APPROVED'
+            and visibility = 'PRIVATE'
+            and fotokey is not null
+          returning id
+        `,
+        [input.imageAssetId]
+      )
+      if ((assetUpdate.rowCount ?? 0) !== 1) {
+        throw new Error("image_assets was not in APPROVED+PRIVATE state; aborted publish completion.")
+      }
+
+      const itemUpdate = await client.query(
+        `
+          update image_publish_job_items
+          set status = 'COMPLETED',
+              failure_code = null,
+              failure_message = null,
+              completed_at = now(),
+              updated_at = now()
+          where id = $1::uuid
+            and status = 'RUNNING'
+          returning id
+        `,
+        [input.itemId]
+      )
+      if ((itemUpdate.rowCount ?? 0) !== 1) {
+        throw new Error("image_publish_job_items was not RUNNING; aborted publish completion.")
+      }
+    })
+  }
+
+  async reconcilePublishJobAggregate(jobId: string): Promise<void> {
+    const pool = getJobsPool(this.databaseUrl)
+    const result = await pool.query<{
+      total: string
+      completed: string
+      failed: string
+      queued: string
+      running: string
+    }>(
+      `
+        select
+          count(*)::text as total,
+          count(*) filter (where status = 'COMPLETED')::text as completed,
+          count(*) filter (where status = 'FAILED')::text as failed,
+          count(*) filter (where status = 'QUEUED')::text as queued,
+          count(*) filter (where status = 'RUNNING')::text as running
+        from image_publish_job_items
+        where job_id = $1::uuid
+      `,
+      [jobId]
+    )
+    const row = result.rows[0]
+    if (!row) return
+    const total = Number(row.total) || 0
+    const completed = Number(row.completed) || 0
+    const failed = Number(row.failed) || 0
+    const queued = Number(row.queued) || 0
+    const running = Number(row.running) || 0
+
+    let status: string
+    if (queued > 0 || running > 0) status = "RUNNING"
+    else if (failed === 0) status = "COMPLETED"
+    else if (completed === 0) status = "FAILED"
+    else status = "PARTIAL_FAILED"
+
+    await pool.query(
+      `
+        update image_publish_jobs
+        set status = $2,
+            total_items = $3,
+            completed_items = $4,
+            failed_items = $5,
+            completed_at = case when $2 in ('COMPLETED', 'FAILED', 'PARTIAL_FAILED') then coalesce(completed_at, now()) else completed_at end,
+            updated_at = now()
+        where id = $1::uuid
+      `,
+      [jobId, status, total, completed, failed]
+    )
   }
 
   /**

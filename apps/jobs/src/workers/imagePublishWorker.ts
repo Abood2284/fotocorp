@@ -5,19 +5,14 @@
  *   - dry-run: read-only count, never claims, never mutates.
  *   - once / worker: gated by `IMAGE_PUBLISH_PROCESSING_ENABLED`.
  *       * disabled (default): logs the queued count and exits without claiming.
- *       * enabled: claims one job via `FOR UPDATE SKIP LOCKED`, marks all of its
- *                  items `FAILED` with `PROCESSING_NOT_IMPLEMENTED`, then marks the
- *                  job `FAILED`. Never touches `image_assets`, never publishes
- *                  anything to the customer-facing catalog.
- *
- * Real Sharp/R2 image processing is intentionally deferred to a follow-up PR; this
- * worker only proves the polling, claiming, and lifecycle plumbing is wired safely.
+ *       * enabled: claims one job via `FOR UPDATE SKIP LOCKED`, runs real Sharp + R2
+ *                  processing for contributor IMAGE items (PR-16G), reconciles job
+ *                  status from item outcomes. Assets stay private until derivatives
+ *                  and DB updates succeed.
  */
+import type { JobsEnvConfig } from "../config/env"
+import { ImagePublishProcessor } from "../services/imagePublishProcessor"
 import type { ImagePublishJobService } from "../services/imagePublishJobService"
-
-export const PROCESSING_NOT_IMPLEMENTED_FAILURE_CODE = "PROCESSING_NOT_IMPLEMENTED"
-const PROCESSING_NOT_IMPLEMENTED_MESSAGE =
-  "PR-16F polling foundation: image processing (Sharp + R2 promotion) is not implemented in apps/jobs yet."
 
 export interface RunOnceOptions {
   /** When true, do not connect to the DB; behave as a read-only stub. */
@@ -26,6 +21,8 @@ export interface RunOnceOptions {
   dryRun: boolean
   /** Gated by `IMAGE_PUBLISH_PROCESSING_ENABLED`. */
   processingEnabled: boolean
+  /** Required when `processingEnabled` and not `dryRun` (R2 + Sharp publish path). */
+  jobsEnv?: JobsEnvConfig
 }
 
 export class ImagePublishWorker {
@@ -64,19 +61,29 @@ export class ImagePublishWorker {
     console.log(`[fotocorp-jobs] claimed publish job id=${job.id} jobType=${job.jobType} status=${job.status}`)
     console.log(`[fotocorp-jobs] job items=${items.length}`)
 
-    console.log(
-      "[fotocorp-jobs] processing not implemented; marking job FAILED safely (PROCESSING_NOT_IMPLEMENTED)"
-    )
+    if (!options.jobsEnv) {
+      console.error("[fotocorp-jobs] missing jobsEnv configuration; cannot run publish processor")
+      await this.jobService.markRemainingItemsFailedForJob(job.id, {
+        failureCode: "CONFIG_ERROR",
+        failureMessage: "Worker invoked processing without typed jobs env (internal error)."
+      })
+      await this.jobService.reconcilePublishJobAggregate(job.id)
+      return
+    }
 
-    const markedItems = await this.jobService.markRemainingItemsFailedForJob(job.id, {
-      failureCode: PROCESSING_NOT_IMPLEMENTED_FAILURE_CODE,
-      failureMessage: PROCESSING_NOT_IMPLEMENTED_MESSAGE
-    })
-    console.log(`[fotocorp-jobs] items marked FAILED=${markedItems}`)
-
-    await this.jobService.markJobFailed(job.id, {
-      failureCode: PROCESSING_NOT_IMPLEMENTED_FAILURE_CODE,
-      failureMessage: PROCESSING_NOT_IMPLEMENTED_MESSAGE
-    })
+    try {
+      const processor = new ImagePublishProcessor(this.jobService, options.jobsEnv)
+      await processor.processClaimedJob(claimed)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`[fotocorp-jobs] fatal publish iteration error: ${message}`)
+      console.error(error)
+      await this.jobService.markRemainingItemsFailedForJob(job.id, {
+        failureCode: "WORKER_FATAL",
+        failureMessage: message.slice(0, 500)
+      })
+      await this.jobService.reconcilePublishJobAggregate(job.id)
+      throw error
+    }
   }
 }

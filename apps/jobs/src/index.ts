@@ -74,7 +74,8 @@ async function main() {
           await worker.runOnce({
             skipDbAccess,
             dryRun: false,
-            processingEnabled: env.imagePublishProcessingEnabled
+            processingEnabled: env.imagePublishProcessingEnabled,
+            jobsEnv: env
           })
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error)
@@ -96,7 +97,8 @@ async function main() {
     await worker.runOnce({
       skipDbAccess,
       dryRun,
-      processingEnabled: env.imagePublishProcessingEnabled
+      processingEnabled: env.imagePublishProcessingEnabled,
+      jobsEnv: env
     })
   } finally {
     await closeJobsPool()

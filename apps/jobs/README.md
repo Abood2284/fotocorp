@@ -15,36 +15,37 @@ Node CLI package for background image publish work. This is **not** a Cloudflare
 
 Root `pnpm dev` starts web + API only. Run `pnpm dev:jobs` manually when you need a quick dry-run of the jobs CLI.
 
-## Publish-job polling (PR-16F)
+## Publish pipeline (PR-16F + PR-16G)
 
-The worker now polls real `image_publish_jobs` rows from Neon via native `pg`. Status vocabulary follows the existing API schema:
+The worker polls real `image_publish_jobs` rows from Neon via native `pg`. Status vocabulary follows the existing API schema:
 
 | Lifecycle stage | `image_publish_jobs.status` | `image_publish_job_items.status` |
 | --- | --- | --- |
 | Created by staff approval | `QUEUED` | `QUEUED` |
-| Claimed by the worker | `RUNNING` | unchanged (item-level statuses are managed by the future processor) |
-| Controlled placeholder failure (PR-16F) | `FAILED` | `FAILED` with `failure_code = PROCESSING_NOT_IMPLEMENTED` |
+| Claimed by the worker | `RUNNING` | `RUNNING` per item as processing starts |
+| Success | `COMPLETED` (or `PARTIAL_FAILED` if some items failed) | `COMPLETED` |
+| Failure | `FAILED` or `PARTIAL_FAILED` | `FAILED` with `failure_code` / `failure_message` |
 
-The schema enum reality is `QUEUED / RUNNING / COMPLETED / FAILED / PARTIAL_FAILED` (jobs) and `QUEUED / RUNNING / COMPLETED / FAILED` (items); we never introduce other enum values.
+The schema enums are `QUEUED / RUNNING / COMPLETED / FAILED / PARTIAL_FAILED` (jobs) and `QUEUED / RUNNING / COMPLETED / FAILED` (items).
 
 ### Safety flag
 
 ```env
-IMAGE_PUBLISH_PROCESSING_ENABLED=false   # default — read-only count, no claiming
-IMAGE_PUBLISH_PROCESSING_ENABLED=true    # claim one job per iteration; placeholder lifecycle
+IMAGE_PUBLISH_PROCESSING_ENABLED=false   # default — count queued jobs only, no claims
+IMAGE_PUBLISH_PROCESSING_ENABLED=true      # VPS — claim and run Sharp + R2 publish
 ```
 
 | Flag | `publish:dry-run` | `publish:once` / `publish:worker` |
 | --- | --- | --- |
 | any | counts queued jobs if `DATABASE_URL` is set; never claims | — |
 | `false` | — | counts queued jobs, logs `processing disabled`, does **not** claim |
-| `true` | — | claims one queued job via `FOR UPDATE SKIP LOCKED`, marks its items + job `FAILED` with `failure_code = PROCESSING_NOT_IMPLEMENTED`, never touches `image_assets` |
+| `true` | — | claims one queued job, runs `ImagePublishProcessor` for contributor IMAGE items |
 
-Real Sharp + R2 derivative generation lives in a follow-up PR. Until then, **leave `IMAGE_PUBLISH_PROCESSING_ENABLED=false` for real staff/contributor data.** Only set it to `true` against a development DB you are willing to mark a job `FAILED` against.
+**Invariant:** assets stay `APPROVED+PRIVATE` until all required derivatives are written to R2 and `completeSuccessfulPublishItem` commits `ACTIVE+PUBLIC`. Leave `IMAGE_PUBLISH_PROCESSING_ENABLED=false` until Neon + R2 credentials on the VPS match production buckets.
 
 ### Concurrency and duplicate claims
 
-Claiming uses an explicit transaction with `SELECT … FOR UPDATE SKIP LOCKED LIMIT 1` followed by an `UPDATE … SET status = 'RUNNING'`. Running multiple worker instances against the same DB will not double-claim a job.
+Claiming uses an explicit transaction with `SELECT … FOR UPDATE SKIP LOCKED LIMIT 1` followed by an `UPDATE … SET status = 'RUNNING'`. Running multiple worker instances against the same DB will not double-claim a job. Items are processed sequentially (concurrency env reserved for future use).
 
 ### Local dry-run
 
@@ -76,10 +77,12 @@ Operator-focused steps (Ubuntu, `/opt/fotocorp/app`, SSH-only firewall) live in 
 - `src/index.ts` — CLI entry (no Worker `fetch` export).
 - `src/config/env.ts` — typed env loader; dry-run tolerates missing service env vars with warnings; parses `IMAGE_PUBLISH_PROCESSING_ENABLED`.
 - `src/db/client.ts` — Node-native `pg.Pool` singleton and `withJobsTransaction` helper.
-- `src/services/imagePublishJobService.ts` — DB-backed publish-job service (`countPendingJobs`, `listPendingJobs`, `claimNextPendingJob`, `getJobItems`, `markJobFailed`, `markItemFailed`, `markRemainingItemsFailedForJob`).
+- `src/lib/r2Client.ts` — AWS4-signed GET/HEAD/PUT for R2 (originals + previews buckets).
+- `src/media/publishImageDerivatives.ts` — Sharp watermarked WebP THUMB/CARD/DETAIL (profiles aligned with API publish script).
+- `src/services/imagePublishJobService.ts` — publish job + item SQL (`claimNextPendingJob`, `markItemRunning`, `completeSuccessfulPublishItem`, `reconcilePublishJobAggregate`, failure helpers).
+- `src/services/imagePublishProcessor.ts` — orchestrates R2 reads/writes + DB promotion per claimed job.
 - `src/workers/imagePublishWorker.ts` — one-iteration orchestration with the safety flag gate.
-- `src/services/imageProcessor.ts`, `src/services/storageService.ts` — Sharp / R2 placeholders for the follow-up PR.
 
 ## Environment
 
-See `apps/jobs/.env.production.example` and `src/config/env.ts`. R2 staging uses **`R2_CONTRIBUTOR_STAGING_BUCKET`** (contributor upload staging bucket name). PR-16F adds **`IMAGE_PUBLISH_PROCESSING_ENABLED`** (default `false`).
+See `apps/jobs/.env.production.example` and `src/config/env.ts`. Staging reads use **`R2_CONTRIBUTOR_STAGING_BUCKET`**. Optional: **`R2_ENDPOINT`** / **`R2_REGION`** (defaults: `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com`, `auto`).
