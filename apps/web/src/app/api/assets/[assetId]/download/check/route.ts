@@ -61,11 +61,15 @@ export async function POST(request: Request, context: AssetDownloadCheckRouteCon
   if (!upstream.ok) {
     const payload = (await upstream.json().catch(() => null)) as {
       ok?: boolean
-      error?: { code?: string; message?: string }
+      error?: { code?: string; message?: string; detail?: unknown }
     } | null
     const code = payload?.error?.code ?? "INTERNAL_ERROR"
     const message = payload?.error?.message ?? "Download check failed."
-    return NextResponse.json({ ok: false, error: { code, message } }, { status: upstream.status })
+    const detail = payload?.error?.detail
+    return NextResponse.json(
+      { ok: false, error: { code, message, ...(detail !== undefined ? { detail } : {}) } },
+      { status: upstream.status },
+    )
   }
 
   return NextResponse.json({ ok: true as const })

@@ -32,6 +32,7 @@ interface LoginAccountRow {
   password_hash: string;
   account_status: string;
   must_change_password: boolean;
+  portal_role: string | null;
   legacy_photographer_id: number | string | null;
   display_name: string;
   email: string | null;
@@ -49,6 +50,7 @@ export interface ContributorSessionResult {
     username: string;
     status: string;
     mustChangePassword: boolean;
+    portalRole: "STANDARD" | "PORTAL_ADMIN";
   };
   contributor: {
     id: string;
@@ -82,6 +84,7 @@ export async function loginPhotographer(
       pa.password_hash,
       pa.status as account_status,
       pa.must_change_password,
+      coalesce(pa.portal_role, 'STANDARD') as portal_role,
       p.legacy_photographer_id,
       p.display_name,
       p.email,
@@ -160,6 +163,7 @@ export async function getCurrentPhotographerSession(
       pa.password_hash,
       pa.status as account_status,
       pa.must_change_password,
+      coalesce(pa.portal_role, 'STANDARD') as portal_role,
       p.legacy_photographer_id,
       p.display_name,
       p.email,
@@ -213,6 +217,7 @@ export async function changePhotographerPassword(
       pa.password_hash,
       pa.status as account_status,
       pa.must_change_password,
+      coalesce(pa.portal_role, 'STANDARD') as portal_role,
       p.legacy_photographer_id,
       p.display_name,
       p.email,
@@ -271,6 +276,7 @@ function invalidLoginError(): AppError {
 }
 
 function toSessionResult(row: SessionRow): ContributorSessionResult {
+  const portalRole = row.portal_role === "PORTAL_ADMIN" ? "PORTAL_ADMIN" : "STANDARD";
   return {
     sessionId: row.session_id,
     account: {
@@ -278,6 +284,7 @@ function toSessionResult(row: SessionRow): ContributorSessionResult {
       username: row.username,
       status: row.account_status,
       mustChangePassword: row.must_change_password,
+      portalRole,
     },
     contributor: {
       id: row.contributor_id,

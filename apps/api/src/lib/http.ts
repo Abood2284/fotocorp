@@ -11,6 +11,7 @@ interface ApiEnvelope<TData> {
   error: {
     code: string;
     message: string;
+    detail?: unknown;
   } | null;
   meta: {
     requestId: string | null;
@@ -43,6 +44,7 @@ export function errorResponse(error: unknown, meta?: ResponseMeta): Response {
         error: {
           code: error.code,
           message: error.message,
+          ...(error.detail !== undefined ? { detail: error.detail } : {}),
         },
         meta: {
           requestId: meta.requestId ?? null,
@@ -55,8 +57,9 @@ export function errorResponse(error: unknown, meta?: ResponseMeta): Response {
       ok: false,
       error: {
         code: error.code,
-        message: error.message
-      }
+        message: error.message,
+        ...(error.detail !== undefined ? { detail: error.detail } : {}),
+      },
     };
 
     return json(body, error.status);

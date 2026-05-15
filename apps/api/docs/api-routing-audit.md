@@ -3,6 +3,13 @@
 ## Related documentation
 
 - [DB revamp docs (README)](../../docs/db-revamp/README.md) — catalog/photographer DB revamp entry point, runbooks, and historical PR reports under `reports/`.
+- [Media pipeline operations (temporary)](../../docs/db-revamp/media-pipeline-operations.md) — one-time derivative migration status and generation commands.
+
+## Incremental update (2026-05-14)
+
+- Added internal admin route: `GET /api/v1/internal/admin/media-pipeline/status`.
+- Route ownership: `apps/api/src/routes/internal/admin/route.ts`.
+- Service: `apps/api/src/routes/internal/admin/service.ts` using shared query module `apps/api/src/lib/media/pipeline-status.ts`.
 
 ## Current Entry Point
 
@@ -54,10 +61,10 @@ This makes route behavior hard to reason about and slows root-cause analysis whe
 
 | Method | Path | Handler | Source file | Notes |
 |---|---|---|---|---|
-| `GET` | `/api/v1/assets` | `publicAssetListRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public catalog list. |
-| `GET` | `/api/v1/assets/filters` | `publicAssetFiltersRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed filters. |
-| `GET` | `/api/v1/assets/collections` | `publicAssetCollectionsRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed collections. |
-| `GET` | `/api/v1/assets/:id` | `publicAssetDetailRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public asset detail. |
+| `GET` | `/api/v1/assets` | `publicAssetListRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public catalog list. PR-16I: JSON `fotokey` = `image_assets.fotokey`; `category` = asset category else event default; `categoryId` query matches asset or (null asset + event) category. |
+| `GET` | `/api/v1/assets/filters` | `publicAssetFiltersRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed filters. PR-16I: category counts use resolved category `coalesce(asset, event)`. |
+| `GET` | `/api/v1/assets/collections` | `publicAssetCollectionsRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed collections. PR-16I: same resolved category for grouping/preview pick. |
+| `GET` | `/api/v1/assets/:id` | `publicAssetDetailRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public asset detail. PR-16I: same `fotokey` + category rules as list. |
 
 ### Public Media Routes
 
@@ -227,4 +234,52 @@ Next recommended migration group:
 | `POST` | `/api/v1/staff/auth/logout` | Revokes session server-side; clears cookie. |
 | `GET` | `/api/v1/staff/auth/me` | Requires valid staff session cookie. |
 
-Implementation: `apps/api/src/routes/staff/auth/route.ts` (mounted from `apps/api/src/honoApp.ts`). Same-origin web proxy: `apps/web/src/app/api/staff/[...path]/route.ts`.
+### Staff — sales-led access inquiries (current)
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/api/v1/staff/access-inquiries` | Staff session; roles `SUPER_ADMIN`, `SUPPORT`, `FINANCE`. |
+| `GET` | `/api/v1/staff/access-inquiries/:inquiryId` | Detail + `subscriberAccess` + linked entitlement rows. |
+| `POST` | `/api/v1/staff/access-inquiries/:inquiryId/entitlement-draft` | Non-destructive: creates missing **DRAFT** rows per inquiry asset type; never overwrites existing rows. |
+| `PATCH` | `/api/v1/staff/subscriber-entitlements/:entitlementId` | **DRAFT** full edit; **ACTIVE** adjust (`allowed_downloads` ≥ 1 and ≥ `downloads_used`, quality, validity). |
+| `POST` | `/api/v1/staff/subscriber-entitlements/:entitlementId/activate` | **DRAFT** → **ACTIVE**; validates positive `allowed_downloads` + quality; sets inquiry **`ACCESS_GRANTED`**; syncs `app_user_profiles` subscriber flags. |
+| `POST` | `/api/v1/staff/subscriber-entitlements/:entitlementId/suspend` | **ACTIVE** → **SUSPENDED**. |
+
+Implementation: `apps/api/src/routes/staff/auth/route.ts`, `apps/api/src/routes/staff/access-inquiries/route.ts` + `service.ts` (mounted from `apps/api/src/honoApp.ts`). Same-origin web proxy: `apps/web/src/app/api/staff/[...path]/route.ts` (GET/POST/PATCH).
+
+## Contributor portal (Hono) — catalog + directory
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/api/v1/contributor/catalog/asset-categories` | Authenticated contributor session; read-only list for event category picker. |
+| `GET` | `/api/v1/contributor/contributors` | `PORTAL_ADMIN` contributor accounts only; optional `q`, `limit` for photographer search. |
+
+Implementation: `apps/api/src/routes/contributor/catalog/route.ts`, `apps/api/src/routes/contributor/contributors/route.ts` (mounted from `apps/api/src/honoApp.ts`). Same-origin web BFF: `apps/web/src/app/api/contributor/[...path]/route.ts` (GET/POST/PATCH).
+
+## Contributor portal — direct R2 upload batches (PR-16H)
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `POST` | `/api/v1/contributor/upload-batches` | Create batch. |
+| `GET` | `/api/v1/contributor/upload-batches` | List batches. |
+| `GET` | `/api/v1/contributor/upload-batches/:batchId` | Batch detail + items. |
+| `POST` | `/api/v1/contributor/upload-batches/:batchId/files` | Registers items and returns presigned PUT instructions. Requires API-side `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_CONTRIBUTOR_STAGING_BUCKET` in `apps/api/.dev.vars` (or legacy `CLOUDFLARE_R2_*` equivalents). Returns **503** `UPLOAD_STORAGE_NOT_CONFIGURED` when missing. |
+| `POST` | `/api/v1/contributor/upload-batches/:batchId/files/:itemId/complete` | Verifies staging object; creates `image_assets` row. |
+| `POST` | `/api/v1/contributor/upload-batches/:batchId/submit` | Submits batch. |
+
+Implementation: `apps/api/src/routes/contributor/uploads/route.ts` + `service.ts`. Presigning: `apps/api/src/lib/r2-presigned-put.ts`, `apps/api/src/lib/r2-contributor-uploads.ts`. Legacy path alias: `/api/v1/photographer/upload-batches/*` → same handlers.
+
+## Internal admin — contributor upload review (staff BFF)
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/api/v1/internal/admin/contributor-uploads` | List upload-linked `image_assets` with filters; optional `sort` (`submitted` \| `contributor` \| `event`) + `order` (`asc` \| `desc`); DTO includes `title`, `caption`, `keywords`. |
+| `POST` | `/api/v1/internal/admin/contributor-uploads/approve` | Approve + queue publish (existing). |
+| `POST` | `/api/v1/internal/admin/contributor-uploads/reject` | Bulk reject eligible `SUBMITTED` rows → `ARCHIVED`. |
+| `PATCH` | `/api/v1/internal/admin/contributor-uploads/:imageAssetId` | Metadata patch for eligible submissions; body includes `expectedUpdatedAt` (optimistic lock on `updated_at`); `409 METADATA_CONFLICT` returns current snapshot in `error.detail`. |
+| `POST` | `/api/v1/internal/admin/contributor-uploads/:imageAssetId/replace-presign` | Presigned PUT to existing staging key; `503` when S3 presign env incomplete. |
+| `POST` | `/api/v1/internal/admin/contributor-uploads/:imageAssetId/replace-complete` | After PUT, verifies staging object; updates file columns on `contributor_upload_items` + `image_assets` without clearing editorial fields; same optimistic lock semantics. |
+| `GET` | `/api/v1/internal/admin/contributor-uploads/:imageAssetId/original` | Stream original bytes (staging or canonical by fotokey). |
+| `GET` | `/api/v1/internal/admin/contributor-uploads/batches/:batchId` | Batch detail + items. |
+
+Implementation: `apps/api/src/routes/internal/admin-contributor-uploads/route.ts` + `service.ts` + `validators.ts`. Same-origin web BFF: `apps/web/src/app/api/staff/contributor-uploads/*` (approve, reject, `[imageAssetId]/metadata`, `replace-presign`, `replace-complete`).

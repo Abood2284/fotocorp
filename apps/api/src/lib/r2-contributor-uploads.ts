@@ -6,10 +6,49 @@ export interface R2BucketContext {
   bucket: string;
 }
 
+function trimEnv(value: string | undefined): string | undefined {
+  const t = value?.trim();
+  return t || undefined;
+}
+
+function resolveR2AccountId(env: Env): string | undefined {
+  return trimEnv(env.R2_ACCOUNT_ID) ?? trimEnv(env.CLOUDFLARE_R2_ACCOUNT_ID);
+}
+
+function resolveR2AccessKeyId(env: Env): string | undefined {
+  return trimEnv(env.R2_ACCESS_KEY_ID) ?? trimEnv(env.CLOUDFLARE_R2_ACCESS_KEY_ID);
+}
+
+function resolveR2SecretAccessKey(env: Env): string | undefined {
+  return trimEnv(env.R2_SECRET_ACCESS_KEY) ?? trimEnv(env.CLOUDFLARE_R2_SECRET_ACCESS_KEY);
+}
+
+/** Staging bucket for contributor browser PUTs (S3 API). Prefer `R2_CONTRIBUTOR_STAGING_BUCKET`. */
+export function resolveContributorStagingBucketName(env: Env): string | undefined {
+  return trimEnv(env.R2_CONTRIBUTOR_STAGING_BUCKET) ?? trimEnv(env.CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET);
+}
+
+function resolveOriginalsBucketName(env: Env): string | undefined {
+  return trimEnv(env.R2_ORIGINALS_BUCKET) ?? trimEnv(env.CLOUDFLARE_R2_ORIGINALS_BUCKET);
+}
+
+/**
+ * Human-readable list of missing env keys (no secret values). Used for logs and API error messages.
+ */
+export function listMissingContributorStagingS3ConfigKeys(env: Env): string[] {
+  const missing: string[] = [];
+  if (!resolveR2AccountId(env)) missing.push("R2_ACCOUNT_ID (or CLOUDFLARE_R2_ACCOUNT_ID)");
+  if (!resolveR2AccessKeyId(env)) missing.push("R2_ACCESS_KEY_ID (or CLOUDFLARE_R2_ACCESS_KEY_ID)");
+  if (!resolveR2SecretAccessKey(env)) missing.push("R2_SECRET_ACCESS_KEY (or CLOUDFLARE_R2_SECRET_ACCESS_KEY)");
+  if (!resolveContributorStagingBucketName(env))
+    missing.push("R2_CONTRIBUTOR_STAGING_BUCKET (or CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET)");
+  return missing;
+}
+
 function getR2BaseClient(env: Env, bucketName: string | undefined): R2BucketContext | null {
-  const accountId = env.CLOUDFLARE_R2_ACCOUNT_ID?.trim();
-  const accessKeyId = env.CLOUDFLARE_R2_ACCESS_KEY_ID?.trim();
-  const secretAccessKey = env.CLOUDFLARE_R2_SECRET_ACCESS_KEY?.trim();
+  const accountId = resolveR2AccountId(env);
+  const accessKeyId = resolveR2AccessKeyId(env);
+  const secretAccessKey = resolveR2SecretAccessKey(env);
   const bucket = bucketName?.trim();
   if (!accountId || !accessKeyId || !secretAccessKey || !bucket) return null;
 
@@ -23,34 +62,44 @@ function getR2BaseClient(env: Env, bucketName: string | undefined): R2BucketCont
   return { client, bucket };
 }
 
-/** S3-compatible client + bucket name for the photographer upload staging bucket. */
+/** S3-compatible client + bucket name for the contributor upload staging bucket. */
+export function getContributorStagingS3Context(env: Env): R2BucketContext | null {
+  return getR2BaseClient(env, resolveContributorStagingBucketName(env));
+}
+
+/** @deprecated Use {@link getContributorStagingS3Context}. */
 export function getPhotographerUploadsS3Context(env: Env): R2BucketContext | null {
-  return getR2BaseClient(env, env.CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET);
+  return getContributorStagingS3Context(env);
 }
 
 /** S3-compatible client + bucket name for the canonical originals bucket. */
 export function getOriginalsS3Context(env: Env): R2BucketContext | null {
-  return getR2BaseClient(env, env.CLOUDFLARE_R2_ORIGINALS_BUCKET);
+  return getR2BaseClient(env, resolveOriginalsBucketName(env));
 }
 
-/** True when staging photographer uploads can be verified via S3 API (used for presigned PUT + head fallback). */
+/** True when contributor staging uploads can be presigned and verified via S3 API (binding optional). */
+export function hasContributorStagingS3Config(env: Env): boolean {
+  return getContributorStagingS3Context(env) !== null;
+}
+
+/** @deprecated Use {@link hasContributorStagingS3Config}. */
 export function hasPhotographerUploadsS3Config(env: Env): boolean {
-  return getPhotographerUploadsS3Context(env) !== null;
+  return hasContributorStagingS3Config(env);
 }
 
 /**
- * Returns whether an object exists at `storageKey` in the photographer staging bucket.
+ * Returns whether an object exists at `storageKey` in the contributor staging bucket.
  * Prefers the Worker `MEDIA_CONTRIBUTOR_UPLOADS_BUCKET.head` binding when available; otherwise
  * falls back to the S3 `HeadObject` API for local smoke without R2 bindings.
  */
-export async function verifyPhotographerStagingObjectExists(env: Env, storageKey: string): Promise<boolean> {
+export async function verifyContributorStagingObjectExists(env: Env, storageKey: string): Promise<boolean> {
   const binding = env.MEDIA_CONTRIBUTOR_UPLOADS_BUCKET;
   if (binding) {
     const head = await binding.head(storageKey);
     return Boolean(head);
   }
 
-  const ctx = getPhotographerUploadsS3Context(env);
+  const ctx = getContributorStagingS3Context(env);
   if (!ctx) return false;
 
   try {
@@ -60,6 +109,11 @@ export async function verifyPhotographerStagingObjectExists(env: Env, storageKey
     if (isNotFoundError(error)) return false;
     throw error;
   }
+}
+
+/** @deprecated Use {@link verifyContributorStagingObjectExists}. */
+export async function verifyPhotographerStagingObjectExists(env: Env, storageKey: string): Promise<boolean> {
+  return verifyContributorStagingObjectExists(env, storageKey);
 }
 
 export interface CopyStagingToOriginalsInput {
@@ -75,20 +129,52 @@ export interface CopyStagingToOriginalsResult {
 }
 
 /**
- * Copies an object from the photographer upload staging bucket to the canonical originals bucket.
- * Uses S3-compatible CopyObject (R2 supports it). Verifies the destination via HeadObject after copy.
+ * Copies an object from the contributor upload staging bucket to the canonical originals bucket.
  *
- * Throws on missing config, missing source, missing destination after copy, or any S3 error.
+ * **Preferred in dev / Workers:** when `MEDIA_CONTRIBUTOR_UPLOADS_BUCKET` and `MEDIA_ORIGINALS_BUCKET`
+ * bindings are present, copies via native R2 `get` + `put` (no S3 API keys required).
+ *
+ * **Otherwise:** uses S3-compatible CopyObject against both buckets (requires `R2_*` / legacy
+ * `CLOUDFLARE_R2_*` credentials and bucket names in env).
+ *
+ * Throws on missing config, missing source, missing destination after copy, or any read/write error.
  */
 export async function copyStagingObjectToOriginals(
   env: Env,
   input: CopyStagingToOriginalsInput,
 ): Promise<CopyStagingToOriginalsResult> {
-  const stagingCtx = getPhotographerUploadsS3Context(env);
+  const stagingBinding = env.MEDIA_CONTRIBUTOR_UPLOADS_BUCKET;
+  const originalsBinding = env.MEDIA_ORIGINALS_BUCKET;
+
+  if (stagingBinding && originalsBinding) {
+    const source = await stagingBinding.get(input.sourceKey);
+    if (!source?.body) {
+      throw new Error(`Staging object missing at key: ${input.sourceKey}`);
+    }
+
+    const contentType = source.httpMetadata?.contentType ?? "application/octet-stream";
+    await originalsBinding.put(input.destinationKey, source.body, {
+      httpMetadata: { contentType },
+    });
+
+    const head = await originalsBinding.head(input.destinationKey);
+    if (!head) {
+      throw new Error(`Canonical original not found after copy: ${input.destinationKey}`);
+    }
+
+    return {
+      ok: true,
+      destinationKey: input.destinationKey,
+      destinationContentType: head.httpMetadata?.contentType ?? contentType,
+      destinationSize: typeof head.size === "number" ? head.size : null,
+    };
+  }
+
+  const stagingCtx = getContributorStagingS3Context(env);
   const originalsCtx = getOriginalsS3Context(env);
   if (!stagingCtx || !originalsCtx) {
     throw new Error(
-      "R2 S3 API credentials, photographer uploads bucket, and originals bucket must all be configured.",
+      "Configure Worker R2 bindings MEDIA_CONTRIBUTOR_UPLOADS_BUCKET + MEDIA_ORIGINALS_BUCKET, or set R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY with R2_CONTRIBUTOR_STAGING_BUCKET and R2_ORIGINALS_BUCKET (or CLOUDFLARE_R2_* equivalents) for S3 CopyObject.",
     );
   }
 

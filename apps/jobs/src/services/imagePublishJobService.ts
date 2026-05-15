@@ -18,7 +18,6 @@
  *     only after the worker has persisted all required preview objects to R2.
  */
 import { PREVIEW_MIME_TYPE } from "../media/publishImageDerivatives"
-import { CURRENT_WATERMARK_PROFILE } from "../lib/watermarkProfile"
 import type { PoolClient, QueryResultRow } from "../db/client"
 import { getJobsPool, withJobsTransaction } from "../db/client"
 
@@ -72,6 +71,8 @@ export interface PublishDerivativeRowInput {
   height: number
   byteSize: number
   checksum: string
+  isWatermarked: boolean
+  watermarkProfile: string
 }
 
 export interface CompletePublishItemInput {
@@ -408,9 +409,9 @@ export class ImagePublishJobService {
               $6,
               $7,
               $8,
-              true,
               $9,
               $10,
+              $11,
               now(),
               'GENERATED',
               now(),
@@ -424,7 +425,7 @@ export class ImagePublishJobService {
               height = excluded.height,
               size_bytes = excluded.size_bytes,
               checksum = excluded.checksum,
-              is_watermarked = true,
+              is_watermarked = excluded.is_watermarked,
               watermark_profile = excluded.watermark_profile,
               generation_status = excluded.generation_status,
               generated_at = excluded.generated_at,
@@ -440,7 +441,8 @@ export class ImagePublishJobService {
             derivative.height,
             derivative.byteSize,
             derivative.checksum,
-            CURRENT_WATERMARK_PROFILE,
+            derivative.isWatermarked,
+            derivative.watermarkProfile,
             "READY"
           ]
         )
@@ -453,6 +455,10 @@ export class ImagePublishJobService {
               visibility = 'PUBLIC',
               original_exists_in_storage = true,
               original_storage_checked_at = now(),
+              category_id = coalesce(
+                category_id,
+                (select pe.category_id from photo_events pe where pe.id = image_assets.event_id limit 1)
+              ),
               updated_at = now()
           where id = $1::uuid
             and status = 'APPROVED'

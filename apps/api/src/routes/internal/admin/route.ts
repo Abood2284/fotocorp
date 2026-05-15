@@ -9,9 +9,12 @@ import {
   adminAssetOriginalService,
   adminAssetPreviewService,
   adminAssetPublishStateService,
+  adminAssetPublishStateBulkService,
   adminAssetUpdateService,
+  adminAssetUpdateBulkService,
   adminFiltersService,
   adminStatsService,
+  adminMediaPipelineStatusService,
   adminUserSubscriptionService,
   adminUsersService,
   listAdminAssetsService,
@@ -25,6 +28,8 @@ import {
   adminPublishStateSchema,
   adminUserParamSchema,
   adminUserSubscriptionSchema,
+  adminBulkEditorialSchema,
+  adminBulkPublishStateSchema,
 } from "./validators";
 
 export const internalAdminRoutes = new Hono<{ Bindings: Env }>();
@@ -36,6 +41,28 @@ internalAdminRoutes.get("/api/v1/internal/admin/assets", async (c) => {
 });
 
 internalAdminRoutes.all("/api/v1/internal/admin/assets", () => methodNotAllowed());
+
+internalAdminRoutes.patch(
+  "/api/v1/internal/admin/assets/bulk/editorial",
+  zValidator("json", adminBulkEditorialSchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    return await adminAssetUpdateBulkService(c.env, body, actorFromRequest(c.req.raw));
+  },
+);
+
+internalAdminRoutes.all("/api/v1/internal/admin/assets/bulk/editorial", () => methodNotAllowed());
+
+internalAdminRoutes.post(
+  "/api/v1/internal/admin/assets/bulk/publish-state",
+  zValidator("json", adminBulkPublishStateSchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    return await adminAssetPublishStateBulkService(c.env, body, actorFromRequest(c.req.raw));
+  },
+);
+
+internalAdminRoutes.all("/api/v1/internal/admin/assets/bulk/publish-state", () => methodNotAllowed());
 
 internalAdminRoutes.post(
   "/api/v1/internal/admin/assets/:assetId/publish-state",
@@ -114,6 +141,12 @@ internalAdminRoutes.get("/api/v1/internal/admin/catalog/stats", async (c) => {
 });
 
 internalAdminRoutes.all("/api/v1/internal/admin/catalog/stats", () => methodNotAllowed());
+
+internalAdminRoutes.get("/api/v1/internal/admin/media-pipeline/status", async (c) => {
+  return await adminMediaPipelineStatusService(c.env);
+});
+
+internalAdminRoutes.all("/api/v1/internal/admin/media-pipeline/status", () => methodNotAllowed());
 
 internalAdminRoutes.get("/api/v1/internal/admin/filters", async (c) => {
   return await adminFiltersService(c.env);

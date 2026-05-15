@@ -1,5 +1,5 @@
 /**
- * Watermarked WebP preview derivatives for the publish pipeline.
+ * WebP preview derivatives for the publish pipeline (clean THUMB; watermarked CARD/DETAIL).
  * Logic aligned with apps/api/scripts/media/process-image-publish-jobs.ts (sizes, qualities, paths).
  */
 import { createHash } from "node:crypto"
@@ -48,13 +48,39 @@ export async function generatePublishDerivative(
   let bestCandidate: GeneratedPublishPreview | undefined
 
   for (const quality of profile.qualities) {
-    const candidate = await renderWatermarkedPreview(original, targetWidth, quality)
+    const candidate =
+      variant === "DETAIL"
+        ? await renderWatermarkedPreview(original, targetWidth, quality)
+        : await renderCleanPreview(original, targetWidth, quality)
     if (!bestCandidate || candidate.byteSize < bestCandidate.byteSize) bestCandidate = candidate
     if (!profile.targetMaxBytes || candidate.byteSize <= profile.targetMaxBytes) return candidate
   }
 
   if (!bestCandidate) throw new Error(`Unable to generate ${variant} derivative for ${fotokey}.`)
   return bestCandidate
+}
+
+async function renderCleanPreview(
+  original: Buffer,
+  targetWidth: number,
+  quality: number
+): Promise<GeneratedPublishPreview> {
+  const encoded = await sharp(original, { failOn: "none" })
+    .rotate()
+    .resize({ width: targetWidth, withoutEnlargement: true })
+    .webp({ quality, effort: 6, smartSubsample: true })
+    .toBuffer({ resolveWithObject: true })
+  const width = encoded.info.width
+  const height = encoded.info.height
+  if (!width || !height) throw new Error("Unable to determine derivative dimensions.")
+  return {
+    buffer: encoded.data,
+    width,
+    height,
+    byteSize: encoded.data.byteLength,
+    checksum: createHash("sha256").update(encoded.data).digest("hex"),
+    selectedQuality: quality
+  }
 }
 
 async function renderWatermarkedPreview(

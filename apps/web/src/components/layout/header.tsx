@@ -59,7 +59,6 @@ const MOBILE_GROUPS: Array<{ title: string; links: HeaderLink[] }> = [
       { label: "Latest", href: "/search?sort=latest" },
       { label: "Categories", href: "/categories" },
       { label: "Events", href: "/events" },
-      { label: "Pricing", href: "/pricing" },
     ],
   },
   {
@@ -151,7 +150,6 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
             <MegaMenu link={{ label: "Editorial", href: "/search?sort=latest" }} pathname={pathname} sortParam={sortParam} />
             <MegaMenu link={{ label: "Video", href: "/video" }} pathname={pathname} sortParam={sortParam} />
             <MegaMenu link={{ label: "Collections", href: "/categories" }} pathname={pathname} sortParam={sortParam} />
-            <NavLink link={{ label: "Pricing", href: "/pricing" }} pathname={pathname} sortParam={sortParam} />
             <RoleMainLinks userProfile={userProfile} staffBrief={staffBrief} pathname={pathname} sortParam={sortParam} />
           </nav>
         </div>
@@ -231,7 +229,6 @@ function HeaderStatic({ userProfile, staffBrief }: HeaderProps) {
             <MegaMenu link={{ label: "Editorial", href: "/search?sort=latest" }} pathname={pathname} sortParam={sortParam} />
             <MegaMenu link={{ label: "Video", href: "/video" }} pathname={pathname} sortParam={sortParam} />
             <MegaMenu link={{ label: "Collections", href: "/categories" }} pathname={pathname} sortParam={sortParam} />
-            <NavLink link={{ label: "Pricing", href: "/pricing" }} pathname={pathname} sortParam={sortParam} />
             <RoleMainLinks userProfile={userProfile} staffBrief={staffBrief} pathname={pathname} sortParam={sortParam} />
           </nav>
         </div>
@@ -394,12 +391,7 @@ function RoleMainLinks({
     )
   }
 
-  const subscriber = isActiveSubscriber(userProfile)
   const links: HeaderLink[] = [...staffLinks]
-
-  if (!subscriber && userProfile.role === "USER") {
-    links.push({ label: "Upgrade", href: "/pricing" })
-  }
 
   return (
     <>
@@ -634,7 +626,7 @@ function MobileRoleLinks({
   const accountLinks: HeaderLink[] = [
     { label: "My account", href: "/account" },
     { label: "Fotobox", href: "/account/fotobox" },
-    subscriber ? { label: "Downloads", href: "/account/downloads" } : { label: "Upgrade", href: "/pricing" },
+    subscriber ? { label: "Downloads", href: "/account/downloads" } : { label: "Subscription", href: "/account/subscription" },
   ]
 
   return (
@@ -805,7 +797,7 @@ function getStaffToolAccountLinks(): AccountLink[] {
   return [
     { label: "Staff dashboard", href: "/staff/dashboard", icon: Gauge },
     { label: "Contributor uploads", href: "/staff/contributor-uploads", icon: Inbox },
-    { label: "Assets", href: "/staff/assets", icon: Image },
+    { label: "Catalog", href: "/staff/catalog", icon: Image },
     { label: "Users", href: "/staff/users", icon: Users },
     { label: "Storage", href: "/staff/storage", icon: HardDrive },
     { label: "Audit", href: "/staff/audit", icon: Shield },
@@ -848,7 +840,7 @@ function getAccountLinks(userProfile?: HeaderUserProfile | null, staffBrief?: St
     { label: "My account", href: "/account", icon: UserRound },
     { label: "My Fotobox", href: "/account/fotobox", icon: Archive },
     { label: "My downloads", href: "/account/downloads", icon: Download },
-    { label: isActiveSubscriber(userProfile) ? "Subscription" : "Subscription / Upgrade", href: "/account/subscription", icon: Shield },
+    { label: isActiveSubscriber(userProfile) ? "Download access" : "Subscription", href: "/account/subscription", icon: Shield },
   ]
 }
 
@@ -864,7 +856,6 @@ function getRoleLinks(userProfile: HeaderUserProfile, staffBrief?: StaffBrief | 
   if (staffBrief) {
     return [
       { label: "Catalog", href: "/staff/catalog" },
-      { label: "Assets", href: "/staff/assets" },
       { label: "Users", href: "/staff/users" },
     ]
   }

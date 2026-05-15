@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { ContributorUploadFlow } from "@/components/contributor/contributor-upload-flow"
-import { getContributorEvents } from "@/lib/api/contributor-api"
+import { getContributorMe } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
 
 export const metadata = {
@@ -11,7 +11,7 @@ export const metadata = {
 export default async function NewContributorUploadPage() {
   await requireContributorPasswordReady()
   const cookieHeader = await getContributorCookieHeader()
-  const events = await getContributorEvents({ scope: "available", limit: 100 }, { cookieHeader })
+  const session = await getContributorMe({ cookieHeader })
 
   return (
     <div className="space-y-8">
@@ -26,11 +26,11 @@ export default async function NewContributorUploadPage() {
         <p className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contributor portal</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">New upload batch</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Select an active event, add optional shared metadata, then upload images. Files are sent directly to secure storage.
+          Create an event for this batch, add optional shared metadata, then upload images. Files are sent directly to secure storage after you start upload.
         </p>
       </div>
 
-      <ContributorUploadFlow initialEvents={events.events} />
+      <ContributorUploadFlow initialSession={session} />
     </div>
   )
 }

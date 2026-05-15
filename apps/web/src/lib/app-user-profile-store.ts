@@ -147,6 +147,38 @@ export async function updateAppUserRolePlaceholder() {
   throw new Error("Role updates are not implemented in this PR.")
 }
 
+/** Sum of ACTIVE, in-window entitlements with a finite download cap (source of truth for staff-led access). */
+export async function getActiveSubscriberEntitlementQuota(authUserId: string): Promise<{ used: number; limit: number } | null> {
+  const result = await getPgPool().query<{
+    total_used: number
+    total_allowed: number
+    row_count: number
+  }>(
+    `
+      select
+        coalesce(sum(downloads_used), 0)::int as total_used,
+        coalesce(sum(allowed_downloads), 0)::int as total_allowed,
+        count(*)::int as row_count
+      from subscriber_entitlements
+      where user_id = $1
+        and status = 'ACTIVE'
+        and allowed_downloads is not null
+        and (valid_until is null or valid_until > now())
+        and (valid_from is null or valid_from <= now())
+    `,
+    [authUserId],
+  )
+
+  const row = result.rows[0]
+  if (!row || row.row_count === 0) return null
+
+  return { used: Number(row.total_used), limit: Number(row.total_allowed) }
+}
+
+export function formatDownloadQuotaLabel(used: number, limit: number | null) {
+  return `${used} / ${limit === null ? "Unlimited" : limit}`
+}
+
 function getBootstrapRole(email: string): AppRole {
   const superAdminEmail = process.env.FOTOCORP_SUPER_ADMIN_EMAIL?.trim().toLowerCase()
 

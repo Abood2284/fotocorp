@@ -22,6 +22,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
   return proxyPhotographerRequest(request, context)
 }
 
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  return proxyPhotographerRequest(request, context)
+}
+
 interface RouteContext {
   params: Promise<{
     path?: string[]

@@ -1,10 +1,13 @@
+// apps/api/src/db/schema/photo-events.ts
 import { sql } from "drizzle-orm";
 import { bigint, check, index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { contributorAccounts } from "./contributor-accounts";
 import { contributors } from "./contributors";
+import { assetCategories } from "./legacy";
 
 export const PHOTO_EVENT_CREATED_BY_SOURCES = ["LEGACY_IMPORT", "ADMIN", "CONTRIBUTOR", "SYSTEM"] as const;
-export const PHOTO_EVENT_ROW_SOURCES = ["LEGACY_IMPORT", "MANUAL", "CONTRIBUTOR"] as const;
+export const PHOTO_EVENT_ROW_SOURCES = ["LEGACY_IMPORT", "MANUAL", "CONTRIBUTOR", "Fotocorp"] as const;
+export const PHOTO_EVENT_SOURCE_FOTOCORP_PORTAL = "Fotocorp" as const;
 
 export const photoEvents = pgTable(
   "photo_events",
@@ -20,6 +23,7 @@ export const photoEvents = pgTable(
     city: text("city"),
     location: text("location"),
     keywords: text("keywords"),
+    categoryId: uuid("category_id").references(() => assetCategories.id, { onDelete: "set null" }),
     photoCount: bigint("photo_count", { mode: "number" }),
     unpublishedPhotoCount: bigint("unpublished_photo_count", { mode: "number" }),
     defaultMainImageCode: text("default_main_image_code"),
@@ -41,13 +45,14 @@ export const photoEvents = pgTable(
   },
   (table) => [
     check("photo_events_status_check", sql`${table.status} in ('ACTIVE', 'INACTIVE', 'DELETED', 'UNKNOWN')`),
-    check("photo_events_source_check", sql`${table.source} in ('LEGACY_IMPORT', 'MANUAL', 'CONTRIBUTOR')`),
+    check("photo_events_source_check", sql`${table.source} in ('LEGACY_IMPORT', 'MANUAL', 'CONTRIBUTOR', 'Fotocorp')`),
     check(
       "photo_events_created_by_source_check",
       sql`${table.createdBySource} in ('LEGACY_IMPORT', 'ADMIN', 'CONTRIBUTOR', 'SYSTEM')`,
     ),
     index("photo_events_legacy_event_id_idx").on(table.legacyEventId),
     index("photo_events_event_date_idx").on(table.eventDate),
+    index("photo_events_category_id_idx").on(table.categoryId),
     index("photo_events_city_idx").on(table.city),
     index("photo_events_status_idx").on(table.status),
     index("photo_events_source_idx").on(table.source),

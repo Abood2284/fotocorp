@@ -78,7 +78,7 @@ Operator-focused steps (Ubuntu, `/opt/fotocorp/app`, SSH-only firewall) live in 
 - `src/config/env.ts` — typed env loader; dry-run tolerates missing service env vars with warnings; parses `IMAGE_PUBLISH_PROCESSING_ENABLED`.
 - `src/db/client.ts` — Node-native `pg.Pool` singleton and `withJobsTransaction` helper.
 - `src/lib/r2Client.ts` — AWS4-signed GET/HEAD/PUT for R2 (originals + previews buckets).
-- `src/media/publishImageDerivatives.ts` — Sharp watermarked WebP THUMB/CARD/DETAIL (profiles aligned with API publish script).
+- `src/media/publishImageDerivatives.ts` — Sharp WebP THUMB (clean) + CARD/DETAIL (watermarked); profiles aligned with `apps/api/scripts/media/process-image-publish-jobs.ts`.
 - `src/services/imagePublishJobService.ts` — publish job + item SQL (`claimNextPendingJob`, `markItemRunning`, `completeSuccessfulPublishItem`, `reconcilePublishJobAggregate`, failure helpers).
 - `src/services/imagePublishProcessor.ts` — orchestrates R2 reads/writes + DB promotion per claimed job.
 - `src/workers/imagePublishWorker.ts` — one-iteration orchestration with the safety flag gate.

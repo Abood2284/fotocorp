@@ -23,7 +23,7 @@ export function getDefaultStaffLandingPath(role: string): string {
     case "REVIEWER":
       return "/staff/contributor-uploads"
     case "CAPTION_MANAGER":
-      return "/staff/caption-management"
+      return "/staff/captions"
     case "FINANCE":
     case "SUPPORT":
       return "/staff/dashboard"
@@ -60,7 +60,7 @@ export function staffRoleCanAccessPath(role: string, pathname: string): boolean 
     return ["SUPER_ADMIN", "CATALOG_MANAGER", "REVIEWER", "FINANCE", "SUPPORT"].includes(r)
   }
 
-  if (normalized === "/staff/caption-management") {
+  if (normalized === "/staff/captions") {
     return ["SUPER_ADMIN", "CAPTION_MANAGER"].includes(r)
   }
 
@@ -68,12 +68,18 @@ export function staffRoleCanAccessPath(role: string, pathname: string): boolean 
     return CONTRIBUTOR_UPLOAD_ROLES.includes(r)
   }
 
-  if (normalized.startsWith("/staff/assets")) {
-    return CATALOG_ASSET_ROLES.includes(r)
+  if (normalized.startsWith("/staff/access-inquiries")) {
+    return ["SUPER_ADMIN", "SUPPORT", "FINANCE"].includes(r)
   }
+
+
 
   if (normalized === "/staff/catalog" || normalized.startsWith("/staff/catalog/")) {
     return CATALOG_ASSET_ROLES.includes(r)
+  }
+
+  if (normalized.startsWith("/staff/media-pipeline")) {
+    return OPS_ONLY.includes(r)
   }
 
   if (
@@ -82,7 +88,8 @@ export function staffRoleCanAccessPath(role: string, pathname: string): boolean 
     normalized.startsWith("/staff/storage") ||
     normalized.startsWith("/staff/audit") ||
     normalized.startsWith("/staff/migration") ||
-    normalized.startsWith("/staff/staff-users")
+    normalized.startsWith("/staff/staff-users") ||
+    normalized.startsWith("/staff/events")
   ) {
     return OPS_ONLY.includes(r)
   }

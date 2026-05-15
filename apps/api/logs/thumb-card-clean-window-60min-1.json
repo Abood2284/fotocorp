@@ -1,0 +1,57 @@
+{
+  "startedAt": "2026-05-14T20:59:14.267Z",
+  "finishedAt": "2026-05-14T22:34:58.235Z",
+  "durationMs": 5743968,
+  "selectedAssets": 48006,
+  "selectedVariants": 19200,
+  "processedAssets": 9600,
+  "processedVariants": 19200,
+  "generatedVariants": 19184,
+  "failedVariants": 16,
+  "skippedReady": 0,
+  "regeneratedFailed": 0,
+  "throughput": {
+    "assetsPerMinute": 100.27911019002892,
+    "variantsPerMinute": 200.55822038005783
+  },
+  "timing": {
+    "averageR2ReadMs": 408.29227272838017,
+    "averageSourceDecodeMs": 63.35182768828325,
+    "averageSharpTransformMs": 25.63998656275799,
+    "averageR2UploadMs": 1004.254065476645,
+    "averageDbWriteMs": 314.5499045464177,
+    "totalR2ReadMs": 3918789.2336469926,
+    "totalSourceDecodeMs": 607670.731186013,
+    "totalSharpTransformMs": 491877.50221994927,
+    "totalR2UploadMs": 19265609.992103957,
+    "totalDbWriteMs": 3022195.482881981
+  },
+  "failureCounts": {
+    "corruptOriginalAssets": 6,
+    "unsupportedImageAssets": 0,
+    "r2ReadFailures": 2,
+    "r2UploadFailures": 0,
+    "dbWriteFailures": 0,
+    "failedVariants": 16
+  },
+  "config": {
+    "scope": "all-verified",
+    "limit": 50000,
+    "batchSize": 100,
+    "assetConcurrency": 4,
+    "uploadConcurrency": 8,
+    "r2RetryAttempts": 3,
+    "r2RetryBaseMs": 250,
+    "maxRuntimeMinutes": 60,
+    "failOnItemErrors": false,
+    "dryRun": false,
+    "variants": [
+      "thumb",
+      "card"
+    ],
+    "variantPolicy": "thumb=clean, card=clean, detail=watermarked",
+    "thumbDerivativeProfile": "fotocorp-thumb-clean-v1",
+    "cardDerivativeProfile": "fotocorp-card-clean-v1",
+    "detailWatermarkProfile": "fotocorp-preview-v4-dense-dark-lowquality"
+  }
+}

@@ -5,6 +5,11 @@ import { createHttpDb, type DrizzleClient } from "../../../db"
 import { AppError } from "../../../lib/errors"
 import { json } from "../../../lib/http"
 import { getR2Object } from "../../../lib/r2"
+import { downloadSizeToQualityRank } from "../../../lib/subscriber-download-quality"
+import {
+  assertSubscriberDownloadEntitlementForRequest,
+  incrementEntitlementDownloadsUsed,
+} from "../../staff/access-inquiries/service"
 
 const downloadRequestSchema = z.object({
   authUserId: z.string().trim().min(1),
@@ -14,10 +19,25 @@ const downloadRequestSchema = z.object({
 })
 
 type DownloadSize = z.infer<typeof downloadRequestSchema>["size"]
-interface DownloadProfileRow { id: string; auth_user_id: string; status: string; is_subscriber: boolean; subscription_status: string; subscription_ends_at: Date | string | null; download_quota_limit: number | null; download_quota_used: number }
+interface DownloadProfileRow {
+  id: string
+  auth_user_id: string
+  status: string
+  is_subscriber: boolean
+  subscription_status: string
+}
 interface DownloadAssetRow { id: string; legacy_imagecode: string | null; r2_original_key: string | null; original_filename: string | null; original_ext: string | null; r2_exists: boolean; status: string; visibility: string; media_type: string }
-interface QuotaUpdateRow { id: string; download_quota_limit: number | null; quota_before: number; quota_after: number }
-interface ValidatedSubscriberDownload { db: DrizzleClient; profile: DownloadProfileRow; asset: DownloadAssetRow & { r2_original_key: string }; size: DownloadSize; userAgent?: string; ipHash: string | null; authUserId: string }
+interface QuotaUpdateRow { id: string; quota_before: number; quota_after: number }
+interface ValidatedSubscriberDownload {
+  db: DrizzleClient
+  profile: DownloadProfileRow
+  asset: DownloadAssetRow & { r2_original_key: string }
+  size: DownloadSize
+  userAgent?: string
+  ipHash: string | null
+  authUserId: string
+  entitlementId: string
+}
 
 async function validateSubscriberDownloadRequest(env: Env, assetId: string, request: Request, options: { recordFailures: boolean }): Promise<ValidatedSubscriberDownload> {
   const parsed = downloadRequestSchema.safeParse(await request.json().catch(() => null))
@@ -34,12 +54,7 @@ async function validateSubscriberDownloadRequest(env: Env, assetId: string, requ
     logInternalDownloadError("profile_not_found", { assetId, authUserId, safeErrorCode: "PROFILE_NOT_FOUND", statusCode: 404 })
     throw new AppError(404, "PROFILE_NOT_FOUND", "Subscriber profile was not found.")
   }
-  assertSubscriberProfile(profile, assetId)
-  if (size !== "large") {
-    if (options.recordFailures) await writeDownloadFailure(db, { assetId, profile, size, failureCode: "SIZE_NOT_AVAILABLE", userAgent, ipHash })
-    logInternalDownloadError("size_not_available", { assetId, authUserId, safeErrorCode: "SIZE_NOT_AVAILABLE", statusCode: 409 })
-    throw new AppError(409, "SIZE_NOT_AVAILABLE", "That download size is not available yet.")
-  }
+  assertActiveSubscriberProfile(profile, assetId)
   const asset = await findAsset(db, assetId)
   if (!asset) {
     if (options.recordFailures) await writeDownloadFailure(db, { assetId, profile, size, failureCode: "ASSET_NOT_FOUND", userAgent, ipHash })
@@ -51,7 +66,27 @@ async function validateSubscriberDownloadRequest(env: Env, assetId: string, requ
     logInternalDownloadError("asset_not_downloadable", { assetId: asset.id, authUserId, safeErrorCode: "ASSET_NOT_DOWNLOADABLE", statusCode: 403 })
     throw new AppError(403, "ASSET_NOT_DOWNLOADABLE", "This asset is not available for clean download.")
   }
-  return { db, profile, asset, size, userAgent, ipHash, authUserId }
+
+  let entitlementId: string
+  try {
+    const granted = await assertSubscriberDownloadEntitlementForRequest(
+      db,
+      authUserId,
+      asset.media_type,
+      downloadSizeToQualityRank(size),
+    )
+    entitlementId = granted.entitlementId
+  } catch (error) {
+    if (error instanceof AppError && options.recordFailures) {
+      await writeDownloadFailure(db, { assetId: asset.id, profile, size, failureCode: error.code, userAgent, ipHash })
+    }
+    if (error instanceof AppError) {
+      logInternalDownloadError(error.code, { assetId: asset.id, authUserId, safeErrorCode: error.code, statusCode: error.status })
+    }
+    throw error
+  }
+
+  return { db, profile, asset, size, userAgent, ipHash, authUserId, entitlementId }
 }
 
 export async function internalSubscriberAssetDownloadCheckService(request: Request, env: Env, assetIdRaw: string): Promise<Response> {
@@ -70,18 +105,31 @@ export async function internalSubscriberAssetDownloadService(request: Request, e
   const assetId = assetIdRaw.trim()
   if (!isUuid(assetId)) throw new AppError(400, "INVALID_ASSET_ID", "Asset id is invalid.")
   const validated = await validateSubscriberDownloadRequest(env, assetId, request, { recordFailures: true })
-  const { profile, asset, size, userAgent, ipHash, authUserId } = validated
+  const { profile, asset, size, userAgent, ipHash, authUserId, entitlementId } = validated
   const db = validated.db
+
+  const quota = await incrementEntitlementDownloadsUsed(db, entitlementId, authUserId)
+  if (!quota) {
+    const snapRows = await executeRows<{ allowed_downloads: number | null; downloads_used: number }>(
+      db,
+      sql`select allowed_downloads, downloads_used from subscriber_entitlements where id = ${entitlementId}::uuid limit 1`,
+    )
+    const snap = snapRows[0]
+    const allowed = snap?.allowed_downloads ?? 0
+    const used = snap?.downloads_used ?? 0
+    await writeDownloadFailure(db, { assetId: asset.id, profile, size, failureCode: "DOWNLOAD_LIMIT_EXCEEDED", userAgent, ipHash })
+    throw new AppError(403, "DOWNLOAD_LIMIT_EXCEEDED", "download_limit_exceeded", {
+      allowedDownloads: allowed,
+      downloadsUsed: used,
+      remainingDownloads: Math.max(0, allowed - used),
+    })
+  }
+
   let object: Awaited<ReturnType<typeof getR2Object>> | null = null
   try { object = await getR2Object(env.MEDIA_ORIGINALS_BUCKET, asset.r2_original_key) } catch { throw new AppError(502, "DOWNLOAD_STREAM_FAILED", "Download service is unavailable.") }
   if (!object?.body) {
     await writeDownloadFailure(db, { assetId: asset.id, profile, size, failureCode: "SOURCE_FILE_NOT_FOUND", userAgent, ipHash })
     throw new AppError(409, "SOURCE_FILE_NOT_FOUND", "This asset is not available for clean download.")
-  }
-  const quota = await incrementQuota(db, authUserId)
-  if (!quota) {
-    await writeDownloadFailure(db, { assetId: asset.id, profile, size, failureCode: "QUOTA_EXCEEDED", userAgent, ipHash })
-    throw new AppError(409, "QUOTA_EXCEEDED", "Download quota has been used for this plan.")
   }
   const logId = await writeDownloadStarted(db, { asset, profile, quota, size, object, userAgent, ipHash })
   await markDownloadCompleted(db, logId)
@@ -96,11 +144,21 @@ async function assertSourceObjectAvailable(env: Env, asset: DownloadAssetRow & {
     throw new AppError(409, "SOURCE_FILE_NOT_FOUND", "This asset is not available for clean download.")
   }
 }
-async function findProfile(db: DrizzleClient, authUserId: string): Promise<DownloadProfileRow | null> { const rows = await executeRows<DownloadProfileRow>(db, sql`select id,auth_user_id,status,is_subscriber,subscription_status,subscription_ends_at,download_quota_limit,download_quota_used from app_user_profiles where auth_user_id = ${authUserId} limit 1`); return rows[0] ?? null }
-function assertSubscriberProfile(profile: DownloadProfileRow, assetId: string): void { if (profile.status !== "ACTIVE" || !profile.is_subscriber || profile.subscription_status !== "ACTIVE") throw new AppError(403, "SUBSCRIPTION_REQUIRED", "Active subscriber access is required."); if (profile.subscription_ends_at && new Date(profile.subscription_ends_at).getTime() <= Date.now()) throw new AppError(403, "SUBSCRIPTION_EXPIRED", "Subscriber access has expired."); if (profile.download_quota_limit !== null && profile.download_quota_used >= profile.download_quota_limit) throw new AppError(409, "QUOTA_EXCEEDED", "Download quota has been used for this plan.") }
+async function findProfile(db: DrizzleClient, authUserId: string): Promise<DownloadProfileRow | null> {
+  const rows = await executeRows<DownloadProfileRow>(
+    db,
+    sql`select id, auth_user_id, status, is_subscriber, subscription_status from app_user_profiles where auth_user_id = ${authUserId} limit 1`,
+  )
+  return rows[0] ?? null
+}
+function assertActiveSubscriberProfile(profile: DownloadProfileRow, _assetId: string): void {
+  if (profile.status !== "ACTIVE") throw new AppError(403, "SUBSCRIPTION_REQUIRED", "subscription_required")
+  if (!profile.is_subscriber || profile.subscription_status !== "ACTIVE") {
+    throw new AppError(403, "SUBSCRIPTION_REQUIRED", "subscription_required")
+  }
+}
 async function findAsset(db: DrizzleClient, assetId: string): Promise<DownloadAssetRow | null> { const rows = await executeRows<DownloadAssetRow>(db, sql`select id,legacy_image_code as legacy_imagecode,original_storage_key as r2_original_key,original_file_name as original_filename,original_file_extension as original_ext,original_exists_in_storage as r2_exists,status,visibility,media_type from image_assets where id = ${assetId}::uuid limit 1`); return rows[0] ?? null }
 function isAssetDownloadable(asset: DownloadAssetRow): asset is DownloadAssetRow & { r2_original_key: string } { return asset.status === "ACTIVE" && asset.visibility === "PUBLIC" && asset.media_type === "IMAGE" && asset.r2_exists && Boolean(asset.r2_original_key) }
-async function incrementQuota(db: DrizzleClient, authUserId: string): Promise<QuotaUpdateRow | null> { const rows = await executeRows<QuotaUpdateRow>(db, sql`update app_user_profiles set download_quota_used = download_quota_used + 1, updated_at = now() where auth_user_id = ${authUserId} and status = 'ACTIVE' and is_subscriber = true and subscription_status = 'ACTIVE' and (subscription_ends_at is null or subscription_ends_at > now()) and (download_quota_limit is null or download_quota_used < download_quota_limit) returning id,download_quota_limit,download_quota_used - 1 as quota_before,download_quota_used as quota_after`); return rows[0] ?? null }
 async function writeDownloadStarted(db: DrizzleClient, values: { asset: DownloadAssetRow; profile: DownloadProfileRow; quota: QuotaUpdateRow; size: DownloadSize; object: Awaited<ReturnType<typeof getR2Object>>; userAgent?: string; ipHash: string | null }): Promise<string | null> {
   try {
     const rows = await executeRows<{ id: string }>(

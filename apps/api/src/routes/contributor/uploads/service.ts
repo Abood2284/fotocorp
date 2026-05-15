@@ -8,10 +8,11 @@ import {
   photographerUploadLegacyImageCode,
 } from "../../../lib/contributor-upload-storage-key";
 import {
-  hasPhotographerUploadsS3Config,
-  verifyPhotographerStagingObjectExists,
+  hasContributorStagingS3Config,
+  listMissingContributorStagingS3ConfigKeys,
+  verifyContributorStagingObjectExists,
 } from "../../../lib/r2-contributor-uploads";
-import { createPhotographerStagingPresignedPutUrl } from "../../../lib/r2-presigned-put";
+import { createContributorStagingPresignedPutUrl } from "../../../lib/r2-presigned-put";
 import type { ContributorSessionResult } from "../auth/service";
 import type { CreateUploadBatchBody, PrepareUploadFilesBody, UploadBatchesListQuery } from "./validators";
 
@@ -315,8 +316,21 @@ export async function preparePhotographerUploadFiles(
     fileName: string;
     uploadMethod: "SIGNED_PUT" | "NOT_CONFIGURED";
     uploadUrl: string | null;
+    expiresAt?: string | null;
     headers: { "content-type": string };
   }> = [];
+
+  if (!hasContributorStagingS3Config(env)) {
+    const missing = listMissingContributorStagingS3ConfigKeys(env);
+    console.warn("[contributor-upload] Direct R2 upload disabled — missing env:", missing.join(", "));
+    throw new AppError(
+      503,
+      "UPLOAD_STORAGE_NOT_CONFIGURED",
+      `Upload storage is not configured on the API. Add to apps/api/.dev.vars (server-side only): ${missing.join(
+        ", ",
+      )}. Then restart the API dev server.`,
+    );
+  }
 
   for (const file of body.files) {
     const ext = extensionFromFileNameAndMime(file.fileName, file.mimeType);
@@ -338,6 +352,18 @@ export async function preparePhotographerUploadFiles(
     }
 
     const originalExt = ext === "jpg" ? "jpg" : ext;
+
+    let signed: { uploadUrl: string; expiresAt: string };
+    try {
+      signed = await createContributorStagingPresignedPutUrl(env, storageKey, file.mimeType);
+    } catch (cause: unknown) {
+      console.error("[contributor-upload] Presign failed", { itemId, storageKey, cause });
+      throw new AppError(
+        502,
+        "UPLOAD_SIGN_FAILED",
+        "Could not create a signed upload URL. Check API R2 credentials and restart the server.",
+      );
+    }
 
     await db.execute(sql`
       insert into contributor_upload_items (
@@ -366,14 +392,12 @@ export async function preparePhotographerUploadFiles(
       )
     `);
 
-    const uploadUrl = await createPhotographerStagingPresignedPutUrl(env, storageKey, file.mimeType);
-    const uploadMethod = uploadUrl ? ("SIGNED_PUT" as const) : ("NOT_CONFIGURED" as const);
-
     items.push({
       itemId,
       fileName: file.fileName,
-      uploadMethod,
-      uploadUrl,
+      uploadMethod: "SIGNED_PUT",
+      uploadUrl: signed.uploadUrl,
+      expiresAt: signed.expiresAt,
       headers: { "content-type": file.mimeType },
     });
   }
@@ -443,16 +467,20 @@ export async function completePhotographerUploadItem(
   if (!allowedComplete) throw new AppError(400, "UPLOAD_ITEM_INVALID_STATE", "This upload item cannot be completed.");
 
   const canVerifyWithBinding = Boolean(env.MEDIA_CONTRIBUTOR_UPLOADS_BUCKET);
-  const canVerifyWithS3Api = hasPhotographerUploadsS3Config(env);
+  const canVerifyWithS3Api = hasContributorStagingS3Config(env);
   if (!canVerifyWithBinding && !canVerifyWithS3Api) {
+    const missing = listMissingContributorStagingS3ConfigKeys(env);
+    console.warn("[contributor-upload] Complete blocked — missing staging verification config:", missing.join(", "));
     throw new AppError(
       503,
       "UPLOAD_STORAGE_NOT_CONFIGURED",
-      "Photographer upload staging storage is not available to verify uploads (configure MEDIA_CONTRIBUTOR_UPLOADS_BUCKET binding or CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET S3 API).",
+      `Upload storage is not configured on the API. Configure the MEDIA_CONTRIBUTOR_UPLOADS_BUCKET binding and/or S3 API vars in apps/api/.dev.vars: ${missing.join(
+        ", ",
+      )}.`,
     );
   }
 
-  const objectExists = await verifyPhotographerStagingObjectExists(env, row.storage_key);
+  const objectExists = await verifyContributorStagingObjectExists(env, row.storage_key);
   if (!objectExists) {
     await db.execute(sql`
       update contributor_upload_items

@@ -25,6 +25,8 @@ export default async function StaffContributorUploadsPage({ searchParams }: Staf
   const from = takeOne(sp.from)
   const to = takeOne(sp.to)
   const assetType = parseAssetType(takeOne(sp.assetType))
+  const sort = parseSortKey(takeOne(sp.sort))
+  const order = parseOrderKey(takeOne(sp.order))
   const limit = parsePositiveInt(takeOne(sp.limit), LIMIT_DEFAULT, 100)
   const offset = parsePositiveInt(takeOne(sp.offset), 0, 100000)
 
@@ -38,6 +40,8 @@ export default async function StaffContributorUploadsPage({ searchParams }: Staf
       from,
       to,
       assetType,
+      sort,
+      order,
       limit,
       offset,
     }).catch(() => null),
@@ -58,7 +62,7 @@ export default async function StaffContributorUploadsPage({ searchParams }: Staf
     <StaffContributorUploadsClient
       initialResponse={uploads}
       filters={filters}
-      currentParams={{ status, eventId, contributorId, batchId, q, from, to, assetType, limit, offset }}
+      currentParams={{ status, eventId, contributorId, batchId, q, from, to, assetType, sort, order, limit, offset }}
     />
   )
 }
@@ -76,6 +80,16 @@ function parseAssetType(
 ): "IMAGE" | "VIDEO" | "CARICATURE" | "all" {
   if (value === "IMAGE" || value === "VIDEO" || value === "CARICATURE" || value === "all") return value
   return "all"
+}
+
+function parseSortKey(value: string | undefined): "submitted" | "contributor" | "event" | undefined {
+  if (value === "submitted" || value === "contributor" || value === "event") return value
+  return undefined
+}
+
+function parseOrderKey(value: string | undefined): "asc" | "desc" | undefined {
+  if (value === "asc" || value === "desc") return value
+  return undefined
 }
 
 function takeOne(value: string | string[] | undefined): string | undefined {

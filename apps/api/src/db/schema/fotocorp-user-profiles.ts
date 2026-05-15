@@ -1,4 +1,5 @@
 import { index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { betterAuthUsers } from "./auth";
 
 export const fotocorpUserProfiles = pgTable(
@@ -20,7 +21,12 @@ export const fotocorpUserProfiles = pgTable(
     emailValidationDecision: text("email_validation_decision").notNull(),
     phoneCountryCode: text("phone_country_code").notNull(),
     phoneNumber: text("phone_number").notNull(),
-    phoneExtension: text("phone_extension"),
+    interestedAssetTypes: text("interested_asset_types")
+      .array()
+      .notNull()
+      .default(sql`ARRAY[]::text[]`),
+    imageQuantityRange: text("image_quantity_range"),
+    imageQualityPreference: text("image_quality_preference"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

@@ -4,10 +4,11 @@
 
 ## Local Media Binding Setup
 
-The public Worker binds two media buckets:
+The public Worker binds media buckets (see `wrangler.jsonc`):
 
 - `MEDIA_PREVIEWS_BUCKET`: read-only watermarked derivative reads
 - `MEDIA_ORIGINALS_BUCKET`: protected admin original-image reads
+- `MEDIA_CONTRIBUTOR_UPLOADS_BUCKET`: contributor upload **staging** (opaque keys; optional binding for `HeadObject` verification; browser PUT uses presigned URLs against the same bucket **name** via S3 API)
 
 Required environment:
 
@@ -16,12 +17,14 @@ Required environment:
 - `BETTER_AUTH_URL`: public web origin for Better Auth, for example `http://localhost:3000`
 - `FOTOCORP_SUPER_ADMIN_EMAIL`: optional bootstrap email for the first super admin profile
 - `MEDIA_PREVIEW_TOKEN_SECRET`: HMAC secret for signed preview URLs
-- `CLOUDFLARE_R2_ACCOUNT_ID`: R2 account id for Node scripts
-- `CLOUDFLARE_R2_ACCESS_KEY_ID`: R2 access key for Node scripts
-- `CLOUDFLARE_R2_SECRET_ACCESS_KEY`: R2 secret key for Node scripts
+- **Contributor direct uploads (presigned PUT)** — set on **this** Worker (`apps/api/.dev.vars` locally), not only on `apps/jobs`: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_CONTRIBUTOR_STAGING_BUCKET` (for example `fotocorp-2026-contributor-uploads`). Legacy aliases `CLOUDFLARE_R2_ACCOUNT_ID`, `CLOUDFLARE_R2_ACCESS_KEY_ID`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`, and `CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET` are still read if the `R2_*` names are unset. Restart `wrangler dev` after changing vars.
+- `CLOUDFLARE_R2_ACCOUNT_ID` (alias of `R2_ACCOUNT_ID`): also used by Node scripts
+- `CLOUDFLARE_R2_ACCESS_KEY_ID` / `CLOUDFLARE_R2_SECRET_ACCESS_KEY`: R2 keys for Node scripts
 - `CLOUDFLARE_R2_REGION`: usually `auto`
-- `CLOUDFLARE_R2_ORIGINALS_BUCKET`: originals bucket, currently `fotocorp-2026-megafinal`
+- `CLOUDFLARE_R2_ORIGINALS_BUCKET` (alias `R2_ORIGINALS_BUCKET`): originals bucket, currently `fotocorp-2026-megafinal`
 - `CLOUDFLARE_R2_PREVIEWS_BUCKET`: watermarked preview bucket
+
+**R2 CORS:** for browser uploads, configure CORS on the **contributor staging** bucket to allow `PUT` from your web app origin (for example `http://localhost:3000` in dev). See `apps/api/.dev.vars.example` and `docs/db-revamp/reports/photographer-bulk-upload-backend-report.md`.
 
 Do not use `CLOUDFLARE_R2_BUCKET` for new code; it is ambiguous now that originals and previews are split.
 
@@ -69,9 +72,9 @@ GET /api/v1/auth/me
 
 3. Derivative generation
    - Reads originals from `CLOUDFLARE_R2_ORIGINALS_BUCKET`.
-   - Generates `thumb`, `card`, and `detail`.
-   - Writes watermarked WebP derivatives to `CLOUDFLARE_R2_PREVIEWS_BUCKET`.
-   - Updates `asset_media_derivatives`.
+   - Generates `thumb`, `card`, and `detail` WebP previews (`thumb` and `card` clean; `detail` watermarked).
+   - Writes WebP derivatives to `CLOUDFLARE_R2_PREVIEWS_BUCKET`.
+   - Updates `image_derivatives` / `asset_media_derivatives` (see [scripts/media/README.md](./scripts/media/README.md)).
 
 4. Public API listing
    - Shows only assets with signed API preview URLs.
@@ -91,17 +94,19 @@ Request previews through the API, not through a public bucket URL:
 GET /api/v1/media/assets/:assetId/preview?variant=thumb|card|detail&token=...
 ```
 
-The secure preview API validates the token, asset status, visibility, original R2 mapping status, derivative readiness, watermarking, and current watermark profile before reading from the preview bucket.
+The secure preview API validates the token, asset status, visibility, original R2 mapping status, derivative readiness, per-variant watermark expectations (`thumb` and `card` clean; `detail` watermarked), and expected `watermark_profile` before reading from the preview bucket.
 
 Notes:
 
 - The secure preview API never serves original R2 objects.
 - The secure preview API only serves records from `asset_media_derivatives`.
-- Derivatives must be watermarked and `READY`; missing derivatives return a safe 404.
+- Derivatives must be `READY` with metadata matching the variant (thumb/card `is_watermarked=false` with clean profiles; detail `is_watermarked=true` with the detail profile); missing derivatives return a safe 404.
 - Legacy key-based media routes are disabled so callers cannot request arbitrary R2 object keys.
 - No API route writes, moves, copies, renames, or deletes R2 objects.
 
-## Watermarked Preview Derivatives
+## Preview derivatives (generator)
+
+**Thumb** and **card** are **unwatermarked** but stay under `previews/watermarked/thumb/` and `previews/watermarked/card/` for URL stability. **Detail** stays watermarked under `previews/watermarked/detail/`.
 
 Generate a 100-image smoke batch:
 
@@ -112,20 +117,30 @@ pnpm --dir apps/api run media:generate-derivatives -- \
   --variants thumb,card,detail
 ```
 
-Generate 10k watermarked assets:
+Regenerate thumb/card only (overwrite objects + DB; use `--dry-run` first):
 
 ```bash
 pnpm --dir apps/api run media:generate-derivatives -- \
-  --limit 10000 \
-  --batch-size 25 \
-  --variants thumb,card,detail
+  --dry-run --force --variants thumb,card --limit 50
+
+pnpm --dir apps/api run media:generate-derivatives -- \
+  --force --variants thumb,card --limit 500 --batch-size 25
 ```
 
-Continue after first 10k using offset:
+Regenerate thumbs only (subset):
 
 ```bash
 pnpm --dir apps/api run media:generate-derivatives -- \
-  --offset 10000 \
+  --dry-run --force --variants thumb --limit 50
+
+pnpm --dir apps/api run media:generate-derivatives -- \
+  --force --variants thumb --limit 500 --batch-size 25
+```
+
+Larger backfill (all variants):
+
+```bash
+pnpm --dir apps/api run media:generate-derivatives -- \
   --limit 10000 \
   --batch-size 25 \
   --variants thumb,card,detail
@@ -141,4 +156,4 @@ pnpm --dir apps/api run media:generate-derivatives -- \
   --variants thumb,card,detail
 ```
 
-The generator writes only under `previews/watermarked/<variant>/<asset-id>.webp`, upserts `asset_media_derivatives`, and never modifies original R2 objects. More details are in [scripts/media/README.md](/Users/abdulraheem/Developer/Next/fotocorp/apps/api/scripts/media/README.md:1).
+The generator writes under `previews/watermarked/<variant>/...`, upserts `image_derivatives` / `asset_media_derivatives` (see [scripts/media/README.md](./scripts/media/README.md)), and never modifies original R2 objects.

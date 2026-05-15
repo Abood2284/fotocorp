@@ -9,12 +9,23 @@ import {
   getInternalAdminPublishEligibility,
   listInternalAdminAssets,
   updateInternalAdminAssetEditorial,
+  updateInternalAdminAssetEditorialBulk,
   updateInternalAdminAssetPublish,
+  updateInternalAdminAssetPublishBulk,
 } from "../../../lib/assets/admin-catalog"
 import { AppError } from "../../../lib/errors"
 import { json } from "../../../lib/http"
 import { parsePreviewTtl } from "../../../lib/assets/public-assets"
 import { listInternalAdminUsers, updateInternalAdminUserSubscription } from "../../../lib/users/internal-admin-users"
+import {
+  getMediaPipelineStatus,
+  type DerivativeProfilePolicyInput,
+} from "../../../lib/media/pipeline-status"
+import {
+  CARD_CLEAN_PROFILE,
+  DETAIL_WATERMARKED_PROFILE,
+  THUMB_CLEAN_PROFILE,
+} from "../../../lib/media/watermark"
 
 interface AdminActor { authUserId: string | null; email: string | null }
 
@@ -55,15 +66,30 @@ export async function adminAssetPublishStateService(env: Env, assetId: string, p
     const check = await getInternalAdminPublishEligibility(db(env), assetId)
     if (!check.assetExists) throw new AppError(404, "ASSET_NOT_FOUND", "Asset was not found.")
     if (!check.eligible) {
-      return Response.json({ error: { code: "PREVIEW_NOT_READY", message: "This asset cannot be published until all required watermarked previews are ready.", details: { missingVariants: check.missingVariants } } }, { status: 409 })
+      return Response.json({ error: { code: "PREVIEW_NOT_READY", message: "This asset cannot be published until all required preview derivatives are ready.", details: { missingVariants: check.missingVariants } } }, { status: 409 })
     }
   }
   return json(await updateInternalAdminAssetPublish(db(env), assetId, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env)))
+}
+export async function adminAssetUpdateBulkService(env: Env, payload: { assetIds: string[], categoryId?: string | null, eventId?: string | null }, actor: AdminActor) {
+  return json(await updateInternalAdminAssetEditorialBulk(db(env), payload.assetIds, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env)))
+}
+export async function adminAssetPublishStateBulkService(env: Env, payload: { assetIds: string[], status: "APPROVED" | "REVIEW" | "REJECTED"; visibility: "PUBLIC" | "PRIVATE" }, actor: AdminActor) {
+  return json(await updateInternalAdminAssetPublishBulk(db(env), payload.assetIds, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env)))
 }
 export async function adminStatsService(env: Env) { return json(await getInternalAdminCatalogStats(db(env))) }
 export async function adminFiltersService(env: Env) { return json(await getInternalAdminFilters(db(env))) }
 export async function adminUsersService(env: Env, request: Request) { return json(await listInternalAdminUsers(db(env), request)) }
 export async function adminUserSubscriptionService(env: Env, authUserId: string, isSubscriber: boolean, actor: AdminActor) { return json(await updateInternalAdminUserSubscription(db(env), authUserId, isSubscriber, actor)) }
+const DEFAULT_DERIVATIVE_PROFILE_POLICY: DerivativeProfilePolicyInput = {
+  thumbProfile: THUMB_CLEAN_PROFILE,
+  cardProfile: CARD_CLEAN_PROFILE,
+  detailProfile: DETAIL_WATERMARKED_PROFILE,
+}
+
+export async function adminMediaPipelineStatusService(env: Env) {
+  return json(await getMediaPipelineStatus(db(env), DEFAULT_DERIVATIVE_PROFILE_POLICY, 20))
+}
 export function normalizeKeywords(input: string[] | null | undefined): string[] | null { if (!input) return null; const dedup = new Map<string, string>(); for (const keyword of input) { const normalized = keyword.trim(); if (!normalized) continue; const token = normalized.toLowerCase(); if (!dedup.has(token)) { dedup.set(token, normalized); if (dedup.size >= 50) break } } return dedup.size > 0 ? [...dedup.values()] : null }
 export function nullable(value: string | null | undefined) { if (value === null || value === undefined) return null; const trimmed = value.trim(); return trimmed ? trimmed : null }
 export function actorFromRequest(request: Request): AdminActor { return { authUserId: request.headers.get("x-admin-auth-user-id")?.trim() || null, email: request.headers.get("x-admin-email")?.trim() || null } }

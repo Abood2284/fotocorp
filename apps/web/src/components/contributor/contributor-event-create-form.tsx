@@ -1,23 +1,91 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState } from "react"
-import { createContributorEvent, ContributorApiError } from "@/lib/api/contributor-api"
+import { useEffect, useState } from "react"
+import {
+  ContributorApiError,
+  createContributorEvent,
+  getContributorAssetCategories,
+  getContributorMe,
+  getContributorPortalContributors,
+  type ContributorAssetCategoryDto,
+  type ContributorAuthResponse,
+  type ContributorPortalContributorDto,
+} from "@/lib/api/contributor-api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
-export function ContributorEventCreateForm() {
+function portalRoleOf(session: ContributorAuthResponse) {
+  return session.account.portalRole ?? "STANDARD"
+}
+
+export function ContributorEventCreateForm(props: { initialSession?: ContributorAuthResponse }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [session, setSession] = useState<ContributorAuthResponse | null>(props.initialSession ?? null)
+  const [categories, setCategories] = useState<ContributorAssetCategoryDto[]>([])
+  const [contributors, setContributors] = useState<ContributorPortalContributorDto[]>([])
+  const [targetContributorId, setTargetContributorId] = useState("")
+
+  const effectiveSession = session ?? props.initialSession ?? null
+
+  useEffect(() => {
+    if (props.initialSession) return
+    void getContributorMe()
+      .then((me) => {
+        setSession(me)
+        setTargetContributorId(me.contributor.id)
+      })
+      .catch(() => setSession(null))
+  }, [props.initialSession])
+
+  useEffect(() => {
+    void getContributorAssetCategories()
+      .then((r) => setCategories(r.categories))
+      .catch(() => setCategories([]))
+  }, [])
+
+  const isPortalAdmin = effectiveSession ? portalRoleOf(effectiveSession) === "PORTAL_ADMIN" : false
+
+  useEffect(() => {
+    if (!effectiveSession || portalRoleOf(effectiveSession) !== "PORTAL_ADMIN") return
+    void getContributorPortalContributors({ limit: 100 })
+      .then((r) => {
+        setContributors(r.contributors)
+        setTargetContributorId((prev) => prev || r.contributors[0]?.id || effectiveSession.contributor.id)
+      })
+      .catch(() => setContributors([]))
+  }, [effectiveSession])
+
+  useEffect(() => {
+    if (effectiveSession && portalRoleOf(effectiveSession) === "PORTAL_ADMIN" && !targetContributorId) {
+      setTargetContributorId(effectiveSession.contributor.id)
+    }
+  }, [effectiveSession, targetContributorId])
 
   async function onSubmit(formData: FormData) {
     setError(null)
+    if (!categories.length) {
+      setError("Categories are not available yet. Try again later.")
+      return
+    }
+    const categoryId = String(formData.get("categoryId") ?? "").trim()
+    if (!categoryId) {
+      setError("Select a category.")
+      return
+    }
+    if (isPortalAdmin && !targetContributorId) {
+      setError("Select a photographer.")
+      return
+    }
     setPending(true)
     try {
       await createContributorEvent({
         name: String(formData.get("name") ?? "").trim(),
+        categoryId,
+        ...(isPortalAdmin && targetContributorId ? { targetContributorId } : {}),
         eventDate: String(formData.get("eventDate") ?? "").trim() || undefined,
         eventTime: String(formData.get("eventTime") ?? "").trim() || undefined,
         country: String(formData.get("country") ?? "").trim() || undefined,
@@ -52,6 +120,55 @@ export function ContributorEventCreateForm() {
         </label>
         <Input id="name" name="name" required minLength={2} maxLength={180} autoComplete="off" />
       </div>
+      <div className="space-y-2">
+        <label htmlFor="categoryId" className="text-sm font-medium text-foreground">
+          Category <span className="text-destructive">*</span>
+        </label>
+        <select
+          id="categoryId"
+          name="categoryId"
+          required
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          defaultValue=""
+        >
+          <option value="" disabled>
+            Select a category…
+          </option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {isPortalAdmin ? (
+        <div className="space-y-2">
+          <label htmlFor="targetContributorId" className="text-sm font-medium text-foreground">
+            Photographer <span className="text-destructive">*</span>
+          </label>
+          <select
+            id="targetContributorId"
+            required
+            value={targetContributorId}
+            onChange={(e) => setTargetContributorId(e.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {contributors.length === 0 && effectiveSession ? (
+              <option value={effectiveSession.contributor.id}>{effectiveSession.contributor.displayName}</option>
+            ) : null}
+            {contributors.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.displayName}
+                {p.email ? ` (${p.email})` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : effectiveSession ? (
+        <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+          Photographer: <span className="font-medium text-foreground">{effectiveSession.contributor.displayName}</span>
+        </div>
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <label htmlFor="eventDate" className="text-sm font-medium text-foreground flex items-center justify-between">

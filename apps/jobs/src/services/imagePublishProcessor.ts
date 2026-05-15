@@ -3,8 +3,8 @@
  *
  * After staff approval the API copies staging → canonical originals and queues
  * `image_publish_job_items`. This processor loads bytes (originals first, staging
- * fallback), ensures the canonical object exists, generates THUMB/CARD/DETAIL
- * watermarked WebPs (same profiles as `apps/api/scripts/media/process-image-publish-jobs.ts`),
+ * fallback), ensures the canonical object exists, generates THUMB/CARD (clean) and DETAIL
+ * (watermarked) WebPs (same profiles as `apps/api/scripts/media/process-image-publish-jobs.ts`),
  * writes previews to R2, upserts `image_derivatives`, and only then sets
  * `image_assets` to ACTIVE+PUBLIC.
  */
@@ -17,6 +17,7 @@ import {
   r2PutPreviewObject,
   type R2ClientConfig
 } from "../lib/r2Client"
+import { CARD_CLEAN_PROFILE, DETAIL_WATERMARKED_PROFILE, THUMB_CLEAN_PROFILE } from "../lib/watermarkProfile"
 import {
   buildDerivativeStorageKey,
   generatePublishDerivative,
@@ -199,7 +200,14 @@ export class ImagePublishProcessor {
         width: g.width,
         height: g.height,
         byteSize: g.byteSize,
-        checksum: g.checksum
+        checksum: g.checksum,
+        isWatermarked: variant === "DETAIL",
+        watermarkProfile:
+          variant === "THUMB"
+            ? THUMB_CLEAN_PROFILE
+            : variant === "CARD"
+              ? CARD_CLEAN_PROFILE
+              : DETAIL_WATERMARKED_PROFILE
       }
     })
 

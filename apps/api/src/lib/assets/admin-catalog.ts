@@ -40,6 +40,11 @@ interface AdminAssetQuery {
   derivativeStatus?: DerivativeFilter;
   previewState: PreviewStateFilter;
   hasPreview?: boolean;
+  missingTitle?: boolean;
+  missingCaption?: boolean;
+  noEvent?: boolean;
+  noCategory?: boolean;
+  contributorUploads?: boolean;
   cursor?: string;
   limit: number;
   sort: AdminSort;
@@ -204,10 +209,12 @@ export async function getInternalAdminAssetPreview(
   if (row.media_type !== "IMAGE") {
     throw new AppError(409, "PREVIEW_NOT_AVAILABLE", "Preview is not available.");
   }
+  const watermarkOk =
+    variant === "detail" ? row.is_watermarked === true : row.is_watermarked === false;
   if (
     !row.r2_key ||
     row.generation_status !== "READY" ||
-    row.is_watermarked !== true ||
+    !watermarkOk ||
     !row.mime_type ||
     row.width === null ||
     row.height === null
@@ -344,6 +351,81 @@ export async function updateInternalAdminAssetPublish(
   return getInternalAdminAssetById(db, assetId, secret, ttlSeconds);
 }
 
+export async function updateInternalAdminAssetEditorialBulk(
+  db: DrizzleClient,
+  assetIds: string[],
+  payload: { categoryId?: string | null; eventId?: string | null },
+  actor: AdminActor,
+  secret: string | undefined,
+  ttlSeconds: number,
+) {
+  const updatedAssets = [];
+  for (const assetId of assetIds) {
+    if (!isUuid(assetId)) continue;
+    const before = await getAuditSnapshot(db, assetId);
+    if (!before) continue;
+    
+    let hasUpdates = false;
+    const updates = [];
+    if (payload.categoryId !== undefined) {
+      updates.push(sql`category_id = ${payload.categoryId}`);
+      hasUpdates = true;
+    }
+    if (payload.eventId !== undefined) {
+      updates.push(sql`event_id = ${payload.eventId}`);
+      hasUpdates = true;
+    }
+    
+    if (hasUpdates) {
+      updates.push(sql`updated_at = now()`);
+      await db.execute(sql`
+        update image_assets
+        set ${sql.join(updates, sql`, `)}
+        where id = ${assetId}::uuid
+      `);
+
+      const after = await getAuditSnapshot(db, assetId);
+      if (after) {
+        const beforeDelta = diffSnapshot(before, after);
+        const afterDelta = diffSnapshot(after, before);
+        if (Object.keys(afterDelta).length > 0) {
+          await insertAuditLog(db, {
+            assetId,
+            action: ASSET_AUDIT_ACTION.metadataUpdated,
+            actor,
+            before: beforeDelta,
+            after: afterDelta,
+          });
+        }
+      }
+    }
+    
+    const result = await getInternalAdminAssetById(db, assetId, secret, ttlSeconds).catch(() => null);
+    if (result) updatedAssets.push(result.asset);
+  }
+  return { items: updatedAssets };
+}
+
+export async function updateInternalAdminAssetPublishBulk(
+  db: DrizzleClient,
+  assetIds: string[],
+  payload: UpdatePublishInput,
+  actor: AdminActor,
+  secret: string | undefined,
+  ttlSeconds: number,
+) {
+  const updatedAssets = [];
+  for (const assetId of assetIds) {
+    try {
+      const result = await updateInternalAdminAssetPublish(db, assetId, payload, actor, secret, ttlSeconds);
+      updatedAssets.push(result.asset);
+    } catch {
+      // skip errors on individual bulk operations
+    }
+  }
+  return { items: updatedAssets };
+}
+
 export async function getInternalAdminPublishEligibility(db: DrizzleClient, assetId: string) {
   if (!isUuid(assetId)) {
     throw new AppError(400, "INVALID_ASSET_ID", "Asset id is invalid.");
@@ -411,12 +493,12 @@ export async function getInternalAdminCatalogStats(db: DrizzleClient) {
       count(*) filter (where a.original_exists_in_storage = false)::bigint as missing_r2_count,
       count(*) filter (
         where card.generation_status = 'READY'
-          and card.is_watermarked = true
+          and card.is_watermarked = false
       )::bigint as ready_card_preview_count,
       count(*) filter (
         where card.id is null
           or card.generation_status <> 'READY'
-          or card.is_watermarked = false
+          or card.is_watermarked = true
       )::bigint as missing_card_preview_count,
       count(*) filter (
         where thumb.generation_status = 'FAILED'
@@ -526,6 +608,11 @@ function parseAdminAssetQuery(params: URLSearchParams): AdminAssetQuery {
   const derivativeStatus = parseDerivativeFilter(params.get("derivativeStatus"));
   const previewState = parsePreviewState(params.get("previewState"));
   const hasPreview = parseOptionalBoolean(params.get("hasPreview"), "hasPreview");
+  const missingTitle = parseOptionalBoolean(params.get("missingTitle"), "missingTitle");
+  const missingCaption = parseOptionalBoolean(params.get("missingCaption"), "missingCaption");
+  const noEvent = parseOptionalBoolean(params.get("noEvent"), "noEvent");
+  const noCategory = parseOptionalBoolean(params.get("noCategory"), "noCategory");
+  const contributorUploads = parseOptionalBoolean(params.get("contributorUploads"), "contributorUploads");
   const cursor = normalizeOptional(params.get("cursor"));
   const limit = parseLimit(params.get("limit"));
   const sort = parseSort(params.get("sort"));
@@ -541,6 +628,11 @@ function parseAdminAssetQuery(params: URLSearchParams): AdminAssetQuery {
     derivativeStatus,
     previewState,
     hasPreview,
+    missingTitle,
+    missingCaption,
+    noEvent,
+    noCategory,
+    contributorUploads,
     cursor,
     limit,
     sort,
@@ -596,6 +688,13 @@ function buildWhere(query: AdminAssetQuery): SQL[] {
   } else if (query.previewState === "missing") {
     where.push(sql`${previewStateSql()} = 'MISSING'`);
   }
+  
+  if (query.missingTitle) where.push(sql`(a.title is null or trim(a.title) = '')`);
+  if (query.missingCaption) where.push(sql`(a.caption is null or trim(a.caption) = '')`);
+  if (query.noEvent) where.push(sql`a.event_id is null`);
+  if (query.noCategory) where.push(sql`a.category_id is null`);
+  if (query.contributorUploads) where.push(sql`a.source = 'CONTRIBUTOR_UPLOAD'`);
+
   if (query.cursor) {
     where.push(cursorPredicate(decodeCursor(query.cursor), query.sort));
   }
@@ -707,9 +806,9 @@ function cursorPredicate(cursor: CursorPayload, sort: AdminSort): SQL {
 }
 
 async function mapAdminAssetRow(row: AdminAssetRow, secret: string | undefined, ttlSeconds: number) {
-  const thumb = derivativeSummary(row.thumb_status, row.thumb_width, row.thumb_height, row.thumb_watermarked, row.thumb_mime_type, row.thumb_updated_at);
-  const card = derivativeSummary(row.card_status, row.card_width, row.card_height, row.card_watermarked, row.card_mime_type, row.card_updated_at);
-  const detail = derivativeSummary(row.detail_status, row.detail_width, row.detail_height, row.detail_watermarked, row.detail_mime_type, row.detail_updated_at);
+  const thumb = derivativeSummary("thumb", row.thumb_status, row.thumb_width, row.thumb_height, row.thumb_watermarked, row.thumb_mime_type, row.thumb_updated_at);
+  const card = derivativeSummary("card", row.card_status, row.card_width, row.card_height, row.card_watermarked, row.card_mime_type, row.card_updated_at);
+  const detail = derivativeSummary("detail", row.detail_status, row.detail_width, row.detail_height, row.detail_watermarked, row.detail_mime_type, row.detail_updated_at);
   const readyPreviewVariants = [
     ...(thumb.state === "READY" ? ["thumb"] : []),
     ...(card.state === "READY" ? ["card"] : []),
@@ -763,6 +862,7 @@ async function mapAdminAssetRow(row: AdminAssetRow, secret: string | undefined, 
 }
 
 function derivativeSummary(
+  variant: "thumb" | "card" | "detail",
   status: string | null,
   width: number | null,
   height: number | null,
@@ -771,7 +871,8 @@ function derivativeSummary(
   updatedAt: Date | string | null,
 ) {
   const hasCompleteMetadata = width !== null && height !== null;
-  const ready = status === "READY" && isWatermarked === true && hasCompleteMetadata;
+  const watermarkOk = variant === "detail" ? isWatermarked === true : isWatermarked === false;
+  const ready = status === "READY" && watermarkOk && hasCompleteMetadata;
   const state = mapDerivativeState(status);
   return {
     state: ready ? "READY" : state,
@@ -819,11 +920,11 @@ function previewStateSql(): SQL {
 }
 
 function cardReadySql(): SQL {
-  return sql`(card.generation_status = 'READY' and card.is_watermarked = true and card.mime_type is not null and card.width is not null and card.height is not null)`;
+  return sql`(card.generation_status = 'READY' and card.is_watermarked = false and card.mime_type is not null and card.width is not null and card.height is not null)`;
 }
 
 function thumbReadySql(): SQL {
-  return sql`(thumb.generation_status = 'READY' and thumb.is_watermarked = true and thumb.mime_type is not null and thumb.width is not null and thumb.height is not null)`;
+  return sql`(thumb.generation_status = 'READY' and thumb.is_watermarked = false and thumb.mime_type is not null and thumb.width is not null and thumb.height is not null)`;
 }
 
 function detailReadySql(): SQL {
@@ -831,7 +932,7 @@ function detailReadySql(): SQL {
 }
 
 function thumbReadyOrMissingSql(): SQL {
-  return sql`(thumb.id is null or (thumb.generation_status = 'READY' and thumb.is_watermarked = true and thumb.mime_type is not null and thumb.width is not null and thumb.height is not null))`;
+  return sql`(thumb.id is null or (thumb.generation_status = 'READY' and thumb.is_watermarked = false and thumb.mime_type is not null and thumb.width is not null and thumb.height is not null))`;
 }
 
 function detailReadyOrMissingSql(): SQL {
@@ -1060,14 +1161,14 @@ async function getPublishEligibility(db: DrizzleClient, assetId: string) {
       a.original_exists_in_storage as r2_exists,
       (
         thumb.generation_status = 'READY'
-        and thumb.is_watermarked = true
+        and thumb.is_watermarked = false
         and thumb.mime_type is not null
         and thumb.width is not null
         and thumb.height is not null
       ) as thumb_ready,
       (
         card.generation_status = 'READY'
-        and card.is_watermarked = true
+        and card.is_watermarked = false
         and card.mime_type is not null
         and card.width is not null
         and card.height is not null

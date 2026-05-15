@@ -100,6 +100,10 @@ Recommended policy (adjust origins to your environments):
 - **Expose headers:** usually empty for uploads.
 - **Max age:** e.g. `3600` seconds.
 
+Copy-paste JSON for the **contributor staging** bucket (`fotocorp-2026-contributor-uploads`) lives at [`apps/api/docs/r2-contributor-staging-cors.example.json`](../../../apps/api/docs/r2-contributor-staging-cors.example.json). Add each production web origin to `AllowedOrigins` (scheme + host + port must match the browser URL exactly).
+
+**You do not need the same CORS on every R2 bucket:** only buckets that receive **browser** cross-origin requests. Contributor uploads use direct `PUT` only on the **staging / contributor-uploads** bucket. Canonical originals and previews are normally reached via the **API Worker** (server-side or same-origin routes), not via contributor presigned PUT—so they typically **do not** need this browser CORS rule unless you add a separate client-direct pattern later.
+
 **Dashboard steps (summary):** Cloudflare dashboard → R2 → select the **staging** bucket (same name as `CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET` / staging Worker binding) → Settings → **CORS policy** → add rules matching the above → save. After changes, wait briefly and re-test browser uploads.
 
 Without CORS, the drag-drop UI (PR-14) will fail in the browser even when presigned PUT works from `curl` or Node `fetch`.

@@ -29,6 +29,7 @@ export const internalApiRoutes = {
     `/api/v1/internal/admin/assets/${encodeURIComponent(assetId)}/preview`,
 
   adminCatalogStats: () => "/api/v1/internal/admin/catalog/stats",
+  adminMediaPipelineStatus: () => "/api/v1/internal/admin/media-pipeline/status",
 
   adminFilters: () => "/api/v1/internal/admin/filters",
 
@@ -45,8 +46,27 @@ export const internalApiRoutes = {
   adminContributorUploadsApprove: () =>
     "/api/v1/internal/admin/contributor-uploads/approve",
 
+  adminContributorUploadsReject: () => "/api/v1/internal/admin/contributor-uploads/reject",
+
+  adminContributorUploadMetadata: (imageAssetId: string) =>
+    `/api/v1/internal/admin/contributor-uploads/${encodeURIComponent(imageAssetId)}`,
+
+  adminContributorUploadReplacePresign: (imageAssetId: string) =>
+    `/api/v1/internal/admin/contributor-uploads/${encodeURIComponent(imageAssetId)}/replace-presign`,
+
+  adminContributorUploadReplaceComplete: (imageAssetId: string) =>
+    `/api/v1/internal/admin/contributor-uploads/${encodeURIComponent(imageAssetId)}/replace-complete`,
+
   adminContributorUploadBatchDetail: (batchId: string) =>
     `/api/v1/internal/admin/contributor-uploads/batches/${encodeURIComponent(batchId)}`,
+
+  adminEvents: () => "/api/v1/internal/admin/events",
+
+  adminEvent: (eventId: string) =>
+    `/api/v1/internal/admin/events/${encodeURIComponent(eventId)}`,
+
+  adminEventPurge: (eventId: string) =>
+    `/api/v1/internal/admin/events/${encodeURIComponent(eventId)}/purge`,
 } as const
 
 export function withQuery(path: string, params: URLSearchParams) {

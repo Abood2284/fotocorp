@@ -26,6 +26,7 @@ interface CliOptions {
   dryRun: boolean
   noSyncCleanSchema: boolean
   syncEvenIfIssues: boolean
+  autoEnd: boolean
 }
 
 interface RunState {
@@ -297,6 +298,7 @@ function parseArgs(args: string[]): CliOptions {
     dryRun: false,
     noSyncCleanSchema: false,
     syncEvenIfIssues: false,
+    autoEnd: true,
   }
 
   for (let index = 0; index < args.length; index += 1) {
@@ -319,6 +321,8 @@ function parseArgs(args: string[]): CliOptions {
     else if (arg === "--dry-run") options.dryRun = true
     else if (arg === "--no-sync-clean-schema") options.noSyncCleanSchema = true
     else if (arg === "--sync-even-if-issues") options.syncEvenIfIssues = true
+    else if (arg === "--auto-end") options.autoEnd = true
+    else if (arg === "--no-auto-end") options.autoEnd = false
     else if (arg === "--help" || arg === "-h") {
       printHelp()
       process.exit(0)
@@ -330,11 +334,20 @@ function parseArgs(args: string[]): CliOptions {
   if (!options.runName) {
     throw new Error("--run-name is required.")
   }
-  if (!options.resume && options.end === undefined) {
-    throw new Error("--end is required for new runs.")
+  if (!options.resume && options.end === undefined && !options.autoEnd) {
+    throw new Error("--end is required for new runs unless --auto-end is enabled.")
   }
 
-  return options as CliOptions
+  return finalizeCliOptions(options as CliOptions)
+}
+
+function finalizeCliOptions(options: CliOptions): CliOptions {
+  if (options.resume || options.end !== undefined || !options.autoEnd) return options
+  const totalRows = countLegacyRows(options)
+  if (totalRows <= options.start) {
+    throw new Error(`Computed total rows (${totalRows}) must be greater than start (${options.start}).`)
+  }
+  return { ...options, end: totalRows }
 }
 
 function createState(options: CliOptions): RunState {
@@ -688,7 +701,46 @@ Options:
   --dry-run
   --no-sync-clean-schema   Skip automatic pnpm legacy:sync-clean-schema after a successful run
   --sync-even-if-issues    If a chunk fails, run clean sync before exiting (partial old data may sync)
+  --auto-end / --no-auto-end  Auto-compute --end from source file rows (default: --auto-end)
 `)
+}
+
+function countLegacyRows(options: Pick<CliOptions, "only" | "dataDir">) {
+  const dataDir = options.dataDir ? resolve(repoRoot, options.dataDir) : join(repoRoot, "data/legacy")
+  const base = sourceBaseByKind(options.only)
+  const source = resolveLegacySource(dataDir, base)
+  if (!source) {
+    throw new Error(`Unable to find legacy source file for '${base}' in ${dataDir}.`)
+  }
+  const raw = readFileSync(source.path, "utf8")
+  const lines = raw.split(/\r?\n/).filter((line) => line.trim().length > 0)
+  if (source.format === "csv") {
+    return Math.max(0, lines.length - 1)
+  }
+  return lines.length
+}
+
+function sourceBaseByKind(kind: ImportKind) {
+  if (kind === "assets") return "fotocorp_images"
+  if (kind === "categories") return "CategoryMaster"
+  if (kind === "events") return "eventtb"
+  return "PhotographerMaster"
+}
+
+function resolveLegacySource(dataDir: string, baseName: string): { path: string; format: "jsonl" | "csv" } | null {
+  const candidates = new Set([
+    `${baseName}.jsonl`,
+    `${baseName}.csv`,
+    `${baseName.toLowerCase()}.jsonl`,
+    `${baseName.toLowerCase()}.csv`,
+  ])
+
+  for (const fileName of candidates) {
+    const path = join(dataDir, fileName)
+    if (!existsSync(path)) continue
+    return { path, format: fileName.toLowerCase().endsWith(".jsonl") ? "jsonl" : "csv" }
+  }
+  return null
 }
 
 main().catch((error) => {

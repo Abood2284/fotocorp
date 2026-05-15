@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import type { PublicAsset, PublicEvent } from "@/features/assets/types"
 import { PublicEventsGrid } from "@/components/assets/public-events-grid"
 import { PublicAssetMosaic } from "@/components/assets/public-asset-mosaic"
@@ -11,11 +10,14 @@ import { PublicAssetCard } from "@/components/assets/public-asset-card"
 interface HomeCategorySectionProps {
   events: PublicEvent[]
   creativeAssets: PublicAsset[]
-  editorialAssets: PublicAsset[]
+  newsAssets: PublicAsset[]
+  sportsAssets: PublicAsset[]
+  entertainmentAssets: PublicAsset[]
+  retroAssets: PublicAsset[]
 }
 
-type TabType = "Creative" | "Editorial" | "Video" | "Collections"
-type EditorialSubcategory = "Latest" | "News" | "Sports" | "Entertainment" | "Archival"
+type TabType = "Editorial" | "Video" | "Caricature" | "Creative"
+type EditorialSubcategory = "Latest" | "News" | "Sports" | "Entertainment" | "Retro"
 
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
@@ -52,11 +54,26 @@ const CREATIVE_CARDS = [
   },
 ]
 
-export function HomeCategorySection({ events, creativeAssets, editorialAssets }: HomeCategorySectionProps) {
-  const router = useRouter()
+export function HomeCategorySection({ 
+  events, 
+  creativeAssets,
+  newsAssets,
+  sportsAssets,
+  entertainmentAssets,
+  retroAssets,
+}: HomeCategorySectionProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState<TabType>("Editorial")
   const [editorialSub, setEditorialSub] = useState<EditorialSubcategory>("Latest")
+
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+  
+  const latestEvents = events.filter((e) => {
+    const targetDate = e.eventDate ? new Date(e.eventDate) : (e.createdAt ? new Date(e.createdAt) : null)
+    if (!targetDate) return false
+    return targetDate >= thirtyDaysAgo || (e.createdAt && new Date(e.createdAt) >= thirtyDaysAgo)
+  })
 
   useEffect(() => {
     if (activeTab === "Creative" && scrollContainerRef.current) {
@@ -83,11 +100,7 @@ export function HomeCategorySection({ events, creativeAssets, editorialAssets }:
   }
 
   const handleTabClick = (tab: TabType) => {
-    if (tab === "Video") return // Disabled
-    if (tab === "Collections") {
-      router.push("/search") // Collections page redirect as per current implementation
-      return
-    }
+    if (tab === "Video" || tab === "Caricature") return // Disabled
     setActiveTab(tab)
   }
 
@@ -95,16 +108,6 @@ export function HomeCategorySection({ events, creativeAssets, editorialAssets }:
     <section className="w-full bg-background pt-8 pb-10">
       <div className="mx-auto flex w-full flex-col items-center">
         <div className="flex w-full flex-wrap justify-center gap-x-12 sm:gap-x-16 gap-y-4 pt-2 pb-0 text-base sm:text-[17px] font-medium text-foreground">
-          <button
-            onClick={() => handleTabClick("Creative")}
-            className={`pb-1 transition-all ${
-              activeTab === "Creative"
-                ? "border-b-[3px] border-accent font-semibold text-foreground"
-                : "border-b-[3px] border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Creative
-          </button>
           <button
             onClick={() => handleTabClick("Editorial")}
             className={`pb-1 transition-all ${
@@ -122,16 +125,26 @@ export function HomeCategorySection({ events, creativeAssets, editorialAssets }:
             Video
           </button>
           <button
-            onClick={() => handleTabClick("Collections")}
-            className="pb-1 border-b-[3px] border-transparent text-muted-foreground transition-all hover:text-foreground"
+            disabled
+            className="pb-1 border-b-[3px] border-transparent text-muted-foreground opacity-50 cursor-not-allowed"
           >
-            Collections
+            Caricature
+          </button>
+          <button
+            onClick={() => handleTabClick("Creative")}
+            className={`pb-1 transition-all ${
+              activeTab === "Creative"
+                ? "border-b-[3px] border-accent font-semibold text-foreground"
+                : "border-b-[3px] border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Creative
           </button>
         </div>
 
         {activeTab === "Editorial" && (
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-sm font-medium">
-            {(["Latest", "News", "Sports", "Entertainment", "Archival"] as EditorialSubcategory[]).map((sub) => (
+            {(["Latest", "News", "Sports", "Entertainment", "Retro"] as EditorialSubcategory[]).map((sub) => (
               <button
                 key={sub}
                 onClick={() => setEditorialSub(sub)}
@@ -150,22 +163,22 @@ export function HomeCategorySection({ events, creativeAssets, editorialAssets }:
 
       <div className="mt-6 w-full">
         {activeTab === "Editorial" && (
-          <div className="flex flex-col gap-16 w-full">
-            <div className="w-full">
-              <PublicEventsGrid events={events} />
-            </div>
+          <div className="flex flex-col gap-12 w-full pb-8">
+            {editorialSub === "Latest" ? (
+              <>
+                {latestEvents.length > 0 && (
+                  <div className="w-full">
+                    <PublicEventsGrid events={latestEvents} />
+                  </div>
+                )}
 
-            {editorialSub === "Latest" && (
-              <div className="w-full">
-                <div className="mb-4 px-4 sm:px-6 lg:px-8">
-                  <h2 className="fc-heading-2 text-foreground">Latest Editorial Content</h2>
-                </div>
-                <div className="px-4 sm:px-6 lg:px-8">
-                  {editorialAssets.length === 0 ? (
-                    <PublicAssetMosaic assets={[]} />
-                  ) : (
+                {creativeAssets.length > 0 && (
+                  <div className="w-full px-4 sm:px-6 lg:px-8">
+                    <div className="mb-4">
+                      <h2 className="fc-heading-2 text-foreground">Latest</h2>
+                    </div>
                     <div className="columns-2 gap-2 sm:columns-3 lg:columns-4 xl:columns-5">
-                      {editorialAssets.slice(0, 50).map((asset, index) => (
+                      {creativeAssets.map((asset, index) => (
                         <PublicAssetCard
                           key={asset.id}
                           asset={asset}
@@ -175,7 +188,72 @@ export function HomeCategorySection({ events, creativeAssets, editorialAssets }:
                         />
                       ))}
                     </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-12 mt-6">
+                  {newsAssets.length > 0 && (
+                    <div className="w-full px-4 sm:px-6 lg:px-8">
+                      <div className="mb-4">
+                        <h2 className="fc-heading-2 text-foreground">News</h2>
+                      </div>
+                      <div className="columns-2 gap-2 sm:columns-3 lg:columns-4 xl:columns-5">
+                        {newsAssets.map((asset, index) => (
+                          <PublicAssetCard key={asset.id} asset={asset} variant="grid" priority={index < 8} className="mb-2 break-inside-avoid" />
+                        ))}
+                      </div>
+                    </div>
                   )}
+
+                  {sportsAssets.length > 0 && (
+                    <div className="w-full px-4 sm:px-6 lg:px-8">
+                      <div className="mb-4">
+                        <h2 className="fc-heading-2 text-foreground">Sports</h2>
+                      </div>
+                      <div className="columns-2 gap-2 sm:columns-3 lg:columns-4 xl:columns-5">
+                        {sportsAssets.map((asset, index) => (
+                          <PublicAssetCard key={asset.id} asset={asset} variant="grid" priority={index < 8} className="mb-2 break-inside-avoid" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {entertainmentAssets.length > 0 && (
+                    <div className="w-full px-4 sm:px-6 lg:px-8">
+                      <div className="mb-4">
+                        <h2 className="fc-heading-2 text-foreground">Entertainment</h2>
+                      </div>
+                      <div className="columns-2 gap-2 sm:columns-3 lg:columns-4 xl:columns-5">
+                        {entertainmentAssets.map((asset, index) => (
+                          <PublicAssetCard key={asset.id} asset={asset} variant="grid" priority={index < 8} className="mb-2 break-inside-avoid" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {retroAssets.length > 0 && (
+                    <div className="w-full px-4 sm:px-6 lg:px-8">
+                      <div className="mb-4">
+                        <h2 className="fc-heading-2 text-foreground">Retro</h2>
+                      </div>
+                      <div className="columns-2 gap-2 sm:columns-3 lg:columns-4 xl:columns-5">
+                        {retroAssets.map((asset, index) => (
+                          <PublicAssetCard key={asset.id} asset={asset} variant="grid" priority={index < 8} className="mb-2 break-inside-avoid" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="w-full px-4 sm:px-6 lg:px-8 mt-2">
+                <div className="columns-2 gap-2 sm:columns-3 lg:columns-4 xl:columns-5">
+                  {(editorialSub === "News" ? newsAssets :
+                    editorialSub === "Sports" ? sportsAssets :
+                    editorialSub === "Entertainment" ? entertainmentAssets :
+                    editorialSub === "Retro" ? retroAssets : []).map((asset, index) => (
+                    <PublicAssetCard key={asset.id} asset={asset} variant="grid" priority={index < 8} className="mb-2 break-inside-avoid" />
+                  ))}
                 </div>
               </div>
             )}

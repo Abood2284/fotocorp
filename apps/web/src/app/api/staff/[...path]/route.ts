@@ -22,6 +22,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
   return proxyStaffRequest(request, context)
 }
 
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  return proxyStaffRequest(request, context)
+}
+
 interface RouteContext {
   params: Promise<{
     path?: string[]

@@ -9,14 +9,30 @@ export const metadata = {
 }
 
 export default async function HomePage() {
-  const [latestAssets, eventsResponse, creativeAssets] = await Promise.all([
-    listPublicAssets({ limit: 50, sort: "newest" })
-      .then((result) => result.items)
-      .catch(() => []),
+  const [
+    eventsResponse,
+    creativeAssets,
+    newsAssets,
+    sportsAssets,
+    entertainmentAssets,
+    retroAssets,
+  ] = await Promise.all([
     listPublicEvents()
       .then((result) => result.items)
       .catch(() => []),
     listPublicAssets({ limit: 50, sort: "newest" })
+      .then((result) => result.items)
+      .catch(() => []),
+    listPublicAssets({ q: "News", limit: 15, sort: "newest" })
+      .then((result) => result.items)
+      .catch(() => []),
+    listPublicAssets({ q: "Sports", limit: 15, sort: "newest" })
+      .then((result) => result.items)
+      .catch(() => []),
+    listPublicAssets({ q: "Entertainment", limit: 15, sort: "newest" })
+      .then((result) => result.items)
+      .catch(() => []),
+    listPublicAssets({ q: "Retro", limit: 15, sort: "newest" })
       .then((result) => result.items)
       .catch(() => []),
   ])
@@ -39,7 +55,14 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <HomeCategorySection events={eventsResponse} creativeAssets={creativeAssets} editorialAssets={latestAssets} />
+      <HomeCategorySection 
+        events={eventsResponse} 
+        creativeAssets={creativeAssets} 
+        newsAssets={newsAssets}
+        sportsAssets={sportsAssets}
+        entertainmentAssets={entertainmentAssets}
+        retroAssets={retroAssets}
+      />
     </>
   )
 }

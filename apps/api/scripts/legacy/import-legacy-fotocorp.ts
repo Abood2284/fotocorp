@@ -49,6 +49,7 @@ interface CliOptions {
 }
 
 interface Counters {
+  selectedRows: number
   totalRows: number
   insertedRows: number
   updatedRows: number
@@ -101,6 +102,7 @@ loadLocalEnv()
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
+  const startedAtMs = Date.now()
   const shouldCheckR2 = !options.skipR2Check && (options.only === "all" || options.only === "assets")
   const r2Config = shouldCheckR2 ? getR2Config({ required: !options.dryRun }) : null
   const counters = emptyCounters()
@@ -134,7 +136,7 @@ async function main() {
   } finally {
     if (pool && batchId) await finishBatch(pool, batchId, counters, status)
     await pool?.end()
-    printReport(counters, batchId, options, status)
+    printReport(counters, batchId, options, status, startedAtMs)
   }
 
   if (status === "FAILED") process.exitCode = 1
@@ -149,6 +151,7 @@ async function importCategories(pool: import("pg").Pool | null, options: CliOpti
 
   const startedAt = Date.now()
   for await (const rows of readRowBatches(source, options)) {
+    counters.selectedRows += rows.length
     counters.totalRows += rows.length
     if (options.dryRun || !pool) {
       logProgress("categories", counters, startedAt)
@@ -205,6 +208,7 @@ async function importEvents(pool: import("pg").Pool | null, options: CliOptions,
 
   const startedAt = Date.now()
   for await (const rows of readRowBatches(source, options)) {
+    counters.selectedRows += rows.length
     counters.totalRows += rows.length
     if (options.dryRun || !pool) {
       logProgress("events", counters, startedAt)
@@ -282,6 +286,7 @@ async function importPhotographers(pool: import("pg").Pool | null, options: CliO
 
   const startedAt = Date.now()
   for await (const rows of readRowBatches(source, options)) {
+    counters.selectedRows += rows.length
     counters.totalRows += rows.length
     if (options.dryRun || !pool) {
       logProgress("contributors", counters, startedAt)
@@ -364,6 +369,7 @@ async function importAssets(
   const startedAt = Date.now()
 
   for await (const rows of readRowBatches(source, options)) {
+    counters.selectedRows += rows.length
     counters.totalRows += rows.length
     const records: unknown[][] = []
     const issues: ImportIssue[] = []
@@ -496,8 +502,13 @@ async function importAssets(
               r2_original_key = excluded.r2_original_key,
               original_filename = excluded.original_filename,
               original_ext = excluded.original_ext,
-              r2_exists = excluded.r2_exists,
-              r2_checked_at = excluded.r2_checked_at,
+              r2_exists = assets.r2_exists or excluded.r2_exists,
+              r2_checked_at = case
+                when excluded.r2_exists = true then excluded.r2_checked_at
+                when excluded.r2_checked_at is null then assets.r2_checked_at
+                when assets.r2_exists = true then assets.r2_checked_at
+                else excluded.r2_checked_at
+              end,
               title = excluded.title,
               caption = excluded.caption,
               headline = excluded.headline,
@@ -1109,6 +1120,7 @@ function hasCompleteR2Config() {
 
 function emptyCounters(): Counters {
   return {
+    selectedRows: 0,
     totalRows: 0,
     insertedRows: 0,
     updatedRows: 0,
@@ -1146,8 +1158,33 @@ function parseDefaultExt(value: string | undefined) {
   throw new Error("--default-ext must be jpg, jpeg, png, or webp.")
 }
 
-function printReport(counters: Counters, batchId: string | null, options: CliOptions, status: BatchStatus) {
-  console.log(JSON.stringify({ batchId, status, options, counters }, null, 2))
+function printReport(
+  counters: Counters,
+  batchId: string | null,
+  options: CliOptions,
+  status: BatchStatus,
+  startedAtMs: number,
+) {
+  const durationMs = Date.now() - startedAtMs
+  const durationMinutes = durationMs / 60_000
+  const rowsPerMinute = durationMinutes > 0 ? Number((counters.selectedRows / durationMinutes).toFixed(2)) : 0
+  const skippedRows = Math.max(0, counters.selectedRows - counters.insertedRows - counters.updatedRows - counters.failedRows)
+
+  console.log(JSON.stringify({
+    batchId,
+    status,
+    options,
+    summary: {
+      selected: counters.selectedRows,
+      inserted: counters.insertedRows,
+      updated: counters.updatedRows,
+      skipped: skippedRows,
+      failed: counters.failedRows,
+      durationMs,
+      rowsPerMinute,
+    },
+    counters,
+  }, null, 2))
 }
 
 function printHelp() {

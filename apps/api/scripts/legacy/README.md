@@ -90,7 +90,7 @@ Use an R2 prefix when objects are stored under a folder:
 pnpm legacy:import -- --only assets --limit 1000 --r2-prefix originals
 ```
 
-Large imports run in bulk upsert batches. Use `--batch-size` to control DB chunk size, and use `--offset` with `--limit` to resume or process the legacy files in deterministic windows:
+Large imports run in bulk upsert batches. Use `--batch-size` to control DB chunk size, and use `--offset` with `--limit` to process deterministic windows when needed:
 
 ```bash
 pnpm legacy:import -- --only assets --skip-r2-check --offset 0 --limit 10000 --batch-size 1000 --default-ext jpg
@@ -206,6 +206,8 @@ data/legacy/import-runs/<run-name>/
 ```
 
 `state.json` tracks the next offset. `chunks.jsonl` appends one record per attempted chunk, including the importer's `batchId`, counters, exit code, and error text when available. When a chunk has a `batchId`, the runner queries `asset_import_issues` for that batch and writes per-chunk issue JSONL/CSV files plus aggregate `all-issues.jsonl` and `all-issues.csv`. Aggregate issue reports are de-duplicated by `batch_id + legacy_srno + issue_type`. `summary.md` is regenerated after every chunk with totals, issue report paths, the last 10 issues, and the resume command.
+
+For new runs, `legacy:import:chunks` now auto-computes `--end` from source file rows by default (`--auto-end`), so manual end-offset planning is optional.
 
 If the process is interrupted, the runner marks the state `STOPPED`, removes `run.lock`, and does not advance the offset for the incomplete chunk. If a stale `run.lock` remains after a crashed terminal, use `--force` only after confirming no runner process is still active.
 

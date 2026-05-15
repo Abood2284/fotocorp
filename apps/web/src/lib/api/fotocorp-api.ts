@@ -8,7 +8,17 @@ import type {
   PublicEventListResponse,
 } from "@/features/assets/types"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ?? ""
+function normalizePublicApiOrigin(value: string) {
+  return value.trim().replace(/\/+$/, "")
+}
+
+function getPublicApiBaseUrl() {
+  const fromPublic = process.env.PUBLIC_API_BASE_URL
+  if (fromPublic?.trim()) return normalizePublicApiOrigin(fromPublic)
+  const fromNextPublic = process.env.NEXT_PUBLIC_API_BASE_URL
+  if (fromNextPublic?.trim()) return normalizePublicApiOrigin(fromNextPublic)
+  return ""
+}
 
 export class FotocorpApiError extends Error {
   constructor(
@@ -22,17 +32,18 @@ export class FotocorpApiError extends Error {
 }
 
 export function hasFotocorpApiBaseUrl() {
-  return API_BASE_URL.length > 0
+  return getPublicApiBaseUrl().length > 0
 }
 
 export function buildApiAssetUrl(path: string) {
-  if (!API_BASE_URL) {
+  const apiBaseUrl = getPublicApiBaseUrl()
+  if (!apiBaseUrl) {
     throw new FotocorpApiError("Fotocorp API base URL is not configured.", 500, "API_BASE_URL_MISSING")
   }
 
   if (/^https?:\/\//i.test(path)) return path
   const normalizedPath = path.startsWith("/") ? path : `/${path}`
-  return `${API_BASE_URL}${normalizedPath}`
+  return `${apiBaseUrl}${normalizedPath}`
 }
 
 export async function listPublicAssets(params: PublicAssetListParams = {}): Promise<PublicAssetListResponse> {
@@ -98,7 +109,7 @@ export async function listPublicEvents(): Promise<PublicEventListResponse> {
 
 async function getJson<T>(path: string): Promise<T> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 5000)
+  const timeout = setTimeout(() => controller.abort(), 15_000)
   const requestUrl = path.startsWith("/api/public/")
     ? path
     : buildApiAssetUrl(path)

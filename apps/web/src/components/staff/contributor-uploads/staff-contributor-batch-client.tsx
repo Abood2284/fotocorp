@@ -49,16 +49,21 @@ export function StaffContributorBatchClient({
       }
       const approved = body.approvedCount
       const skipped = body.skipped.length
+      const skipReasonSummary = summarizeSkipReasons(body.skipped)
       const queueNote =
         approved > 0
           ? "Items approved and queued for derivative generation."
           : ""
       const skippedNote = skipped > 0 ? ` ${skipped} skipped.` : ""
+      const skipDebug =
+        approved === 0 && skipped > 0 && skipReasonSummary
+          ? ` ${skipReasonSummary}`
+          : ""
       const message =
         approved > 0
           ? `${queueNote}${skippedNote}`
           : skipped > 0
-            ? `0 approved.${skippedNote}`
+            ? `0 approved.${skippedNote}${skipDebug}`
             : "Nothing to approve."
       setStatusMessage({ kind: approved > 0 ? "ok" : "error", text: message })
       setOpenModalFor(null)
@@ -297,6 +302,14 @@ function ReviewModal({
             <DescItem label="Visibility" value={upload.visibility} />
             <DescItem label="Source" value={upload.source} />
             <DescItem label="Fotokey" value={upload.fotokey ?? "—"} />
+            <DescItem
+              label="Asset category"
+              value={upload.assetCategoryName ?? "—"}
+            />
+            <DescItem
+              label="Event default category"
+              value={upload.eventDefaultCategoryName ?? "—"}
+            />
           </dl>
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
@@ -340,4 +353,14 @@ function formatSize(bytes: number | null) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`
+}
+
+function summarizeSkipReasons(skipped: Array<{ imageAssetId: string; reason: string }>): string {
+  if (skipped.length === 0) return ""
+  const counts = new Map<string, number>()
+  for (const row of skipped) {
+    counts.set(row.reason, (counts.get(row.reason) ?? 0) + 1)
+  }
+  const parts = [...counts.entries()].map(([reason, n]) => `${reason} (${n})`)
+  return `Skip reasons: ${parts.join(", ")}.`
 }

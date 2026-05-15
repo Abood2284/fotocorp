@@ -2,16 +2,15 @@
 
 import Link from "next/link"
 import { useMemo, useRef, useState } from "react"
-import { Check, Copy, Download, ShieldCheck } from "lucide-react"
+import { Download, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { FotoboxSaveButton } from "@/components/assets/fotobox-save-button"
 import { messageForSubscriberDownloadErrorCode } from "@/lib/download-error-messages"
 import { cn } from "@/lib/utils"
 
 export type AssetDetailAccessState =
   | "logged-out"
   | "profile-unavailable"
-  | "non-subscriber"
+  | "signed-in-without-download"
   | "subscriber"
 
 export interface AssetSizeOption {
@@ -28,10 +27,9 @@ interface AssetDetailActionsProps {
   accessState: AssetDetailAccessState
   assetHref: string
   downloadHref: string
-  fotokey: string | null
-  previewUrl?: string | null
   sizeOptions: AssetSizeOption[]
   metadataRows: AssetMetadataRow[]
+  keywords: string[]
 }
 
 interface AssetMetadataRow {
@@ -44,13 +42,11 @@ export function AssetDetailActions({
   accessState,
   assetHref,
   downloadHref,
-  fotokey,
-  previewUrl,
   sizeOptions,
   metadataRows,
+  keywords,
 }: AssetDetailActionsProps) {
   const [selectedSize, setSelectedSize] = useState<AssetSizeOption["id"]>("large")
-  const [copied, setCopied] = useState(false)
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
   const downloadFrameRef = useRef<HTMLIFrameElement>(null)
@@ -59,17 +55,6 @@ export function AssetDetailActions({
     () => sizeOptions.find((option) => option.id === selectedSize) ?? sizeOptions[0],
     [selectedSize, sizeOptions],
   )
-
-  async function handleCopyLink() {
-    const url = typeof window === "undefined" ? assetHref : new URL(assetHref, window.location.origin).toString()
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    } catch {
-      setCopied(false)
-    }
-  }
 
   async function handleSubscriberDownload(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
@@ -108,16 +93,7 @@ export function AssetDetailActions({
     }
   }
 
-  function handleWatermarkDownload() {
-    if (!previewUrl) return
-    const fileNameBase = fotokey || assetId
-    const anchor = document.createElement("a")
-    anchor.href = previewUrl
-    anchor.download = `${fileNameBase}-watermarked.jpg`
-    anchor.rel = "noreferrer"
-    anchor.target = "_blank"
-    anchor.click()
-  }
+
 
   const message = getAccessMessage(accessState)
 
@@ -134,18 +110,23 @@ export function AssetDetailActions({
       <div className="border-b border-border pb-4">
         <p className="text-xs font-medium text-muted-foreground">{message.eyebrow}</p>
         <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">{message.title}</h2>
+        {message.description ? (
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{message.description}</p>
+        ) : null}
       </div>
 
-      <fieldset className="space-y-2">
-        <legend className="text-xs font-medium text-muted-foreground">File access tiers</legend>
+      <fieldset className="space-y-1.5">
         {sizeOptions.map((option) => {
           const selected = option.id === selectedOption?.id
+          const isDisabled = !option.downloadAvailable
+
           return (
             <label
               key={option.id}
               className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors",
-                selected ? "border-primary bg-primary-wash" : "border-border/60 hover:bg-muted/35",
+                "relative flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors",
+                selected ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/35",
+                isDisabled && "opacity-60 cursor-not-allowed bg-muted/20"
               )}
             >
               <input
@@ -153,18 +134,22 @@ export function AssetDetailActions({
                 name="asset-size"
                 value={option.id}
                 checked={selected}
+                disabled={isDisabled}
                 onChange={() => setSelectedSize(option.id)}
-                className="mt-1"
+                className="mt-0.5 h-3.5 w-3.5 accent-primary"
               />
               <span className="min-w-0 flex-1">
-                <span className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-foreground">{qualityLabelForSize(option.id)}</span>
-                  {option.dimensions && <span className="text-xs text-muted-foreground">{option.dimensions}</span>}
+                <span className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-foreground">{option.label}</span>
+                  {isDisabled && (
+                    <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Coming Soon
+                    </span>
+                  )}
                 </span>
-                <span className="mt-1 block text-sm leading-5 text-muted-foreground">{option.description}</span>
-                {!option.downloadAvailable && option.disabledReason && (
-                  <span className="mt-1 block text-xs font-medium text-muted-foreground">{option.disabledReason}</span>
-                )}
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {option.description}
+                </span>
               </span>
             </label>
           )
@@ -172,13 +157,13 @@ export function AssetDetailActions({
       </fieldset>
 
       {metadataRows.length > 0 && (
-        <div className="space-y-2 rounded-xl border border-border/70 bg-background p-4">
-          <h3 className="text-sm font-medium text-foreground">Details</h3>
-          <dl className="mt-2 space-y-2 text-sm">
+        <div className="space-y-1.5 rounded-lg border border-border/70 bg-background p-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Details</h3>
+          <dl className="mt-1.5 space-y-1 text-xs">
             {metadataRows.map((row) => (
-              <div key={row.label} className="grid grid-cols-[96px_minmax(0,1fr)] gap-2.5">
-                <dt className="text-xs font-normal text-muted-foreground">{row.label}</dt>
-                <dd className="text-sm font-normal text-foreground">{row.value}</dd>
+              <div key={row.label} className="grid grid-cols-[100px_minmax(0,1fr)] gap-2">
+                <dt className="font-medium text-muted-foreground/80">{row.label}</dt>
+                <dd className="font-medium text-foreground truncate" title={row.value}>{row.value}</dd>
               </div>
             ))}
           </dl>
@@ -217,15 +202,31 @@ export function AssetDetailActions({
             aria-label={`Download ${selectedOption?.label ?? "selected"} size`}
           >
             <Download className="h-4 w-4" />
-            {downloadBusy ? "Starting download..." : "Download clean file"}
+            {downloadBusy ? "Starting download..." : "Download asset"}
           </Button>
+        ) : accessState === "signed-in-without-download" ? (
+          <div className="space-y-3">
+            <Link
+              href="/account/subscription"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Download access & account
+            </Link>
+            <Link
+              href="/account/access-pending"
+              className="inline-flex h-10 w-full items-center justify-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              Request status
+            </Link>
+          </div>
         ) : (
           <Link
-            href="/pricing"
+            href="/request-access"
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
           >
             <ShieldCheck className="h-4 w-4" />
-            Choose plan for clean download
+            Request download access
           </Link>
         )}
 
@@ -235,37 +236,33 @@ export function AssetDetailActions({
           </div>
         )}
 
-        <FotoboxSaveButton assetId={assetId} />
-
-        <div className="grid gap-2 sm:grid-cols-2">
-          {previewUrl ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-border px-3 py-2 text-center text-sm font-medium leading-5 text-foreground transition-colors hover:bg-muted"
-              onClick={handleWatermarkDownload}
-              aria-label="Download watermark"
-              title="Download watermark"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button disabled variant="outline" className="h-10">
-              Preview unavailable
-            </Button>
-          )}
-          <Button type="button" variant="outline" className="min-h-10 py-2" onClick={handleCopyLink} aria-label="Copy asset link">
-            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {copied ? "Copied" : "Copy link"}
-          </Button>
-        </div>
+        {keywords.length > 0 && (
+          <div className="pt-4 border-t border-border/60">
+            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Keywords</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {keywords.map((keyword) => (
+                <Link
+                  key={keyword}
+                  href={`/search?q=${encodeURIComponent(keyword)}`}
+                  className="rounded bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {keyword}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
       </div>
     </section>
   )
 }
 
-function getAccessMessage(accessState: AssetDetailAccessState) {
+function getAccessMessage(accessState: AssetDetailAccessState): {
+  eyebrow: string
+  title: string
+  description?: string
+} {
   if (accessState === "subscriber") {
     return {
       eyebrow: "Image access",
@@ -280,21 +277,20 @@ function getAccessMessage(accessState: AssetDetailAccessState) {
     }
   }
 
-  if (accessState === "non-subscriber") {
+  if (accessState === "signed-in-without-download") {
     return {
-      eyebrow: "Image access",
-      title: "Choose your delivery quality",
+      eyebrow: "Signed in",
+      title: "Clean downloads unlock after approval",
+      description:
+        "You can browse watermarked previews and use Fotobox. Staff-approved download entitlements are required for clean files—not a self-serve plan checkout.",
     }
   }
 
   return {
-    eyebrow: "Image access",
-    title: "Choose your delivery quality",
+    eyebrow: "Clean downloads",
+    title: "Request access to originals",
+    description: "Create an account and tell us what you need. After Fotocorp reviews your request, approved accounts can download files where licensing allows.",
   }
 }
 
-function qualityLabelForSize(size: AssetSizeOption["id"]) {
-  if (size === "large") return "High quality (Original clean file)"
-  if (size === "medium") return "Medium quality (Editorial layout)"
-  return "Low quality (Watermarked preview)"
-}
+

@@ -8,6 +8,7 @@ export interface ErrorResponseDto {
   error: {
     code: string;
     message: string;
+    detail?: unknown;
   };
 }
 

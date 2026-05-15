@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { Archive, Download, ShieldCheck } from "lucide-react"
 import { AccountShell } from "@/components/account/account-shell"
 import { requireAuth } from "@/lib/app-user"
+import { formatDownloadQuotaLabel, getActiveSubscriberEntitlementQuota } from "@/lib/app-user-profile-store"
 
 export const metadata = {
   title: "Account",
@@ -11,6 +12,9 @@ export const metadata = {
 export default async function AccountPage() {
   const appUser = await requireAuth()
   const subscriber = appUser.isSubscriber && appUser.subscriptionStatus === "ACTIVE"
+  const entitlementQuota = await getActiveSubscriberEntitlementQuota(appUser.authUserId)
+  const downloadUsed = entitlementQuota?.used ?? appUser.downloadQuotaUsed
+  const downloadLimit = entitlementQuota ? entitlementQuota.limit : appUser.downloadQuotaLimit
 
   return (
     <AccountShell
@@ -28,7 +32,7 @@ export default async function AccountPage() {
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
                 {subscriber
                   ? "Your subscriber access is active."
-                  : "Clean downloads require subscriber access. You can still browse and save images to Fotobox."}
+                  : "Clean downloads require staff-approved access. You can still browse and save images to Fotobox."}
               </p>
             </div>
           </div>
@@ -37,7 +41,7 @@ export default async function AccountPage() {
             <ProfileField label="Role" value={appUser.role} />
             <ProfileField label="Profile" value={appUser.status} />
             <ProfileField label="Subscription" value={appUser.subscriptionStatus} />
-            <ProfileField label="Downloads used" value={quotaLabel(appUser.downloadQuotaUsed, appUser.downloadQuotaLimit)} />
+            <ProfileField label="Downloads used" value={formatDownloadQuotaLabel(downloadUsed, downloadLimit)} />
             <ProfileField label="Subscriber" value={appUser.isSubscriber ? "Yes" : "No"} />
           </dl>
         </section>
@@ -56,10 +60,10 @@ export default async function AccountPage() {
             description="See subscriber download history and re-download eligible files."
           />
           <QuickLink
-            href={subscriber ? "/account/subscription" : "/pricing"}
+            href={subscriber ? "/account/subscription" : "/request-access"}
             icon={<ShieldCheck className="h-5 w-5" />}
-            title={subscriber ? "Subscription" : "View access plans"}
-            description={subscriber ? "Check plan status and quota." : "Upgrade when you need clean licensed downloads."}
+            title={subscriber ? "Download access" : "Request access"}
+            description={subscriber ? "Check access status and quota summary." : "Tell our team what you need; we will email you."}
           />
         </section>
       </div>
@@ -100,6 +104,3 @@ function QuickLink({
   )
 }
 
-function quotaLabel(used: number, limit: number | null) {
-  return `${used} / ${limit === null ? "Unlimited" : limit}`
-}

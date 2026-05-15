@@ -1,0 +1,51 @@
+{
+  "startedAt": "2026-05-14T16:46:41.925Z",
+  "finishedAt": "2026-05-14T17:47:17.804Z",
+  "durationMs": 3635879,
+  "selectedAssets": 10000,
+  "selectedVariants": 24000,
+  "processedAssets": 8000,
+  "processedVariants": 24000,
+  "generatedVariants": 23938,
+  "failedVariants": 62,
+  "skippedReady": 0,
+  "regeneratedFailed": 0,
+  "throughput": {
+    "assetsPerMinute": 132.0175946449263,
+    "variantsPerMinute": 396.0527839347789
+  },
+  "timing": {
+    "averageR2ReadMs": 498.84064148493496,
+    "averageSourceDecodeMs": 90.00477210713059,
+    "averageSharpTransformMs": 201.3089169886812,
+    "averageR2UploadMs": 661.2578965141608,
+    "averageDbWriteMs": 102.85847580218686,
+    "totalR2ReadMs": 3990226.2912379946,
+    "totalSourceDecodeMs": 718328.0861870092,
+    "totalSharpTransformMs": 4819939.399459994,
+    "totalR2UploadMs": 15829191.526755981,
+    "totalDbWriteMs": 826776.428497978
+  },
+  "failureCounts": {
+    "corruptOriginalAssets": 16,
+    "unsupportedImageAssets": 0,
+    "r2ReadFailures": 1,
+    "r2UploadFailures": 0,
+    "dbWriteFailures": 4,
+    "failedVariants": 62
+  },
+  "config": {
+    "scope": "all-verified",
+    "limit": 10000,
+    "batchSize": 100,
+    "assetConcurrency": 4,
+    "uploadConcurrency": 8,
+    "r2RetryAttempts": 3,
+    "r2RetryBaseMs": 250,
+    "maxRuntimeMinutes": 60,
+    "failOnItemErrors": false,
+    "dryRun": false,
+    "watermarkProfile": "fotocorp-preview-v4-dense-dark-lowquality",
+    "failureLogPath": "logs/media-derivative-generation-failures-2026-05-14T16-46-41-926Z.jsonl"
+  }
+}

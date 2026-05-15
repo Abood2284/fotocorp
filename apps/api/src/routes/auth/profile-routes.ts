@@ -5,6 +5,7 @@ import { createHttpDb } from "../../db";
 import { AppError } from "../../lib/errors";
 import { errorResponse, json } from "../../lib/http";
 import {
+  findLatestInquiryForUser,
   getFotocorpUserProfileByUserId,
   toFotocorpUserProfileDto,
 } from "./services/fotocorp-registration-profile";
@@ -37,6 +38,7 @@ authProfileRoutes.get("/api/v1/auth/me", async (c) => {
     );
   }
 
+  const latestInquiry = await findLatestInquiryForUser(db, session.user.id);
   const user = session.user as {
     id: string;
     email: string;
@@ -53,6 +55,13 @@ authProfileRoutes.get("/api/v1/auth/me", async (c) => {
       username: user.username ?? profile.username,
     },
     profile: toFotocorpUserProfileDto(profile),
+    accessInquiry: latestInquiry
+      ? {
+          id: latestInquiry.id,
+          status: latestInquiry.status,
+          createdAt: latestInquiry.createdAt instanceof Date ? latestInquiry.createdAt.toISOString() : latestInquiry.createdAt,
+        }
+      : null,
   });
 });
 

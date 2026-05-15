@@ -16,15 +16,20 @@ INTERNAL_API_SECRET=replace-with-long-random-internal-secret
 # Runtime media delivery uses Worker R2 bindings in wrangler.jsonc:
 # - MEDIA_PREVIEWS_BUCKET for watermarked derivatives
 # - MEDIA_ORIGINALS_BUCKET for canonical Fotokey originals (admin tunnel + subscriber download)
-# - MEDIA_CONTRIBUTOR_UPLOADS_BUCKET for photographer pre-approval staging objects (PR-15.1+)
-# Node scripts use S3-compatible R2 credentials. Keep these server-side only.
+# - MEDIA_CONTRIBUTOR_UPLOADS_BUCKET for contributor pre-approval staging objects (browser PUT target)
+# When both staging + originals bindings are present (e.g. `wrangler dev`), contributor **approve**
+# copies staging → originals via native R2 get/put without S3 API keys.
+# S3-compatible R2 credentials (server-side only; never expose to the browser).
+# Contributor direct uploads are **signed by this API** (`POST .../upload-batches/:id/files`), so these
+# variables belong in `apps/api/.dev.vars` — not only in `apps/jobs/.env.production`.
 #
-# Bucket separation (PR-15.1):
-# - Photographer browser PUT presigned URLs sign against CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET ONLY.
-# - Canonical originals bucket holds Fotokey-named files (FCddmmyyNNN.<ext>) at root and is written
-#   server-side via R2 CopyObject during admin approval.
-# - Browser CORS is required on the photographer staging bucket (NOT on the canonical originals bucket).
-#   See ../../docs/db-revamp/reports/photographer-bulk-upload-backend-report.md for the dashboard CORS instructions.
+# Preferred names (aligned with `apps/jobs`):
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_CONTRIBUTOR_STAGING_BUCKET=fotocorp-2026-contributor-uploads
+#
+# Legacy aliases (still read by the API if the `R2_*` names above are unset):
 CLOUDFLARE_R2_ACCOUNT_ID=
 CLOUDFLARE_R2_ACCESS_KEY_ID=
 CLOUDFLARE_R2_SECRET_ACCESS_KEY=
@@ -32,6 +37,19 @@ CLOUDFLARE_R2_REGION=auto
 CLOUDFLARE_R2_ORIGINALS_BUCKET=fotocorp-2026-megafinal
 CLOUDFLARE_R2_PREVIEWS_BUCKET=fotocorp-2026-previews
 CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET=fotocorp-2026-contributor-uploads
+#
+# Bucket roles:
+# - Contributor browser PUT presigned URLs target **only** the contributor staging bucket (`R2_CONTRIBUTOR_STAGING_BUCKET`,
+#   same name as Worker binding `MEDIA_CONTRIBUTOR_UPLOADS_BUCKET` in wrangler.jsonc).
+# - Canonical originals bucket holds Fotokey-named files at root; promotion is server-side (R2 CopyObject), not browser PUT.
+#
+# R2 CORS (browser PUT): the **contributor staging** bucket needs a CORS rule allowing PUT from your web origin
+# (e.g. `http://localhost:3000` in dev, and your deployed Pages/Workers site origin in production). AllowedMethods
+# should include `PUT`; AllowedHeaders must allow `Content-Type`. Without CORS, presigned PUT succeeds from curl/Node
+# but fails in the browser. Paste JSON in R2 → bucket → Settings → CORS policy. Example file:
+#   apps/api/docs/r2-contributor-staging-cors.example.json
+# (duplicate each production origin in AllowedOrigins; do not use `*` for production if you can avoid it).
+# See ../../docs/db-revamp/reports/photographer-bulk-upload-backend-report.md for context.
 
 # Optional: bootstrap first staff user (never commit real passwords)
 # STAFF_BOOTSTRAP_USERNAME=super.admin

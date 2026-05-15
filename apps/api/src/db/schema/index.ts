@@ -21,6 +21,8 @@ export * from "./fotokey-daily-counters";
 export * from "./image-publish-jobs";
 export * from "./image-publish-job-items";
 export * from "./fotocorp-user-profiles";
+export * from "./customer-access-inquiries";
+export * from "./subscriber-entitlements";
 export * from "./admin-audit";
 export * from "./admin-user-audit";
 export * from "./staff-accounts";

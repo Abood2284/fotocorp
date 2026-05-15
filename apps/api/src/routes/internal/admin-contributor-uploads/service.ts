@@ -1,6 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { Env } from "../../../appTypes";
-import { createHttpDb, createTransactionalDb, type DrizzleClient } from "../../../db";
+import { createHttpDb, createTransactionalDb } from "../../../db";
 import { AppError } from "../../../lib/errors";
 import {
   allocateFotokeysForApproval,
@@ -14,11 +14,17 @@ import { json } from "../../../lib/http";
 import { getR2Object } from "../../../lib/r2";
 import {
   copyStagingObjectToOriginals,
-  verifyPhotographerStagingObjectExists,
+  hasContributorStagingS3Config,
+  verifyContributorStagingObjectExists,
 } from "../../../lib/r2-contributor-uploads";
+import { createContributorStagingPresignedPutUrl } from "../../../lib/r2-presigned-put";
 import type {
   AdminContributorUploadApproveBody,
   AdminContributorUploadListQuery,
+  AdminContributorUploadMetadataPatchBody,
+  AdminContributorUploadRejectBody,
+  AdminContributorUploadReplaceCompleteBody,
+  AdminContributorUploadReplacePresignBody,
 } from "./validators";
 
 interface AdminUploadListRow {
@@ -41,11 +47,16 @@ interface AdminUploadListRow {
   event_date: Date | string | null;
   event_city: string | null;
   event_location: string | null;
+  asset_category_name: string | null;
+  event_default_category_name: string | null;
   batch_status: string;
   asset_type: string | null;
   batch_submitted_at: Date | string | null;
   created_at: Date | string;
   updated_at: Date | string;
+  title: string | null;
+  caption: string | null;
+  keywords: string | null;
 }
 
 interface AdminUploadOriginalRow {
@@ -111,6 +122,9 @@ export async function listAdminContributorUploadsService(
 
   const filters = buildListFilters({ ...query, status, limit, offset });
   const filterSql = filters.length > 0 ? sql.join(filters, sql` and `) : sql`true`;
+  const sort = query.sort ?? "submitted";
+  const order = query.order ?? "desc";
+  const orderBySql = buildListOrderBy(sort, order);
 
   const rows = await executeRows<AdminUploadListRow>(
     database,
@@ -135,18 +149,25 @@ export async function listAdminContributorUploadsService(
         ev.event_date as event_date,
         ev.city as event_city,
         ev.location as event_location,
+        ac_cat.name as asset_category_name,
+        ev_cat.name as event_default_category_name,
         b.status as batch_status,
         b.asset_type as asset_type,
         b.submitted_at as batch_submitted_at,
         ia.created_at as created_at,
-        ia.updated_at as updated_at
+        ia.updated_at as updated_at,
+        ia.title as title,
+        ia.caption as caption,
+        ia.keywords as keywords
       from contributor_upload_items pui
       join image_assets ia on ia.id = pui.image_asset_id
       join contributor_upload_batches b on b.id = pui.batch_id
       join contributors ph on ph.id = pui.contributor_id
       left join photo_events ev on ev.id = ia.event_id
+      left join asset_categories ac_cat on ac_cat.id = ia.category_id
+      left join asset_categories ev_cat on ev_cat.id = ev.category_id
       where ${filterSql}
-      order by ia.created_at desc, ia.id desc
+      ${orderBySql}
       limit ${limit}
       offset ${offset}
     `,
@@ -161,6 +182,8 @@ export async function listAdminContributorUploadsService(
       join contributor_upload_batches b on b.id = pui.batch_id
       join contributors ph on ph.id = pui.contributor_id
       left join photo_events ev on ev.id = ia.event_id
+      left join asset_categories ac_cat on ac_cat.id = ia.category_id
+      left join asset_categories ev_cat on ev_cat.id = ev.category_id
       where ${filterSql}
     `,
   );
@@ -349,7 +372,7 @@ export async function approveAdminContributorUploadsService(
   for (const item of prepared) {
     let exists = false;
     try {
-      exists = await verifyPhotographerStagingObjectExists(env, item.sourceStorageKey);
+      exists = await verifyContributorStagingObjectExists(env, item.sourceStorageKey);
     } catch {
       exists = false;
     }
@@ -480,6 +503,10 @@ export async function approveAdminContributorUploadsService(
             original_file_extension = ${item.canonicalExtension},
             original_exists_in_storage = true,
             original_storage_checked_at = now(),
+            category_id = coalesce(
+              category_id,
+              (select pe.category_id from photo_events pe where pe.id = image_assets.event_id limit 1)
+            ),
             updated_at = now()
           where id = ${item.imageAssetId}::uuid
             and status = 'SUBMITTED'
@@ -607,6 +634,7 @@ export async function getAdminContributorUploadBatchService(
 
   const filters = buildListFilters(itemsQuery);
   const filterSql = filters.length > 0 ? sql.join(filters, sql` and `) : sql`true`;
+  const orderBySql = buildListOrderBy("submitted", "desc");
 
   const itemsRows = await executeRows<AdminUploadListRow>(
     database,
@@ -631,18 +659,25 @@ export async function getAdminContributorUploadBatchService(
         ev.event_date as event_date,
         ev.city as event_city,
         ev.location as event_location,
+        ac_cat.name as asset_category_name,
+        ev_cat.name as event_default_category_name,
         b.status as batch_status,
         b.asset_type as asset_type,
         b.submitted_at as batch_submitted_at,
         ia.created_at as created_at,
-        ia.updated_at as updated_at
+        ia.updated_at as updated_at,
+        ia.title as title,
+        ia.caption as caption,
+        ia.keywords as keywords
       from contributor_upload_items pui
       join image_assets ia on ia.id = pui.image_asset_id
       join contributor_upload_batches b on b.id = pui.batch_id
       join contributors ph on ph.id = pui.contributor_id
       left join photo_events ev on ev.id = ia.event_id
+      left join asset_categories ac_cat on ac_cat.id = ia.category_id
+      left join asset_categories ev_cat on ev_cat.id = ev.category_id
       where ${filterSql}
-      order by ia.created_at desc, ia.id desc
+      ${orderBySql}
     `,
   );
 
@@ -720,6 +755,472 @@ function buildListFilters(
   return filters;
 }
 
+function buildListOrderBy(sort: string, order: "asc" | "desc"): SQL {
+  if (sort === "contributor") {
+    return order === "asc"
+      ? sql`order by lower(coalesce(ph.display_name, '')) asc, ia.created_at desc, ia.id desc`
+      : sql`order by lower(coalesce(ph.display_name, '')) desc, ia.created_at desc, ia.id desc`;
+  }
+  if (sort === "event") {
+    return order === "asc"
+      ? sql`order by lower(coalesce(ev.name, '')) asc, ia.created_at desc, ia.id desc`
+      : sql`order by lower(coalesce(ev.name, '')) desc, ia.created_at desc, ia.id desc`;
+  }
+  return order === "asc"
+    ? sql`order by ia.created_at asc, ia.id asc`
+    : sql`order by ia.created_at desc, ia.id desc`;
+}
+
+export async function patchAdminContributorUploadMetadataService(
+  env: Env,
+  imageAssetId: string,
+  body: AdminContributorUploadMetadataPatchBody,
+): Promise<Response> {
+  if (!env.DATABASE_URL) {
+    throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.");
+  }
+
+  const writeDb = createTransactionalDb(env.DATABASE_URL);
+  try {
+    const currentRows = await executeRows<{
+      title: string | null;
+      caption: string | null;
+      keywords: string | null;
+      updated_at: Date | string;
+    }>(
+      writeDb.db,
+      sql`
+        select ia.title, ia.caption, ia.keywords, ia.updated_at
+        from image_assets ia
+        inner join contributor_upload_items pui on pui.image_asset_id = ia.id
+        where ia.id = ${imageAssetId}::uuid
+          and ia.source = 'FOTOCORP'
+          and ia.status = 'SUBMITTED'
+          and ia.visibility = 'PRIVATE'
+          and ia.fotokey is null
+        limit 1
+      `,
+    );
+    const cur = currentRows[0];
+    if (!cur) {
+      throw new AppError(
+        404,
+        "CONTRIBUTOR_UPLOAD_NOT_FOUND",
+        "This upload is not editable, or it does not exist.",
+      );
+    }
+
+    const nextTitle =
+      body.title !== undefined ? normalizeNullableText(body.title, 2048) : (cur.title ?? null);
+    const nextCaption =
+      body.caption !== undefined ? normalizeNullableText(body.caption, 8000) : (cur.caption ?? null);
+    const nextKeywords =
+      body.keywords !== undefined ? normalizeKeywordsInput(body.keywords) : (cur.keywords ?? null);
+    const searchText = [nextTitle, nextCaption, nextKeywords].filter(Boolean).join(" ").trim() || null;
+
+    const updated = await executeRows<{ updated_at: Date | string }>(
+      writeDb.db,
+      sql`
+        update image_assets ia
+        set
+          title = ${nextTitle},
+          headline = ${nextTitle},
+          caption = ${nextCaption},
+          keywords = ${nextKeywords},
+          search_text = ${searchText},
+          updated_at = now()
+        where ia.id = ${imageAssetId}::uuid
+          and ia.source = 'FOTOCORP'
+          and ia.status = 'SUBMITTED'
+          and ia.visibility = 'PRIVATE'
+          and ia.fotokey is null
+          and ia.updated_at = ${body.expectedUpdatedAt}::timestamptz
+          and exists (select 1 from contributor_upload_items pui where pui.image_asset_id = ia.id)
+        returning ia.updated_at
+      `,
+    );
+    const u = updated[0];
+    if (!u) {
+      const snapRows = await executeRows<{
+        title: string | null;
+        caption: string | null;
+        keywords: string | null;
+        updated_at: Date | string;
+      }>(
+        writeDb.db,
+        sql`
+          select ia.title, ia.caption, ia.keywords, ia.updated_at
+          from image_assets ia
+          where ia.id = ${imageAssetId}::uuid
+          limit 1
+        `,
+      );
+      const snap = snapRows[0];
+      if (!snap) {
+        throw new AppError(
+          404,
+          "CONTRIBUTOR_UPLOAD_NOT_FOUND",
+          "This upload is not editable, or it does not exist.",
+        );
+      }
+      return json(
+        {
+          ok: false as const,
+          error: {
+            code: "METADATA_CONFLICT",
+            message: "Another change was saved first. Reload the form and try again.",
+            detail: {
+              title: snap.title ?? null,
+              caption: snap.caption ?? null,
+              keywords: snap.keywords ?? null,
+              updatedAt: toIso(snap.updated_at) ?? new Date(0).toISOString(),
+            },
+          },
+        },
+        409,
+      );
+    }
+
+    return json({
+      ok: true as const,
+      title: nextTitle,
+      caption: nextCaption,
+      keywords: nextKeywords,
+      updatedAt: toIso(u.updated_at) ?? new Date(0).toISOString(),
+    });
+  } finally {
+    await writeDb.close().catch(() => undefined);
+  }
+}
+
+type RejectSkippedReason =
+  | "NOT_FOUND"
+  | "NOT_LINKED_TO_UPLOAD"
+  | "NOT_FOTOCORP_SOURCE"
+  | "NOT_SUBMITTED"
+  | "NOT_PRIVATE"
+  | "ALREADY_FOTOKEYED";
+
+interface RejectSkipped {
+  imageAssetId: string;
+  reason: RejectSkippedReason;
+}
+
+export async function rejectAdminContributorUploadsService(
+  env: Env,
+  body: AdminContributorUploadRejectBody,
+): Promise<Response> {
+  if (!env.DATABASE_URL) {
+    throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.");
+  }
+
+  const requestedIds = unique(body.imageAssetIds);
+  const skipped: RejectSkipped[] = [];
+  const rejectedItems: { imageAssetId: string }[] = [];
+
+  const writeDb = createTransactionalDb(env.DATABASE_URL);
+  try {
+    await writeDb.db.transaction(async (tx) => {
+      for (const id of requestedIds) {
+        const row = await executeRows<{ id: string }>(
+          tx,
+          sql`
+            update image_assets ia
+            set
+              status = 'ARCHIVED',
+              updated_at = now()
+            where ia.id = ${id}::uuid
+              and ia.status = 'SUBMITTED'
+              and ia.visibility = 'PRIVATE'
+              and ia.source = 'FOTOCORP'
+              and ia.fotokey is null
+              and exists (select 1 from contributor_upload_items pui where pui.image_asset_id = ia.id)
+            returning ia.id
+          `,
+        );
+        const ok = row[0];
+        if (ok) {
+          rejectedItems.push({ imageAssetId: ok.id });
+          continue;
+        }
+
+        const probe = await executeRows<{
+          id: string;
+          status: string;
+          visibility: string;
+          source: string;
+          fotokey: string | null;
+          linked: boolean;
+        }>(
+          tx,
+          sql`
+            select
+              ia.id as id,
+              ia.status as status,
+              ia.visibility as visibility,
+              ia.source as source,
+              ia.fotokey as fotokey,
+              exists (select 1 from contributor_upload_items pui where pui.image_asset_id = ia.id) as linked
+            from image_assets ia
+            where ia.id = ${id}::uuid
+            limit 1
+          `,
+        );
+        const p = probe[0];
+        if (!p) {
+          skipped.push({ imageAssetId: id, reason: "NOT_FOUND" });
+        } else if (!p.linked) {
+          skipped.push({ imageAssetId: id, reason: "NOT_LINKED_TO_UPLOAD" });
+        } else if (p.source !== "FOTOCORP") {
+          skipped.push({ imageAssetId: id, reason: "NOT_FOTOCORP_SOURCE" });
+        } else if (p.fotokey) {
+          skipped.push({ imageAssetId: id, reason: "ALREADY_FOTOKEYED" });
+        } else if (p.status !== "SUBMITTED") {
+          skipped.push({ imageAssetId: id, reason: "NOT_SUBMITTED" });
+        } else if (p.visibility !== "PRIVATE") {
+          skipped.push({ imageAssetId: id, reason: "NOT_PRIVATE" });
+        } else {
+          skipped.push({ imageAssetId: id, reason: "NOT_SUBMITTED" });
+        }
+      }
+    });
+  } finally {
+    await writeDb.close().catch(() => undefined);
+  }
+
+  return json({
+    ok: true as const,
+    rejectedCount: rejectedItems.length,
+    items: rejectedItems,
+    skipped,
+  });
+}
+
+export async function presignAdminContributorUploadReplaceService(
+  env: Env,
+  imageAssetId: string,
+  body: AdminContributorUploadReplacePresignBody,
+): Promise<Response> {
+  if (!hasContributorStagingS3Config(env)) {
+    throw new AppError(
+      503,
+      "UPLOAD_STORAGE_NOT_CONFIGURED",
+      "Contributor staging storage is not configured for presigned uploads.",
+    );
+  }
+
+  const database = httpDb(env);
+  const rows = await executeRows<{ storage_key: string }>(
+    database,
+    sql`
+      select pui.storage_key as storage_key
+      from image_assets ia
+      inner join contributor_upload_items pui on pui.image_asset_id = ia.id
+      where ia.id = ${imageAssetId}::uuid
+        and ia.source = 'FOTOCORP'
+        and ia.status = 'SUBMITTED'
+        and ia.visibility = 'PRIVATE'
+        and ia.fotokey is null
+      limit 1
+    `,
+  );
+  const row = rows[0];
+  if (!row) {
+    throw new AppError(
+      404,
+      "CONTRIBUTOR_UPLOAD_NOT_FOUND",
+      "This upload cannot be replaced, or it does not exist.",
+    );
+  }
+
+  const signed = await createContributorStagingPresignedPutUrl(env, row.storage_key, body.contentType);
+  return json({
+    ok: true as const,
+    uploadUrl: signed.uploadUrl,
+    expiresAt: signed.expiresAt,
+  });
+}
+
+export async function completeAdminContributorUploadReplaceService(
+  env: Env,
+  imageAssetId: string,
+  body: AdminContributorUploadReplaceCompleteBody,
+): Promise<Response> {
+  if (!env.DATABASE_URL) {
+    throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.");
+  }
+
+  const database = httpDb(env);
+  const rows = await executeRows<{
+    storage_key: string;
+    display_name: string;
+    ext: string | null;
+    mime_type: string | null;
+    size_bytes: number | string | null;
+  }>(
+    database,
+    sql`
+      select
+        pui.storage_key as storage_key,
+        coalesce(ia.original_file_name, pui.original_file_name) as display_name,
+        coalesce(ia.original_file_extension, pui.original_file_extension) as ext,
+        pui.mime_type as mime_type,
+        pui.size_bytes as size_bytes
+      from image_assets ia
+      inner join contributor_upload_items pui on pui.image_asset_id = ia.id
+      where ia.id = ${imageAssetId}::uuid
+        and ia.source = 'FOTOCORP'
+        and ia.status = 'SUBMITTED'
+        and ia.visibility = 'PRIVATE'
+        and ia.fotokey is null
+      limit 1
+    `,
+  );
+  const row = rows[0];
+  if (!row) {
+    throw new AppError(
+      404,
+      "CONTRIBUTOR_UPLOAD_NOT_FOUND",
+      "This upload cannot be replaced, or it does not exist.",
+    );
+  }
+
+  let exists = false;
+  try {
+    exists = await verifyContributorStagingObjectExists(env, row.storage_key);
+  } catch {
+    throw new AppError(502, "R2_ERROR", "Could not verify the uploaded file in storage.");
+  }
+  if (!exists) {
+    throw new AppError(400, "REPLACE_OBJECT_MISSING", "The new file was not found in storage. Upload it first.");
+  }
+
+  const displayName =
+    body.originalFileName?.trim() ||
+    row.display_name ||
+    "original";
+  const safeDisplay = displayName.replace(/[\\/\r\n"]/g, "_").trim() || "original";
+  const parsedExt = parseExtensionFromFileName(safeDisplay) ?? row.ext;
+  const mimeType = body.mimeType?.trim() || row.mime_type || "application/octet-stream";
+  const sizeBytes =
+    body.sizeBytes !== undefined && body.sizeBytes !== null
+      ? body.sizeBytes
+      : row.size_bytes === null || row.size_bytes === undefined
+        ? null
+        : Number(row.size_bytes);
+
+  const writeDb = createTransactionalDb(env.DATABASE_URL);
+  try {
+    const updated = await executeRows<{
+      updated_at: Date | string;
+      original_file_name: string;
+      original_file_extension: string | null;
+    }>(
+      writeDb.db,
+      sql`
+        update image_assets ia
+        set
+          original_file_name = ${safeDisplay},
+          original_file_extension = ${parsedExt},
+          original_exists_in_storage = true,
+          original_storage_checked_at = now(),
+          updated_at = now()
+        where ia.id = ${imageAssetId}::uuid
+          and ia.source = 'FOTOCORP'
+          and ia.status = 'SUBMITTED'
+          and ia.visibility = 'PRIVATE'
+          and ia.fotokey is null
+          and ia.updated_at = ${body.expectedUpdatedAt}::timestamptz
+          and exists (select 1 from contributor_upload_items pui where pui.image_asset_id = ia.id)
+        returning ia.updated_at, ia.original_file_name, ia.original_file_extension
+      `,
+    );
+    const u = updated[0];
+    if (!u) {
+      const snapRows = await executeRows<{ updated_at: Date | string }>(
+        writeDb.db,
+        sql`select ia.updated_at from image_assets ia where ia.id = ${imageAssetId}::uuid limit 1`,
+      );
+      const snap = snapRows[0];
+      if (!snap) {
+        throw new AppError(
+          404,
+          "CONTRIBUTOR_UPLOAD_NOT_FOUND",
+          "This upload cannot be replaced, or it does not exist.",
+        );
+      }
+      return json(
+        {
+          ok: false as const,
+          error: {
+            code: "METADATA_CONFLICT",
+            message: "Another change was saved first. Reload and try the replace again.",
+            detail: { updatedAt: toIso(snap.updated_at) ?? new Date(0).toISOString() },
+          },
+        },
+        409,
+      );
+    }
+
+    await writeDb.db.execute(sql`
+      update contributor_upload_items
+      set
+        mime_type = ${mimeType},
+        size_bytes = ${sizeBytes},
+        updated_at = now()
+      where image_asset_id = ${imageAssetId}::uuid
+    `);
+
+    const puiRows = await executeRows<{ mime_type: string | null; size_bytes: number | string | null }>(
+      writeDb.db,
+      sql`
+        select mime_type, size_bytes
+        from contributor_upload_items
+        where image_asset_id = ${imageAssetId}::uuid
+        limit 1
+      `,
+    );
+    const pui = puiRows[0];
+
+    return json({
+      ok: true as const,
+      originalFileName: u.original_file_name,
+      originalFileExtension: u.original_file_extension ?? null,
+      mimeType: pui?.mime_type ?? mimeType,
+      sizeBytes:
+        pui?.size_bytes === null || pui?.size_bytes === undefined ? null : Number(pui.size_bytes),
+      updatedAt: toIso(u.updated_at) ?? new Date(0).toISOString(),
+    });
+  } finally {
+    await writeDb.close().catch(() => undefined);
+  }
+}
+
+function normalizeNullableText(value: string | null, maxLen: number): string | null {
+  if (value === null) return null;
+  const t = value.trim().slice(0, maxLen);
+  return t ? t : null;
+}
+
+function normalizeKeywordsInput(value: string | string[] | null): string | null {
+  if (value === null) return null;
+  if (Array.isArray(value)) {
+    const parts = value.map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) return null;
+    return parts.slice(0, 80).join(", ");
+  }
+  const t = value.trim();
+  return t ? t.slice(0, 8000) : null;
+}
+
+function parseExtensionFromFileName(name: string): string | null {
+  const idx = name.lastIndexOf(".");
+  if (idx <= 0 || idx === name.length - 1) return null;
+  const ext = name.slice(idx + 1).trim();
+  if (!ext || ext.length > 32) return null;
+  return ext.replace(/[^a-zA-Z0-9]/g, "") || null;
+}
+
 function toUploadDto(row: AdminUploadListRow) {
   const status = row.status;
   const visibility = row.visibility;
@@ -738,6 +1239,9 @@ function toUploadDto(row: AdminUploadListRow) {
     source,
     assetType: row.asset_type,
     fotokey: row.fotokey ?? null,
+    title: row.title ?? null,
+    caption: row.caption ?? null,
+    keywords: row.keywords ?? null,
     contributor: {
       id: row.contributor_id,
       legacyPhotographerId:
@@ -763,6 +1267,8 @@ function toUploadDto(row: AdminUploadListRow) {
     createdAt: toIso(row.created_at) ?? new Date(0).toISOString(),
     updatedAt: toIso(row.updated_at) ?? new Date(0).toISOString(),
     canApprove,
+    assetCategoryName: row.asset_category_name ?? null,
+    eventDefaultCategoryName: row.event_default_category_name ?? null,
   };
 }
 
@@ -796,7 +1302,11 @@ function httpDb(env: Env) {
   return createHttpDb(env.DATABASE_URL);
 }
 
-async function executeRows<T>(database: DrizzleClient, query: SQL): Promise<T[]> {
+interface SqlExecutor {
+  execute(query: SQL): Promise<unknown>;
+}
+
+async function executeRows<T>(database: SqlExecutor, query: SQL): Promise<T[]> {
   const result = await database.execute(query);
   if (Array.isArray(result)) return result as T[];
   if (result && typeof result === "object" && "rows" in result && Array.isArray(result.rows)) {

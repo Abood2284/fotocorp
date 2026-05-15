@@ -35,6 +35,8 @@ const keywordsField = z.union([
 
 export const photographerEventCreateBodySchema = z.object({
   name: z.string().trim().min(2).max(180),
+  categoryId: z.string().uuid(),
+  targetContributorId: z.string().uuid().optional(),
   eventDate: optionalDateString,
   eventTime: optionalNullableString(64),
   country: optionalNullableString(120),
@@ -52,6 +54,7 @@ export const photographerEventCreateBodySchema = z.object({
 export const photographerEventPatchBodySchema = z
   .object({
     name: z.string().trim().min(2).max(180).optional(),
+    categoryId: z.string().uuid().optional(),
     eventDate: optionalDateString.optional(),
     eventTime: optionalNullableString(64).optional(),
     country: optionalNullableString(120).optional(),

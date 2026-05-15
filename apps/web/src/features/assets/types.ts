@@ -94,6 +94,7 @@ export interface PublicEvent {
   eventDate: string | null
   assetCount: number
   preview: PublicPreview | null
+  createdAt?: string | null
 }
 
 export interface PublicEventListResponse {

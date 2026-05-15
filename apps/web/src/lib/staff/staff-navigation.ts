@@ -3,12 +3,15 @@ import {
   Images,
   Inbox,
   LayoutDashboard,
+  Mail,
   ShieldCheck,
   Subtitles,
   Users,
   Workflow,
   Database,
+  Gauge,
   UserCog,
+  Calendar,
 } from "lucide-react"
 import type { StaffRole } from "@/lib/staff/staff-route-access"
 
@@ -34,14 +37,26 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     roles: ["SUPER_ADMIN", "CATALOG_MANAGER", "REVIEWER"],
   },
   {
+    label: "Access inquiries",
+    href: "/staff/access-inquiries",
+    icon: Mail,
+    roles: ["SUPER_ADMIN", "SUPPORT", "FINANCE"],
+  },
+  {
     label: "Catalog",
-    href: "/staff/assets",
+    href: "/staff/catalog",
     icon: Images,
     roles: ["SUPER_ADMIN", "CATALOG_MANAGER"],
   },
   {
+    label: "Events",
+    href: "/staff/events",
+    icon: Calendar,
+    roles: ["SUPER_ADMIN"],
+  },
+  {
     label: "Caption management",
-    href: "/staff/caption-management",
+    href: "/staff/captions",
     icon: Subtitles,
     roles: ["SUPER_ADMIN", "CAPTION_MANAGER"],
   },
@@ -55,6 +70,12 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     label: "Ingestion",
     href: "/staff/ingestion",
     icon: Workflow,
+    roles: ["SUPER_ADMIN"],
+  },
+  {
+    label: "Media pipeline",
+    href: "/staff/media-pipeline",
+    icon: Gauge,
     roles: ["SUPER_ADMIN"],
   },
   {

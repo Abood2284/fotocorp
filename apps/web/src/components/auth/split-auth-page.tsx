@@ -132,6 +132,49 @@ const JOB_TITLE_GROUPS: SelectGroup[] = [
 
 const USERNAME_ERROR_MESSAGE = "Username can only use letters, numbers, dots, and underscores."
 
+const SIGN_IN_FIELD_ORDER = ["identifier", "password"] as const
+
+const REGISTER_FIELD_ORDER = [
+  "firstName",
+  "lastName",
+  "username",
+  "companyType",
+  "companyName",
+  "jobTitle",
+  "customJobTitle",
+  "companyEmail",
+  "interestedAssetTypes",
+  "imageQuantityRange",
+  "imageQualityPreference",
+  "phoneCountryCode",
+  "phoneNumber",
+  "password",
+] as const
+
+const fieldErrorTextClass = "text-xs font-medium text-red-600"
+
+function scrollFirstAuthFieldErrorIntoView(tab: AuthTab, errors: FormErrors) {
+  const order = tab === "register" ? REGISTER_FIELD_ORDER : SIGN_IN_FIELD_ORDER
+  const firstKey = order.find((key) => Boolean(errors[key]))
+  if (!firstKey) return
+  const root = document.querySelector(`[data-auth-form="${tab}"]`)
+  const scope = root instanceof HTMLElement ? root : document.body
+  const el = scope.querySelector(`[data-auth-field="${firstKey}"]`) as HTMLElement | null
+  if (!el) return
+  el.scrollIntoView({ behavior: "smooth", block: "center" })
+  const focusable = el.matches("input, select, textarea")
+    ? el
+    : (el.querySelector("input, select, textarea") as HTMLElement | null)
+  if (focusable) focusable.focus({ preventScroll: true })
+}
+
+function queueScrollToFirstFieldError(tab: AuthTab, errors: FormErrors) {
+  if (!Object.keys(errors).length) return
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => scrollFirstAuthFieldErrorIntoView(tab, errors))
+  })
+}
+
 export function SplitAuthPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -142,6 +185,7 @@ export function SplitAuthPage() {
   const [errors, setErrors] = useState<FormErrors>({})
   const [jobTitle, setJobTitle] = useState("")
   const [companyEmail, setCompanyEmail] = useState("")
+  const [interest, setInterest] = useState({ IMAGE: false, VIDEO: false, CARICATURE: false })
   const [notice, setNotice] = useState("")
   const [emailStatus, setEmailStatus] = useState<EmailValidationStatus>("idle")
   const [emailStatusMessage, setEmailStatusMessage] = useState("")
@@ -167,6 +211,7 @@ export function SplitAuthPage() {
     setActiveTab(tab)
     setErrors({})
     setNotice("")
+    if (tab === "sign-in") setInterest({ IMAGE: false, VIDEO: false, CARICATURE: false })
   }
 
   function handleCompanyEmailBlur() {
@@ -230,7 +275,10 @@ export function SplitAuthPage() {
     if (!password) nextErrors.password = "Password is required."
 
     setErrors(nextErrors)
-    if (Object.keys(nextErrors).length) return
+    if (Object.keys(nextErrors).length) {
+      queueScrollToFirstFieldError("sign-in", nextErrors)
+      return
+    }
 
     startTransition(async () => {
       try {
@@ -239,11 +287,11 @@ export function SplitAuthPage() {
           : await authClient.signIn.username({ username: normalizeUsername(identifier), password })
 
         if (response.error) {
-          applySignInServerError({ error: response.error, setErrors, setNotice })
+          applySignInServerError({ error: response.error, setErrors, setNotice, tab: "sign-in" })
           return
         }
       } catch (error) {
-        applySignInServerError({ error, setErrors, setNotice })
+        applySignInServerError({ error, setErrors, setNotice, tab: "sign-in" })
         return
       }
 
@@ -291,8 +339,20 @@ export function SplitAuthPage() {
       nextErrors.companyEmail = "Please wait until company email validation completes."
     }
 
+    const interestedAssetTypes = (["IMAGE", "VIDEO", "CARICATURE"] as const).filter((k) => interest[k])
+    if (!interestedAssetTypes.length) {
+      nextErrors.interestedAssetTypes = "Select at least one content type you are interested in."
+    }
+    if (interestedAssetTypes.includes("IMAGE")) {
+      requireField(formData, nextErrors, "imageQuantityRange", "Image quantity range is required when Images is selected.")
+      requireField(formData, nextErrors, "imageQualityPreference", "Image quality preference is required when Images is selected.")
+    }
+
     setErrors(nextErrors)
-    if (Object.keys(nextErrors).length) return
+    if (Object.keys(nextErrors).length) {
+      queueScrollToFirstFieldError("register", nextErrors)
+      return
+    }
 
     const password = String(formData.get("password") ?? "")
     const firstName = String(formData.get("firstName") ?? "").trim()
@@ -302,10 +362,9 @@ export function SplitAuthPage() {
     const customJobTitle = String(formData.get("customJobTitle") ?? "").trim()
     const phoneCountryCode = String(formData.get("phoneCountryCode") ?? "").trim()
     const phoneNumber = String(formData.get("phoneNumber") ?? "").trim()
-    const phoneExtension = String(formData.get("phoneExtension") ?? "").trim()
 
     startTransition(async () => {
-      const signUpPayload = {
+      const signUpPayload: Record<string, unknown> = {
         email,
         name: `${firstName} ${lastName}`.trim(),
         password,
@@ -319,24 +378,27 @@ export function SplitAuthPage() {
         companyEmail: email,
         phoneCountryCode,
         phoneNumber,
-        phoneExtension,
+        interestedAssetTypes,
+      }
+      if (interestedAssetTypes.includes("IMAGE")) {
+        signUpPayload.imageQuantityRange = String(formData.get("imageQuantityRange") ?? "").trim()
+        signUpPayload.imageQualityPreference = String(formData.get("imageQualityPreference") ?? "").trim()
       }
 
-      const signUp = authClient.signUp.email as (payload: typeof signUpPayload) => Promise<{ error?: unknown }>
+      const signUp = authClient.signUp.email as unknown as (payload: Record<string, unknown>) => Promise<{ error?: unknown }>
 
       try {
         const response = await signUp(signUpPayload)
         if (response.error) {
-          applyRegisterServerError({ error: response.error, setErrors, setNotice })
+          applyRegisterServerError({ error: response.error, setErrors, setNotice, tab: "register" })
           return
         }
       } catch (error) {
-        applyRegisterServerError({ error, setErrors, setNotice })
+        applyRegisterServerError({ error, setErrors, setNotice, tab: "register" })
         return
       }
 
-      setNotice("Check your email to verify your account.")
-      router.push(redirectTo)
+      router.push("/account/access-pending")
       router.refresh()
     })
   }
@@ -383,7 +445,7 @@ export function SplitAuthPage() {
 
             <div className="min-h-0 flex-1 lg:pr-1">
               {activeTab === "sign-in" ? (
-                <form onSubmit={handleSignIn} noValidate className="space-y-5">
+                <form data-auth-form="sign-in" onSubmit={handleSignIn} noValidate className="space-y-5">
                   <TextField
                     label="Username or company email"
                     name="identifier"
@@ -412,7 +474,7 @@ export function SplitAuthPage() {
                   <FormNotice isError>{notice}</FormNotice>
                 </form>
               ) : (
-                <form onSubmit={handleRegister} noValidate className="space-y-4 pb-4">
+                <form data-auth-form="register" onSubmit={handleRegister} noValidate className="space-y-4 pb-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <TextField label="First Name" name="firstName" autoComplete="given-name" error={errors.firstName} required />
                     <TextField label="Last Name" name="lastName" autoComplete="family-name" error={errors.lastName} required />
@@ -444,8 +506,71 @@ export function SplitAuthPage() {
                     required
                   />
                   <EmailStatusNotice status={emailStatus} message={emailStatusMessage} />
+                  <fieldset data-auth-field="interestedAssetTypes" className="space-y-3 rounded-md border border-border-subtle p-3">
+                    <legend className={labelClassName}>Tell us what you need *</legend>
+                    <div className="flex flex-col gap-2 text-sm">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={interest.IMAGE}
+                          onChange={(e) => setInterest((s) => ({ ...s, IMAGE: e.target.checked }))}
+                          className="h-4 w-4 rounded border-input"
+                        />
+                        Images
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={interest.VIDEO}
+                          onChange={(e) => setInterest((s) => ({ ...s, VIDEO: e.target.checked }))}
+                          className="h-4 w-4 rounded border-input"
+                        />
+                        Videos
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={interest.CARICATURE}
+                          onChange={(e) => setInterest((s) => ({ ...s, CARICATURE: e.target.checked }))}
+                          className="h-4 w-4 rounded border-input"
+                        />
+                        Caricatures
+                      </label>
+                    </div>
+                    <FieldError>{errors.interestedAssetTypes}</FieldError>
+                    {interest.IMAGE ? (
+                      <div className="grid gap-4 border-t border-border-subtle pt-3 sm:grid-cols-2">
+                        <label data-auth-field="imageQuantityRange" className="block space-y-2">
+                          <span className={labelClassName}> Quantity *</span>
+                          <select name="imageQuantityRange" className={inputClassName} defaultValue="">
+                            <option value="" disabled>
+                              Select range
+                            </option>
+                            <option value="0_20">0–20</option>
+                            <option value="20_50">20–50</option>
+                            <option value="50_100">50–100</option>
+                            <option value="100_250">100–250</option>
+                            <option value="250_plus">250+</option>
+                          </select>
+                          <FieldError>{errors.imageQuantityRange}</FieldError>
+                        </label>
+                        <label data-auth-field="imageQualityPreference" className="block space-y-2">
+                          <span className={labelClassName}>Quality *</span>
+                          <select name="imageQualityPreference" className={inputClassName} defaultValue="">
+                            <option value="" disabled>
+                              Select quality
+                            </option>
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                          </select>
+                          <FieldError>{errors.imageQualityPreference}</FieldError>
+                        </label>
+                      </div>
+                    ) : null}
+                  </fieldset>
                   <div className="grid gap-4 sm:grid-cols-[132px_minmax(0,1fr)]">
-                    <label className="block space-y-2">
+                    <label data-auth-field="phoneCountryCode" className="block space-y-2">
                       <span className={labelClassName}>Telephone *</span>
                       <select name="phoneCountryCode" defaultValue="+91" className={inputClassName}>
                         {callingCodes.map((country) => (
@@ -458,7 +583,6 @@ export function SplitAuthPage() {
                     </label>
                     <TextField label="Phone Number" name="phoneNumber" type="tel" autoComplete="tel-national" error={errors.phoneNumber} required />
                   </div>
-                  <TextField label="Ext" name="phoneExtension" type="tel" autoComplete="tel-extension" />
                   <TextField label="Password" name="password" type="password" autoComplete="new-password" error={errors.password} required />
                   <SubmitButton disabled={isCreateDisabled}>
                     {isPending ? "Creating Account..." : "Create Account"}
@@ -517,7 +641,7 @@ function TextField({
   required = false,
 }: TextFieldProps) {
   return (
-    <label className="block space-y-2">
+    <label data-auth-field={name} className="block space-y-2">
       <span className={labelClassName}>
         {label}
         {required ? " *" : ""}
@@ -555,7 +679,7 @@ function SelectField({
   required?: boolean
 }) {
   return (
-    <label className="block space-y-2">
+    <label data-auth-field={name} className="block space-y-2">
       <span className={labelClassName}>
         {label}
         {required ? " *" : ""}
@@ -595,13 +719,13 @@ function EmailStatusNotice({
     ? "text-green-700"
     : status === "checking"
       ? "text-muted-foreground"
-      : "text-destructive"
+      : "text-red-600"
   return <p className={`text-xs font-medium ${colorClass}`}>{message}</p>
 }
 
 function FieldError({ children }: { children?: string }) {
   if (!children) return null
-  return <p className="text-xs font-medium text-destructive">{children}</p>
+  return <p className={fieldErrorTextClass}>{children}</p>
 }
 
 function FormNotice({
@@ -613,7 +737,7 @@ function FormNotice({
 }) {
   if (!children) return null
   const className = isError
-    ? "border-destructive/30 bg-destructive/10 text-destructive"
+    ? "border-red-200 bg-red-50 text-red-600"
     : "border-border bg-surface-warm text-muted-foreground"
   return <p className={`border px-3 py-2 text-xs font-medium ${className}`}>{children}</p>
 }
@@ -718,14 +842,20 @@ function applyRegisterServerError({
   error,
   setErrors,
   setNotice,
+  tab,
 }: {
   error: unknown
   setErrors: (errors: FormErrors) => void
   setNotice: (notice: string) => void
+  tab: AuthTab
 }) {
   const message = humanizeAuthErrorMessage(error, "register")
   const fieldName = mapRegisterServerErrorToField(error, message)
-  if (fieldName) setErrors({ [fieldName]: message })
+  if (fieldName) {
+    const next = { [fieldName]: message }
+    setErrors(next)
+    queueScrollToFirstFieldError(tab, next)
+  }
   setNotice(message)
 }
 
@@ -733,14 +863,20 @@ function applySignInServerError({
   error,
   setErrors,
   setNotice,
+  tab,
 }: {
   error: unknown
   setErrors: (errors: FormErrors) => void
   setNotice: (notice: string) => void
+  tab: AuthTab
 }) {
   const message = humanizeAuthErrorMessage(error, "sign-in")
   const fieldName = mapSignInServerErrorToField(error, message)
-  if (fieldName) setErrors({ [fieldName]: message })
+  if (fieldName) {
+    const next = { [fieldName]: message }
+    setErrors(next)
+    queueScrollToFirstFieldError(tab, next)
+  }
   setNotice(message)
 }
 
@@ -853,6 +989,6 @@ function getNestedValue(target: unknown, path: string) {
 }
 
 const inputClassName =
-  "h-11 w-full border border-border bg-white px-3 text-sm text-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-0 aria-[invalid=true]:border-destructive"
+  "h-11 w-full border border-border bg-white px-3 text-sm text-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-0 aria-[invalid=true]:border-red-600"
 
 const labelClassName = "fc-label text-xs uppercase tracking-[0.11em] text-foreground"

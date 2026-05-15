@@ -5,15 +5,23 @@ import { methodNotAllowed } from "../../../lib/route-errors";
 import { internalAuthMiddleware } from "../../../middleware/internalAuth";
 import {
   approveAdminContributorUploadsService,
+  completeAdminContributorUploadReplaceService,
   getAdminContributorUploadOriginalService,
-  listAdminContributorUploadsService,
   getAdminContributorUploadBatchService,
+  listAdminContributorUploadsService,
+  patchAdminContributorUploadMetadataService,
+  presignAdminContributorUploadReplaceService,
+  rejectAdminContributorUploadsService,
 } from "./service";
 import {
   adminContributorUploadApproveBodySchema,
-  adminContributorUploadListQuerySchema,
-  adminContributorUploadParamSchema,
   adminContributorUploadBatchParamSchema,
+  adminContributorUploadListQuerySchema,
+  adminContributorUploadMetadataPatchBodySchema,
+  adminContributorUploadParamSchema,
+  adminContributorUploadRejectBodySchema,
+  adminContributorUploadReplaceCompleteBodySchema,
+  adminContributorUploadReplacePresignBodySchema,
 } from "./validators";
 
 export const internalAdminContributorUploadRoutes = new Hono<{ Bindings: Env }>();
@@ -46,6 +54,48 @@ internalAdminContributorUploadRoutes.post(
   },
 );
 
+internalAdminContributorUploadRoutes.post(
+  "/api/v1/internal/admin/contributor-uploads/reject",
+  zValidator("json", adminContributorUploadRejectBodySchema),
+  async (c) => {
+    const body = c.req.valid("json");
+    return await rejectAdminContributorUploadsService(c.env, body);
+  },
+);
+
+internalAdminContributorUploadRoutes.patch(
+  "/api/v1/internal/admin/contributor-uploads/:imageAssetId",
+  zValidator("param", adminContributorUploadParamSchema),
+  zValidator("json", adminContributorUploadMetadataPatchBodySchema),
+  async (c) => {
+    const { imageAssetId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    return await patchAdminContributorUploadMetadataService(c.env, imageAssetId, body);
+  },
+);
+
+internalAdminContributorUploadRoutes.post(
+  "/api/v1/internal/admin/contributor-uploads/:imageAssetId/replace-presign",
+  zValidator("param", adminContributorUploadParamSchema),
+  zValidator("json", adminContributorUploadReplacePresignBodySchema),
+  async (c) => {
+    const { imageAssetId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    return await presignAdminContributorUploadReplaceService(c.env, imageAssetId, body);
+  },
+);
+
+internalAdminContributorUploadRoutes.post(
+  "/api/v1/internal/admin/contributor-uploads/:imageAssetId/replace-complete",
+  zValidator("param", adminContributorUploadParamSchema),
+  zValidator("json", adminContributorUploadReplaceCompleteBodySchema),
+  async (c) => {
+    const { imageAssetId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    return await completeAdminContributorUploadReplaceService(c.env, imageAssetId, body);
+  },
+);
+
 internalAdminContributorUploadRoutes.get(
   "/api/v1/internal/admin/contributor-uploads/:imageAssetId/original",
   zValidator("param", adminContributorUploadParamSchema),
@@ -70,6 +120,22 @@ internalAdminContributorUploadRoutes.all(
 );
 internalAdminContributorUploadRoutes.all(
   "/api/v1/internal/admin/contributor-uploads/approve",
+  () => methodNotAllowed(),
+);
+internalAdminContributorUploadRoutes.all(
+  "/api/v1/internal/admin/contributor-uploads/reject",
+  () => methodNotAllowed(),
+);
+internalAdminContributorUploadRoutes.all(
+  "/api/v1/internal/admin/contributor-uploads/:imageAssetId",
+  () => methodNotAllowed(),
+);
+internalAdminContributorUploadRoutes.all(
+  "/api/v1/internal/admin/contributor-uploads/:imageAssetId/replace-presign",
+  () => methodNotAllowed(),
+);
+internalAdminContributorUploadRoutes.all(
+  "/api/v1/internal/admin/contributor-uploads/:imageAssetId/replace-complete",
   () => methodNotAllowed(),
 );
 internalAdminContributorUploadRoutes.all(

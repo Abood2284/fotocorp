@@ -183,6 +183,27 @@
       "when": 1778650000000,
       "tag": "0025_staff_role_caption_manager",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1779100000000,
+      "tag": "0026_contributor_events_fotocorp_category_portal",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1779200000000,
+      "tag": "0027_sales_led_inquiries_entitlements",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1779300000000,
+      "tag": "0028_access_inquiry_access_granted_status",
+      "breakpoints": true
     }
   ]
 }

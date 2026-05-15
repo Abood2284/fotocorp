@@ -3,7 +3,7 @@
  * Photographer upload smoke.
  *
  * Prepare-only (default with credentials): login → batch → prepare → assert shape → logout.
- * Full R2 path: set PHOTOGRAPHER_UPLOAD_SMOKE_REAL_R2=1 plus CLOUDFLARE_R2_* and matching bucket name.
+ * Full R2 path: set PHOTOGRAPHER_UPLOAD_SMOKE_REAL_R2=1 plus R2_* (or CLOUDFLARE_R2_*) and contributor staging bucket in apps/api/.dev.vars.
  */
 import dotenv from "dotenv";
 import pg from "pg";
@@ -77,10 +77,27 @@ async function main() {
     }),
     env,
   );
-  assertStatus(prepareRes, 201, "prepare upload files");
+  if (prepareRes.status === 503) {
+    const errBody = (await prepareRes.json().catch(() => ({}))) as { error?: { message?: string } }
+    console.log(
+      "prepare: UPLOAD_STORAGE_NOT_CONFIGURED —",
+      errBody.error?.message ?? "configure R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_CONTRIBUTOR_STAGING_BUCKET in apps/api/.dev.vars",
+    )
+    await logout(env, cookieHeader)
+    console.log("PASS contributor uploads HTTP smoke (prepare skipped: API upload storage not configured).")
+    return
+  }
+
+  assertStatus(prepareRes, 201, "prepare upload files")
   const prepareBody = (await prepareRes.json()) as {
-    items?: Array<{ itemId?: string; uploadMethod?: string; uploadUrl?: string | null; headers?: { "content-type"?: string } }>;
-  };
+    items?: Array<{
+      itemId?: string
+      uploadMethod?: string
+      uploadUrl?: string | null
+      expiresAt?: string | null
+      headers?: { "content-type"?: string }
+    }>
+  }
   const item = prepareBody.items?.[0];
   const itemId = item?.itemId;
   const uploadMethod = item?.uploadMethod;
@@ -93,7 +110,7 @@ async function main() {
     if (item.headers?.["content-type"] !== "image/jpeg") throw new Error("expected content-type image/jpeg in instructions");
     console.log("prepare: SIGNED_PUT ok, uploadUrl:", redactPresignedUrl(item.uploadUrl));
   } else {
-    console.log("prepare: NOT_CONFIGURED (CLOUDFLARE_R2_* incomplete in process env for API)");
+    console.log("prepare: unexpected NOT_CONFIGURED (API should return 503 when storage is not configured)");
   }
 
   const realR2 = process.env.PHOTOGRAPHER_UPLOAD_SMOKE_REAL_R2 === "1";
@@ -105,17 +122,22 @@ async function main() {
 
   if (uploadMethod !== "SIGNED_PUT" || !item?.uploadUrl) {
     throw new Error(
-      "PHOTOGRAPHER_UPLOAD_SMOKE_REAL_R2=1 requires SIGNED_PUT and uploadUrl; set CLOUDFLARE_R2_ACCOUNT_ID, CLOUDFLARE_R2_ACCESS_KEY_ID, CLOUDFLARE_R2_SECRET_ACCESS_KEY, CLOUDFLARE_R2_ORIGINALS_BUCKET (same bucket as Worker MEDIA_ORIGINALS_BUCKET).",
-    );
+      "PHOTOGRAPHER_UPLOAD_SMOKE_REAL_R2=1 requires SIGNED_PUT and uploadUrl; set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_CONTRIBUTOR_STAGING_BUCKET (or CLOUDFLARE_R2_* equivalents) in apps/api/.dev.vars.",
+    )
   }
 
-  const r2Configured =
-    Boolean(process.env.CLOUDFLARE_R2_ACCOUNT_ID?.trim()) &&
-    Boolean(process.env.CLOUDFLARE_R2_ACCESS_KEY_ID?.trim()) &&
-    Boolean(process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY?.trim()) &&
-    Boolean(process.env.CLOUDFLARE_R2_ORIGINALS_BUCKET?.trim());
-  if (!r2Configured) {
-    throw new Error("PHOTOGRAPHER_UPLOAD_SMOKE_REAL_R2=1 requires full CLOUDFLARE_R2_* env for presign and complete (S3 head fallback).");
+  const r2StagingConfigured =
+    (Boolean(process.env.R2_ACCOUNT_ID?.trim()) || Boolean(process.env.CLOUDFLARE_R2_ACCOUNT_ID?.trim())) &&
+    (Boolean(process.env.R2_ACCESS_KEY_ID?.trim()) || Boolean(process.env.CLOUDFLARE_R2_ACCESS_KEY_ID?.trim())) &&
+    (Boolean(process.env.R2_SECRET_ACCESS_KEY?.trim()) || Boolean(process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY?.trim())) &&
+    (Boolean(process.env.R2_CONTRIBUTOR_STAGING_BUCKET?.trim()) ||
+      Boolean(process.env.CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET?.trim()))
+  const r2OriginalsForComplete =
+    Boolean(process.env.R2_ORIGINALS_BUCKET?.trim()) || Boolean(process.env.CLOUDFLARE_R2_ORIGINALS_BUCKET?.trim())
+  if (!r2StagingConfigured || !r2OriginalsForComplete) {
+    throw new Error(
+      "PHOTOGRAPHER_UPLOAD_SMOKE_REAL_R2=1 requires contributor staging S3 vars plus originals bucket name (R2_ORIGINALS_BUCKET or CLOUDFLARE_R2_ORIGINALS_BUCKET) for complete-flow assertions in this script.",
+    )
   }
 
   const putRes = await fetch(item.uploadUrl, {
@@ -163,11 +185,17 @@ async function main() {
 function buildApiEnv(databaseUrl: string): Env {
   return {
     DATABASE_URL: databaseUrl,
+    R2_ACCOUNT_ID: process.env.R2_ACCOUNT_ID,
+    R2_ACCESS_KEY_ID: process.env.R2_ACCESS_KEY_ID,
+    R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
+    R2_CONTRIBUTOR_STAGING_BUCKET: process.env.R2_CONTRIBUTOR_STAGING_BUCKET,
+    R2_ORIGINALS_BUCKET: process.env.R2_ORIGINALS_BUCKET,
     CLOUDFLARE_R2_ACCOUNT_ID: process.env.CLOUDFLARE_R2_ACCOUNT_ID,
     CLOUDFLARE_R2_ACCESS_KEY_ID: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID,
     CLOUDFLARE_R2_SECRET_ACCESS_KEY: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+    CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET: process.env.CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET,
     CLOUDFLARE_R2_ORIGINALS_BUCKET: process.env.CLOUDFLARE_R2_ORIGINALS_BUCKET,
-  } as Env;
+  } as Env
 }
 
 function redactPresignedUrl(url: string): string {

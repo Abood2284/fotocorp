@@ -2,7 +2,7 @@ import { sql, type SQL } from "drizzle-orm";
 import type { DrizzleClient } from "../../db";
 import { AppError } from "../errors";
 import { createPreviewUrl, type MediaPreviewVariant } from "../media/preview-token";
-import { CURRENT_WATERMARK_PROFILE } from "../media/watermark";
+import { CARD_CLEAN_PROFILE, CURRENT_WATERMARK_PROFILE, THUMB_CLEAN_PROFILE } from "../media/watermark";
 
 type SortMode = "newest" | "oldest" | "relevance";
 
@@ -39,7 +39,7 @@ interface CursorPayload {
 
 interface AssetRow {
   id: string;
-  legacy_imagecode: string | null;
+  fotokey: string | null;
   title: string | null;
   caption: string | null;
   headline: string | null;
@@ -54,8 +54,10 @@ interface AssetRow {
   source: string;
   sort_at: Date | string;
   rank: number | string | null;
-  category_id: string | null;
-  category_name: string | null;
+  asset_category_id: string | null;
+  asset_category_name: string | null;
+  event_category_id: string | null;
+  event_category_name: string | null;
   event_id: string | null;
   event_name: string | null;
   event_date: Date | string | null;
@@ -93,6 +95,7 @@ interface EventRow {
   id: string;
   name: string | null;
   event_date: Date | string | null;
+  created_at: Date | string | null;
   asset_count: number | string;
   preview_asset_id: string;
   preview_width: number | null;
@@ -177,10 +180,12 @@ export async function getPublicAssetFilters(db: DrizzleClient) {
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = true
-      and card.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
-    join asset_categories c on c.id = a.category_id
+      and card.is_watermarked = false
+      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
+    left join photo_events ev on ev.id = a.event_id
+    join asset_categories c on c.id = coalesce(a.category_id, ev.category_id)
     where ${publicAssetPredicate("a")}
+      and coalesce(a.category_id, ev.category_id) is not null
     group by c.id, c.name
     order by asset_count desc, c.name asc
     limit 100
@@ -193,8 +198,8 @@ export async function getPublicAssetFilters(db: DrizzleClient) {
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = true
-      and card.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
+      and card.is_watermarked = false
+      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
     join photo_events e on e.id = a.event_id
     where ${publicAssetPredicate("a")}
     group by e.id, e.name, e.event_date
@@ -231,13 +236,17 @@ export async function getPublicAssetCollections(
       preview.width as preview_width,
       preview.height as preview_height
     from asset_categories c
-    join image_assets a on a.category_id = c.id
+    join image_assets a
+      on coalesce(
+        a.category_id,
+        (select pe.category_id from photo_events pe where pe.id = a.event_id limit 1)
+      ) = c.id
     join image_derivatives card
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = true
-      and card.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
+      and card.is_watermarked = false
+      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
     join lateral (
       select a2.id as asset_id, card2.width, card2.height
       from image_assets a2
@@ -245,10 +254,13 @@ export async function getPublicAssetCollections(
         on card2.image_asset_id = a2.id
         and card2.variant = 'CARD'
         and card2.generation_status = 'READY'
-        and card2.is_watermarked = true
-        and card2.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
+        and card2.is_watermarked = false
+        and card2.watermark_profile = ${CARD_CLEAN_PROFILE}
       where ${publicAssetPredicate("a2")}
-        and a2.category_id = c.id
+        and coalesce(
+          a2.category_id,
+          (select pe2.category_id from photo_events pe2 where pe2.id = a2.event_id limit 1)
+        ) = c.id
       order by coalesce(a2.image_date, a2.created_at) desc, a2.id desc
       limit 1
     ) preview on true
@@ -284,6 +296,7 @@ export async function getPublicAssetEvents(
       e.id,
       e.name,
       e.event_date,
+      e.created_at,
       count(*)::int as asset_count,
       preview.asset_id as preview_asset_id,
       preview.width as preview_width,
@@ -294,8 +307,8 @@ export async function getPublicAssetEvents(
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = true
-      and card.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
+      and card.is_watermarked = false
+      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
     join lateral (
       select a2.id as asset_id, card2.width, card2.height
       from image_assets a2
@@ -303,17 +316,17 @@ export async function getPublicAssetEvents(
         on card2.image_asset_id = a2.id
         and card2.variant = 'CARD'
         and card2.generation_status = 'READY'
-        and card2.is_watermarked = true
-        and card2.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
+        and card2.is_watermarked = false
+        and card2.watermark_profile = ${CARD_CLEAN_PROFILE}
       where ${publicAssetPredicate("a2")}
         and a2.event_id = e.id
       order by coalesce(a2.image_date, a2.created_at) desc, a2.id desc
       limit 1
     ) preview on true
     where ${publicAssetPredicate("a")}
-    group by e.id, e.name, e.event_date, preview.asset_id, preview.width, preview.height
-    order by e.event_date desc nulls last, asset_count desc, e.id desc
-    limit 5
+    group by e.id, e.name, e.event_date, e.created_at, preview.asset_id, preview.width, preview.height
+    order by coalesce(e.event_date, e.created_at) desc nulls last, asset_count desc, e.id desc
+    limit 100
   `);
 
   return {
@@ -321,6 +334,7 @@ export async function getPublicAssetEvents(
       id: row.id,
       name: row.name ?? "Untitled event",
       eventDate: toIso(row.event_date),
+      createdAt: toIso(row.created_at),
       assetCount: Number(row.asset_count),
       preview: row.preview_width && row.preview_height
         ? {
@@ -398,7 +412,12 @@ function buildDetailSql(assetId: string): SQL {
 
 function buildWhere(query: PublicAssetQuery): SQL[] {
   const where = [publicAssetPredicate("a"), sql`card.id is not null`];
-  if (query.categoryId) where.push(sql`a.category_id = ${query.categoryId}`);
+  if (query.categoryId) {
+    where.push(sql`(
+      a.category_id = ${query.categoryId}
+      or (a.category_id is null and e.category_id = ${query.categoryId})
+    )`);
+  }
   if (query.eventId) where.push(sql`a.event_id = ${query.eventId}`);
   if (query.contributorId) where.push(sql`a.contributor_id = ${query.contributorId}`);
   if (query.year) where.push(sql`extract(year from coalesce(e.event_date, a.image_date, a.created_at)) = ${query.year}`);
@@ -420,7 +439,7 @@ function selectAssetSql(q: string | undefined): SQL {
   return sql`
     select
       a.id,
-      a.legacy_image_code as legacy_imagecode,
+      a.fotokey as fotokey,
       a.title,
       a.caption,
       a.headline,
@@ -435,8 +454,10 @@ function selectAssetSql(q: string | undefined): SQL {
       a.source,
       coalesce(e.event_date, a.image_date, a.created_at) as sort_at,
       ${rank} as rank,
-      c.id as category_id,
-      c.name as category_name,
+      ac.id as asset_category_id,
+      ac.name as asset_category_name,
+      ec.id as event_category_id,
+      ec.name as event_category_name,
       e.id as event_id,
       e.name as event_name,
       e.event_date,
@@ -461,22 +482,23 @@ function fromAssetSql(requireDetail = false): SQL {
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = true
-      and card.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
+      and card.is_watermarked = false
+      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
     left join image_derivatives thumb
       on thumb.image_asset_id = a.id
       and thumb.variant = 'THUMB'
       and thumb.generation_status = 'READY'
-      and thumb.is_watermarked = true
-      and thumb.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
+      and thumb.is_watermarked = false
+      and thumb.watermark_profile = ${THUMB_CLEAN_PROFILE}
     ${detailJoin} image_derivatives detail
       on detail.image_asset_id = a.id
       and detail.variant = 'DETAIL'
       and detail.generation_status = 'READY'
       and detail.is_watermarked = true
       and detail.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
-    left join asset_categories c on c.id = a.category_id
+    left join asset_categories ac on ac.id = a.category_id
     left join photo_events e on e.id = a.event_id
+    left join asset_categories ec on ec.id = e.category_id
     left join contributors p on p.id = a.contributor_id
   `;
 }
@@ -502,6 +524,16 @@ function cursorPredicate(cursor: CursorPayload, sort: SortMode, q: string | unde
   return sql`(coalesce(e.event_date, a.image_date, a.created_at), a.id) < (${cursor.sortAt}::timestamptz, ${cursor.id}::uuid)`;
 }
 
+function resolvePublicCategory(row: AssetRow): { id: string; name: string } | null {
+  if (row.asset_category_id && row.asset_category_name) {
+    return { id: row.asset_category_id, name: row.asset_category_name };
+  }
+  if (row.event_category_id && row.event_category_name) {
+    return { id: row.event_category_id, name: row.event_category_name };
+  }
+  return null;
+}
+
 async function toAssetDto(
   row: AssetRow,
   secret: string | undefined,
@@ -510,7 +542,7 @@ async function toAssetDto(
 ): Promise<AssetDto> {
   return {
     id: row.id,
-    fotokey: row.legacy_imagecode,
+    fotokey: row.fotokey,
     title: row.title,
     caption: row.caption,
     headline: row.headline,
@@ -523,7 +555,7 @@ async function toAssetDto(
     visibility: row.visibility,
     mediaType: row.media_type,
     source: row.source,
-    category: row.category_id && row.category_name ? { id: row.category_id, name: row.category_name } : null,
+    category: resolvePublicCategory(row),
     event: row.event_id
       ? { id: row.event_id, name: row.event_name, eventDate: toIso(row.event_date), location: row.event_location }
       : null,

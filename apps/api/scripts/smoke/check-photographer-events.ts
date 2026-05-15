@@ -28,12 +28,22 @@ async function main() {
   const env = { DATABASE_URL: databaseUrl } as Env
   const cookieHeader = await loginAndCookie(env, username, password)
 
+  const pool = new Pool({ connectionString: databaseUrl })
+  let categoryId: string | undefined
+  try {
+    const cat = await pool.query<{ id: string }>(`select id from asset_categories limit 1`)
+    categoryId = cat.rows[0]?.id
+  } finally {
+    await pool.end()
+  }
+  if (!categoryId) throw new Error("HTTP photographer events smoke needs at least one row in asset_categories.")
+
   const smokeName = `Smoke Test Event ${new Date().toISOString()}`
   const createRes = await honoApp.fetch(
     new Request("https://fotocorp.local/api/v1/contributor/events", {
       method: "POST",
       headers: { "content-type": "application/json", cookie: cookieHeader },
-      body: JSON.stringify({ name: smokeName, location: "Smoke QA" }),
+      body: JSON.stringify({ name: smokeName, location: "Smoke QA", categoryId }),
     }),
     env,
   )
@@ -120,7 +130,7 @@ async function runDbChecks(url: string) {
     }>(`
       select
         count(*)::text as total_events,
-        count(*) filter (where created_by_source = 'PHOTOGRAPHER')::text as photographer_created,
+        count(*) filter (where created_by_source = 'CONTRIBUTOR')::text as photographer_created,
         count(*) filter (where created_by_source = 'LEGACY_IMPORT')::text as legacy_import_rows
       from photo_events
     `)

@@ -11,7 +11,7 @@ export function PublicEventsGrid({ events }: PublicEventsGridProps) {
   if (!events || events.length === 0) return null
 
   return (
-    <div className="grid h-[300px] w-full grid-cols-1 gap-[1px] bg-background sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 sm:h-[400px] lg:h-[500px]">
+    <div className="grid w-full grid-cols-1 gap-[1px] bg-background sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 auto-rows-[300px] sm:auto-rows-[400px] lg:auto-rows-[500px]">
       {events.map((event) => (
         <Link
           key={event.id}
@@ -38,9 +38,6 @@ export function PublicEventsGrid({ events }: PublicEventsGridProps) {
           )}
           
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-5 pt-16">
-            <div className="text-xs font-bold uppercase tracking-wider text-white/90">
-              Event
-            </div>
             <h3 className="mt-1 line-clamp-2 text-lg font-medium leading-snug text-white">
               {event.name || "Untitled event"}
             </h3>

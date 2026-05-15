@@ -7,14 +7,14 @@
  * operator backfill / local runs against Neon + R2 when not using the jobs package.
  *
  * Reads queued items from `image_publish_jobs`/`image_publish_job_items`, generates required
- * watermarked WebP derivatives (THUMB/CARD/DETAIL) for each canonical Fotokey original, upserts
+ * WebP derivatives (clean THUMB; watermarked CARD/DETAIL) for each canonical Fotokey original, upserts
  * `image_derivatives`, and only then promotes the image asset to ACTIVE+PUBLIC.
  *
  * Lifecycle:
  *   pre-pipeline (admin approve): image_assets → APPROVED + PRIVATE, fotokey set, original copied
  *                                 to canonical originals bucket as FCddmmyyNNN.<ext>.
  *   this script:                  read canonical original → generate THUMB/CARD/DETAIL into the
- *                                 previews bucket → upsert image_derivatives → on success only
+ *                                 previews bucket (THUMB unwatermarked under previews/watermarked/thumb) → upsert image_derivatives → on success only
  *                                 set image_assets.status=ACTIVE, visibility=PUBLIC.
  *   on failure:                   leave image_assets APPROVED + PRIVATE, mark job item FAILED.
  *
@@ -34,7 +34,11 @@ import dotenv from "dotenv";
 import pg from "pg";
 import type { Pool as PgPool, QueryResultRow } from "pg";
 import sharp from "sharp";
-import { CURRENT_WATERMARK_PROFILE } from "../../src/lib/media/watermark";
+import {
+  CARD_CLEAN_PROFILE,
+  DETAIL_WATERMARKED_PROFILE,
+  THUMB_CLEAN_PROFILE,
+} from "../../src/lib/media/watermark";
 
 type Variant = "THUMB" | "CARD" | "DETAIL";
 type DerivativeStatus = "READY" | "STALE" | "FAILED";
@@ -240,6 +244,10 @@ async function processSingleItem(pool: PgPool, r2: R2Config, item: JobItemRow): 
            visibility = 'PUBLIC',
            original_exists_in_storage = true,
            original_storage_checked_at = now(),
+           category_id = coalesce(
+             category_id,
+             (select pe.category_id from photo_events pe where pe.id = image_assets.event_id limit 1)
+           ),
            updated_at = now()
        where id = $1::uuid
          and status = 'APPROVED'
@@ -352,7 +360,10 @@ async function generateDerivative(original: Buffer, variant: Variant, fotokey: s
   let bestCandidate: GeneratedPreview | undefined;
 
   for (const quality of profile.qualities) {
-    const candidate = await renderWatermarkedPreview(original, targetWidth, quality);
+    const candidate =
+      variant === "DETAIL"
+        ? await renderWatermarkedPreview(original, targetWidth, quality)
+        : await renderCleanPreview(original, targetWidth, quality);
     if (!bestCandidate || candidate.byteSize < bestCandidate.byteSize) bestCandidate = candidate;
     if (!profile.targetMaxBytes || candidate.byteSize <= profile.targetMaxBytes) return candidate;
   }
@@ -361,6 +372,25 @@ async function generateDerivative(original: Buffer, variant: Variant, fotokey: s
     throw new Error(`Unable to generate ${variant} derivative for ${fotokey}.`);
   }
   return bestCandidate;
+}
+
+async function renderCleanPreview(original: Buffer, targetWidth: number, quality: number): Promise<GeneratedPreview> {
+  const encoded = await sharp(original, { failOn: "none" })
+    .rotate()
+    .resize({ width: targetWidth, withoutEnlargement: true })
+    .webp({ quality, effort: 6, smartSubsample: true })
+    .toBuffer({ resolveWithObject: true });
+  const width = encoded.info.width;
+  const height = encoded.info.height;
+  if (!width || !height) throw new Error("Unable to determine derivative dimensions.");
+  return {
+    buffer: encoded.data,
+    width,
+    height,
+    byteSize: encoded.data.byteLength,
+    checksum: createHash("sha256").update(encoded.data).digest("hex"),
+    selectedQuality: quality,
+  };
 }
 
 async function renderWatermarkedPreview(original: Buffer, targetWidth: number, quality: number): Promise<GeneratedPreview> {
@@ -436,6 +466,9 @@ async function upsertDerivative(
   derivative: GeneratedPreview,
   status: DerivativeStatus,
 ) {
+  const isWatermarked = variant === "DETAIL";
+  const watermarkProfile =
+    variant === "THUMB" ? THUMB_CLEAN_PROFILE : variant === "CARD" ? CARD_CLEAN_PROFILE : DETAIL_WATERMARKED_PROFILE;
   await pool.query(
     `
       insert into image_derivatives (
@@ -455,7 +488,7 @@ async function upsertDerivative(
         created_at,
         updated_at
       )
-      values ($1::uuid, $2, $3, $4, $5, $6, $7, $8, true, $9, $10, now(), 'GENERATED', now(), now())
+      values ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), 'GENERATED', now(), now())
       on conflict (image_asset_id, variant) do update
       set
         storage_key = excluded.storage_key,
@@ -464,7 +497,7 @@ async function upsertDerivative(
         height = excluded.height,
         size_bytes = excluded.size_bytes,
         checksum = excluded.checksum,
-        is_watermarked = true,
+        is_watermarked = excluded.is_watermarked,
         watermark_profile = excluded.watermark_profile,
         generation_status = excluded.generation_status,
         generated_at = excluded.generated_at,
@@ -480,7 +513,8 @@ async function upsertDerivative(
       derivative.height,
       derivative.byteSize,
       derivative.checksum,
-      CURRENT_WATERMARK_PROFILE,
+      isWatermarked,
+      watermarkProfile,
       status,
     ],
   );

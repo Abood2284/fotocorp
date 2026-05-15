@@ -12,7 +12,7 @@ const EXPLORE_LINKS: FooterLink[] = [
   { label: "Editorial", href: "/search?sort=latest" },
   { label: "Video", href: "/video" },
   { label: "Collections", href: "/categories" },
-  { label: "Pricing", href: "/pricing" },
+  { label: "Request access", href: "/request-access" },
 ]
 
 /** Matches `MOBILE_GROUPS` Browse in `header.tsx`. */
@@ -21,7 +21,7 @@ const BROWSE_LINKS: FooterLink[] = [
   { label: "Latest", href: "/search?sort=latest" },
   { label: "Categories", href: "/categories" },
   { label: "Events", href: "/events" },
-  { label: "Pricing", href: "/pricing" },
+  { label: "Request access", href: "/request-access" },
 ]
 
 /** Matches `MOBILE_GROUPS` Company in `header.tsx`. */

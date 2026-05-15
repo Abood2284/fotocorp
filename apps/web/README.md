@@ -38,6 +38,7 @@ Add these variables to `.env.local`:
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8787
+PUBLIC_API_BASE_URL=http://127.0.0.1:8787
 INTERNAL_API_BASE_URL=http://127.0.0.1:8787
 INTERNAL_API_SECRET=replace-with-long-random-internal-secret
 NEXT_PUBLIC_ASSET_DATA_SOURCE=auto
@@ -47,6 +48,7 @@ DATABASE_URL=postgresql://user:password@host:5432/database
 FOTOCORP_SUPER_ADMIN_EMAIL=admin@example.com
 ```
 
+- `PUBLIC_API_BASE_URL` should match `NEXT_PUBLIC_API_BASE_URL` locally. On **Cloudflare Workers**, set `PUBLIC_API_BASE_URL` in Wrangler `vars` (or dashboard) for the **web** Worker: Next inlines `NEXT_PUBLIC_*` at **build** time, so SSR catalog fetches read this server var at **runtime** and still resolve the public API when the build machine had no `NEXT_PUBLIC_API_BASE_URL`.
 - `NEXT_PUBLIC_ASSET_DATA_SOURCE=auto` tries API first and falls back to fixtures when unavailable
 - `NEXT_PUBLIC_ASSET_DATA_SOURCE=api` uses API only (shows error states if API is down)
 - `NEXT_PUBLIC_ASSET_DATA_SOURCE=fixture` uses local fixture repository only

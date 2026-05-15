@@ -46,7 +46,7 @@ export function PublicAssetSaveButton({ assetId }: PublicAssetSaveButtonProps) {
       ) : (
         <Plus className="h-4 w-4" strokeWidth={2.5} />
       )}
-      <span>{saveState === "saving" ? "Saving" : saveState === "saved" ? "Saved" : "Save"}</span>
+      <span>{saveState === "saving" ? "Saving" : saveState === "saved" ? "Saved" : "Save to FotoBox"}</span>
     </button>
   )
 }

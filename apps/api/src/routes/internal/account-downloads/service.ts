@@ -3,7 +3,7 @@ import type { Env } from "../../../appTypes"
 import { createHttpDb, type DrizzleClient } from "../../../db"
 import { AppError } from "../../../lib/errors"
 import { createPreviewUrl } from "../../../lib/media/preview-token"
-import { CURRENT_WATERMARK_PROFILE } from "../../../lib/media/watermark"
+import { CARD_CLEAN_PROFILE, THUMB_CLEAN_PROFILE } from "../../../lib/media/watermark"
 import { parsePreviewTtl } from "../../../lib/assets/public-assets"
 
 interface ListDownloadHistoryInput {
@@ -118,14 +118,14 @@ async function listDownloadRows(
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = true
-      and card.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
+      and card.is_watermarked = false
+      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
     left join image_derivatives thumb
       on thumb.image_asset_id = a.id
       and thumb.variant = 'THUMB'
       and thumb.generation_status = 'READY'
-      and thumb.is_watermarked = true
-      and thumb.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
+      and thumb.is_watermarked = false
+      and thumb.watermark_profile = ${THUMB_CLEAN_PROFILE}
     where ${sql.join(filters, sql` and `)}
     order by dl.created_at desc, dl.id desc
     limit ${input.limit}

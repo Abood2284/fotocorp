@@ -1,9 +1,14 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { ContributorEventDto } from "@/lib/api/contributor-api"
-import { ContributorApiError, updateContributorEvent } from "@/lib/api/contributor-api"
+import {
+  ContributorApiError,
+  getContributorAssetCategories,
+  updateContributorEvent,
+  type ContributorAssetCategoryDto,
+} from "@/lib/api/contributor-api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -12,6 +17,13 @@ export function ContributorEventEditForm(props: { event: ContributorEventDto }) 
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [categories, setCategories] = useState<ContributorAssetCategoryDto[]>([])
+
+  useEffect(() => {
+    void getContributorAssetCategories()
+      .then((r) => setCategories(r.categories))
+      .catch(() => setCategories([]))
+  }, [])
 
   async function onSubmit(formData: FormData) {
     setError(null)
@@ -19,6 +31,7 @@ export function ContributorEventEditForm(props: { event: ContributorEventDto }) 
     try {
       await updateContributorEvent(props.event.id, {
         name: String(formData.get("name") ?? "").trim(),
+        categoryId: String(formData.get("categoryId") ?? "").trim() || undefined,
         eventDate: String(formData.get("eventDate") ?? "").trim() || undefined,
         eventTime: String(formData.get("eventTime") ?? "").trim() || undefined,
         country: String(formData.get("country") ?? "").trim() || undefined,
@@ -54,6 +67,24 @@ export function ContributorEventEditForm(props: { event: ContributorEventDto }) 
           Event name
         </label>
         <Input id="name" name="name" required minLength={2} maxLength={180} defaultValue={e.name} autoComplete="off" />
+      </div>
+      <div className="space-y-2">
+        <label htmlFor="categoryId" className="text-sm font-medium text-foreground">
+          Category
+        </label>
+        <select
+          id="categoryId"
+          name="categoryId"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          defaultValue={e.category?.id ?? ""}
+        >
+          <option value="">None</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">

@@ -1,3 +1,5 @@
 packages:
   - "apps/*"
   - "packages/*"
+patchedDependencies:
+  pg-cloudflare@1.3.0: patches/pg-cloudflare@1.3.0.patch

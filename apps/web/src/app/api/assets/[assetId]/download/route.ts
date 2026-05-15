@@ -147,8 +147,13 @@ function mapDownloadError(code: string | null) {
       return "subscription-required"
     case "SUBSCRIPTION_EXPIRED":
       return "subscription-expired"
+    case "DOWNLOAD_LIMIT_EXCEEDED":
     case "QUOTA_EXCEEDED":
-      return "quota-exceeded"
+      return "download-limit-exceeded"
+    case "ENTITLEMENT_REQUIRED":
+      return "entitlement-required"
+    case "QUALITY_NOT_ALLOWED":
+      return "quality-not-allowed"
     case "SIZE_NOT_AVAILABLE":
     case "INVALID_DOWNLOAD_SIZE":
     case "INVALID_DOWNLOAD_REQUEST":

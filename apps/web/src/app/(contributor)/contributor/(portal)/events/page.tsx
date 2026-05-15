@@ -47,7 +47,7 @@ export default async function ContributorEventsPage({
           </p>
         </div>
         <Button asChild>
-          <Link href="/contributor/events/new">Create event</Link>
+          <Link href="/contributor/uploads/new">Create event</Link>
         </Button>
       </div>
 
@@ -97,6 +97,7 @@ export default async function ContributorEventsPage({
               <th className="px-4 py-3">Event name</th>
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">City / Location</th>
+              <th className="px-4 py-3">Category</th>
               <th className="px-4 py-3">Created by</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Actions</th>
@@ -105,7 +106,7 @@ export default async function ContributorEventsPage({
           <tbody>
             {data.events.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                   No events match this view.
                 </td>
               </tr>
@@ -115,6 +116,7 @@ export default async function ContributorEventsPage({
                   <td className="px-4 py-3 font-medium text-foreground">{event.name}</td>
                   <td className="px-4 py-3 tabular-nums text-muted-foreground">{event.eventDate ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{cityLocation(event)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{event.category?.name ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{createdByLabel(event.createdBySource)}</td>
                   <td className="px-4 py-3">
                     <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-foreground">{event.status}</span>

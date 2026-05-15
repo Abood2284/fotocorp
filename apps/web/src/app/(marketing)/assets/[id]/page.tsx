@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft, ImageOff, Search } from "lucide-react"
+import { ChevronLeft, ImageOff, Search, Plus } from "lucide-react"
 import { getCurrentAppUser } from "@/lib/app-user"
 import { getPublicAsset, listPublicAssets } from "@/lib/api/fotocorp-api"
 import { messageForDownloadRedirectError } from "@/lib/download-error-messages"
@@ -9,9 +9,9 @@ import { formatDate } from "@/components/assets/public-asset-card"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { AssetDetailActions, type AssetDetailAccessState, type AssetSizeOption } from "@/components/assets/asset-detail-actions"
 import { CopyFotokeyButton } from "@/components/assets/copy-fotokey-button"
-import { FotoboxSaveButton } from "@/components/assets/fotobox-save-button"
-import { KeywordChips } from "@/components/assets/keyword-chips"
 import { PublicAssetMosaic } from "@/components/assets/public-asset-mosaic"
+import { WatermarkDownloadButton } from "@/components/assets/watermark-download-button"
+import { FotoboxSaveButton } from "@/components/assets/fotobox-save-button"
 
 interface AssetDetailPageProps {
   params: Promise<{ id: string }>
@@ -23,22 +23,22 @@ export const dynamic = "force-dynamic"
 const SIZE_OPTIONS: AssetSizeOption[] = [
   {
     id: "web",
-    label: "Watermarked preview",
-    description: "Browser-safe preview for evaluation and internal shortlisting.",
+    label: "Low",
+    description: "72 DPI • 1200px • Best for web preview",
     downloadAvailable: false,
-    disabledReason: "Preview access is already available on this page.",
+    disabledReason: "Coming soon",
   },
   {
     id: "medium",
-    label: "Medium clean file",
-    description: "Balanced publishing file for standard editorial layouts.",
+    label: "Medium",
+    description: "300 DPI • 2400px • Best for editorial",
     downloadAvailable: false,
-    disabledReason: "Clean Medium derivatives will be enabled later.",
+    disabledReason: "Coming soon",
   },
   {
     id: "large",
-    label: "Original clean file",
-    description: "Highest available licensed file for active subscribers.",
+    label: "High",
+    description: "300 DPI • Max px • Best for print & archive",
     downloadAvailable: true,
   },
 ]
@@ -79,7 +79,6 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
   const title = getAssetTitle(asset)
   const caption = asset.caption?.trim()
   const keywords = splitKeywords(asset.keywords)
-  const metadataGroups = getMetadataGroups(asset)
   const assetHref = `/assets/${asset.id}`
   const downloadError = messageForDownloadRedirectError(resolvedSearchParams?.downloadError)
   const relatedResult = await getRelatedAssets(asset)
@@ -146,8 +145,8 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               <h1 className="max-w-5xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl lg:text-[2.45rem] lg:leading-[1.08]">
                 {title}
               </h1>
-              {subtitle && <p className="max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base">{subtitle}</p>}
-              {caption && (
+              {subtitle && subtitle !== title && <p className="max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base">{subtitle}</p>}
+              {caption && caption !== title && (
                 <p className="max-w-5xl text-sm leading-6 text-muted-foreground sm:text-base">
                   {caption}
                 </p>
@@ -172,6 +171,21 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                     className="h-full max-h-[86vh] w-full object-contain drop-shadow-2xl"
                     loading="eager"
                   />
+                  <div className="absolute right-4 top-4 flex items-center gap-2">
+                    <FotoboxSaveButton
+                      assetId={asset.id}
+                      variant="ghost"
+                      className="!space-y-0 m-0"
+                      buttonClassName="h-9 px-3 bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white border-0"
+                      text="Save to fotobox"
+                      icon={<Plus className="h-4 w-4 mr-2" />}
+                    />
+                    <WatermarkDownloadButton
+                      previewUrl={preview.url}
+                      assetId={asset.id}
+                      fotokey={asset.fotokey ?? null}
+                    />
+                  </div>
                   <div className="pointer-events-none absolute bottom-5 right-5 hidden rounded-md bg-black/40 px-3 py-2 text-xs font-medium text-white/90 backdrop-blur-md sm:block">
                     Fotocorp preview{asset.contributor?.displayName ? ` • ${asset.contributor.displayName}` : ""}
                   </div>
@@ -188,19 +202,8 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               )}
             </figure>
 
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <FotoboxSaveButton assetId={asset.id} />
-              <CopyFotokeyButton fotokey={asset.fotokey ?? null} />
-              <Link
-                href={`/report?assetId=${encodeURIComponent(asset.id)}`}
-                className="inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                Report issue
-              </Link>
-            </div>
-
             {downloadError && (
-              <div className="border border-destructive/25 bg-destructive/10 p-4 text-sm leading-6 text-foreground">
+              <div className="border border-destructive/25 bg-destructive/10 p-4 text-sm leading-6 text-foreground mt-4">
                 {downloadError}
               </div>
             )}
@@ -212,51 +215,14 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               accessState={accessState}
               assetHref={assetHref}
               downloadHref={`/api/assets/${asset.id}/download`}
-              previewUrl={preview?.url ?? null}
               sizeOptions={SIZE_OPTIONS}
-              fotokey={asset.fotokey ?? null}
               metadataRows={actionMetadataRows}
+              keywords={keywords}
             />
           </aside>
         </div>
 
-        {(caption || metadataGroups.length > 0 || keywords.length > 0) && (
-          <div className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.36fr)] lg:items-start">
-            <div className="space-y-12">
-              {metadataGroups.length > 0 && (
-                <section className="border-t border-border/40 pt-8">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Details</h2>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Identification, editorial context, and rights information from the archive record.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-8 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                    {metadataGroups.map((group) => (
-                      <section key={group.key}>
-                        <h3 className="text-sm font-medium text-foreground">{group.label}</h3>
-                        <dl className="mt-4 space-y-4 text-sm">
-                          {group.rows.map((row) => (
-                            <div key={row.key} className="grid gap-1.5">
-                              <dt className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{row.label}</dt>
-                              <dd className="wrap-break-word font-medium leading-6 text-foreground">{row.value}</dd>
-                            </div>
-                          ))}
-                        </dl>
-                      </section>
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
 
-            <div className="space-y-8">
-              <KeywordChips keywords={keywords} />
-            </div>
-          </div>
-        )}
 
         <section className="mt-12 border-t border-border pt-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -293,29 +259,7 @@ function getAssetAlt(asset: PublicAsset) {
   return asset.headline || asset.caption || asset.event?.name || asset.category?.name || "Fotocorp archive image"
 }
 
-function getMetadataGroups(asset: PublicAsset) {
-  const identificationRows = [
-    asset.fotokey ? { key: "fotokey", label: "Fotokey", value: asset.fotokey } : null,
-  ].filter((row): row is { key: string; label: string; value: string } => Boolean(row?.value))
 
-  const editorialRows = [
-    { key: "event", label: "Event", value: asset.event?.name },
-    { key: "category", label: "Category", value: asset.category?.name },
-    { key: "date", label: "Date", value: formatDate(asset.imageDate ?? asset.event?.eventDate) },
-    { key: "location", label: "Location", value: asset.event?.location },
-  ].filter((row): row is { key: string; label: string; value: string } => Boolean(row.value))
-
-  const rightsRows = [
-    { key: "photographer", label: "Photographer", value: asset.contributor?.displayName },
-    { key: "copyright", label: "Copyright", value: asset.copyright },
-  ].filter((row): row is { key: string; label: string; value: string } => Boolean(row.value))
-
-  return [
-    { key: "identification", label: "Identification", rows: identificationRows },
-    { key: "editorial-context", label: "Editorial context", rows: editorialRows },
-    { key: "rights-source", label: "Rights and source", rows: rightsRows },
-  ].filter((group) => group.rows.length > 0)
-}
 
 function splitKeywords(value: string | null) {
   if (!value) return []
@@ -332,7 +276,7 @@ async function resolveAssetDetailAccessState(): Promise<AssetDetailAccessState> 
     const appUser = await getCurrentAppUser()
     if (!appUser) return "logged-out"
     if (appUser.isSubscriber && appUser.subscriptionStatus === "ACTIVE") return "subscriber"
-    return "non-subscriber"
+    return "signed-in-without-download"
   } catch {
     return "profile-unavailable"
   }
@@ -440,14 +384,7 @@ function getActionMetadataRows(asset: PublicAsset) {
     { label: "Photographer", value: asset.contributor?.displayName ?? "Unavailable" },
     { label: "Event", value: asset.event?.name ?? "Unavailable" },
     { label: "Category", value: asset.category?.name ?? "Unavailable" },
-    { label: "Status", value: asset.status ?? "Unavailable" },
-    { label: "Visibility", value: asset.visibility ?? "Unavailable" },
-    { label: "Media type", value: asset.mediaType ?? "Unavailable" },
     { label: "Source", value: asset.source ? humanizeEnum(asset.source) : "Unavailable" },
-    { label: "Image date", value: formatDate(asset.imageDate) ?? "Unavailable" },
-    { label: "Uploaded", value: formatDateTime(asset.uploadedAt) ?? "Unavailable" },
-    { label: "Created", value: formatDateTime(asset.createdAt) ?? "Unavailable" },
-    { label: "Updated", value: formatDateTime(asset.updatedAt) ?? "Unavailable" },
   ]
 }
 
@@ -459,16 +396,4 @@ function humanizeEnum(value: string) {
     .join(" ")
 }
 
-function formatDateTime(value?: string | null) {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date)
-}
+

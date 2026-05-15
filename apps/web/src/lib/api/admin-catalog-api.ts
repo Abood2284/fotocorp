@@ -44,6 +44,44 @@ export async function getAdminCatalogStats() {
   })
 }
 
+export interface AdminMediaPipelineStatusResponse {
+  watermarkProfile: string
+  /** Expected `watermark_profile` strings per variant (thumb/card clean, detail watermarked). */
+  derivativeProfiles: {
+    thumbProfile: string
+    cardProfile: string
+    detailProfile: string
+  }
+  generatedAt: string
+  totalImageAssets: number
+  assetsWithOriginalStorageKey: number
+  assetsWithR2ExistsTrue: number
+  assetsWithR2ExistsFalse: number
+  assetsWithR2ExistsNull: number
+  assetsMissingOriginalOrR2Mapping: number
+  derivativeByVariant: Record<string, { ready: number; failed: number; missing: number }>
+  assetsReadyForPublicListing: number
+  assetsCurrentlyVisibleInPublicApi: number
+  assetsEligibleForPublicListing: number
+  assetsVisibleThroughCurrentPublicApiConditions: number
+  latestFailedDerivatives: Array<{
+    assetId: string
+    legacyImageCode: string | null
+    variant: string
+    generationStatus: string
+    watermarkProfile: string | null
+    updatedAt: string | null
+    storageKeyMasked: string | null
+    hasErrorData: boolean
+  }>
+}
+
+export async function getAdminMediaPipelineStatus() {
+  return adminJson<AdminMediaPipelineStatusResponse>({
+    path: internalApiRoutes.adminMediaPipelineStatus(),
+  })
+}
+
 export async function getAdminCatalogFilters() {
   return adminJson<AdminCatalogFilters>({
     path: internalApiRoutes.adminFilters(),
@@ -61,6 +99,22 @@ export async function updateAdminAsset(assetId: string, payload: AdminCatalogEdi
 export async function updateAdminAssetPublishState(assetId: string, payload: AdminCatalogPublishUpdateInput) {
   return adminJson<AdminCatalogAssetResponse>({
     path: internalApiRoutes.adminAssetPublishState(assetId),
+    method: "POST",
+    body: payload,
+  })
+}
+
+export async function updateAdminAssetBulk(payload: { assetIds: string[], categoryId?: string | null, eventId?: string | null }) {
+  return adminJson<AdminCatalogAssetsResponse>({
+    path: "/api/v1/internal/admin/assets/bulk/editorial",
+    method: "PATCH",
+    body: payload,
+  })
+}
+
+export async function updateAdminAssetPublishStateBulk(payload: { assetIds: string[], status: "APPROVED" | "REVIEW" | "REJECTED"; visibility: "PUBLIC" | "PRIVATE" }) {
+  return adminJson<AdminCatalogAssetsResponse>({
+    path: "/api/v1/internal/admin/assets/bulk/publish-state",
     method: "POST",
     body: payload,
   })

@@ -281,7 +281,7 @@ export function createApiAssetRepository({
     },
     async listAdminAssets() {
       const getPrimary = async () => {
-        const response = await getJsonOrThrow<ApiListResponse<ApiAdminAssetListItem>>("/staff/assets")
+        const response = await getJsonOrThrow<ApiListResponse<ApiAdminAssetListItem>>("/staff/catalog")
         const items = response.items ?? []
         return items
           .map((item, index) => mapAdminListItemToRecord(item, index))
@@ -298,7 +298,7 @@ export function createApiAssetRepository({
     async getAdminAssetById(id: string) {
       const getPrimary = async () => {
         const response = await getJsonOrThrow<ApiItemResponse<ApiAdminAssetDetail>>(
-          `/staff/assets/${encodeURIComponent(id)}`,
+          `/staff/catalog/${encodeURIComponent(id)}`,
         )
         if (!response.item) return null
         return mapAdminDetailToRecord(response.item)

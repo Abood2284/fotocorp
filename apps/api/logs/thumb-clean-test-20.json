@@ -1,0 +1,52 @@
+{
+  "startedAt": "2026-05-14T20:29:35.244Z",
+  "finishedAt": "2026-05-14T20:29:50.287Z",
+  "durationMs": 15043,
+  "selectedAssets": 20,
+  "selectedVariants": 20,
+  "processedAssets": 20,
+  "processedVariants": 20,
+  "generatedVariants": 20,
+  "failedVariants": 0,
+  "skippedReady": 0,
+  "regeneratedFailed": 0,
+  "throughput": {
+    "assetsPerMinute": 79.77132220966563,
+    "variantsPerMinute": 79.77132220966563
+  },
+  "timing": {
+    "averageR2ReadMs": 419.99620819999984,
+    "averageSourceDecodeMs": 60.74883740000013,
+    "averageSharpTransformMs": 19.759308400000215,
+    "averageR2UploadMs": 568.2706020500001,
+    "averageDbWriteMs": 108.49770820000015,
+    "totalR2ReadMs": 8399.924163999996,
+    "totalSourceDecodeMs": 1214.9767480000025,
+    "totalSharpTransformMs": 395.1861680000043,
+    "totalR2UploadMs": 11365.412041000001,
+    "totalDbWriteMs": 2169.954164000003
+  },
+  "failureCounts": {
+    "corruptOriginalAssets": 0,
+    "unsupportedImageAssets": 0,
+    "r2ReadFailures": 0,
+    "r2UploadFailures": 0,
+    "dbWriteFailures": 0,
+    "failedVariants": 0
+  },
+  "config": {
+    "scope": "all-verified",
+    "limit": 20,
+    "batchSize": 5,
+    "assetConcurrency": 2,
+    "uploadConcurrency": 4,
+    "r2RetryAttempts": 3,
+    "r2RetryBaseMs": 250,
+    "maxRuntimeMinutes": 10,
+    "failOnItemErrors": false,
+    "dryRun": false,
+    "variants": [
+      "thumb"
+    ]
+  }
+}

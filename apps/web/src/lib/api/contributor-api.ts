@@ -3,6 +3,7 @@ export interface ContributorAccountSummary {
   username: string
   status: "ACTIVE" | "DISABLED" | "LOCKED" | string
   mustChangePassword: boolean
+  portalRole?: "STANDARD" | "PORTAL_ADMIN"
 }
 
 export interface ContributorSummary {
@@ -101,6 +102,7 @@ export interface ContributorEventDto {
   description: string | null
   status: string
   createdBySource: string
+  category: { id: string; name: string } | null
   canEdit: boolean
   createdAt: string
   updatedAt: string
@@ -119,6 +121,8 @@ export interface ContributorEventDetailResponse {
 
 export interface ContributorEventCreatePayload {
   name: string
+  categoryId: string
+  targetContributorId?: string
   eventDate?: string
   eventTime?: string
   country?: string
@@ -202,6 +206,8 @@ export interface ContributorPrepareUploadItemInstruction {
   fileName: string
   uploadMethod: "SIGNED_PUT" | "NOT_CONFIGURED"
   uploadUrl: string | null
+  /** ISO-8601; present when `uploadMethod` is `SIGNED_PUT` and the API returns it. */
+  expiresAt?: string | null
   headers: { "content-type": string }
 }
 
@@ -261,6 +267,48 @@ export async function changeContributorPassword(currentPassword: string, newPass
   return contributorJson<ContributorAuthResponse>("/auth/change-password", {
     method: "POST",
     body: { currentPassword, newPassword },
+  })
+}
+
+export interface ContributorAssetCategoryDto {
+  id: string
+  name: string
+}
+
+export interface ContributorAssetCategoriesResponse {
+  ok: true
+  categories: ContributorAssetCategoryDto[]
+}
+
+export interface ContributorPortalContributorDto {
+  id: string
+  displayName: string
+  email: string | null
+}
+
+export interface ContributorPortalContributorsResponse {
+  ok: true
+  contributors: ContributorPortalContributorDto[]
+}
+
+export async function getContributorAssetCategories(options: ContributorRequestOptions = {}) {
+  return contributorJson<ContributorAssetCategoriesResponse>("/catalog/asset-categories", {
+    method: "GET",
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function getContributorPortalContributors(
+  params: { q?: string; limit?: number } = {},
+  options: ContributorRequestOptions = {},
+) {
+  const search = new URLSearchParams()
+  if (params.q) search.set("q", params.q)
+  if (params.limit !== undefined) search.set("limit", String(params.limit))
+  const query = search.toString()
+  return contributorJson<ContributorPortalContributorsResponse>(`/contributors${query ? `?${query}` : ""}`, {
+    method: "GET",
+    cookieHeader: options.cookieHeader,
   })
 }
 
@@ -409,16 +457,69 @@ export async function submitContributorUploadBatch(batchId: string, options: Con
   )
 }
 
-/** Direct browser PUT to R2 — not proxied; uses short-lived signed URL from prepare only. */
+/** Maps `fetch` / XHR network failures to contributor-safe copy (never raw "Failed to fetch" alone). */
+export function humanizeContributorNetworkError(error: unknown): string {
+  const msg = error instanceof Error ? error.message : ""
+  if (
+    msg === "Failed to fetch" ||
+    /networkerror|load failed|failed to fetch/i.test(msg) ||
+    (error instanceof TypeError && /fetch|network/i.test(msg))
+  ) {
+    return "We could not reach the server or cloud storage. Check your internet connection, try again in a moment, or switch networks. If this keeps happening on upload, ask staff to confirm R2 CORS allows your site (including PUT and Content-Type)."
+  }
+  if (error instanceof Error) return error.message
+  return "Something went wrong. Please try again."
+}
+
+export interface PutToSignedUrlResult {
+  ok: boolean
+  status: number
+}
+
+/**
+ * Browser PUT directly to R2 (not proxied). Uses XMLHttpRequest when available so upload progress can be reported.
+ */
 export async function putContributorFileToSignedUrl(
   uploadUrl: string,
   file: Blob,
   contentType: string,
-): Promise<Response> {
-  return fetch(uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: file,
+  onProgress?: (percent0to100: number) => void,
+): Promise<PutToSignedUrlResult> {
+  if (typeof XMLHttpRequest === "undefined") {
+    try {
+      const response = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: file,
+      })
+      return { ok: response.ok, status: response.status }
+    } catch (e) {
+      throw new Error(humanizeContributorNetworkError(e))
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open("PUT", uploadUrl)
+    xhr.setRequestHeader("Content-Type", contentType)
+    xhr.upload.addEventListener("progress", (e) => {
+      if (!onProgress) return
+      if (e.lengthComputable && e.total > 0) onProgress(Math.min(100, Math.round((100 * e.loaded) / e.total)))
+    })
+    xhr.addEventListener("load", () => {
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status })
+    })
+    xhr.addEventListener("error", () => {
+      reject(new Error(humanizeContributorNetworkError(new Error("Failed to fetch"))))
+    })
+    xhr.addEventListener("abort", () => {
+      reject(new Error("Upload was cancelled."))
+    })
+    try {
+      xhr.send(file)
+    } catch (e) {
+      reject(new Error(humanizeContributorNetworkError(e)))
+    }
   })
 }
 
@@ -430,17 +531,22 @@ async function contributorJson<T>(
     cookieHeader?: string
   },
 ): Promise<T> {
-  const response = await fetch(resolveContributorUrl(path), {
-    method: input.method,
-    cache: "no-store",
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      ...(input.body ? { "Content-Type": "application/json" } : {}),
-      ...(input.cookieHeader ? { Cookie: input.cookieHeader } : {}),
-    },
-    body: input.body ? JSON.stringify(input.body) : undefined,
-  })
+  let response: Response
+  try {
+    response = await fetch(resolveContributorUrl(path), {
+      method: input.method,
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        ...(input.body ? { "Content-Type": "application/json" } : {}),
+        ...(input.cookieHeader ? { Cookie: input.cookieHeader } : {}),
+      },
+      body: input.body ? JSON.stringify(input.body) : undefined,
+    })
+  } catch (e) {
+    throw new ContributorApiError(503, "NETWORK_ERROR", humanizeContributorNetworkError(e))
+  }
 
   if (!response.ok) {
     const error = await readContributorApiError(response)
@@ -462,12 +568,14 @@ function resolveContributorUrl(path: string) {
 async function readContributorApiError(response: Response) {
   try {
     const body = (await response.json()) as {
+      success?: boolean
       error?: { code?: string; message?: string }
       meta?: unknown
     }
+    const err = body.error
     return {
-      code: body.error?.code ?? "CONTRIBUTOR_API_ERROR",
-      message: body.error?.message ?? "Contributor request failed.",
+      code: err?.code ?? "CONTRIBUTOR_API_ERROR",
+      message: err?.message ?? "Contributor request failed.",
     }
   } catch {
     return {

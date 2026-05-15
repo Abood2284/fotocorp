@@ -5,6 +5,7 @@
  */
 import dotenv from "dotenv"
 import pg from "pg"
+import { pathToFileURL } from "node:url"
 
 dotenv.config({ path: ".dev.vars" })
 
@@ -244,7 +245,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = excluded.updated_at;
 `
 
-const IMAGE_ASSETS_UPSERT = `
+export const IMAGE_ASSETS_UPSERT = `
 INSERT INTO image_assets (
   id,
   legacy_source,
@@ -305,7 +306,7 @@ SELECT
   a.original_filename AS original_file_name,
   a.original_ext AS original_file_extension,
   a.r2_exists AS original_exists_in_storage,
-  a.r2_checked_at AS original_storage_checked_at,
+  CASE WHEN a.r2_exists = true THEN a.r2_checked_at ELSE NULL END AS original_storage_checked_at,
   a.image_date,
   a.uploaded_at,
   a.legacy_status,
@@ -314,7 +315,7 @@ SELECT
     WHEN a.status IN ('REJECTED', 'ARCHIVED') THEN 'ARCHIVED'
     WHEN a.status IN ('REVIEW', 'DRAFT') THEN 'DRAFT'
     WHEN a.status IN ('APPROVED', 'ACTIVE', 'READY', 'PUBLISHED') THEN 'ACTIVE'
-    WHEN a.r2_exists = false THEN 'MISSING_ORIGINAL'
+    WHEN a.r2_exists = false AND a.r2_checked_at IS NOT NULL THEN 'MISSING_ORIGINAL'
     ELSE 'UNKNOWN'
   END AS status,
   CASE WHEN a.visibility IN ('PUBLIC', 'PRIVATE', 'UNLISTED') THEN a.visibility ELSE 'PRIVATE' END AS visibility,
@@ -347,12 +348,19 @@ ON CONFLICT (id) DO UPDATE SET
   original_storage_key = excluded.original_storage_key,
   original_file_name = excluded.original_file_name,
   original_file_extension = excluded.original_file_extension,
-  original_exists_in_storage = excluded.original_exists_in_storage,
-  original_storage_checked_at = excluded.original_storage_checked_at,
+  original_exists_in_storage = image_assets.original_exists_in_storage OR excluded.original_exists_in_storage,
+  original_storage_checked_at = CASE
+    WHEN excluded.original_exists_in_storage = true THEN excluded.original_storage_checked_at
+    WHEN image_assets.original_exists_in_storage = true THEN image_assets.original_storage_checked_at
+    ELSE image_assets.original_storage_checked_at
+  END,
   image_date = excluded.image_date,
   uploaded_at = excluded.uploaded_at,
   legacy_status = excluded.legacy_status,
-  status = excluded.status,
+  status = CASE
+    WHEN image_assets.original_exists_in_storage = true AND excluded.original_exists_in_storage = false THEN image_assets.status
+    ELSE excluded.status
+  END,
   visibility = excluded.visibility,
   media_type = excluded.media_type,
   source = excluded.source,
@@ -512,4 +520,6 @@ async function main() {
   }
 }
 
-main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main()
+}

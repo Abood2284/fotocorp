@@ -29,6 +29,7 @@ Entry point for the database revamp: clean catalog tables, photographer flows, i
 | [Staff auth runbook](./staff-auth-runbook.md) | Staff accounts/sessions, internal dashboard cookie, bootstrap | Internal `/admin` access, staff login/logout |
 | [Photographer upload runbook](./photographer-upload-runbook.md) | Events, batches, staging, submit semantics | Upload API/UI or staging bucket work |
 | [Fotokey / publish pipeline](./fotokey-publish-pipeline.md) | Fotokey rules, R2 buckets, go-live gating | Approval queue, publish jobs, derivatives |
+| [Media pipeline operations (temporary)](./media-pipeline-operations.md) | One-time derivative migration status + generation commands | Production cutover prep and derivative backlog burn-down |
 | [Jobs direct VPS (Docker)](./jobs-direct-vps-deployment-runbook.md) | Private `apps/jobs` worker on a VPS | Raff / bare-metal Docker Compose without CapRover or public HTTP |
 
 ## Historical PR reports
@@ -54,6 +55,7 @@ Detailed PR write-ups live under [`reports/`](./reports/). They are kept for aud
 | [photographer-bulk-upload-ui-report.md](./reports/photographer-bulk-upload-ui-report.md) | PR-14 upload UI |
 | [admin-photographer-upload-review-report.md](./reports/admin-photographer-upload-review-report.md) | PR-15 admin queue |
 | [fotokey-publish-pipeline-report.md](./reports/fotokey-publish-pipeline-report.md) | PR-15.1 Fotokey + publish |
+| [pr-16i-asset-category-canonicalization-report.md](./reports/pr-16i-asset-category-canonicalization-report.md) | PR-16I public Fotokey + category model |
 | [pr-16e-jobs-docker-vps-deployment-report.md](./reports/pr-16e-jobs-docker-vps-deployment-report.md) | PR-16E jobs Docker + VPS |
 
 > **Note:** `image-runtime-compatibility-spike-report.md` and `image-runtime-fallback-spike-report.md` are reserved names for future spikes if checked in; they are not present in the repo today.
@@ -91,6 +93,7 @@ derivatives generated (THUMB, CARD, DETAIL) → image becomes ACTIVE + PUBLIC
 - Fotokey is generated **only** on admin approval, never at upload/submit time.
 - Fotokey sequence follows **admin approval order** (request array order) for a given business date.
 - No image is `ACTIVE` + `PUBLIC` until required derivatives exist and are `READY`.
+- **Categories (PR-16I):** `photo_events.category_id` = event default; `image_assets.category_id` = canonical asset category. Staff approve + publish completion may copy event → asset when `image_assets.category_id` is null. Public catalog uses asset category first, else event category, for list/detail/filters/collections.
 - Hard delete is blocked once `image_assets.fotokey` is non-null (`ASSET_HAS_FOTOKEY`).
 - Runtime reads/writes should use **clean** tables, not legacy fixture tables, for production paths.
 

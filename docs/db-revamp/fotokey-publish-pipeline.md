@@ -26,6 +26,7 @@ FC + DD + MM + YY + sequence
 - **Photographer staging** uploads use bucket `fotocorp-2026-contributor-uploads` (binding `MEDIA_CONTRIBUTOR_UPLOADS_BUCKET`).
 - **Previews** (watermarked derivatives) are written under `previews/watermarked/<variant>/<fotokey>.webp` in `fotocorp-2026-previews` (`MEDIA_PREVIEWS_BUCKET`).
 - An image becomes **`ACTIVE` + `PUBLIC`** only after required derivatives (`THUMB`, `CARD`, `DETAIL`) are **`READY`** in `image_derivatives`.
+- **Categories (PR-16I):** `photo_events.category_id` is the event default; `image_assets.category_id` is the canonical asset category. Approve + publish completion set asset `category_id` from the event when still null (never overwrite non-null). Public catalog resolves **asset → event → unavailable** for display and category facets.
 - **Admin approval alone does not go-live an asset.** Approval assigns Fotokey, copies the staging original to the canonical originals bucket, and enqueues publish job rows; visibility flips only after derivative generation completes successfully.
 
 ## Runtime: API processor vs Node `apps/jobs`

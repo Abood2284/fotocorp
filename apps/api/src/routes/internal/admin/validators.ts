@@ -30,3 +30,15 @@ export const adminPublishStateSchema = z.object({
 export const adminUserSubscriptionSchema = z.object({
   isSubscriber: z.boolean(),
 })
+
+export const adminBulkEditorialSchema = z.object({
+  assetIds: z.array(z.uuid()).min(1).max(500),
+  categoryId: z.uuid().nullable().optional(),
+  eventId: z.uuid().nullable().optional(),
+})
+
+export const adminBulkPublishStateSchema = z.object({
+  assetIds: z.array(z.uuid()).min(1).max(500),
+  status: z.enum(["APPROVED", "REVIEW", "REJECTED"]),
+  visibility: z.enum(["PUBLIC", "PRIVATE"]),
+})
