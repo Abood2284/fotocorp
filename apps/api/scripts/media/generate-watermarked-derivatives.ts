@@ -1397,7 +1397,7 @@ Options:
   --verbose-errors
   --watermark-profile <name>  (detail / watermarked variant only; default ${DETAIL_WATERMARKED_PROFILE})
 `);
-}
+} 
 
 function parseVariants(value: string) {
   const variants = value.split(",").map((item) => parseVariant(item.trim()));

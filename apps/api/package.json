@@ -18,6 +18,7 @@
     "smoke:subscriber-download-quality": "tsx scripts/smoke/check-subscriber-download-quality.ts",
     "smoke:clean-admin-catalog": "tsx scripts/smoke/check-clean-admin-catalog.ts",
     "smoke:clean-runtime-routes": "tsx scripts/smoke/check-clean-runtime-routes.ts",
+    "smoke:legacy-derivative-preserve": "tsx scripts/smoke/check-legacy-derivative-preserve.ts",
     "smoke:legacy-r2-preserve": "tsx scripts/smoke/check-legacy-r2-preserve.ts",
     "smoke:public-preview": "tsx scripts/smoke/check-public-preview.ts",
     "media:generate-derivatives": "tsx scripts/media/generate-watermarked-derivatives.ts",

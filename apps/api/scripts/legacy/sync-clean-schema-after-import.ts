@@ -6,6 +6,11 @@
 import dotenv from "dotenv"
 import pg from "pg"
 import { pathToFileURL } from "node:url"
+import {
+  CARD_CLEAN_PROFILE,
+  DETAIL_WATERMARKED_PROFILE,
+  THUMB_CLEAN_PROFILE,
+} from "../../src/lib/media/watermark.js"
 
 dotenv.config({ path: ".dev.vars" })
 
@@ -369,7 +374,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = excluded.updated_at;
 `
 
-const IMAGE_DERIVATIVES_UPSERT = `
+export const IMAGE_DERIVATIVES_UPSERT = `
 INSERT INTO image_derivatives (
   id,
   image_asset_id,
@@ -412,7 +417,7 @@ SELECT
 FROM asset_media_derivatives old
 JOIN image_assets ia ON ia.id = old.asset_id
 WHERE lower(old.variant) IN ('thumb', 'card', 'detail')
-ON CONFLICT (id) DO UPDATE SET
+ON CONFLICT (image_asset_id, variant) DO UPDATE SET
   image_asset_id = excluded.image_asset_id,
   variant = excluded.variant,
   storage_key = excluded.storage_key,
@@ -427,7 +432,27 @@ ON CONFLICT (id) DO UPDATE SET
   generated_at = excluded.generated_at,
   source = excluded.source,
   created_at = excluded.created_at,
-  updated_at = excluded.updated_at;
+  updated_at = excluded.updated_at
+WHERE NOT (
+  (
+    image_derivatives.variant = 'THUMB'
+    AND image_derivatives.generation_status = 'READY'
+    AND image_derivatives.is_watermarked = false
+    AND image_derivatives.watermark_profile = '${THUMB_CLEAN_PROFILE}'
+  )
+  OR (
+    image_derivatives.variant = 'CARD'
+    AND image_derivatives.generation_status = 'READY'
+    AND image_derivatives.is_watermarked = false
+    AND image_derivatives.watermark_profile = '${CARD_CLEAN_PROFILE}'
+  )
+  OR (
+    image_derivatives.variant = 'DETAIL'
+    AND image_derivatives.generation_status = 'READY'
+    AND image_derivatives.is_watermarked = true
+    AND image_derivatives.watermark_profile = '${DETAIL_WATERMARKED_PROFILE}'
+  )
+);
 `
 
 async function main() {
