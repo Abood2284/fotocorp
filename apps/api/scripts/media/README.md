@@ -91,6 +91,28 @@ pnpm --dir apps/api run media:generate-derivatives -- \
   --variants thumb,card,detail
 ```
 
+Deterministic shard backfill (run one terminal per index, keeping the same shard count for the whole wave):
+
+```bash
+pnpm --dir apps/api run media:generate-derivatives -- \
+  --scope all-verified \
+  --variants thumb,card,detail \
+  --limit 40000 \
+  --batch-size 100 \
+  --asset-concurrency 1 \
+  --upload-concurrency 3 \
+  --shard-count 6 \
+  --shard-index 0
+```
+
+Run indexes `0..shardCount-1`. Use a dry run on two shards first, and do not use `--force` for normal cleanup.
+
+Shard assignment smoke:
+
+```bash
+pnpm --dir apps/api run smoke:derivative-shards
+```
+
 Dry run:
 
 ```bash

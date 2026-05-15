@@ -14,7 +14,7 @@ import {
   CARD_CLEAN_PROFILE,
   DETAIL_WATERMARKED_PROFILE,
   THUMB_CLEAN_PROFILE,
-} from "../../src/lib/media/watermark";
+} from "../../src/lib/media/watermark.js";
 
 type Variant = "thumb" | "card" | "detail";
 type GenerationStatus = "READY" | "FAILED" | "STALE";
@@ -48,6 +48,8 @@ interface CliOptions {
   variants: Variant[];
   scope: "public-ready" | "all-verified";
   assetId?: string;
+  shardCount?: number;
+  shardIndex?: number;
   force: boolean;
   dryRun: boolean;
   failOnItemErrors: boolean;
@@ -656,6 +658,7 @@ async function selectAssets(pool: PgPool, options: CliOptions): Promise<AssetRow
     params.push(options.assetId);
     where.push(`a.id = $${params.length}`);
   } else {
+    appendShardPredicate(where, params, options, "a.id");
     where.push(`
       exists (
         select 1
@@ -709,6 +712,19 @@ async function selectAssets(pool: PgPool, options: CliOptions): Promise<AssetRow
 }
 
 async function getSelectionDiagnostics(pool: PgPool, options: CliOptions): Promise<SelectionDiagnostics> {
+  const params: unknown[] = [
+    options.variants,
+    THUMB_CLEAN_PROFILE,
+    CARD_CLEAN_PROFILE,
+    options.detailWatermarkProfile,
+    options.scope,
+    options.force,
+    options.retryFailed,
+  ];
+  const shardWhere: string[] = [];
+  appendShardPredicate(shardWhere, params, options, "sf.id");
+  const shardPredicate = shardWhere.length > 0 ? `where ${shardWhere.join(" and ")}` : "";
+
   const result = await dbQuery<SelectionDiagnostics>(
     pool,
     "selectionDiagnostics",
@@ -741,9 +757,44 @@ async function getSelectionDiagnostics(pool: PgPool, options: CliOptions): Promi
             and c.visibility = 'PUBLIC'
           )
       ),
-      needs_work as (
+      scope_needs_work as (
         select sf.id
         from scope_filtered sf
+        where exists (
+          select 1
+          from unnest($1::text[]) as v(variant)
+          left join image_derivatives d
+            on d.image_asset_id = sf.id
+           and d.variant = upper(v.variant)
+          where
+            $6::boolean = true
+            or d.image_asset_id is null
+            or d.generation_status <> 'READY'
+            or (
+              case upper(v.variant)
+                when 'THUMB' then d.is_watermarked is distinct from false
+                when 'CARD' then d.is_watermarked is distinct from false
+                else d.is_watermarked is distinct from true
+              end
+            )
+            or (
+              case upper(v.variant)
+                when 'THUMB' then d.watermark_profile is distinct from $2::text
+                when 'CARD' then d.watermark_profile is distinct from $3::text
+                else d.watermark_profile is distinct from $4::text
+              end
+            )
+            or ($7::boolean = true and d.generation_status = 'FAILED')
+        )
+      ),
+      shard_filtered as (
+        select sf.*
+        from scope_filtered sf
+        ${shardPredicate}
+      ),
+      needs_work as (
+        select sf.id
+        from shard_filtered sf
         where exists (
           select 1
           from unnest($1::text[]) as v(variant)
@@ -783,20 +834,12 @@ async function getSelectionDiagnostics(pool: PgPool, options: CliOptions): Promi
         ) as excluded_scope_not_public_ready,
         (
           select greatest(
-            (select count(*)::int from scope_filtered) - (select count(*)::int from needs_work),
+            (select count(*)::int from scope_filtered) - (select count(*)::int from scope_needs_work),
             0
           )
         ) as excluded_already_ready_for_scope
     `,
-    [
-      options.variants,
-      THUMB_CLEAN_PROFILE,
-      CARD_CLEAN_PROFILE,
-      options.detailWatermarkProfile,
-      options.scope,
-      options.force,
-      options.retryFailed,
-    ],
+    params,
   );
 
   return result.rows[0] ?? {
@@ -809,7 +852,7 @@ async function getSelectionDiagnostics(pool: PgPool, options: CliOptions): Promi
 }
 
 function printSelectionDiagnostics(diagnostics: SelectionDiagnostics, options: CliOptions) {
-  console.log("Selection diagnostics:");
+  console.log(`Selection diagnostics (selectedCandidates shard=${shardLabel(options)}; exclusion totals are global):`);
   console.table({
     selectedCandidates: diagnostics.selected_candidates,
     excludedNoOriginalKey: diagnostics.excluded_no_original_key,
@@ -938,6 +981,18 @@ function countRegenerationReason(counters: Counters, reason: GenerateReason) {
   if (reason === "missing-object") counters.regeneratedMissingObject += 1;
   else if (reason === "failed") counters.regeneratedFailed += 1;
   else if (reason === "profile-changed") counters.regeneratedProfileChanged += 1;
+}
+
+function appendShardPredicate(where: string[], params: unknown[], options: CliOptions, idExpression: string) {
+  const shard = getShardConfig(options);
+  if (!shard) return;
+
+  params.push(shard.count, shard.index);
+  const shardCountParam = params.length - 1;
+  const shardIndexParam = params.length;
+  where.push(
+    `mod((('x' || substr(md5(${idExpression}::text), 1, 8))::bit(32)::bigint), $${shardCountParam}::bigint) = $${shardIndexParam}::bigint`,
+  );
 }
 
 async function generateDerivative(
@@ -1335,6 +1390,8 @@ function parseArgs(args: string[]): CliOptions {
     else if (arg === "--variants") options.variants = parseVariants(next());
     else if (arg === "--scope") options.scope = parseScope(next());
     else if (arg === "--asset-id") options.assetId = parseUuid(next(), "asset-id");
+    else if (arg === "--shard-count") options.shardCount = parsePositiveInteger(next(), "shard-count");
+    else if (arg === "--shard-index") options.shardIndex = parseNonNegativeInteger(next(), "shard-index");
     else if (arg === "--force") options.force = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--fail-on-item-errors") options.failOnItemErrors = true;
@@ -1356,6 +1413,24 @@ function parseArgs(args: string[]): CliOptions {
   if (options.uploadConcurrency > 64) {
     throw new Error("--upload-concurrency must be 64 or lower.");
   }
+  const hasShardCount = options.shardCount !== undefined;
+  const hasShardIndex = options.shardIndex !== undefined;
+  if (hasShardCount !== hasShardIndex) {
+    throw new Error("--shard-count and --shard-index must be provided together.");
+  }
+  if (options.shardCount !== undefined && options.shardCount > 128) {
+    throw new Error("--shard-count must be 128 or lower.");
+  }
+  if (
+    options.shardCount !== undefined &&
+    options.shardIndex !== undefined &&
+    options.shardIndex >= options.shardCount
+  ) {
+    throw new Error("--shard-index must be an integer from 0 to shardCount - 1.");
+  }
+  if (options.assetId && (hasShardCount || hasShardIndex)) {
+    throw new Error("--asset-id cannot be combined with --shard-count/--shard-index.");
+  }
   if (!options.prefix) throw new Error("--prefix is required.");
   if (!isAllowedDerivativePrefix(options.prefix)) {
     throw new Error("--prefix must stay under previews/watermarked.");
@@ -1374,6 +1449,20 @@ Examples:
   pnpm --dir apps/api media:generate-derivatives -- --limit 500 --batch-size 100 --concurrency 6
   pnpm --dir apps/api media:generate-derivatives -- --asset-id <uuid> --force
   pnpm --dir apps/api media:generate-derivatives -- --dry-run --force --variants thumb,card --limit 50
+  pnpm --dir apps/api media:generate-derivatives -- \\
+    --scope all-verified \\
+    --variants thumb,card,detail \\
+    --limit 40000 \\
+    --batch-size 100 \\
+    --asset-concurrency 1 \\
+    --upload-concurrency 3 \\
+    --shard-count 6 \\
+    --shard-index 0
+
+Shard mode:
+  Run indexes 0..shardCount-1.
+  Keep the same --shard-count across one generation wave.
+  Do not use --force for normal cleanup.
 
 Options:
   --limit <n>
@@ -1389,6 +1478,8 @@ Options:
   --variants <thumb,card,detail>
   --scope <public-ready|all-verified>
   --asset-id <uuid>
+  --shard-count <n>
+  --shard-index <n>
   --force
   --dry-run
   --fail-on-item-errors
@@ -1417,6 +1508,12 @@ function parseScope(value: string): CliOptions["scope"] {
 function parsePositiveInteger(value: string, name: string) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`--${name} must be a positive integer.`);
+  return parsed;
+}
+
+function parseNonNegativeInteger(value: string, name: string) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`--${name} must be a non-negative integer.`);
   return parsed;
 }
 
@@ -1498,6 +1595,16 @@ function isAllowedDerivativePrefix(prefix: string) {
 
 function derivativeIdentity(assetId: string, variant: Variant) {
   return `${assetId}:${variant.toLowerCase()}`;
+}
+
+function getShardConfig(options: CliOptions): { count: number; index: number } | null {
+  if (options.shardCount === undefined || options.shardIndex === undefined) return null;
+  return { count: options.shardCount, index: options.shardIndex };
+}
+
+function shardLabel(options: CliOptions) {
+  const shard = getShardConfig(options);
+  return shard ? `${shard.index}/${shard.count}` : "none";
 }
 
 function hashHex(value: string | Buffer) {
@@ -1726,7 +1833,7 @@ function errorMessage(error: unknown) {
 
 function printStartup(options: CliOptions, failureLogPath: string, checkpointEvery: number) {
   console.log(
-    `Derivative generation dryRun=${options.dryRun} scope=${options.scope} variants=${options.variants.join(",")} limit=${options.limit ?? "all"} batchSize=${options.batchSize} assetConcurrency=${options.assetConcurrency} uploadConcurrency=${options.uploadConcurrency} r2RetryAttempts=${options.r2RetryAttempts} r2RetryBaseMs=${options.r2RetryBaseMs} maxRuntimeMinutes=${options.maxRuntimeMinutes ?? "none"} reportFile=${options.reportFile ?? "none"} prefix=${options.prefix} retryFailed=${options.retryFailed} failOnItemErrors=${options.failOnItemErrors} force=${options.force} detailWatermarkProfile=${options.detailWatermarkProfile} checkpointEvery=${checkpointEvery} failureLogPath=${failureLogPath}`,
+    `Derivative generation dryRun=${options.dryRun} scope=${options.scope} variants=${options.variants.join(",")} limit=${options.limit ?? "all"} shard=${shardLabel(options)} batchSize=${options.batchSize} assetConcurrency=${options.assetConcurrency} uploadConcurrency=${options.uploadConcurrency} r2RetryAttempts=${options.r2RetryAttempts} r2RetryBaseMs=${options.r2RetryBaseMs} maxRuntimeMinutes=${options.maxRuntimeMinutes ?? "none"} reportFile=${options.reportFile ?? "none"} prefix=${options.prefix} retryFailed=${options.retryFailed} failOnItemErrors=${options.failOnItemErrors} force=${options.force} detailWatermarkProfile=${options.detailWatermarkProfile} checkpointEvery=${checkpointEvery} failureLogPath=${failureLogPath}`,
   );
   console.log("Variant policy: thumb=clean, card=clean, detail=watermarked");
   console.log(
@@ -1814,6 +1921,8 @@ function buildRunSummary(
     config: {
       scope: options.scope,
       limit: options.limit ?? null,
+      shardCount: options.shardCount ?? null,
+      shardIndex: options.shardIndex ?? null,
       batchSize: options.batchSize,
       assetConcurrency: options.assetConcurrency,
       uploadConcurrency: options.uploadConcurrency,
