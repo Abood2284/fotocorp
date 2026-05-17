@@ -24,7 +24,7 @@ export interface ContributorImageItem {
   id: string
   contributorId: string
   legacyImageCode: string | null
-  title: string | null
+  whoIsInPicture: string | null
   headline: string | null
   caption: string | null
   status: string
@@ -64,7 +64,7 @@ export interface ContributorAnalyticsSummary {
 export interface ContributorTopDownloadedImage {
   imageAssetId: string
   legacyImageCode: string | null
-  title: string | null
+  whoIsInPicture: string | null
   headline: string | null
   eventName: string | null
   downloadCount: number
@@ -74,7 +74,7 @@ export interface ContributorTopDownloadedImage {
 export interface ContributorRecentUpload {
   imageAssetId: string
   legacyImageCode: string | null
-  title: string | null
+  whoIsInPicture: string | null
   headline: string | null
   eventName: string | null
   status: string
@@ -180,6 +180,10 @@ export interface ContributorUploadBatchItemDto {
   imageAssetId: string | null
   imageAssetStatus: string | null
   imageAssetVisibility: string | null
+  whoIsInPicture: string | null
+  caption: string | null
+  keywords: string | null
+  assetUpdatedAt: string | null
   failureCode: string | null
   failureMessage: string | null
   uploadedAt: string | null
@@ -197,8 +201,23 @@ export interface ContributorUploadBatchCreatePayload {
 
 export interface ContributorPrepareUploadFileMeta {
   fileName: string
-  mimeType: "image/jpeg" | "image/png" | "image/webp"
+  mimeType: "image/jpeg"
   sizeBytes: number
+}
+
+export interface ContributorPatchUploadAssetMetadataPayload {
+  expectedUpdatedAt?: string
+  whoIsInPicture?: string | null
+  caption?: string | null
+  keywords?: string | string[] | null
+}
+
+export interface ContributorPatchUploadAssetMetadataResponse {
+  ok: true
+  whoIsInPicture: string | null
+  caption: string | null
+  keywords: string | null
+  updatedAt: string
 }
 
 export interface ContributorPrepareUploadItemInstruction {
@@ -239,6 +258,7 @@ export class ContributorApiError extends Error {
     public readonly status: number,
     public readonly code: string,
     message: string,
+    public readonly detail?: unknown,
   ) {
     super(message)
     this.name = "ContributorApiError"
@@ -457,6 +477,22 @@ export async function submitContributorUploadBatch(batchId: string, options: Con
   )
 }
 
+export async function patchContributorUploadAssetMetadata(
+  batchId: string,
+  imageAssetId: string,
+  payload: ContributorPatchUploadAssetMetadataPayload,
+  options: ContributorRequestOptions = {},
+) {
+  return contributorJson<ContributorPatchUploadAssetMetadataResponse>(
+    `/upload-batches/${encodeURIComponent(batchId)}/assets/${encodeURIComponent(imageAssetId)}/metadata`,
+    {
+      method: "PATCH",
+      body: payload,
+      cookieHeader: options.cookieHeader,
+    },
+  )
+}
+
 /** Maps `fetch` / XHR network failures to contributor-safe copy (never raw "Failed to fetch" alone). */
 export function humanizeContributorNetworkError(error: unknown): string {
   const msg = error instanceof Error ? error.message : ""
@@ -550,7 +586,7 @@ async function contributorJson<T>(
 
   if (!response.ok) {
     const error = await readContributorApiError(response)
-    throw new ContributorApiError(response.status, error.code, error.message)
+    throw new ContributorApiError(response.status, error.code, error.message, error.detail)
   }
 
   return response.json() as Promise<T>
@@ -569,18 +605,20 @@ async function readContributorApiError(response: Response) {
   try {
     const body = (await response.json()) as {
       success?: boolean
-      error?: { code?: string; message?: string }
+      error?: { code?: string; message?: string; detail?: unknown }
       meta?: unknown
     }
     const err = body.error
     return {
       code: err?.code ?? "CONTRIBUTOR_API_ERROR",
       message: err?.message ?? "Contributor request failed.",
+      detail: err?.detail,
     }
   } catch {
     return {
       code: "CONTRIBUTOR_API_ERROR",
       message: "Contributor request failed.",
+      detail: undefined,
     }
   }
 }

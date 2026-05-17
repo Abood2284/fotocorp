@@ -48,7 +48,7 @@ export function StaffCaptionsQueue({ assets, selectedId, onSelect, nextCursor }:
                 {asset.preview?.url ? (
                   <Image
                     src={asset.preview.url}
-                    alt={asset.title || "Asset thumbnail"}
+                    alt={asset.whoIsInPicture || asset.headline || "Asset thumbnail"}
                     fill
                     className="object-cover"
                     sizes="64px"

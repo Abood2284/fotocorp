@@ -5,7 +5,7 @@ import { joinPublicCardDerivative, publicAssetPredicate } from "./public-catalog
 export interface HomepageAssetRow {
   id: string
   fotokey: string | null
-  title: string | null
+  who_is_in_picture: string | null
   caption: string | null
   image_date: Date | string | null
   created_at: Date | string | null
@@ -26,7 +26,7 @@ function buildHomepageAssetsSql(options: { limit: number; searchQuery?: string }
   const where: SQL[] = [publicAssetPredicate("a")]
   if (options.searchQuery) {
     where.push(
-      sql`to_tsvector('english', coalesce(a.search_text, '')) @@ plainto_tsquery('english', ${options.searchQuery})`,
+      sql`to_tsvector('english', coalesce(a.search_text, '') || ' ' || coalesce(a.who_is_in_picture, '')) @@ plainto_tsquery('english', ${options.searchQuery})`,
     )
   }
 
@@ -34,7 +34,7 @@ function buildHomepageAssetsSql(options: { limit: number; searchQuery?: string }
     select
       a.id,
       a.fotokey,
-      a.title,
+      a.who_is_in_picture,
       a.caption,
       a.image_date,
       a.created_at,

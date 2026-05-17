@@ -23,11 +23,7 @@ export default async function NewContributorUploadPage() {
           <ArrowLeft className="h-4 w-4" />
           Back to uploads
         </Link>
-        <p className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contributor portal</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">New upload batch</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Create an event for this batch, add optional shared metadata, then upload images. Files are sent directly to secure storage after you start upload.
-        </p>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">New upload batch</h1>
       </div>
 
       <ContributorUploadFlow initialSession={session} />

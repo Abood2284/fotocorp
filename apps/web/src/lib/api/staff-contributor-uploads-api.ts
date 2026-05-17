@@ -26,7 +26,7 @@ export interface StaffContributorUploadDto {
   assetCategoryName?: string | null
   /** Event default category (`photo_events.category_id`) when present. */
   eventDefaultCategoryName?: string | null
-  title: string | null
+  whoIsInPicture: string | null
   caption: string | null
   keywords: string | null
   contributor: {
@@ -128,7 +128,7 @@ export async function rejectStaffContributorUploads(imageAssetIds: string[]) {
 
 export interface StaffContributorUploadMetadataPatchResponse {
   ok: true
-  title: string | null
+  whoIsInPicture: string | null
   caption: string | null
   keywords: string | null
   updatedAt: string
@@ -138,7 +138,7 @@ export async function patchStaffContributorUploadMetadata(
   imageAssetId: string,
   body: {
     expectedUpdatedAt: string
-    title?: string | null
+    whoIsInPicture?: string | null
     caption?: string | null
     keywords?: string | string[] | null
   },

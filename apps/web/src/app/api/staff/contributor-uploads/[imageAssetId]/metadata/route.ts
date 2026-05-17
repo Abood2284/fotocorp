@@ -45,7 +45,7 @@ export async function PATCH(request: Request, context: MetadataRouteContext) {
       {
         error: {
           code: "INVALID_PAYLOAD",
-          message: "expectedUpdatedAt and at least one of title, caption, or keywords are required.",
+          message: "expectedUpdatedAt and at least one of whoIsInPicture, caption, or keywords are required.",
         },
       },
       { status: 400, headers: SAFE_HEADERS },
@@ -68,7 +68,7 @@ export async function PATCH(request: Request, context: MetadataRouteContext) {
 
 interface MetadataPayload {
   expectedUpdatedAt: string
-  title?: string | null
+  whoIsInPicture?: string | null
   caption?: string | null
   keywords?: string | string[] | null
 }
@@ -78,6 +78,6 @@ function isMetadataPayload(value: unknown): value is MetadataPayload {
   const o = value as MetadataPayload
   if (typeof o.expectedUpdatedAt !== "string" || o.expectedUpdatedAt.trim().length === 0) return false
   const has =
-    o.title !== undefined || o.caption !== undefined || o.keywords !== undefined
+    o.whoIsInPicture !== undefined || o.caption !== undefined || o.keywords !== undefined
   return has
 }

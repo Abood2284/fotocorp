@@ -11,7 +11,9 @@ const buttonVariants = cva(
         default:
           "bg-primary text-primary-foreground shadow hover:bg-primary/90 active:scale-[0.98]",
         accent:
-          "bg-accent text-accent-foreground shadow hover:bg-accent/90 active:scale-[0.98]",
+          "bg-accent text-accent-foreground shadow hover:bg-accent-hover active:scale-[0.98]",
+        accentSoft:
+          "border border-accent-soft-border bg-accent-soft text-accent-soft-foreground shadow-sm hover:border-accent/35 hover:bg-accent-mid/40 active:scale-[0.98]",
         secondary:
           "bg-secondary text-secondary-foreground border border-border hover:bg-muted active:scale-[0.98]",
         outline:

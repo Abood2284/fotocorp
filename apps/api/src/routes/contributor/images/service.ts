@@ -14,7 +14,7 @@ interface PhotographerImageRow {
   id: string;
   contributor_id: string;
   legacy_image_code: string | null;
-  title: string | null;
+  who_is_in_picture: string | null;
   headline: string | null;
   caption: string | null;
   status: string;
@@ -44,7 +44,7 @@ export async function listPhotographerImages(
       ia.id,
       ia.contributor_id,
       ia.legacy_image_code,
-      ia.title,
+      ia.who_is_in_picture,
       ia.headline,
       ia.caption,
       ia.status,
@@ -82,7 +82,7 @@ function mapImageRow(row: PhotographerImageRow) {
     id: row.id,
     contributorId: row.contributor_id,
     legacyImageCode: row.legacy_image_code,
-    title: row.title,
+    whoIsInPicture: row.who_is_in_picture,
     headline: row.headline,
     caption: row.caption,
     status: row.status,

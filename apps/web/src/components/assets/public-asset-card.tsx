@@ -134,7 +134,7 @@ export function PublicAssetCard({
 }
 
 function getAssetAlt(asset: PublicAsset) {
-  return asset.headline || asset.caption || asset.title || "Fotocorp archive image"
+  return asset.headline || asset.caption || "Fotocorp archive image"
 }
 
 function getPreviewAspectRatio(

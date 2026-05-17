@@ -11,7 +11,7 @@ export const imageAssets = pgTable(
     legacySource: text("legacy_source"),
     legacyAssetId: bigint("legacy_asset_id", { mode: "number" }),
     legacyImageCode: text("legacy_image_code"),
-    title: text("title"),
+    whoIsInPicture: text("who_is_in_picture"),
     headline: text("headline"),
     caption: text("caption"),
     description: text("description"),

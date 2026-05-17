@@ -23,7 +23,7 @@ function toAdminAssetListItemDto(
 
   return {
     id: asset.id,
-    title: asset.title,
+    whoIsInPicture: asset.whoIsInPicture,
     filename: asset.filename,
     previewUrl: asset.previewUrl,
     thumbnailUrl: asset.previewUrl,

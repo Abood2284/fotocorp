@@ -92,7 +92,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
     <div className="relative flex min-h-screen flex-col">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[680px] bg-[radial-gradient(circle_at_top,rgba(124,58,237,0.26),rgba(124,58,237,0.1)_32%,transparent_72%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[680px] bg-[radial-gradient(ellipse_70%_55%_at_75%_50%,rgba(192,124,10,0.045)_0%,transparent_65%),radial-gradient(ellipse_50%_40%_at_10%_85%,rgba(26,37,64,0.05)_0%,transparent_60%)]"
       />
       <Header userProfile={headerUser} staffBrief={staffBrief} />
       <main className="relative z-10 flex-1">{children}</main>

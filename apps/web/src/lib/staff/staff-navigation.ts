@@ -31,13 +31,13 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     roles: ["SUPER_ADMIN", "CATALOG_MANAGER", "REVIEWER", "FINANCE", "SUPPORT"],
   },
   {
-    label: "Contributor uploads",
+    label: "Uploads",
     href: "/staff/contributor-uploads",
     icon: Inbox,
     roles: ["SUPER_ADMIN", "CATALOG_MANAGER", "REVIEWER"],
   },
   {
-    label: "Access inquiries",
+    label: "Inquiries",
     href: "/staff/access-inquiries",
     icon: Mail,
     roles: ["SUPER_ADMIN", "SUPPORT", "FINANCE"],
@@ -55,7 +55,7 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     roles: ["SUPER_ADMIN"],
   },
   {
-    label: "Caption management",
+    label: "Captions",
     href: "/staff/captions",
     icon: Subtitles,
     roles: ["SUPER_ADMIN", "CAPTION_MANAGER"],
@@ -73,7 +73,7 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     roles: ["SUPER_ADMIN"],
   },
   {
-    label: "Media pipeline",
+    label: "Pipeline",
     href: "/staff/media-pipeline",
     icon: Gauge,
     roles: ["SUPER_ADMIN"],
@@ -91,7 +91,7 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     roles: ["SUPER_ADMIN"],
   },
   {
-    label: "Staff users",
+    label: "Staff",
     href: "/staff/staff-users",
     icon: UserCog,
     roles: ["SUPER_ADMIN"],

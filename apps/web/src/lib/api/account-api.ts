@@ -18,7 +18,7 @@ export interface FotoboxItem {
   assetId: string
   savedAt: string | null
   headline: string | null
-  title: string | null
+  whoIsInPicture: string | null
   caption: string | null
   fotokey: string | null
   category: string | null
@@ -40,7 +40,7 @@ export interface DownloadHistoryItem {
   downloadSize: "WEB" | "MEDIUM" | "LARGE"
   status: "STARTED" | "FAILED"
   headline: string | null
-  title: string | null
+  whoIsInPicture: string | null
   caption: string | null
   fotokey: string | null
   previewUrl: AccountPreview | null

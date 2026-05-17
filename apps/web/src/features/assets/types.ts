@@ -25,7 +25,7 @@ export interface PublicAssetContributor {
 
 export interface PublicAsset {
   id: string
-  title: string | null
+  whoIsInPicture: string | null
   caption: string | null
   headline: string | null
   keywords: string | null

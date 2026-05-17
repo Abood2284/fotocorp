@@ -106,7 +106,7 @@ export function StaffCaptionsEditor({ asset, filters, onSaveAndNext, onSkip, onP
               {asset.preview?.url ? (
                 <Image
                   src={asset.preview.url}
-                  alt={asset.title || "Asset preview"}
+                  alt={asset.whoIsInPicture || asset.headline || "Asset preview"}
                   fill
                   className="object-contain"
                   sizes="(max-width: 768px) 100vw, 50vw"

@@ -29,7 +29,7 @@ export function StaffCaptionsFilterBar({ filters }: { filters: AdminCatalogFilte
     router.push(`/staff/captions?${sp.toString()}`)
   }
 
-  const isMissingTitle = searchParams.get("missingTitle") === "true"
+  const isMissingWhoIsInPicture = searchParams.get("missingWhoIsInPicture") === "true"
   const isMissingCaption = searchParams.get("missingCaption") === "true"
   const isNoEvent = searchParams.get("noEvent") === "true"
   const isNoCategory = searchParams.get("noCategory") === "true"
@@ -39,14 +39,14 @@ export function StaffCaptionsFilterBar({ filters }: { filters: AdminCatalogFilte
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex items-center space-x-1 border-r pr-2 mr-1">
         <button
-          onClick={() => handleToggle("missingTitle")}
+          onClick={() => handleToggle("missingWhoIsInPicture")}
           className={`px-3 py-1 text-xs rounded-full border transition-colors ${
-            isMissingTitle 
+            isMissingWhoIsInPicture
               ? "bg-primary text-primary-foreground border-primary" 
               : "bg-background hover:bg-muted"
           }`}
         >
-          No Title
+          No who is in picture
         </button>
         <button
           onClick={() => handleToggle("missingCaption")}

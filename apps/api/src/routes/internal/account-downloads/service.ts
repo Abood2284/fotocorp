@@ -25,7 +25,7 @@ interface DownloadHistoryRow {
   downloaded_at: Date | string
   download_size: string
   download_status: string
-  title: string | null
+  who_is_in_picture: string | null
   headline: string | null
   caption: string | null
   fotokey: string | null
@@ -104,7 +104,7 @@ async function listDownloadRows(
       dl.created_at as downloaded_at,
       dl.download_size,
       dl.download_status,
-      a.title,
+      a.who_is_in_picture,
       a.headline,
       a.caption,
       a.fotokey,
@@ -140,7 +140,7 @@ async function toDownloadHistoryItem(row: DownloadHistoryRow, env: Env) {
     downloadSize: row.download_size,
     status: row.download_status,
     headline: row.headline,
-    title: row.title,
+    whoIsInPicture: row.who_is_in_picture,
     caption: row.caption,
     fotokey: row.fotokey,
     previewUrl: row.asset_id ? await previewUrl(row.asset_id, row.card_width, row.card_height, "card", env) : null,

@@ -33,6 +33,10 @@
   --accent-mid: #f0c96b;
   --accent-wash: #fdf4e3;
   --accent-foreground: #ffffff;
+  /* Soft CTA surface — light amber fill for download / secondary licensing actions */
+  --accent-soft: #fdf4e3;
+  --accent-soft-foreground: #7a4d06;
+  --accent-soft-border: rgba(192, 124, 10, 0.28);
 
   --destructive: #b91c1c;
   --destructive-light: #fef2f2;
@@ -81,6 +85,9 @@
   --primary-foreground: #0d0f1a;
   
   --accent-wash: #2d1d04;
+  --accent-soft: #2d1d04;
+  --accent-soft-foreground: #f0c96b;
+  --accent-soft-border: rgba(240, 201, 107, 0.28);
   
   --nav: #131624;
   --nav-foreground: #ffffff;
@@ -122,6 +129,9 @@
   --color-accent-mid: var(--accent-mid);
   --color-accent-wash: var(--accent-wash);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent-soft-foreground);
+  --color-accent-soft-border: var(--accent-soft-border);
 
   --color-destructive: var(--destructive);
   --color-destructive-light: var(--destructive-light);

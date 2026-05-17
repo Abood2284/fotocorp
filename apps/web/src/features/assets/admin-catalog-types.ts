@@ -10,7 +10,7 @@ export interface AdminCatalogDerivativeSummary {
 export interface AdminCatalogAssetItem {
   id: string
   legacyImageCode: string | null
-  title: string | null
+  whoIsInPicture: string | null
   caption: string | null
   headline: string | null
   description: string | null

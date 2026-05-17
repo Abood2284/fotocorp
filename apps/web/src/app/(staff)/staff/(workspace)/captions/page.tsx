@@ -21,7 +21,7 @@ export default async function StaffCaptionsPage({ searchParams }: StaffCaptionsP
   query.set("limit", "100")
   query.set("sort", typeof params.sort === "string" ? params.sort : "newest")
 
-  if (typeof params.missingTitle === "string") query.set("missingTitle", params.missingTitle)
+  if (typeof params.missingWhoIsInPicture === "string") query.set("missingWhoIsInPicture", params.missingWhoIsInPicture)
   if (typeof params.missingCaption === "string") query.set("missingCaption", params.missingCaption)
   if (typeof params.noEvent === "string") query.set("noEvent", params.noEvent)
   if (typeof params.noCategory === "string") query.set("noCategory", params.noCategory)

@@ -16,7 +16,7 @@ export function buildPhotographerOriginalStorageKey(input: {
 }
 
 export function isAllowedUploadExtension(ext: string): boolean {
-  return ext === "jpg" || ext === "jpeg" || ext === "png" || ext === "webp";
+  return ext === "jpg" || ext === "jpeg";
 }
 
 export function extensionFromFileNameAndMime(fileName: string, mimeType: string): string | null {
@@ -40,8 +40,6 @@ function extractExtensionFromFileName(fileName: string): string | null {
 function extensionFromMime(mime: string): string | null {
   const m = mime.trim().toLowerCase();
   if (m === "image/jpeg") return "jpg";
-  if (m === "image/png") return "png";
-  if (m === "image/webp") return "webp";
   return null;
 }
 

@@ -12,12 +12,15 @@ import {
   createPhotographerUploadBatch,
   getPhotographerUploadBatchDetail,
   listPhotographerUploadBatches,
+  patchPhotographerUploadAssetMetadata,
   preparePhotographerUploadFiles,
   submitPhotographerUploadBatch,
 } from "./service";
 import {
   createUploadBatchBodySchema,
+  patchUploadAssetMetadataBodySchema,
   prepareUploadFilesBodySchema,
+  uploadBatchAssetParamSchema,
   uploadBatchIdParamSchema,
   uploadBatchItemParamSchema,
   uploadBatchesListQuerySchema,
@@ -90,11 +93,29 @@ photographerUploadRoutes.post(
   },
 );
 
+photographerUploadRoutes.patch(
+  "/api/v1/contributor/upload-batches/:batchId/assets/:imageAssetId/metadata",
+  zValidator("param", uploadBatchAssetParamSchema),
+  zValidator("json", patchUploadAssetMetadataBodySchema),
+  async (c) => {
+    const database = db(c.env);
+    const session = await requirePhotographerSession(database, getCookie(c, CONTRIBUTOR_SESSION_COOKIE));
+    const { batchId, imageAssetId } = c.req.valid("param");
+    return json(
+      await patchPhotographerUploadAssetMetadata(database, session, batchId, imageAssetId, c.req.valid("json")),
+    );
+  },
+);
+
 photographerUploadRoutes.all("/api/v1/contributor/upload-batches", () => methodNotAllowed());
 photographerUploadRoutes.all("/api/v1/contributor/upload-batches/:batchId", () => methodNotAllowed());
 photographerUploadRoutes.all("/api/v1/contributor/upload-batches/:batchId/files", () => methodNotAllowed());
 photographerUploadRoutes.all("/api/v1/contributor/upload-batches/:batchId/files/:itemId/complete", () => methodNotAllowed());
 photographerUploadRoutes.all("/api/v1/contributor/upload-batches/:batchId/submit", () => methodNotAllowed());
+photographerUploadRoutes.all(
+  "/api/v1/contributor/upload-batches/:batchId/assets/:imageAssetId/metadata",
+  () => methodNotAllowed(),
+);
 
 function db(env: Env) {
   if (!env.DATABASE_URL) throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.");

@@ -54,7 +54,7 @@ interface AdminUploadListRow {
   batch_submitted_at: Date | string | null;
   created_at: Date | string;
   updated_at: Date | string;
-  title: string | null;
+  who_is_in_picture: string | null;
   caption: string | null;
   keywords: string | null;
 }
@@ -156,7 +156,7 @@ export async function listAdminContributorUploadsService(
         b.submitted_at as batch_submitted_at,
         ia.created_at as created_at,
         ia.updated_at as updated_at,
-        ia.title as title,
+        ia.who_is_in_picture as who_is_in_picture,
         ia.caption as caption,
         ia.keywords as keywords
       from contributor_upload_items pui
@@ -666,7 +666,7 @@ export async function getAdminContributorUploadBatchService(
         b.submitted_at as batch_submitted_at,
         ia.created_at as created_at,
         ia.updated_at as updated_at,
-        ia.title as title,
+        ia.who_is_in_picture as who_is_in_picture,
         ia.caption as caption,
         ia.keywords as keywords
       from contributor_upload_items pui
@@ -783,14 +783,14 @@ export async function patchAdminContributorUploadMetadataService(
   const writeDb = createTransactionalDb(env.DATABASE_URL);
   try {
     const currentRows = await executeRows<{
-      title: string | null;
+      who_is_in_picture: string | null;
       caption: string | null;
       keywords: string | null;
       updated_at: Date | string;
     }>(
       writeDb.db,
       sql`
-        select ia.title, ia.caption, ia.keywords, ia.updated_at
+        select ia.who_is_in_picture, ia.caption, ia.keywords, ia.updated_at
         from image_assets ia
         inner join contributor_upload_items pui on pui.image_asset_id = ia.id
         where ia.id = ${imageAssetId}::uuid
@@ -810,21 +810,22 @@ export async function patchAdminContributorUploadMetadataService(
       );
     }
 
-    const nextTitle =
-      body.title !== undefined ? normalizeNullableText(body.title, 2048) : (cur.title ?? null);
+    const nextWhoIsInPicture =
+      body.whoIsInPicture !== undefined
+        ? normalizeNullableText(body.whoIsInPicture, 2048)
+        : (cur.who_is_in_picture ?? null);
     const nextCaption =
       body.caption !== undefined ? normalizeNullableText(body.caption, 8000) : (cur.caption ?? null);
     const nextKeywords =
       body.keywords !== undefined ? normalizeKeywordsInput(body.keywords) : (cur.keywords ?? null);
-    const searchText = [nextTitle, nextCaption, nextKeywords].filter(Boolean).join(" ").trim() || null;
+    const searchText = [nextWhoIsInPicture, nextCaption, nextKeywords].filter(Boolean).join(" ").trim() || null;
 
     const updated = await executeRows<{ updated_at: Date | string }>(
       writeDb.db,
       sql`
         update image_assets ia
         set
-          title = ${nextTitle},
-          headline = ${nextTitle},
+          who_is_in_picture = ${nextWhoIsInPicture},
           caption = ${nextCaption},
           keywords = ${nextKeywords},
           search_text = ${searchText},
@@ -842,14 +843,14 @@ export async function patchAdminContributorUploadMetadataService(
     const u = updated[0];
     if (!u) {
       const snapRows = await executeRows<{
-        title: string | null;
+        who_is_in_picture: string | null;
         caption: string | null;
         keywords: string | null;
         updated_at: Date | string;
       }>(
         writeDb.db,
         sql`
-          select ia.title, ia.caption, ia.keywords, ia.updated_at
+          select ia.who_is_in_picture, ia.caption, ia.keywords, ia.updated_at
           from image_assets ia
           where ia.id = ${imageAssetId}::uuid
           limit 1
@@ -870,7 +871,7 @@ export async function patchAdminContributorUploadMetadataService(
             code: "METADATA_CONFLICT",
             message: "Another change was saved first. Reload the form and try again.",
             detail: {
-              title: snap.title ?? null,
+              whoIsInPicture: snap.who_is_in_picture ?? null,
               caption: snap.caption ?? null,
               keywords: snap.keywords ?? null,
               updatedAt: toIso(snap.updated_at) ?? new Date(0).toISOString(),
@@ -883,7 +884,7 @@ export async function patchAdminContributorUploadMetadataService(
 
     return json({
       ok: true as const,
-      title: nextTitle,
+      whoIsInPicture: nextWhoIsInPicture,
       caption: nextCaption,
       keywords: nextKeywords,
       updatedAt: toIso(u.updated_at) ?? new Date(0).toISOString(),
@@ -1239,7 +1240,7 @@ function toUploadDto(row: AdminUploadListRow) {
     source,
     assetType: row.asset_type,
     fotokey: row.fotokey ?? null,
-    title: row.title ?? null,
+    whoIsInPicture: row.who_is_in_picture ?? null,
     caption: row.caption ?? null,
     keywords: row.keywords ?? null,
     contributor: {

@@ -64,12 +64,12 @@ const keywordsField = z.union([
 export const adminContributorUploadMetadataPatchBodySchema = z
   .object({
     expectedUpdatedAt: z.string().trim().min(1).max(64),
-    title: z.string().trim().max(2048).nullable().optional(),
+    whoIsInPicture: z.string().trim().max(2048).nullable().optional(),
     caption: z.string().trim().max(8000).nullable().optional(),
     keywords: keywordsField.nullable().optional(),
   })
-  .refine((v) => v.title !== undefined || v.caption !== undefined || v.keywords !== undefined, {
-    message: "At least one of title, caption, or keywords is required.",
+  .refine((v) => v.whoIsInPicture !== undefined || v.caption !== undefined || v.keywords !== undefined, {
+    message: "At least one of who is in picture, caption, or keywords is required.",
   });
 
 export type AdminContributorUploadMetadataPatchBody = z.infer<typeof adminContributorUploadMetadataPatchBodySchema>;

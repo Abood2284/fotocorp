@@ -40,7 +40,7 @@ interface CursorPayload {
 interface AssetRow {
   id: string;
   fotokey: string | null;
-  title: string | null;
+  who_is_in_picture: string | null;
   caption: string | null;
   headline: string | null;
   keywords: string | null;
@@ -111,7 +111,7 @@ interface PreviewDto {
 interface AssetDto {
   id: string;
   fotokey: string | null;
-  title: string | null;
+  whoIsInPicture: string | null;
   caption: string | null;
   headline: string | null;
   keywords: string | null;
@@ -423,7 +423,7 @@ function buildWhere(query: PublicAssetQuery): SQL[] {
   if (query.year) where.push(sql`extract(year from coalesce(e.event_date, a.image_date, a.created_at)) = ${query.year}`);
   if (query.month) where.push(sql`extract(month from coalesce(e.event_date, a.image_date, a.created_at)) = ${query.month}`);
   if (query.q) {
-    where.push(sql`to_tsvector('english', coalesce(a.search_text, '')) @@ plainto_tsquery('english', ${query.q})`);
+    where.push(sql`${assetSearchVectorSql()} @@ plainto_tsquery('english', ${query.q})`);
   }
   if (query.cursor) {
     where.push(cursorPredicate(decodeCursor(query.cursor), query.sort, query.q));
@@ -431,16 +431,20 @@ function buildWhere(query: PublicAssetQuery): SQL[] {
   return where;
 }
 
+function assetSearchVectorSql(): SQL {
+  return sql`to_tsvector('english', coalesce(a.search_text, '') || ' ' || coalesce(a.who_is_in_picture, ''))`;
+}
+
 function selectAssetSql(q: string | undefined): SQL {
   const rank = q
-    ? sql`ts_rank_cd(to_tsvector('english', coalesce(a.search_text, '')), plainto_tsquery('english', ${q}))`
+    ? sql`ts_rank_cd(${assetSearchVectorSql()}, plainto_tsquery('english', ${q}))`
     : sql`0`;
 
   return sql`
     select
       a.id,
       a.fotokey as fotokey,
-      a.title,
+      a.who_is_in_picture,
       a.caption,
       a.headline,
       a.keywords,
@@ -519,7 +523,7 @@ function cursorPredicate(cursor: CursorPayload, sort: SortMode, q: string | unde
     return sql`(coalesce(e.event_date, a.image_date, a.created_at), a.id) > (${cursor.sortAt}::timestamptz, ${cursor.id}::uuid)`;
   }
   if (sort === "relevance") {
-    return sql`(ts_rank_cd(to_tsvector('english', coalesce(a.search_text, '')), plainto_tsquery('english', ${q ?? ""})), coalesce(e.event_date, a.image_date, a.created_at), a.id) < (${cursor.rank ?? 0}, ${cursor.sortAt}::timestamptz, ${cursor.id}::uuid)`;
+    return sql`(ts_rank_cd(${assetSearchVectorSql()}, plainto_tsquery('english', ${q ?? ""})), coalesce(e.event_date, a.image_date, a.created_at), a.id) < (${cursor.rank ?? 0}, ${cursor.sortAt}::timestamptz, ${cursor.id}::uuid)`;
   }
   return sql`(coalesce(e.event_date, a.image_date, a.created_at), a.id) < (${cursor.sortAt}::timestamptz, ${cursor.id}::uuid)`;
 }
@@ -543,7 +547,7 @@ async function toAssetDto(
   return {
     id: row.id,
     fotokey: row.fotokey,
-    title: row.title,
+    whoIsInPicture: row.who_is_in_picture,
     caption: row.caption,
     headline: row.headline,
     keywords: row.keywords,

@@ -28,7 +28,7 @@ export function FotoboxGrid({
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {items.map((item) => {
-        const title = item.headline || item.title || item.caption || "Fotocorp archive image"
+        const title = item.headline || item.whoIsInPicture || item.caption || "Fotocorp archive image"
         const preview = item.previewUrl ?? item.thumbUrl
         return (
           <article key={item.assetId} className="overflow-hidden rounded-xl border border-border bg-background">

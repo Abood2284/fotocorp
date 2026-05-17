@@ -26,7 +26,7 @@ export class FixtureCatalogRepository implements CatalogRepository {
     return fixtureAssets.filter((asset) => {
       const haystacks = [
         asset.id,
-        asset.title,
+        asset.whoIsInPicture,
         asset.filename,
         asset.description,
         asset.collection,

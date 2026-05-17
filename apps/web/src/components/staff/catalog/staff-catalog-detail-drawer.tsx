@@ -30,7 +30,7 @@ export function StaffCatalogDetailDrawer({ assetId, onClose, onUpdate, filters }
     fetchAdminAssetAction(assetId).then(res => {
       if (mounted && res?.asset) {
         setAsset(res.asset)
-        setTitle(res.asset.headline || res.asset.title || "")
+        setTitle(res.asset.headline || res.asset.whoIsInPicture || "")
         setCaption(res.asset.caption || "")
         setCategoryId(res.asset.category?.id || "")
         setEventId(res.asset.event?.id || "")

@@ -81,24 +81,6 @@ export default async function ContributorUploadBatchDetailPage({ params }: { par
               {new Date(batch.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
             </p>
           </div>
-          {batch.commonTitle ? (
-            <div className="sm:col-span-2">
-              <p className="text-muted-foreground">Common title</p>
-              <p className="mt-1 text-foreground">{batch.commonTitle}</p>
-            </div>
-          ) : null}
-          {batch.commonCaption ? (
-            <div className="sm:col-span-2">
-              <p className="text-muted-foreground">Common caption</p>
-              <p className="mt-1 text-foreground">{batch.commonCaption}</p>
-            </div>
-          ) : null}
-          {batch.commonKeywords ? (
-            <div className="sm:col-span-2">
-              <p className="text-muted-foreground">Common keywords</p>
-              <p className="mt-1 text-foreground">{batch.commonKeywords}</p>
-            </div>
-          ) : null}
         </CardContent>
       </Card>
 
@@ -130,6 +112,11 @@ export default async function ContributorUploadBatchDetailPage({ params }: { par
                       <p className="text-xs text-muted-foreground">
                         {item.mimeType ?? "—"} · {formatBytes(item.sizeBytes)}
                       </p>
+                      {item.whoIsInPicture ? (
+                        <p className="mt-1 text-xs text-foreground">
+                          <span className="text-muted-foreground">Who is in picture:</span> {item.whoIsInPicture}
+                        </p>
+                      ) : null}
                       {item.failureMessage ? (
                         <p className="mt-1 text-xs text-destructive">
                           {item.failureCode ? `${item.failureCode}: ` : ""}

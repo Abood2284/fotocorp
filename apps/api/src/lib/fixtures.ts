@@ -1,6 +1,6 @@
 export interface FixtureAssetRecord {
   id: string;
-  title: string;
+  whoIsInPicture: string;
   filename: string;
   previewUrl: string;
   thumbnailUrl: string;
@@ -26,7 +26,7 @@ export interface FixtureAssetRecord {
 export const fixtureAssets: FixtureAssetRecord[] = [
   {
     id: "asset_01HQKX8Q3R5N8EVTQ7V0P9ABCD",
-    title: "Mumbai Street Portrait",
+    whoIsInPicture: "Mumbai Street Portrait",
     filename: "mumbai-street-portrait.jpg",
     previewUrl: "https://fixtures.fotocorp.test/assets/mumbai-street-portrait/preview.jpg",
     thumbnailUrl: "https://fixtures.fotocorp.test/assets/mumbai-street-portrait/thumb.jpg",
@@ -55,7 +55,7 @@ export const fixtureAssets: FixtureAssetRecord[] = [
   },
   {
     id: "asset_01HQKXA3M7JZ8NEC6S6P1RF2KQ",
-    title: "Studio Product Flatlay",
+    whoIsInPicture: "Studio Product Flatlay",
     filename: "studio-product-flatlay.jpg",
     previewUrl: "https://fixtures.fotocorp.test/assets/studio-product-flatlay/preview.jpg",
     thumbnailUrl: "https://fixtures.fotocorp.test/assets/studio-product-flatlay/thumb.jpg",
@@ -83,7 +83,7 @@ export const fixtureAssets: FixtureAssetRecord[] = [
   },
   {
     id: "asset_01HQKXBB2F29WEMH62K91HZVR2",
-    title: "Archive Contact Sheet",
+    whoIsInPicture: "Archive Contact Sheet",
     filename: "archive-contact-sheet.jpg",
     previewUrl: "https://fixtures.fotocorp.test/assets/archive-contact-sheet/preview.jpg",
     thumbnailUrl: "https://fixtures.fotocorp.test/assets/archive-contact-sheet/thumb.jpg",

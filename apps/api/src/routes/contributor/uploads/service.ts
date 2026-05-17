@@ -14,7 +14,12 @@ import {
 } from "../../../lib/r2-contributor-uploads";
 import { createContributorStagingPresignedPutUrl } from "../../../lib/r2-presigned-put";
 import type { ContributorSessionResult } from "../auth/service";
-import type { CreateUploadBatchBody, PrepareUploadFilesBody, UploadBatchesListQuery } from "./validators";
+import type {
+  CreateUploadBatchBody,
+  PatchUploadAssetMetadataBody,
+  PrepareUploadFilesBody,
+  UploadBatchesListQuery,
+} from "./validators";
 
 interface BatchRow {
   id: string;
@@ -204,6 +209,10 @@ interface BatchDetailEventRow extends BatchRow {
 interface BatchDetailItemRow extends ItemRow {
   image_asset_status: string | null;
   image_asset_visibility: string | null;
+  who_is_in_picture: string | null;
+  caption: string | null;
+  keywords: string | null;
+  asset_updated_at: Date | string | null;
 }
 
 export async function getPhotographerUploadBatchDetail(db: DrizzleClient, session: ContributorSessionResult, batchId: string) {
@@ -263,7 +272,11 @@ export async function getPhotographerUploadBatchDetail(db: DrizzleClient, sessio
         i.created_at,
         i.updated_at,
         ia.status as image_asset_status,
-        ia.visibility as image_asset_visibility
+        ia.visibility as image_asset_visibility,
+        ia.who_is_in_picture,
+        ia.caption,
+        ia.keywords,
+        ia.updated_at as asset_updated_at
       from contributor_upload_items i
       left join image_assets ia on ia.id = i.image_asset_id
       where i.batch_id = ${batchId}::uuid
@@ -291,6 +304,10 @@ export async function getPhotographerUploadBatchDetail(db: DrizzleClient, sessio
       imageAssetId: row.image_asset_id,
       imageAssetStatus: row.image_asset_status,
       imageAssetVisibility: row.image_asset_visibility,
+      whoIsInPicture: row.who_is_in_picture,
+      caption: row.caption,
+      keywords: row.keywords,
+      assetUpdatedAt: row.asset_updated_at ? toIso(row.asset_updated_at) : null,
       failureCode: row.failure_code,
       failureMessage: row.failure_message,
       uploadedAt: row.uploaded_at ? toIso(row.uploaded_at) : null,
@@ -508,17 +525,16 @@ export async function completePhotographerUploadItem(
 
   if (!imageAssetId) {
     const legacyCode = photographerUploadLegacyImageCode(itemId);
-    const title = row.common_title ?? null;
+    const whoIsInPicture = row.common_title ?? null;
     const caption = row.common_caption ?? null;
     const keywords = row.common_keywords ?? null;
-    const searchText = [title, caption, keywords].filter(Boolean).join(" ").trim() || null;
+    const searchText = [whoIsInPicture, caption, keywords].filter(Boolean).join(" ").trim() || null;
 
     const inserted = await executeRows<{ id: string }>(
       db,
       sql`
         insert into image_assets (
-          title,
-          headline,
+          who_is_in_picture,
           caption,
           keywords,
           search_text,
@@ -539,8 +555,7 @@ export async function completePhotographerUploadItem(
           updated_at
         )
         values (
-          ${title},
-          ${title},
+          ${whoIsInPicture},
           ${caption},
           ${keywords},
           ${searchText},
@@ -731,6 +746,131 @@ async function requireOpenBatchForPhotographer(db: DrizzleClient, session: Contr
   return batch;
 }
 
+export async function patchPhotographerUploadAssetMetadata(
+  db: DrizzleClient,
+  session: ContributorSessionResult,
+  batchId: string,
+  imageAssetId: string,
+  body: PatchUploadAssetMetadataBody,
+) {
+  const photographerId = session.contributor.id;
+  const batch = await requireOpenBatchForPhotographer(db, session, batchId);
+
+  const linkRows = await executeRows<{ id: string }>(
+    db,
+    sql`
+      select i.id
+      from contributor_upload_items i
+      where i.batch_id = ${batch.id}::uuid
+        and i.contributor_id = ${photographerId}::uuid
+        and i.image_asset_id = ${imageAssetId}::uuid
+        and i.upload_status = 'ASSET_CREATED'
+      limit 1
+    `,
+  );
+  if (!linkRows[0]) {
+    throw new AppError(404, "UPLOAD_ASSET_NOT_FOUND", "This image is not part of your open upload batch.");
+  }
+
+  const currentRows = await executeRows<{
+    who_is_in_picture: string | null;
+    caption: string | null;
+    keywords: string | null;
+    updated_at: Date | string;
+  }>(
+    db,
+    sql`
+      select ia.who_is_in_picture, ia.caption, ia.keywords, ia.updated_at
+      from image_assets ia
+      where ia.id = ${imageAssetId}::uuid
+        and ia.contributor_id = ${photographerId}::uuid
+        and ia.source = 'FOTOCORP'
+        and ia.status = 'SUBMITTED'
+        and ia.visibility = 'PRIVATE'
+        and ia.fotokey is null
+      limit 1
+    `,
+  );
+  const cur = currentRows[0];
+  if (!cur) {
+    throw new AppError(404, "UPLOAD_ASSET_NOT_FOUND", "This image is not editable.");
+  }
+
+  const nextWhoIsInPicture =
+    body.whoIsInPicture !== undefined
+      ? normalizeNullableText(body.whoIsInPicture, 2048)
+      : (cur.who_is_in_picture ?? null);
+  const nextCaption =
+    body.caption !== undefined ? normalizeNullableText(body.caption, 8000) : (cur.caption ?? null);
+  const nextKeywords =
+    body.keywords !== undefined ? normalizeKeywordsInput(body.keywords) : (cur.keywords ?? null);
+  const searchText = [nextWhoIsInPicture, nextCaption, nextKeywords].filter(Boolean).join(" ").trim() || null;
+
+  const expectedAt = body.expectedUpdatedAt ?? toIso(cur.updated_at);
+  const updated = await executeRows<{ updated_at: Date | string }>(
+    db,
+    sql`
+      update image_assets ia
+      set
+        who_is_in_picture = ${nextWhoIsInPicture},
+        caption = ${nextCaption},
+        keywords = ${nextKeywords},
+        search_text = ${searchText},
+        updated_at = now()
+      where ia.id = ${imageAssetId}::uuid
+        and ia.contributor_id = ${photographerId}::uuid
+        and ia.source = 'FOTOCORP'
+        and ia.status = 'SUBMITTED'
+        and ia.visibility = 'PRIVATE'
+        and ia.fotokey is null
+        and ia.updated_at = ${expectedAt}::timestamptz
+        and exists (
+          select 1
+          from contributor_upload_items i
+          where i.image_asset_id = ia.id
+            and i.batch_id = ${batch.id}::uuid
+            and i.contributor_id = ${photographerId}::uuid
+        )
+      returning ia.updated_at
+    `,
+  );
+  const u = updated[0];
+  if (!u) {
+    const snapRows = await executeRows<{
+      who_is_in_picture: string | null;
+      caption: string | null;
+      keywords: string | null;
+      updated_at: Date | string;
+    }>(
+      db,
+      sql`
+        select ia.who_is_in_picture, ia.caption, ia.keywords, ia.updated_at
+        from image_assets ia
+        where ia.id = ${imageAssetId}::uuid
+        limit 1
+      `,
+    );
+    const snap = snapRows[0];
+    if (!snap) {
+      throw new AppError(404, "UPLOAD_ASSET_NOT_FOUND", "This image is not editable.");
+    }
+    throw new AppError(409, "METADATA_CONFLICT", "Another change was saved first. Reload and try again.", {
+      whoIsInPicture: snap.who_is_in_picture ?? null,
+      caption: snap.caption ?? null,
+      keywords: snap.keywords ?? null,
+      updatedAt: toIso(snap.updated_at) ?? new Date(0).toISOString(),
+    });
+  }
+
+  return {
+    ok: true as const,
+    whoIsInPicture: nextWhoIsInPicture,
+    caption: nextCaption,
+    keywords: nextKeywords,
+    updatedAt: toIso(u.updated_at) ?? new Date(0).toISOString(),
+  };
+}
+
 function mapBatch(row: BatchRow) {
   return {
     id: row.id,
@@ -765,4 +905,21 @@ async function executeRows<T>(db: DrizzleClient, query: SQL): Promise<T[]> {
   if (Array.isArray(result)) return result as T[];
   if (result && typeof result === "object" && "rows" in result && Array.isArray(result.rows)) return result.rows as T[];
   return [];
+}
+
+function normalizeNullableText(value: string | null, maxLen: number): string | null {
+  if (value === null) return null;
+  const t = value.trim().slice(0, maxLen);
+  return t ? t : null;
+}
+
+function normalizeKeywordsInput(value: string | string[] | null): string | null {
+  if (value === null) return null;
+  if (Array.isArray(value)) {
+    const parts = value.map((s) => s.trim()).filter(Boolean);
+    if (parts.length === 0) return null;
+    return parts.slice(0, 80).join(", ");
+  }
+  const t = value.trim();
+  return t ? t.slice(0, 8000) : null;
 }

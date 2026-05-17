@@ -269,8 +269,9 @@ Implementation: `apps/api/src/routes/contributor/catalog/route.ts`, `apps/api/sr
 | `POST` | `/api/v1/contributor/upload-batches/:batchId/files` | Registers items and returns presigned PUT instructions. Requires API-side `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_CONTRIBUTOR_STAGING_BUCKET` in `apps/api/.dev.vars` (or legacy `CLOUDFLARE_R2_*` equivalents). Returns **503** `UPLOAD_STORAGE_NOT_CONFIGURED` when missing. |
 | `POST` | `/api/v1/contributor/upload-batches/:batchId/files/:itemId/complete` | Verifies staging object; creates `image_assets` row. |
 | `POST` | `/api/v1/contributor/upload-batches/:batchId/submit` | Submits batch. |
+| `PATCH` | `/api/v1/contributor/upload-batches/:batchId/assets/:imageAssetId/metadata` | Per-asset metadata on OPEN batches (`whoIsInPicture`, `caption`, `keywords`); optional `expectedUpdatedAt` optimistic lock; `409 METADATA_CONFLICT` with snapshot in `error.detail`. |
 
-Implementation: `apps/api/src/routes/contributor/uploads/route.ts` + `service.ts`. Presigning: `apps/api/src/lib/r2-presigned-put.ts`, `apps/api/src/lib/r2-contributor-uploads.ts`. Legacy path alias: `/api/v1/photographer/upload-batches/*` → same handlers.
+Implementation: `apps/api/src/routes/contributor/uploads/route.ts` + `service.ts`. Prepare accepts **JPEG only** (`image/jpeg`). Presigning: `apps/api/src/lib/r2-presigned-put.ts`, `apps/api/src/lib/r2-contributor-uploads.ts`. Legacy path alias: `/api/v1/photographer/upload-batches/*` → same handlers.
 
 ## Internal admin — contributor upload review (staff BFF)
 

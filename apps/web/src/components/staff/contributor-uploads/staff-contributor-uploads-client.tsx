@@ -93,7 +93,7 @@ export function StaffContributorUploadsClient({
       setPanelSaveHint(null)
       return
     }
-    setDraftTitle(selectedUpload.title ?? "")
+    setDraftTitle(selectedUpload.whoIsInPicture ?? "")
     setDraftCaption(selectedUpload.caption ?? "")
     setDraftKeywordTags(keywordsToTags(selectedUpload.keywords))
     setDraftKeywordInput("")
@@ -252,16 +252,16 @@ export function StaffContributorUploadsClient({
   const saveMetadata = useCallback(async () => {
     if (!selectedUpload?.canApprove) return
     const expectedUpdatedAt = selectedUpload.updatedAt
-    const title = draftTitle.trim() || null
+    const whoIsInPicture = draftTitle.trim() || null
     const caption = draftCaption.trim() || null
     const keywords = draftKeywordTags.length > 0 ? draftKeywordTags : null
 
-    const baselineTitle = selectedUpload.title ?? ""
+    const baselineTitle = selectedUpload.whoIsInPicture ?? ""
     const baselineCaption = selectedUpload.caption ?? ""
     const baselineKw = keywordsToTags(selectedUpload.keywords).join("\u0000")
 
     const dirty =
-      title !== (selectedUpload.title ?? null) ||
+      whoIsInPicture !== (selectedUpload.whoIsInPicture ?? null) ||
       caption !== (selectedUpload.caption ?? null) ||
       draftKeywordTags.join("\u0000") !== baselineKw
     if (!dirty) {
@@ -280,7 +280,7 @@ export function StaffContributorUploadsClient({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             expectedUpdatedAt,
-            title,
+            whoIsInPicture,
             caption,
             keywords,
           }),
@@ -292,20 +292,20 @@ export function StaffContributorUploadsClient({
 
       if (response.status === 409 && body && "error" in body && body.error?.code === "METADATA_CONFLICT") {
         const d = body.error.detail as
-          | { title: string | null; caption: string | null; keywords: string | null; updatedAt: string }
+          | { whoIsInPicture: string | null; caption: string | null; keywords: string | null; updatedAt: string }
           | undefined
         if (d) {
           setLocalPatch((prev) => ({
             ...prev,
             [selectedUpload.imageAssetId]: {
               ...prev[selectedUpload.imageAssetId],
-              title: d.title,
+              whoIsInPicture: d.whoIsInPicture,
               caption: d.caption,
               keywords: d.keywords,
               updatedAt: d.updatedAt,
             },
           }))
-          setDraftTitle(d.title ?? "")
+          setDraftTitle(d.whoIsInPicture ?? "")
           setDraftCaption(d.caption ?? "")
           setDraftKeywordTags(keywordsToTags(d.keywords))
         }
@@ -326,7 +326,7 @@ export function StaffContributorUploadsClient({
 
       const ok = body as {
         ok: true
-        title: string | null
+        whoIsInPicture: string | null
         caption: string | null
         keywords: string | null
         updatedAt: string
@@ -335,7 +335,7 @@ export function StaffContributorUploadsClient({
         ...prev,
         [selectedUpload.imageAssetId]: {
           ...prev[selectedUpload.imageAssetId],
-          title: ok.title,
+          whoIsInPicture: ok.whoIsInPicture,
           caption: ok.caption,
           keywords: ok.keywords,
           updatedAt: ok.updatedAt,
@@ -360,13 +360,13 @@ export function StaffContributorUploadsClient({
     selectedUpload?.caption,
     selectedUpload?.imageAssetId,
     selectedUpload?.keywords,
-    selectedUpload?.title,
+    selectedUpload?.whoIsInPicture,
     selectedUpload?.updatedAt,
   ])
 
   useEffect(() => {
     if (!selectedUpload?.canApprove) return
-    const baselineTitle = selectedUpload.title ?? ""
+    const baselineTitle = selectedUpload.whoIsInPicture ?? ""
     const baselineCaption = selectedUpload.caption ?? ""
     const baselineKw = keywordsToTags(selectedUpload.keywords).join("\u0000")
     const dirty =
@@ -390,7 +390,7 @@ export function StaffContributorUploadsClient({
     selectedUpload?.canApprove,
     selectedUpload?.caption,
     selectedUpload?.keywords,
-    selectedUpload?.title,
+    selectedUpload?.whoIsInPicture,
   ])
 
   const approvableSelected = useMemo(
@@ -670,11 +670,14 @@ export function StaffContributorUploadsClient({
                           onChange={() => toggleSelect(upload.imageAssetId, upload.canApprove)}
                         />
                       </td>
-                      <td className="px-3 py-2">
-                        <p className="font-medium">{upload.originalFileName}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {upload.mimeType ?? "—"} · {formatSize(upload.sizeBytes)}
+                      <td className="max-w-[11rem] px-3 py-2">
+                        <p
+                          className="truncate text-sm font-medium text-foreground"
+                          title={upload.originalFileName}
+                        >
+                          {upload.originalFileName}
                         </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{formatSize(upload.sizeBytes)}</p>
                       </td>
                       <td className="px-3 py-2">
                         <p>{upload.contributor.displayName}</p>
@@ -823,14 +826,14 @@ export function StaffContributorUploadsClient({
                 <label className="block text-xs font-medium text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <FieldDot ok={draftTitle.trim().length > 0} />
-                    Title
+                    Who is in picture
                   </span>
                   <Input
                     className="mt-1"
                     value={draftTitle}
                     disabled={!selectedUpload.canApprove}
                     onChange={(e) => setDraftTitle(e.target.value)}
-                    placeholder="Add a descriptive title…"
+                    placeholder="Who is in the picture (comma-separated names)…"
                   />
                 </label>
 
@@ -1300,13 +1303,13 @@ interface ConflictPatchBody {
     code?: string
     message?: string
     detail?: {
-      title: string | null
+      whoIsInPicture: string | null
       caption: string | null
       keywords: string | null
       updatedAt: string
     }
   }
-  title?: string | null
+  whoIsInPicture?: string | null
   caption?: string | null
   keywords?: string | null
   updatedAt?: string

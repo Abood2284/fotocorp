@@ -53,7 +53,7 @@ export interface HealthResponseDto {
 
 export interface AssetListItemDto {
   id: string;
-  title: string;
+  whoIsInPicture: string;
   filename: string;
   previewUrl: string;
   thumbnailUrl: string;
@@ -71,7 +71,7 @@ export interface AssetListResponseDto {
 
 export interface AssetDetailDto {
   id: string;
-  title: string;
+  whoIsInPicture: string;
   filename: string;
   previewUrl: string;
   thumbnailUrl: string;

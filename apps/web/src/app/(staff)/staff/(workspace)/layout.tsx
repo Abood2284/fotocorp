@@ -7,7 +7,14 @@ export default async function StaffWorkspaceLayout({ children }: { children: Rea
   const initial = (staff.displayName || staff.username).trim().charAt(0).toUpperCase() || "S"
 
   return (
-    <StaffShell userInitial={initial} staffRole={staff.role}>
+    <StaffShell
+      staff={{
+        displayName: staff.displayName,
+        username: staff.username,
+        role: staff.role,
+        userInitial: initial,
+      }}
+    >
       {children}
     </StaffShell>
   )

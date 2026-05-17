@@ -72,7 +72,7 @@ export default async function ContributorImagesPage({ searchParams }: Contributo
 }
 
 function ContributorImageCard({ item }: { item: ContributorImageItem }) {
-  const title = item.headline || item.title || item.legacyImageCode || "Untitled image"
+  const title = item.headline || item.whoIsInPicture || item.legacyImageCode || "Untitled image"
   return (
     <article className="overflow-hidden rounded-3xl border border-border bg-background shadow-sm">
       <div className="flex aspect-[4/3] items-center justify-center bg-muted/40">

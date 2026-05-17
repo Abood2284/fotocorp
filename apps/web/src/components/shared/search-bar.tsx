@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 interface SearchBarProps {
   defaultValue?: string
   placeholder?: string
-  size?: "default" | "lg"
+  size?: "default" | "lg" | "compact"
   variant?: "default" | "pill" | "minimal"
   showTypeSelect?: boolean
   /** Where the Photos/Videos menu opens relative to the trigger. Use "above" when content sits directly below the bar. */
@@ -58,27 +58,51 @@ export function SearchBar({
     }
   }
 
+  const isCompact = size === "compact"
+  const isLarge = size === "lg"
+
   return (
     <form
       onSubmit={handleSubmit}
       className={cn(
         "relative flex w-full items-center transition-all duration-300",
         "bg-[#F4F4F5]",
-        variant === "pill" ? "rounded-[32px]" : (size === "lg" ? "rounded-xl" : "rounded-md"),
+        variant === "pill"
+          ? isCompact
+            ? "rounded-[26px]"
+            : "rounded-[32px]"
+          : isLarge
+            ? "rounded-xl"
+            : "rounded-md",
         className
       )}
       role="search"
     >
       {showTypeSelect && (
-        <div className="relative z-50 pl-2 py-2 flex shrink-0 items-center" ref={dropdownRef}>
+        <div
+          className={cn(
+            "relative z-50 flex shrink-0 items-center",
+            isCompact ? "py-1.5 pl-2" : "py-2 pl-2",
+          )}
+          ref={dropdownRef}
+        >
           <button
             type="button"
             onClick={() => setIsTypeSelectOpen(!isTypeSelectOpen)}
-            className="flex items-center gap-2 rounded-full bg-[#E5E7EB] hover:bg-[#D1D5DB] transition-colors px-4 py-2 text-[0.95rem] font-medium text-foreground outline-none"
+            className={cn(
+              "flex items-center rounded-full bg-[#E5E7EB] font-medium text-foreground outline-none transition-colors hover:bg-[#D1D5DB]",
+              isCompact
+                ? "gap-1.5 px-3 py-1.5 text-sm"
+                : "gap-2 px-4 py-2 text-[0.95rem]",
+            )}
           >
-            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+            <ImageIcon className={cn("text-muted-foreground", isCompact ? "h-4 w-4" : "h-4 w-4")} />
             <span>{selectedType === "photos" ? "Photos" : "Videos"}</span>
-            {isTypeSelectOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {isTypeSelectOpen ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
           </button>
           
           {isTypeSelectOpen && (
@@ -125,8 +149,8 @@ export function SearchBar({
         {!showTypeSelect && (
           <Search
             className={cn(
-              "pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground/60",
-              size === "lg" ? "h-5 w-5" : "h-4 w-4",
+              "pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted-foreground/60",
+              isLarge ? "left-5 h-5 w-5" : isCompact ? "left-3.5 h-3.5 w-3.5" : "left-5 h-4 w-4",
             )}
             strokeWidth={1.5}
           />
@@ -145,9 +169,11 @@ export function SearchBar({
             "focus:border-none focus:!outline-none focus:!ring-0 focus:shadow-none",
             "focus-visible:border-none focus-visible:!outline-none focus-visible:!ring-0 focus-visible:shadow-none",
             "[&::-webkit-search-cancel-button]:hidden [&::-webkit-search-decoration]:hidden",
-            !showTypeSelect && (size === "lg" ? "pl-14" : "pl-11"),
-            showTypeSelect && "pl-4",
-            size === "lg" ? "h-14 pr-5 text-[1.05rem]" : "h-12 pr-4 text-[0.95rem]",
+            !showTypeSelect && (isLarge ? "pl-14" : isCompact ? "pl-9" : "pl-11"),
+            showTypeSelect && (isCompact ? "pl-3" : "pl-4"),
+            isLarge && "h-14 pr-5 text-[1.05rem]",
+            isCompact && "h-10 pr-3.5 text-sm",
+            !isLarge && !isCompact && "h-12 pr-4 text-[0.95rem]",
           )}
         />
         {value && (
@@ -158,7 +184,10 @@ export function SearchBar({
               setValue("")
               inputRef.current?.focus()
             }}
-            className="absolute right-12 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground",
+              isCompact ? "right-10" : "right-12",
+            )}
             aria-label="Clear search"
           >
             <X className="h-4 w-4" />
@@ -168,10 +197,13 @@ export function SearchBar({
       
       <button
         type="submit"
-        className="shrink-0 flex items-center justify-center pr-5 pl-2 h-full text-muted-foreground hover:text-foreground transition-colors"
+        className={cn(
+          "flex h-full shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground",
+          isCompact ? "pl-2 pr-3.5" : "pl-2 pr-5",
+        )}
         aria-label="Submit search"
       >
-        <Search className="h-5 w-5" strokeWidth={2} />
+        <Search className={isCompact ? "h-[1.125rem] w-[1.125rem]" : "h-5 w-5"} strokeWidth={2} />
       </button>
     </form>
   )

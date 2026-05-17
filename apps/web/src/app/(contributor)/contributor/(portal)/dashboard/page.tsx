@@ -147,7 +147,7 @@ export default async function ContributorDashboardPage() {
                 {topDownloaded.map((row) => (
                   <li key={row.imageAssetId} className="group flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between transition-colors hover:bg-muted/20">
                     <div>
-                      <p className="font-medium text-foreground md:text-base">{row.title ?? row.headline ?? row.legacyImageCode ?? "Untitled"}</p>
+                      <p className="font-medium text-foreground md:text-base">{row.whoIsInPicture ?? row.headline ?? row.legacyImageCode ?? "Untitled"}</p>
                       <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span>{row.eventName || "Event TBD"}</span>
                         {row.legacyImageCode && (

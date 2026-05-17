@@ -21,7 +21,7 @@ export function DownloadHistoryList({
       </div>
       <div className="divide-y divide-border">
         {items.map((item) => {
-          const title = item.headline || item.title || item.caption || "Fotocorp archive image"
+          const title = item.headline || item.whoIsInPicture || item.caption || "Fotocorp archive image"
           const preview = item.thumbUrl ?? item.previewUrl
           const canDownload = isSubscriber && item.assetId && item.downloadSize === "LARGE"
           return (

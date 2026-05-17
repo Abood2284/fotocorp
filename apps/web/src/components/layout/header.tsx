@@ -27,6 +27,10 @@ import { buttonVariants } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
 
+/** Matches homepage hero (`--surface-warm` / #faf8f5) */
+const HEADER_SHELL_CLASS =
+  "relative z-50 w-full bg-[#faf8f5] text-foreground"
+
 export type HeaderUserProfile = {
   email: string
   displayName: string | null
@@ -50,6 +54,13 @@ interface HeaderLink {
   label: string
   href: string
 }
+
+const PRIMARY_NAV_LINKS: HeaderLink[] = [
+  { label: "Creative", href: "/search" },
+  { label: "Editorial", href: "/search?sort=latest" },
+  { label: "Video", href: "/video" },
+  { label: "Collections", href: "/categories" },
+]
 
 const MOBILE_GROUPS: Array<{ title: string; links: HeaderLink[] }> = [
   {
@@ -84,7 +95,6 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
   const searchParams = useSearchParams()
   const [mobileOpen, setMobileOpen] = useState(false)
   const sortParam = searchParams.get("sort")
-  const headerScrollsWithPage = pathname === "/search"
 
   useEffect(() => {
     setMobileOpen(false)
@@ -100,73 +110,92 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
   }, [])
 
   return (
-    <header
-      className={cn(
-        "z-50 w-full bg-background/95 text-foreground backdrop-blur supports-[backdrop-filter]:bg-background/88 border-b border-border/70",
-        headerScrollsWithPage ? "relative" : "sticky top-0",
-      )}
-    >
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col">
-        {/* Top Tier */}
-        <div className="flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
+    <header className={HEADER_SHELL_CLASS}>
+      <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <Link
+          href="/"
+          className="fc-brand flex shrink-0 items-center gap-2 rounded-md py-1 pr-3 font-semibold tracking-tight transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Fotocorp home"
+        >
+          <Camera className="h-7 w-7 text-primary" />
+          <span className="hidden text-2xl sm:inline-block">
+            foto<span className="text-accent">corp</span>
+          </span>
+        </Link>
+
+        <nav
+          className="hidden min-w-0 flex-1 items-center gap-1 lg:flex"
+          aria-label="Primary navigation"
+        >
+          {PRIMARY_NAV_LINKS.map((link) => (
+            <MegaMenu
+              key={link.href}
+              link={link}
+              pathname={pathname}
+              sortParam={sortParam}
+            />
+          ))}
+          <RoleMainLinks
+            userProfile={userProfile}
+            staffBrief={staffBrief}
+            pathname={pathname}
+            sortParam={sortParam}
+          />
+        </nav>
+
+        <div className="ml-auto flex shrink-0 items-center gap-4 sm:gap-6">
           <Link
-            href="/"
-            className="fc-brand flex shrink-0 items-center gap-2 rounded-md py-2 pr-4 font-semibold tracking-tight transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Fotocorp home"
+            href="/account/fotobox"
+            className="hidden items-center gap-2 fc-label text-[#6b7280] transition-colors hover:text-foreground lg:flex"
           >
-            <Camera className="h-8 w-8 text-primary" />
-            <span className="text-2xl hidden sm:inline-block">
-              foto<span className="text-accent">corp</span>
-            </span>
+            <Archive className="h-4.5 w-4.5" />
+            Fotobox
           </Link>
 
-          <div className="ml-auto flex items-center gap-6">
-            <Link href="/account/fotobox" className="hidden lg:flex items-center gap-2 text-sm font-medium hover:text-muted-foreground transition-colors">
-              <Archive className="h-5 w-5" />
-              Fotobox
-            </Link>
-            
-            <div className="hidden lg:flex items-center gap-2">
-              <AccountMenu userProfile={userProfile} staffBrief={staffBrief} />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setMobileOpen((value) => !value)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden ml-auto"
-              aria-expanded={mobileOpen}
-              aria-controls="mobile-nav-panel"
-              aria-label="Toggle menu"
-            >
-              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+          <div className="hidden items-center gap-2 lg:flex">
+            <AccountMenu userProfile={userProfile} staffBrief={staffBrief} />
           </div>
-        </div>
 
-        {/* Bottom Tier */}
-        <div className="hidden lg:flex h-12 items-center px-4 sm:px-6 lg:px-8">
-          <nav className="flex h-full items-center gap-6" aria-label="Primary navigation">
-            <MegaMenu link={{ label: "Creative", href: "/search" }} pathname={pathname} sortParam={sortParam} />
-            <MegaMenu link={{ label: "Editorial", href: "/search?sort=latest" }} pathname={pathname} sortParam={sortParam} />
-            <MegaMenu link={{ label: "Video", href: "/video" }} pathname={pathname} sortParam={sortParam} />
-            <MegaMenu link={{ label: "Collections", href: "/categories" }} pathname={pathname} sortParam={sortParam} />
-            <RoleMainLinks userProfile={userProfile} staffBrief={staffBrief} pathname={pathname} sortParam={sortParam} />
-          </nav>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((value) => !value)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-nav-panel"
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </div>
 
       <div
         id="mobile-nav-panel"
         className={cn(
-          "overflow-hidden border-t border-border/70 bg-background transition-all duration-200 lg:hidden",
-          mobileOpen ? "max-h-[calc(100vh-4rem)] overflow-y-auto opacity-100" : "pointer-events-none max-h-0 opacity-0",
+          "overflow-hidden border-t border-[#ede9e0] bg-[#faf8f5] transition-all duration-200 lg:hidden",
+          mobileOpen
+            ? "max-h-[calc(100vh-4rem)] overflow-y-auto opacity-100"
+            : "pointer-events-none max-h-0 opacity-0",
         )}
       >
-        <nav className="mx-auto grid max-w-[1600px] gap-5 px-4 py-5 sm:px-6" aria-label="Mobile navigation">
+        <nav
+          className="mx-auto grid max-w-[1600px] gap-5 px-4 py-5 sm:px-6"
+          aria-label="Mobile navigation"
+        >
           {MOBILE_GROUPS.map((group) => (
-            <MobileLinkGroup key={group.title} group={group} pathname={pathname} sortParam={sortParam} />
+            <MobileLinkGroup
+              key={group.title}
+              group={group}
+              pathname={pathname}
+              sortParam={sortParam}
+            />
           ))}
-          <MobileRoleLinks userProfile={userProfile} staffBrief={staffBrief} pathname={pathname} sortParam={sortParam} />
+          <MobileRoleLinks
+            userProfile={userProfile}
+            staffBrief={staffBrief}
+            pathname={pathname}
+            sortParam={sortParam}
+          />
           <MobileAccountMenu userProfile={userProfile} staffBrief={staffBrief} />
         </nav>
       </div>
@@ -184,119 +213,124 @@ function HeaderStatic({ userProfile, staffBrief }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-background/95 text-foreground backdrop-blur supports-[backdrop-filter]:bg-background/88 border-b border-border/70">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col">
-        {/* Top Tier */}
-        <div className="flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
+    <header className={HEADER_SHELL_CLASS}>
+      <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <Link
+          href="/"
+          className="fc-brand flex shrink-0 items-center gap-2 rounded-md py-1 pr-3 font-semibold tracking-tight transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Fotocorp home"
+        >
+          <Camera className="h-7 w-7 text-primary" />
+          <span className="hidden text-2xl sm:inline-block">
+            foto<span className="text-accent">corp</span>
+          </span>
+        </Link>
+
+        <nav
+          className="hidden min-w-0 flex-1 items-center gap-1 lg:flex"
+          aria-label="Primary navigation"
+        >
+          {PRIMARY_NAV_LINKS.map((link) => (
+            <MegaMenu
+              key={link.href}
+              link={link}
+              pathname={pathname}
+              sortParam={sortParam}
+            />
+          ))}
+          <RoleMainLinks
+            userProfile={userProfile}
+            staffBrief={staffBrief}
+            pathname={pathname}
+            sortParam={sortParam}
+          />
+        </nav>
+
+        <div className="ml-auto flex shrink-0 items-center gap-4 sm:gap-6">
           <Link
-            href="/"
-            className="fc-brand flex shrink-0 items-center gap-2 rounded-md py-2 pr-4 font-semibold tracking-tight transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label="Fotocorp home"
+            href="/account/fotobox"
+            className="hidden items-center gap-2 fc-label text-[#6b7280] transition-colors hover:text-foreground lg:flex"
           >
-            <Camera className="h-8 w-8 text-primary" />
-            <span className="text-2xl hidden sm:inline-block">
-              foto<span className="text-accent">corp</span>
-            </span>
+            <Archive className="h-4.5 w-4.5" />
+            Fotobox
           </Link>
 
-          <div className="ml-auto flex items-center gap-6">
-            <Link href="/account/fotobox" className="hidden lg:flex items-center gap-2 text-sm font-medium hover:text-muted-foreground transition-colors">
-              <Archive className="h-5 w-5" />
-              Fotobox
-            </Link>
-            
-            <div className="hidden lg:flex items-center gap-2">
-              <AccountMenu userProfile={userProfile} staffBrief={staffBrief} />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setMobileOpen((value) => !value)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden ml-auto"
-              aria-expanded={mobileOpen}
-              aria-controls="mobile-nav-panel"
-              aria-label="Toggle menu"
-            >
-              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </button>
+          <div className="hidden items-center gap-2 lg:flex">
+            <AccountMenu userProfile={userProfile} staffBrief={staffBrief} />
           </div>
-        </div>
 
-        {/* Bottom Tier */}
-        <div className="hidden lg:flex h-12 items-center px-4 sm:px-6 lg:px-8">
-          <nav className="flex h-full items-center gap-6" aria-label="Primary navigation">
-            <MegaMenu link={{ label: "Creative", href: "/search" }} pathname={pathname} sortParam={sortParam} />
-            <MegaMenu link={{ label: "Editorial", href: "/search?sort=latest" }} pathname={pathname} sortParam={sortParam} />
-            <MegaMenu link={{ label: "Video", href: "/video" }} pathname={pathname} sortParam={sortParam} />
-            <MegaMenu link={{ label: "Collections", href: "/categories" }} pathname={pathname} sortParam={sortParam} />
-            <RoleMainLinks userProfile={userProfile} staffBrief={staffBrief} pathname={pathname} sortParam={sortParam} />
-          </nav>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((value) => !value)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-nav-panel"
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
       </div>
     </header>
   )
 }
 
+
+const MEGA_MENU_ITEMS: Record<string, { label: string; href: string }[]> = {
+  Creative: [
+    { label: "All creative", href: "/search" },
+    { label: "Photography", href: "/search?type=photo" },
+    { label: "Illustrations", href: "/search?type=illustration" },
+  ],
+  Editorial: [
+    { label: "Latest", href: "/search?sort=latest" },
+    { label: "Sports", href: "/search?category=sports" },
+    { label: "Celebrity", href: "/search?category=celebrity" },
+    { label: "News", href: "/search?category=news" },
+  ],
+  Video: [
+    { label: "All video", href: "/video" },
+    { label: "News footage", href: "/video?category=news" },
+    { label: "Sports footage", href: "/video?category=sports" },
+  ],
+  Collections: [
+    { label: "Browse all", href: "/categories" },
+    { label: "Archive collections", href: "/categories?type=archive" },
+    { label: "Curated sets", href: "/categories?type=curated" },
+  ],
+}
+
 function MegaMenu({ link, pathname, sortParam }: { link: HeaderLink; pathname: string; sortParam: string | null }) {
   const active = isActivePath(pathname, link.href, sortParam)
+  const items = MEGA_MENU_ITEMS[link.label] ?? []
 
   return (
-    <div className="group relative flex h-full items-center">
+    <div className="group relative flex items-center">
       <Link
         href={link.href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex h-full items-center gap-1 text-sm font-medium transition-colors hover:text-foreground",
-          active ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-[2px] after:bg-foreground" : "text-muted-foreground",
+          "fc-label flex items-center gap-1 px-3 py-2 transition-colors hover:text-foreground",
+          active ? "text-foreground" : "text-[#6b7280]",
         )}
       >
         {link.label}
-        <ChevronDown className="h-3 w-3 transition-transform group-hover:rotate-180" />
+        <ChevronDown className="h-3 w-3 opacity-60 transition-transform duration-200 group-hover:rotate-180" />
       </Link>
-      
-      {/* Dropdown panel */}
-      <div className="absolute top-full left-0 z-50 hidden pt-0 group-hover:block w-[500px]">
-        <div className="overflow-hidden rounded-b-2xl border border-border border-t-0 bg-background shadow-2xl">
-          <div className="flex h-[280px]">
-            {/* Left Sidebar */}
-            <div className="w-[180px] bg-muted/20 p-4 border-r border-border flex flex-col gap-1">
-              <h3 className="mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">{link.label} Content</h3>
-              <Link href={link.href} className="flex items-center justify-between rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground font-medium">
-                Images
-                <ChevronDown className="h-4 w-4 -rotate-90" />
-              </Link>
-              <Link href="#" className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
-                Videos
-                <ChevronDown className="h-4 w-4 -rotate-90" />
-              </Link>
-              <Link href="#" className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
-                Illustrations
-                <ChevronDown className="h-4 w-4 -rotate-90" />
-              </Link>
-            </div>
-            
-            {/* Right Content */}
-            <div className="flex-1 p-6 bg-background">
-              <h3 className="mb-2 text-sm font-semibold text-foreground">{link.label} Images</h3>
-              <p className="mb-4 text-sm text-muted-foreground">
-                Browse millions of royalty-free images and photos, available in a variety of formats and styles.
-              </p>
-              <Link href={link.href} className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline group/link">
-                See all {link.label.toLowerCase()} images
-                <span className="transition-transform group-hover/link:translate-x-1">→</span>
-              </Link>
 
-              <div className="mt-8">
-                <h3 className="mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Top image searches</h3>
-                <div className="flex flex-wrap gap-2">
-                  {['Architecture', 'Business', 'Calendar', 'Education'].map(tag => (
-                    <span key={tag} className="px-3 py-1 text-xs border border-border rounded-full text-muted-foreground hover:text-foreground hover:border-foreground/50 cursor-pointer transition-colors">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
+      {/* Dropdown panel */}
+      <div className="pointer-events-none absolute top-full left-0 z-50 translate-y-1 opacity-0 transition-all duration-150 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
+        <div className="mt-1 min-w-[180px] overflow-hidden rounded-xl border border-[#e5dfd3] bg-[#faf8f5] shadow-[0_8px_32px_rgba(26,37,64,0.10)]">
+          <div className="p-1.5">
+            {items.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="block rounded-lg px-3.5 py-2 text-[13px] font-medium leading-snug text-[#4b5563] transition-colors hover:bg-white hover:text-[#0d0f1a]"
+              >
+                {item.label}
+              </Link>
+            ))}
           </div>
         </div>
       </div>

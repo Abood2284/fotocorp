@@ -1,8 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useMemo, useRef, useState } from "react"
-import { Download, HelpCircle, ShieldCheck } from "lucide-react"
+import { Download, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { messageForSubscriberDownloadErrorCode } from "@/lib/download-error-messages"
 import { cn } from "@/lib/utils"
@@ -32,6 +33,7 @@ interface AssetDetailActionsProps {
   sizeOptions: AssetSizeOption[]
   restrictions?: string
   metadataRows: AssetMetadataRow[]
+  whoIsInPictureNames?: string[]
   keywords: string[]
 }
 
@@ -48,8 +50,10 @@ export function AssetDetailActions({
   sizeOptions,
   restrictions,
   metadataRows,
+  whoIsInPictureNames = [],
   keywords,
 }: AssetDetailActionsProps) {
+  const router = useRouter()
   const [selectedSize, setSelectedSize] = useState<AssetSizeOption["id"]>("large")
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -64,9 +68,16 @@ export function AssetDetailActions({
     [selectedSize, sizeOptions],
   )
 
-  async function handleSubscriberDownload(event: React.MouseEvent<HTMLButtonElement>) {
+  const canDownload =
+    accessState === "subscriber" && selectedOption?.downloadAvailable !== false
+
+  async function handleDownloadClick(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
-    if (accessState !== "subscriber" || selectedOption?.downloadAvailable === false) return
+
+    if (!canDownload) {
+      router.push("/request-access")
+      return
+    }
 
     setDownloadError(null)
     setDownloadBusy(true)
@@ -101,10 +112,6 @@ export function AssetDetailActions({
     }
   }
 
-
-
-  const message = getAccessMessage(accessState)
-
   return (
     <section className="relative space-y-6 rounded-2xl bg-surface-warm/30 p-5 sm:p-6">
       <iframe
@@ -115,15 +122,11 @@ export function AssetDetailActions({
         aria-hidden
       />
 
-      <div className="border-b border-border pb-4">
-        <p className="text-xs font-medium text-muted-foreground">{message.eyebrow}</p>
-        <div className="mt-1 flex items-center gap-2">
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">{message.title}</h2>
-          {message.helpText ? <AccessRequestHelp text={message.helpText} /> : null}
-        </div>
-        {message.description ? (
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{message.description}</p>
-        ) : null}
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold tracking-tight text-foreground sm:text-base">
+          How can I use this image?
+        </h2>
+        <ImageUsageHelp />
       </div>
 
       <fieldset className="overflow-hidden rounded-md border border-border bg-background">
@@ -137,8 +140,9 @@ export function AssetDetailActions({
               <label
                 className={cn(
                   "flex items-center gap-3 px-4 py-3 transition-colors",
-                  isSelectable ? "cursor-pointer" : "cursor-not-allowed opacity-60",
-                  selected && "bg-muted/50",
+                  isSelectable ? "cursor-pointer" : "cursor-not-allowed",
+                  !isSelectable && "opacity-70",
+                  selected && isSelectable && "bg-muted/50",
                 )}
               >
                 <input
@@ -159,11 +163,18 @@ export function AssetDetailActions({
                   ) : null}
                 </span>
               </label>
-              {selected && (option.dimensions || option.description) ? (
-                <div className="border-t border-border/80 bg-muted/30 px-4 py-2.5 pl-11 text-xs leading-relaxed text-muted-foreground">
-                  {option.dimensions ? <p>{option.dimensions}</p> : null}
+              {option.dimensions || option.description ? (
+                <div
+                  className={cn(
+                    "border-t border-border/80 bg-muted/30 px-4 py-2.5 pl-11 text-xs leading-relaxed text-muted-foreground",
+                    selected && isSelectable && "bg-muted/40",
+                  )}
+                >
+                  {option.dimensions ? (
+                    <p className="font-medium text-foreground/80">{option.dimensions}</p>
+                  ) : null}
                   {option.description ? (
-                    <p className={option.dimensions ? "mt-0.5" : undefined}>{option.description}</p>
+                    <p className={option.dimensions ? "mt-1" : undefined}>{option.description}</p>
                   ) : null}
                 </div>
               ) : null}
@@ -172,7 +183,58 @@ export function AssetDetailActions({
         })}
       </fieldset>
 
-      {(restrictions || metadataRows.length > 0) && (
+      <div className="space-y-2">
+        {accessState === "profile-unavailable" ? (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-border bg-muted/35 p-4 text-sm leading-6 text-foreground">
+              <p>
+                Your account session is active, but profile access could not be loaded. Refresh or sign in again.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="h-10" onClick={() => window.location.reload()}>
+                  Refresh
+                </Button>
+                <Button asChild variant="outline" className="h-10">
+                  <Link href={`/sign-in?callbackUrl=${encodeURIComponent(assetHref)}`}>
+                    Sign in again
+                  </Link>
+                </Button>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="accentSoft"
+              size="lg"
+              className="w-full justify-center"
+              onClick={handleDownloadClick}
+            >
+              <Download className="h-4 w-4" />
+              Download now
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="accentSoft"
+            size="lg"
+            disabled={downloadBusy || (accessState === "subscriber" && selectedOption?.downloadAvailable === false)}
+            className="w-full justify-center"
+            onClick={handleDownloadClick}
+            aria-label={`Download ${selectedOption?.label ?? "selected"} size`}
+          >
+            <Download className="h-4 w-4" />
+            {downloadBusy ? "Starting download..." : "Download now"}
+          </Button>
+        )}
+
+        {downloadError ? (
+          <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-3 text-sm leading-6 text-foreground">
+            {downloadError}
+          </div>
+        ) : null}
+      </div>
+
+      {(restrictions || whoIsInPictureNames.length > 0 || metadataRows.length > 0) && (
         <div className="space-y-3 border-t border-border pt-5">
           <h3 className="text-xs font-medium text-foreground">Details</h3>
           {restrictions ? (
@@ -181,12 +243,36 @@ export function AssetDetailActions({
               <p className="text-foreground">{restrictions}</p>
             </div>
           ) : null}
+          {whoIsInPictureNames.length > 0 ? (
+            <dl className="space-y-2 text-xs leading-relaxed">
+              <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
+                <dt className="text-muted-foreground">Who is in picture:</dt>
+                <dd className="text-foreground">
+                  <p className="flex flex-wrap items-center gap-x-1 gap-y-1">
+                    {whoIsInPictureNames.map((name, index) => (
+                      <span key={name} className="inline-flex items-center">
+                        {index > 0 ? <span className="mr-1 text-muted-foreground">,</span> : null}
+                        <Link
+                          href={`/search?q=${encodeURIComponent(name)}`}
+                          className="text-primary underline underline-offset-4 hover:text-primary-hover"
+                        >
+                          {name}
+                        </Link>
+                      </span>
+                    ))}
+                  </p>
+                </dd>
+              </div>
+            </dl>
+          ) : null}
           {metadataRows.length > 0 ? (
             <dl className="space-y-2 text-xs leading-relaxed">
               {metadataRows.map((row) => (
                 <div key={row.label} className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
                   <dt className="text-muted-foreground">{row.label}</dt>
-                  <dd className="text-foreground" title={row.value}>{row.value}</dd>
+                  <dd className="text-foreground" title={row.value}>
+                    {row.value}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -194,95 +280,29 @@ export function AssetDetailActions({
         </div>
       )}
 
-      <div className="space-y-2">
-        {accessState === "profile-unavailable" ? (
-          <div className="rounded-xl border border-border bg-muted/35 p-4 text-sm leading-6 text-foreground">
-            <p>
-              Your account session is active, but profile access could not be loaded. Refresh or sign in again.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button type="button" variant="outline" className="h-10" onClick={() => window.location.reload()}>
-                Refresh
-              </Button>
+      {keywords.length > 0 ? (
+        <div className="border-t border-border/60 pt-4">
+          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Keywords
+          </h3>
+          <div className="flex flex-wrap gap-1.5">
+            {keywords.map((keyword) => (
               <Link
-                href={`/sign-in?callbackUrl=${encodeURIComponent(assetHref)}`}
-                className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                key={keyword}
+                href={`/search?q=${encodeURIComponent(keyword)}`}
+                className="rounded bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
-                Sign in again
+                {keyword}
               </Link>
-            </div>
+            ))}
           </div>
-        ) : accessState === "subscriber" && selectedOption?.downloadAvailable === false ? (
-          <Button disabled className="h-11 w-full justify-center">
-            <Download className="h-4 w-4" />
-            Size not available
-          </Button>
-        ) : accessState === "subscriber" ? (
-          <Button
-            type="button"
-            disabled={downloadBusy}
-            className="h-11 w-full justify-center gap-2"
-            onClick={handleSubscriberDownload}
-            aria-label={`Download ${selectedOption?.label ?? "selected"} size`}
-          >
-            <Download className="h-4 w-4" />
-            {downloadBusy ? "Starting download..." : "Download asset"}
-          </Button>
-        ) : accessState === "signed-in-without-download" ? (
-          <div className="space-y-3">
-            <Link
-              href="/account/subscription"
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
-            >
-              <ShieldCheck className="h-4 w-4" />
-              Download access & account
-            </Link>
-            <Link
-              href="/account/access-pending"
-              className="inline-flex h-10 w-full items-center justify-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-            >
-              Request status
-            </Link>
-          </div>
-        ) : (
-          <Link
-            href="/request-access"
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
-          >
-            <ShieldCheck className="h-4 w-4" />
-            Request download access
-          </Link>
-        )}
-
-        {downloadError && (
-          <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-3 text-sm leading-6 text-foreground">
-            {downloadError}
-          </div>
-        )}
-
-        {keywords.length > 0 && (
-          <div className="pt-4 border-t border-border/60">
-            <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Keywords</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {keywords.map((keyword) => (
-                <Link
-                  key={keyword}
-                  href={`/search?q=${encodeURIComponent(keyword)}`}
-                  className="rounded bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  {keyword}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-      </div>
+        </div>
+      ) : null}
     </section>
   )
 }
 
-function AccessRequestHelp({ text }: { text: string }) {
+function ImageUsageHelp() {
   const [open, setOpen] = useState(false)
 
   return (
@@ -292,57 +312,33 @@ function AccessRequestHelp({ text }: { text: string }) {
         onClick={() => setOpen((value) => !value)}
         className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         aria-expanded={open}
-        aria-label="How requesting download access works"
+        aria-label="How you can use this image"
       >
         <HelpCircle className="h-4 w-4" aria-hidden />
       </button>
       {open ? (
-        <p
-          role="tooltip"
-          className="absolute left-0 top-full z-20 mt-2 w-[min(100vw-2.5rem,18rem)] rounded-md border border-border bg-background p-3 text-xs leading-relaxed text-muted-foreground shadow-md sm:left-auto sm:right-0"
+        <div
+          role="dialog"
+          className="absolute right-0 top-full z-30 mt-2 w-[min(100vw-2.5rem,22rem)] rounded-lg border border-border bg-background p-4 text-xs leading-relaxed text-muted-foreground shadow-lg sm:w-80"
         >
-          {text}
-        </p>
+          <p className="font-semibold text-foreground">Common uses include:</p>
+          <p className="mt-1.5">
+            Newspapers, magazines and books (except for covers), editorial broadcasts, documentaries,
+            non-commercial websites, blogs and social media posts illustrating matters of public interest
+          </p>
+          <p className="mt-3 font-semibold text-foreground">Can&apos;t be used for:</p>
+          <p className="mt-1.5">
+            Book or magazine covers, commercial, promotional, advertorial, endorsement, advertising, or
+            merchandising purposes in any media (e.g. print, commercial broadcast, film, digital)
+          </p>
+          <p className="mt-3 font-semibold text-foreground">Standard editorial rights:</p>
+          <p className="mt-1.5">
+            Anyone in your organisation can use it an unlimited number of times for up to 15 years, worldwide,
+            with uncapped indemnification.
+          </p>
+          <p className="mt-3 text-foreground/90">Subject to the Content Licence Agreement</p>
+        </div>
       ) : null}
     </div>
   )
 }
-
-function getAccessMessage(accessState: AssetDetailAccessState): {
-  eyebrow: string
-  title: string
-  description?: string
-  helpText?: string
-} {
-  if (accessState === "subscriber") {
-    return {
-      eyebrow: "Image access",
-      title: "Choose your delivery quality",
-    }
-  }
-
-  if (accessState === "profile-unavailable") {
-    return {
-      eyebrow: "Image access",
-      title: "Choose your delivery quality",
-    }
-  }
-
-  if (accessState === "signed-in-without-download") {
-    return {
-      eyebrow: "Signed in",
-      title: "Clean downloads unlock after approval",
-      description:
-        "You can browse watermarked previews and use Fotobox. Staff-approved download entitlements are required for clean files—not a self-serve plan checkout.",
-    }
-  }
-
-  return {
-    eyebrow: "Clean downloads",
-    title: "Request access to originals",
-    helpText:
-      "Create a Fotocorp account and tell us what you need. Our team reviews each request and emails you when download access is approved for your use case. Licensing depends on your intended use—it is not instant self-serve checkout.",
-  }
-}
-
-

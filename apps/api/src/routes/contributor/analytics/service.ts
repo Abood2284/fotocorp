@@ -21,7 +21,7 @@ interface DownloadSummaryRow {
 interface TopImageRow {
   image_asset_id: string;
   legacy_image_code: string | null;
-  title: string | null;
+  who_is_in_picture: string | null;
   headline: string | null;
   event_name: string | null;
   download_count: number | string;
@@ -31,7 +31,7 @@ interface TopImageRow {
 interface RecentUploadRow {
   image_asset_id: string;
   legacy_image_code: string | null;
-  title: string | null;
+  who_is_in_picture: string | null;
   headline: string | null;
   event_name: string | null;
   status: string;
@@ -91,7 +91,7 @@ export async function getPhotographerAnalyticsSummary(db: DrizzleClient, session
         select
           ia.id as image_asset_id,
           ia.legacy_image_code,
-          ia.title,
+          ia.who_is_in_picture,
           ia.headline,
           pe.name as event_name,
           count(l.id)::int as download_count,
@@ -108,7 +108,7 @@ export async function getPhotographerAnalyticsSummary(db: DrizzleClient, session
           on l.image_asset_id = ia.id
           and l.download_status = 'COMPLETED'
         where ia.contributor_id = ${photographerId}::uuid
-        group by ia.id, ia.legacy_image_code, ia.title, ia.headline, pe.name, ia.created_at
+        group by ia.id, ia.legacy_image_code, ia.who_is_in_picture, ia.headline, pe.name, ia.created_at
         order by download_count desc, ia.created_at desc
         limit 5
       `,
@@ -119,7 +119,7 @@ export async function getPhotographerAnalyticsSummary(db: DrizzleClient, session
         select
           ia.id as image_asset_id,
           ia.legacy_image_code,
-          ia.title,
+          ia.who_is_in_picture,
           ia.headline,
           pe.name as event_name,
           ia.status,
@@ -154,7 +154,7 @@ export async function getPhotographerAnalyticsSummary(db: DrizzleClient, session
     topDownloadedImages: topRows.map((row) => ({
       imageAssetId: row.image_asset_id,
       legacyImageCode: row.legacy_image_code,
-      title: row.title,
+      whoIsInPicture: row.who_is_in_picture,
       headline: row.headline,
       eventName: row.event_name,
       downloadCount: toInt(row.download_count),
@@ -163,7 +163,7 @@ export async function getPhotographerAnalyticsSummary(db: DrizzleClient, session
     recentUploads: recentRows.map((row) => ({
       imageAssetId: row.image_asset_id,
       legacyImageCode: row.legacy_image_code,
-      title: row.title,
+      whoIsInPicture: row.who_is_in_picture,
       headline: row.headline,
       eventName: row.event_name,
       status: row.status,

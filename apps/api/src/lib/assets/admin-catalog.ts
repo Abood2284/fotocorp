@@ -44,7 +44,7 @@ interface AdminAssetQuery {
   derivativeStatus?: DerivativeFilter;
   previewState: PreviewStateFilter;
   hasPreview?: boolean;
-  missingTitle?: boolean;
+  missingWhoIsInPicture?: boolean;
   missingCaption?: boolean;
   noEvent?: boolean;
   noCategory?: boolean;
@@ -57,7 +57,7 @@ interface AdminAssetQuery {
 interface AdminAssetRow {
   id: string;
   legacy_imagecode: string | null;
-  title: string | null;
+  who_is_in_picture: string | null;
   caption: string | null;
   headline: string | null;
   description: string | null;
@@ -618,7 +618,7 @@ function parseAdminAssetQuery(params: URLSearchParams): AdminAssetQuery {
   const derivativeStatus = parseDerivativeFilter(params.get("derivativeStatus"));
   const previewState = parsePreviewState(params.get("previewState"));
   const hasPreview = parseOptionalBoolean(params.get("hasPreview"), "hasPreview");
-  const missingTitle = parseOptionalBoolean(params.get("missingTitle"), "missingTitle");
+  const missingWhoIsInPicture = parseOptionalBoolean(params.get("missingWhoIsInPicture"), "missingWhoIsInPicture");
   const missingCaption = parseOptionalBoolean(params.get("missingCaption"), "missingCaption");
   const noEvent = parseOptionalBoolean(params.get("noEvent"), "noEvent");
   const noCategory = parseOptionalBoolean(params.get("noCategory"), "noCategory");
@@ -638,7 +638,7 @@ function parseAdminAssetQuery(params: URLSearchParams): AdminAssetQuery {
     derivativeStatus,
     previewState,
     hasPreview,
-    missingTitle,
+    missingWhoIsInPicture,
     missingCaption,
     noEvent,
     noCategory,
@@ -699,7 +699,7 @@ function buildWhere(query: AdminAssetQuery): SQL[] {
     where.push(sql`${previewStateSql()} = 'MISSING'`);
   }
   
-  if (query.missingTitle) where.push(sql`(a.title is null or trim(a.title) = '')`);
+  if (query.missingWhoIsInPicture) where.push(sql`(a.who_is_in_picture is null or trim(a.who_is_in_picture) = '')`);
   if (query.missingCaption) where.push(sql`(a.caption is null or trim(a.caption) = '')`);
   if (query.noEvent) where.push(sql`a.event_id is null`);
   if (query.noCategory) where.push(sql`a.category_id is null`);
@@ -717,7 +717,7 @@ function adminSelectSql(sort: AdminSort): SQL {
     select
       a.id,
       a.legacy_image_code as legacy_imagecode,
-      a.title,
+      a.who_is_in_picture,
       a.caption,
       a.headline,
       a.description,
@@ -840,7 +840,7 @@ async function mapAdminAssetRow(row: AdminAssetRow, secret: string | undefined, 
   return {
     id: row.id,
     legacyImageCode: row.legacy_imagecode,
-    title: row.title,
+    whoIsInPicture: row.who_is_in_picture,
     caption: row.caption,
     headline: row.headline,
     description: row.description,

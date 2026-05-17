@@ -1,15 +1,14 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft, ImageOff, Search, Plus } from "lucide-react"
+import { ChevronLeft, ImageOff, Search } from "lucide-react"
 import { getCurrentAppUser } from "@/lib/app-user"
 import { getPublicAsset, listPublicAssets } from "@/lib/api/fotocorp-api"
 import { messageForDownloadRedirectError } from "@/lib/download-error-messages"
 import type { PublicAsset } from "@/features/assets/types"
-import { PreviewImage } from "@/components/assets/preview-image"
+import { AssetPreviewChrome } from "@/components/assets/asset-preview-chrome"
+import { parseWhoIsInPicture } from "@/lib/who-is-in-picture"
 import { AssetDetailActions, type AssetDetailAccessState, type AssetSizeOption } from "@/components/assets/asset-detail-actions"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
-import { WatermarkDownloadButton } from "@/components/assets/watermark-download-button"
-import { FotoboxSaveButton } from "@/components/assets/fotobox-save-button"
 
 interface AssetDetailPageProps {
   params: Promise<{ id: string }>
@@ -85,11 +84,13 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
   const title = getAssetTitle(asset)
   const caption = formatCaptionWithPhotoCredit(asset.caption, asset.contributor?.displayName)
   const keywords = splitKeywords(asset.keywords)
+  const whoIsInPictureNames = parseWhoIsInPicture(asset.whoIsInPicture)
   const assetHref = `/assets/${asset.id}`
   const downloadError = messageForDownloadRedirectError(resolvedSearchParams?.downloadError)
   const relatedResult = await getRelatedAssets(asset)
   const relatedAssets = relatedResult.items
   const relatedLabel = relatedResult.label
+  const relatedCountLabel = formatRelatedCountLabel(relatedResult.totalCount)
   const searchDefaultValue = resolvedSearchParams?.q ?? ""
   const actionMetadataRows = getActionMetadataRows(asset)
 
@@ -159,37 +160,18 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
             <figure className="overflow-hidden rounded-xl bg-surface-stone/40">
               {preview ? (
-                <div className="relative mx-auto flex w-full justify-center px-4 pb-5 pt-2 sm:px-5 sm:pb-6 sm:pt-2 lg:px-6 lg:pb-7 lg:pt-2">
-                  <PreviewImage
+                <div className="flex w-full justify-center px-4 pb-2 pt-2 sm:px-5 sm:pb-3 sm:pt-2 lg:px-6 lg:pb-3 lg:pt-2">
+                  <AssetPreviewChrome
                     src={preview.url}
                     alt={getAssetAlt(asset)}
                     width={preview.width}
                     height={preview.height}
                     className="block h-auto max-h-[86vh] w-auto max-w-full object-contain drop-shadow-2xl"
                     loading="eager"
+                    whoIsInPicture={asset.whoIsInPicture}
+                    fotokey={asset.fotokey ?? null}
+                    assetId={asset.id}
                   />
-                  <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-                    <WatermarkDownloadButton
-                      previewUrl={preview.url}
-                      assetId={asset.id}
-                      fotokey={asset.fotokey ?? null}
-                      hoverLabel="Download this image"
-                    />
-                    <FotoboxSaveButton
-                      assetId={asset.id}
-                      stub
-                      variant="ghost"
-                      iconOnly
-                      className="m-0"
-                      buttonClassName="rounded-md bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white"
-                      icon={<Plus className="h-5 w-5" strokeWidth={2.5} />}
-                      text="Save as"
-                      hoverLabel="Save as"
-                    />
-                  </div>
-                  <div className="pointer-events-none absolute bottom-5 right-5 rounded-md bg-black/40 px-3 py-2 text-xs font-medium text-white/90 backdrop-blur-md">
-                    {asset.fotokey ?? "Unavailable"}
-                  </div>
                 </div>
               ) : (
                 <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
@@ -219,6 +201,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               sizeOptions={SIZE_OPTIONS}
               restrictions={FOTOCORP_EDITORIAL_RESTRICTIONS}
               metadataRows={actionMetadataRows}
+              whoIsInPictureNames={whoIsInPictureNames}
               keywords={keywords}
             />
           </aside>
@@ -229,6 +212,11 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
         <section className="mt-6 pt-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h2 className="text-2xl font-semibold tracking-tight text-foreground">{relatedLabel}</h2>
+            {relatedCountLabel ? (
+              <span className="text-sm font-normal tabular-nums text-muted-foreground">
+                ({relatedCountLabel})
+              </span>
+            ) : null}
             <Link
               href={relatedResult.browseHref}
               className="text-sm font-normal text-primary underline underline-offset-4 hover:text-primary-hover"
@@ -259,7 +247,7 @@ function formatCaptionWithPhotoCredit(caption: string | null | undefined, photog
 }
 
 function getAssetTitle(asset: PublicAsset) {
-  return asset.headline || asset.title || asset.caption || asset.category?.name || asset.event?.name || "Fotocorp archive image"
+  return asset.headline || asset.caption || asset.category?.name || asset.event?.name || "Fotocorp archive image"
 }
 
 function getAssetAlt(asset: PublicAsset) {
@@ -293,29 +281,36 @@ async function getRelatedAssets(asset: PublicAsset) {
   const targetCount = 12
   const deduped = new Map<string, PublicAsset>()
   let primarySource: "event" | "category" | "photographer" | "archive" = "archive"
+  let totalCount: number | undefined
 
   if (asset.event?.id) {
-    const eventItems = await listPublicAssets({ eventId: asset.event.id, limit: 20 })
-      .then((result) => result.items)
-      .catch(() => [])
+    const eventResult = await listPublicAssets({ eventId: asset.event.id, limit: 20 }).catch(() => null)
+    const eventItems = eventResult?.items ?? []
     const added = appendRelated(deduped, eventItems, asset.id, targetCount)
-    if (added > 0) primarySource = "event"
+    if (added > 0) {
+      primarySource = "event"
+      totalCount = eventResult?.totalCount
+    }
   }
 
   if (deduped.size < targetCount && asset.category?.id) {
-    const categoryItems = await listPublicAssets({ categoryId: asset.category.id, limit: 20 })
-      .then((result) => result.items)
-      .catch(() => [])
+    const categoryResult = await listPublicAssets({ categoryId: asset.category.id, limit: 20 }).catch(() => null)
+    const categoryItems = categoryResult?.items ?? []
     const added = appendRelated(deduped, categoryItems, asset.id, targetCount)
-    if (added > 0 && primarySource === "archive") primarySource = "category"
+    if (added > 0 && primarySource === "archive") {
+      primarySource = "category"
+      totalCount = categoryResult?.totalCount
+    }
   }
 
   if (deduped.size < targetCount && asset.contributor?.id) {
-    const photographerItems = await listPublicAssets({ contributorId: asset.contributor.id, limit: 20 })
-      .then((result) => result.items)
-      .catch(() => [])
+    const photographerResult = await listPublicAssets({ contributorId: asset.contributor.id, limit: 20 }).catch(() => null)
+    const photographerItems = photographerResult?.items ?? []
     const added = appendRelated(deduped, photographerItems, asset.id, targetCount)
-    if (added > 0 && primarySource === "archive") primarySource = "photographer"
+    if (added > 0 && primarySource === "archive") {
+      primarySource = "photographer"
+      totalCount = photographerResult?.totalCount
+    }
   }
 
   if (deduped.size < targetCount) {
@@ -330,7 +325,14 @@ async function getRelatedAssets(asset: PublicAsset) {
     items,
     label: relatedLabelForSource(primarySource, asset),
     browseHref: relatedBrowseHref(primarySource, asset),
+    totalCount,
   }
+}
+
+function formatRelatedCountLabel(totalCount: number | undefined) {
+  if (totalCount == null || totalCount <= 0) return null
+  const formatted = totalCount.toLocaleString()
+  return totalCount === 1 ? `${formatted} image` : `${formatted} images`
 }
 
 function appendRelated(

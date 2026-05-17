@@ -194,8 +194,8 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                   </td>
                   <td className="px-3 py-2 max-w-[200px]">
                     <p className="font-mono text-xs">{asset.legacyImageCode ?? asset.id.split('-')[0]}</p>
-                    <p className="mt-0.5 truncate font-medium" title={asset.headline || asset.title || "Untitled"}>{asset.headline || asset.title || "Untitled"}</p>
-                    {(!asset.headline && !asset.title) && <span className="text-[10px] text-amber-600 font-medium">Missing title</span>}
+                    <p className="mt-0.5 truncate font-medium" title={asset.headline || asset.whoIsInPicture || "Untitled"}>{asset.headline || asset.whoIsInPicture || "Untitled"}</p>
+                    {(!asset.headline && !asset.whoIsInPicture) && <span className="text-[10px] text-amber-600 font-medium">Missing who is in picture</span>}
                     {!asset.caption && <span className="text-[10px] text-amber-600 font-medium ml-2">Missing caption</span>}
                   </td>
                   <td className="px-3 py-2"><StatusBadge tone="neutral">{asset.status}</StatusBadge></td>
@@ -314,7 +314,7 @@ function HeaderSearchFilter({ query }: { query: URLSearchParams }) {
         <input name="q" defaultValue={value} placeholder="Search terms..." className="mb-2 h-8 w-full rounded border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary" />
         <div className="flex items-center gap-2 mb-3 mt-3">
           <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" name="missingTitle" value="true" defaultChecked={query.has("missingTitle")} /> Missing Title
+            <input type="checkbox" name="missingWhoIsInPicture" value="true" defaultChecked={query.has("missingWhoIsInPicture")} /> Missing who is in picture
           </label>
         </div>
         <div className="flex items-center gap-2 mb-3">
@@ -364,7 +364,7 @@ function ActiveFilterChips({ query }: { query: URLSearchParams }) {
     chip("visibility", query.get("visibility"), "Visibility"),
     chip("categoryId", query.get("categoryId"), "Category"),
     chip("eventId", query.get("eventId"), "Event"),
-    chip("missingTitle", query.has("missingTitle") ? "true" : null, "Missing Title"),
+    chip("missingWhoIsInPicture", query.has("missingWhoIsInPicture") ? "true" : null, "Missing who is in picture"),
     chip("missingCaption", query.has("missingCaption") ? "true" : null, "Missing Caption"),
     chip("noEvent", query.has("noEvent") ? "true" : null, "No Event"),
     chip("noCategory", query.has("noCategory") ? "true" : null, "No Category"),
