@@ -18,6 +18,7 @@ WORKDIR /app
 
 # Workspace install (lockfile + filter keeps the image focused on @fotocorp/jobs).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches patches
 COPY apps/jobs/package.json apps/jobs/package.json
 
 RUN pnpm install --frozen-lockfile --filter @fotocorp/jobs...

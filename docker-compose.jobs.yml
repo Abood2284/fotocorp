@@ -25,7 +25,7 @@ services:
       IMAGE_PUBLISH_POLL_INTERVAL_MS: "15000"
       # PR-16G: set IMAGE_PUBLISH_PROCESSING_ENABLED=true on the VPS only when Neon + R2
       # env is complete and you want real Sharp publish processing. Default false = count only.
-      IMAGE_PUBLISH_PROCESSING_ENABLED: "false"
+      IMAGE_PUBLISH_PROCESSING_ENABLED: ${IMAGE_PUBLISH_PROCESSING_ENABLED:-false}
     logging:
       driver: json-file
       options:
