@@ -39,6 +39,8 @@ import {
   DETAIL_WATERMARKED_PROFILE,
   THUMB_CLEAN_PROFILE,
 } from "../../src/lib/media/watermark";
+import { createHttpDb } from "../../src/db";
+import { schedulePublicEventFeedSyncForAsset } from "../../src/lib/assets/public-event-feed-projection";
 
 type Variant = "THUMB" | "CARD" | "DETAIL";
 type DerivativeStatus = "READY" | "STALE" | "FAILED";
@@ -272,6 +274,12 @@ async function processSingleItem(pool: PgPool, r2: R2Config, item: JobItemRow): 
       imageAssetId: item.image_asset_id,
       fotokey: item.fotokey,
     });
+
+    const databaseUrl = process.env.DATABASE_URL;
+    if (databaseUrl) {
+      await schedulePublicEventFeedSyncForAsset(createHttpDb(databaseUrl), item.image_asset_id);
+    }
+
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

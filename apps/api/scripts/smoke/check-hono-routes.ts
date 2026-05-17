@@ -56,6 +56,24 @@ const checks: Array<{
     expectedCode: "METHOD_NOT_ALLOWED",
   },
   {
+    name: "public stable media preview wrong method",
+    request: request("/api/media/assets/00000000-0000-4000-8000-000000000001/preview/card", { method: "POST" }),
+    expectedStatus: 405,
+    expectedCode: "METHOD_NOT_ALLOWED",
+  },
+  {
+    name: "public homepage wrong method",
+    request: request("/api/v1/public/homepage", { method: "POST" }),
+    expectedStatus: 405,
+    expectedCode: "METHOD_NOT_ALLOWED",
+  },
+  {
+    name: "public latest events wrong method",
+    request: request("/api/v1/public/events/latest", { method: "POST" }),
+    expectedStatus: 405,
+    expectedCode: "METHOD_NOT_ALLOWED",
+  },
+  {
     name: "auth profile wrong method",
     request: request("/api/v1/auth/me", { method: "POST" }),
     expectedStatus: 405,

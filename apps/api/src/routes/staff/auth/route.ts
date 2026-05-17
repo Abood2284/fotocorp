@@ -12,6 +12,7 @@ import {
   STAFF_SESSION_COOKIE,
 } from "./service";
 import { staffLoginSchema } from "./validators";
+import { createTimingTracker, formatServerTiming, logLatencyTrace } from "../../../lib/latency-trace";
 
 export const staffAuthRoutes = new Hono<{ Bindings: Env; Variables: AppRequestVariables }>();
 
@@ -57,19 +58,56 @@ staffAuthRoutes.post("/api/v1/staff/auth/logout", async (c) => {
 staffAuthRoutes.all("/api/v1/staff/auth/logout", () => methodNotAllowed());
 
 staffAuthRoutes.get("/api/v1/staff/auth/me", async (c) => {
+  const requestId = c.get("requestId") as string;
+  const tracker = createTimingTracker();
   const session = await getCurrentStaffSession(db(c.env), getCookie(c, STAFF_SESSION_COOKIE));
-  if (!session) throw new AppError(401, "STAFF_AUTH_REQUIRED", "Staff authentication is required.");
+  tracker.mark("db");
+  if (!session) {
+    const durationMs = tracker.total();
+    const timings = { db: tracker.elapsed("db"), total: durationMs };
+    logLatencyTrace({
+      event: "latency_trace",
+      requestId,
+      layer: "api",
+      route: "/api/v1/staff/auth/me",
+      status: "error",
+      statusCode: 401,
+      durationMs,
+      timings,
+      cache: { mode: "staff-auth", hit: false, cacheControl: null },
+      error: { name: "StaffAuthRequired", message: "Staff authentication is required." },
+    });
+    throw new AppError(401, "STAFF_AUTH_REQUIRED", "Staff authentication is required.");
+  }
 
-  return c.json({
-    ok: true,
-    staff: {
-      id: session.staff.id,
-      username: session.staff.username,
-      displayName: session.staff.displayName,
-      role: session.staff.role,
-      status: session.staff.status,
-    },
+  const durationMs = tracker.total();
+  const timings = { db: tracker.elapsed("db"), total: durationMs };
+  logLatencyTrace({
+    event: "latency_trace",
+    requestId,
+    layer: "api",
+    route: "/api/v1/staff/auth/me",
+    status: "ok",
+    statusCode: 200,
+    durationMs,
+    timings,
+    cache: { mode: "staff-auth", hit: false, cacheControl: null },
   });
+
+  return c.json(
+    {
+      ok: true,
+      staff: {
+        id: session.staff.id,
+        username: session.staff.username,
+        displayName: session.staff.displayName,
+        role: session.staff.role,
+        status: session.staff.status,
+      },
+    },
+    200,
+    { "Server-Timing": formatServerTiming(timings, durationMs) },
+  );
 });
 
 staffAuthRoutes.all("/api/v1/staff/auth/me", () => methodNotAllowed());

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useMemo, useRef, useState } from "react"
-import { Download, ShieldCheck } from "lucide-react"
+import { Download, HelpCircle, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { messageForSubscriberDownloadErrorCode } from "@/lib/download-error-messages"
 import { cn } from "@/lib/utils"
@@ -20,6 +20,8 @@ export interface AssetSizeOption {
   dimensions?: string | null
   downloadAvailable?: boolean
   disabledReason?: string
+  /** When false, the tier cannot be selected (e.g. not yet offered). */
+  selectable?: boolean
 }
 
 interface AssetDetailActionsProps {
@@ -28,6 +30,7 @@ interface AssetDetailActionsProps {
   assetHref: string
   downloadHref: string
   sizeOptions: AssetSizeOption[]
+  restrictions?: string
   metadataRows: AssetMetadataRow[]
   keywords: string[]
 }
@@ -43,6 +46,7 @@ export function AssetDetailActions({
   assetHref,
   downloadHref,
   sizeOptions,
+  restrictions,
   metadataRows,
   keywords,
 }: AssetDetailActionsProps) {
@@ -52,7 +56,11 @@ export function AssetDetailActions({
   const downloadFrameRef = useRef<HTMLIFrameElement>(null)
 
   const selectedOption = useMemo(
-    () => sizeOptions.find((option) => option.id === selectedSize) ?? sizeOptions[0],
+    () =>
+      sizeOptions.find((option) => option.id === selectedSize)
+      ?? sizeOptions.find((option) => option.id === "large")
+      ?? sizeOptions.find((option) => option.selectable !== false)
+      ?? sizeOptions[0],
     [selectedSize, sizeOptions],
   )
 
@@ -109,64 +117,80 @@ export function AssetDetailActions({
 
       <div className="border-b border-border pb-4">
         <p className="text-xs font-medium text-muted-foreground">{message.eyebrow}</p>
-        <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">{message.title}</h2>
+        <div className="mt-1 flex items-center gap-2">
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">{message.title}</h2>
+          {message.helpText ? <AccessRequestHelp text={message.helpText} /> : null}
+        </div>
         {message.description ? (
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{message.description}</p>
         ) : null}
       </div>
 
-      <fieldset className="space-y-1.5">
-        {sizeOptions.map((option) => {
+      <fieldset className="overflow-hidden rounded-md border border-border bg-background">
+        {sizeOptions.map((option, index) => {
           const selected = option.id === selectedOption?.id
-          const isDisabled = !option.downloadAvailable
+          const isSelectable = option.selectable !== false
+          const statusLabel = option.disabledReason ?? null
 
           return (
-            <label
-              key={option.id}
-              className={cn(
-                "relative flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-colors",
-                selected ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/35",
-                isDisabled && "opacity-60 cursor-not-allowed bg-muted/20"
-              )}
-            >
-              <input
-                type="radio"
-                name="asset-size"
-                value={option.id}
-                checked={selected}
-                disabled={isDisabled}
-                onChange={() => setSelectedSize(option.id)}
-                className="mt-0.5 h-3.5 w-3.5 accent-primary"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-foreground">{option.label}</span>
-                  {isDisabled && (
-                    <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Coming Soon
-                    </span>
-                  )}
+            <div key={option.id} className={cn(index > 0 && "border-t border-border")}>
+              <label
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3 transition-colors",
+                  isSelectable ? "cursor-pointer" : "cursor-not-allowed opacity-60",
+                  selected && "bg-muted/50",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="asset-size"
+                  value={option.id}
+                  checked={selected}
+                  disabled={!isSelectable}
+                  onChange={() => {
+                    if (isSelectable) setSelectedSize(option.id)
+                  }}
+                  className="h-4 w-4 shrink-0 accent-foreground disabled:cursor-not-allowed"
+                />
+                <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+                  <span className="text-sm text-foreground">{option.label}</span>
+                  {statusLabel ? (
+                    <span className="shrink-0 text-sm text-muted-foreground">{statusLabel}</span>
+                  ) : null}
                 </span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  {option.description}
-                </span>
-              </span>
-            </label>
+              </label>
+              {selected && (option.dimensions || option.description) ? (
+                <div className="border-t border-border/80 bg-muted/30 px-4 py-2.5 pl-11 text-xs leading-relaxed text-muted-foreground">
+                  {option.dimensions ? <p>{option.dimensions}</p> : null}
+                  {option.description ? (
+                    <p className={option.dimensions ? "mt-0.5" : undefined}>{option.description}</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           )
         })}
       </fieldset>
 
-      {metadataRows.length > 0 && (
-        <div className="space-y-1.5 rounded-lg border border-border/70 bg-background p-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Details</h3>
-          <dl className="mt-1.5 space-y-1 text-xs">
-            {metadataRows.map((row) => (
-              <div key={row.label} className="grid grid-cols-[100px_minmax(0,1fr)] gap-2">
-                <dt className="font-medium text-muted-foreground/80">{row.label}</dt>
-                <dd className="font-medium text-foreground truncate" title={row.value}>{row.value}</dd>
-              </div>
-            ))}
-          </dl>
+      {(restrictions || metadataRows.length > 0) && (
+        <div className="space-y-3 border-t border-border pt-5">
+          <h3 className="text-xs font-medium text-foreground">Details</h3>
+          {restrictions ? (
+            <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs leading-relaxed">
+              <p className="text-muted-foreground">Restrictions:</p>
+              <p className="text-foreground">{restrictions}</p>
+            </div>
+          ) : null}
+          {metadataRows.length > 0 ? (
+            <dl className="space-y-2 text-xs leading-relaxed">
+              {metadataRows.map((row) => (
+                <div key={row.label} className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
+                  <dt className="text-muted-foreground">{row.label}</dt>
+                  <dd className="text-foreground" title={row.value}>{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
         </div>
       )}
 
@@ -258,10 +282,37 @@ export function AssetDetailActions({
   )
 }
 
+function AccessRequestHelp({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        aria-expanded={open}
+        aria-label="How requesting download access works"
+      >
+        <HelpCircle className="h-4 w-4" aria-hidden />
+      </button>
+      {open ? (
+        <p
+          role="tooltip"
+          className="absolute left-0 top-full z-20 mt-2 w-[min(100vw-2.5rem,18rem)] rounded-md border border-border bg-background p-3 text-xs leading-relaxed text-muted-foreground shadow-md sm:left-auto sm:right-0"
+        >
+          {text}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 function getAccessMessage(accessState: AssetDetailAccessState): {
   eyebrow: string
   title: string
   description?: string
+  helpText?: string
 } {
   if (accessState === "subscriber") {
     return {
@@ -289,7 +340,8 @@ function getAccessMessage(accessState: AssetDetailAccessState): {
   return {
     eyebrow: "Clean downloads",
     title: "Request access to originals",
-    description: "Create an account and tell us what you need. After Fotocorp reviews your request, approved accounts can download files where licensing allows.",
+    helpText:
+      "Create a Fotocorp account and tell us what you need. Our team reviews each request and emails you when download access is approved for your use case. Licensing depends on your intended use—it is not instant self-serve checkout.",
   }
 }
 

@@ -24,6 +24,7 @@ import { photographerEventRoutes } from "./routes/contributor/events/route";
 import { photographerImageRoutes } from "./routes/contributor/images/route";
 import { photographerUploadRoutes } from "./routes/contributor/uploads/route";
 import { publicCatalogRoutes } from "./routes/public/catalog-routes";
+import { publicHomepageRoutes } from "./routes/public/homepage-routes";
 import { publicMediaRoutes } from "./routes/public/media-routes";
 
 export const honoApp = new Hono<{ Bindings: Env; Variables: AppRequestVariables }>();
@@ -83,6 +84,7 @@ honoApp.route("/", internalAdminRoutes);
 honoApp.route("/", internalAdminEventsRoutes);
 honoApp.route("/", internalAdminContributorUploadRoutes);
 honoApp.route("/", publicCatalogRoutes);
+honoApp.route("/", publicHomepageRoutes);
 honoApp.route("/", publicMediaRoutes);
 honoApp.route("/", legacyFixtureRoutes);
 

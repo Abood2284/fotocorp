@@ -30,7 +30,7 @@ Entry point for the database revamp: clean catalog tables, photographer flows, i
 | [Photographer upload runbook](./photographer-upload-runbook.md) | Events, batches, staging, submit semantics | Upload API/UI or staging bucket work |
 | [Fotokey / publish pipeline](./fotokey-publish-pipeline.md) | Fotokey rules, R2 buckets, go-live gating | Approval queue, publish jobs, derivatives |
 | [Media pipeline operations (temporary)](./media-pipeline-operations.md) | One-time derivative migration status + generation commands | Production cutover prep and derivative backlog burn-down |
-| [Jobs direct VPS (Docker)](./jobs-direct-vps-deployment-runbook.md) | Private `apps/jobs` worker on a VPS | Raff / bare-metal Docker Compose without CapRover or public HTTP |
+| [Jobs direct VPS (Docker)](./jobs-direct-vps-deployment-runbook.md) | Private `apps/jobs` worker on a VPS (`git pull` + **`up -d --build`** after code changes) | Raff / bare-metal Docker Compose without CapRover or public HTTP |
 
 ## Historical PR reports
 

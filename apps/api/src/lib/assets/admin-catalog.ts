@@ -2,6 +2,10 @@ import { sql, type SQL } from "drizzle-orm";
 import type { DrizzleClient } from "../../db";
 import { ASSET_AUDIT_ACTION } from "../audit/actions";
 import { AppError } from "../errors";
+import {
+  schedulePublicEventFeedSync,
+  schedulePublicEventFeedSyncForAsset,
+} from "./public-event-feed-projection";
 import { createPreviewUrl } from "../media/preview-token";
 import { getR2Object } from "../r2";
 
@@ -276,6 +280,7 @@ export async function updateInternalAdminAssetEditorial(
   if (!before) throw new AppError(404, "ASSET_NOT_FOUND", "Asset was not found.");
   await assertForeignKeysExist(db, payload);
   const normalizedKeywords = payload.keywords ? payload.keywords.join(", ") : null;
+  const previousEventId = before.event_id;
 
   await db.execute(sql`
     update image_assets
@@ -306,6 +311,7 @@ export async function updateInternalAdminAssetEditorial(
     }
   }
 
+  await schedulePublicEventFeedSyncForAsset(db, assetId, previousEventId)
   return getInternalAdminAssetById(db, assetId, secret, ttlSeconds);
 }
 
@@ -348,6 +354,7 @@ export async function updateInternalAdminAssetPublish(
     }
   }
 
+  await schedulePublicEventFeedSyncForAsset(db, assetId, before.event_id)
   return getInternalAdminAssetById(db, assetId, secret, ttlSeconds);
 }
 
@@ -364,7 +371,8 @@ export async function updateInternalAdminAssetEditorialBulk(
     if (!isUuid(assetId)) continue;
     const before = await getAuditSnapshot(db, assetId);
     if (!before) continue;
-    
+    const previousEventId = before.event_id;
+
     let hasUpdates = false;
     const updates = [];
     if (payload.categoryId !== undefined) {
@@ -398,6 +406,8 @@ export async function updateInternalAdminAssetEditorialBulk(
           });
         }
       }
+
+      await schedulePublicEventFeedSyncForAsset(db, assetId, previousEventId)
     }
     
     const result = await getInternalAdminAssetById(db, assetId, secret, ttlSeconds).catch(() => null);

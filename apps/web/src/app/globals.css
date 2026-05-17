@@ -265,7 +265,7 @@ h6 {
 
 .public-grid-card:hover .public-grid-card-overlay p,
 .public-grid-card:focus-within .public-grid-card-overlay p {
-  color: var(--primary-foreground);
+  color: #ffffff;
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────── */

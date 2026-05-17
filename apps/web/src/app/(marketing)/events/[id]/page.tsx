@@ -1,7 +1,8 @@
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { getPublicAssetFilters, listPublicAssets } from "@/lib/api/fotocorp-api"
-import { PublicAssetCard, formatDate } from "@/components/assets/public-asset-card"
+import { formatDate } from "@/components/assets/public-asset-card"
+import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
 import { PlaceholderPage } from "@/components/layout/placeholder-page"
 
 interface EventDetailPageProps {
@@ -56,11 +57,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
       </div>
 
       {result.items.length > 0 ? (
-        <div className="mt-8 columns-1 gap-3 sm:columns-2 lg:columns-3 xl:columns-4">
-          {result.items.map((asset) => (
-            <PublicAssetCard key={asset.id} asset={asset} className="mb-3 break-inside-avoid" />
-          ))}
-        </div>
+        <PublicAssetGrid assets={result.items} className="mt-8" />
       ) : (
         <div className="mt-8 rounded-2xl border border-border bg-muted/25 p-6 text-sm text-muted-foreground">
           No public previews are available for this event right now.

@@ -17,7 +17,9 @@ RUN corepack enable && corepack prepare pnpm@10.33.1 --activate
 WORKDIR /app
 
 # Workspace install (lockfile + filter keeps the image focused on @fotocorp/jobs).
+# patches/ must exist before install: pnpm-lock.yaml applies patchedDependencies (e.g. pg-cloudflare).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches patches
 COPY apps/jobs/package.json apps/jobs/package.json
 
 RUN pnpm install --frozen-lockfile --filter @fotocorp/jobs...

@@ -1,4 +1,12 @@
 import { NextRequest } from "next/server"
+import {
+  createTimingTracker,
+  formatServerTiming,
+  FOTOCORP_REQUEST_ID_HEADER,
+  logLatencyTrace,
+  requestIdHeaders,
+  resolveRequestId,
+} from "@/lib/latency-trace"
 
 const UPSTREAM_UNREACHABLE_CODES = new Set([
   "ECONNREFUSED",
@@ -42,7 +50,11 @@ async function proxyAuthRequest(request: NextRequest) {
   }
 
   const upstreamUrl = new URL(request.nextUrl.pathname + request.nextUrl.search, apiBaseUrl)
+  const requestId = resolveRequestId(request)
+  const traceGetSession = request.nextUrl.pathname.endsWith("/get-session")
+  const tracker = traceGetSession ? createTimingTracker() : null
   const headers = buildAuthProxyRequestHeaders(request.headers)
+  for (const [key, value] of Object.entries(requestIdHeaders(requestId))) headers.set(key, value)
 
   let response: Response
   try {
@@ -53,8 +65,28 @@ async function proxyAuthRequest(request: NextRequest) {
       redirect: "manual",
       duplex: "half",
     } as RequestInit)
+    tracker?.mark("upstream_fetch")
   } catch (error) {
     if (!isUpstreamUnreachableFetchError(error)) throw error
+    if (traceGetSession && tracker) {
+      const durationMs = tracker.total()
+      const timings = { ...tracker.timings(), total: durationMs }
+      logLatencyTrace({
+        event: "latency_trace",
+        requestId,
+        layer: "web",
+        route: "/api/auth/get-session",
+        status: "error",
+        statusCode: 502,
+        durationMs,
+        timings,
+        error: {
+          name: error instanceof Error ? error.name : "AuthUpstreamUnavailable",
+          message: error instanceof Error ? error.message : "Auth upstream unavailable.",
+          upstreamPath: upstreamUrl.pathname + upstreamUrl.search,
+        },
+      })
+    }
     return Response.json(
       {
         error: {
@@ -67,10 +99,31 @@ async function proxyAuthRequest(request: NextRequest) {
     )
   }
 
+  const outHeaders = buildAuthProxyResponseHeaders(response.headers)
+  outHeaders.set(FOTOCORP_REQUEST_ID_HEADER, response.headers.get(FOTOCORP_REQUEST_ID_HEADER) ?? requestId)
+
+  if (traceGetSession && tracker) {
+    tracker.mark("response_build")
+    const durationMs = tracker.total()
+    const timings = { ...tracker.timings(), total: durationMs }
+    logLatencyTrace({
+      event: "latency_trace",
+      requestId: outHeaders.get(FOTOCORP_REQUEST_ID_HEADER) ?? requestId,
+      layer: "web",
+      route: "/api/auth/get-session",
+      status: response.ok ? "ok" : "error",
+      statusCode: response.status,
+      durationMs,
+      timings,
+      cache: { mode: "auth-proxy", hit: false, cacheControl: outHeaders.get("cache-control") },
+    })
+    outHeaders.set("Server-Timing", formatServerTiming(timings, durationMs))
+  }
+
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
-    headers: buildAuthProxyResponseHeaders(response.headers),
+    headers: outHeaders,
   })
 }
 

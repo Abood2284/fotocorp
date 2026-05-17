@@ -4,16 +4,16 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, Info } from "lucide-react"
+import { AlertTriangle } from "lucide-react"
 import { purgeAdminEventAction } from "@/app/(staff)/staff/(workspace)/events/actions"
-import type { AdminEventPurgeResult } from "@/features/events/admin-events-types"
+
+const STAFF_EVENTS_LIST_PATH = "/staff/events"
 
 export function StaffEventPurgeModal({ eventId, eventName }: { eventId: string; eventName: string }) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<AdminEventPurgeResult | null>(null)
 
   async function handlePurge(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -45,42 +45,20 @@ export function StaffEventPurgeModal({ eventId, eventName }: { eventId: string; 
 
     try {
       const res = await purgeAdminEventAction(eventId, formData)
-      if (res.error) {
+      if ("error" in res && res.error) {
         setError(res.error)
-      } else if (res.data) {
-        setResult(res.data)
+        return
       }
+      if ("data" in res && res.data) {
+        router.replace(STAFF_EVENTS_LIST_PATH)
+        return
+      }
+      setError("Unexpected response from server.")
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.")
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  if (result) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded border border-green-500/50 bg-green-500/10 p-4 text-sm text-green-800 dark:text-green-300">
-          <strong>Event permanently purged.</strong>
-          <ul className="mt-2 list-disc pl-5">
-            <li>Assets deleted from DB: {result.dbDeleted.assets}</li>
-            <li>Derivatives deleted from DB: {result.dbDeleted.derivatives}</li>
-            <li>Originals deleted from R2: {result.r2Results.originalsDeleted} (Failed: {result.r2Results.originalsFailed})</li>
-            <li>Previews deleted from R2: {result.r2Results.previewsDeleted} (Failed: {result.r2Results.previewsFailed})</li>
-            <li>Uploads deleted from R2: {result.r2Results.uploadsDeleted} (Failed: {result.r2Results.uploadsFailed})</li>
-          </ul>
-          {(result.r2Results.originalsFailed > 0 || result.r2Results.previewsFailed > 0 || result.r2Results.uploadsFailed > 0) && (
-            <div className="mt-3 flex items-start gap-2 rounded bg-amber-500/10 p-2 text-amber-700 dark:text-amber-400">
-              <Info className="h-4 w-4 shrink-0 mt-0.5" />
-              <p>Some R2 objects failed to delete. The database records were successfully purged, but there may be orphaned objects in the storage buckets.</p>
-            </div>
-          )}
-        </div>
-        <Button onClick={() => router.push("/staff/events")} variant="outline">
-          Return to Events List
-        </Button>
-      </div>
-    )
   }
 
   if (!isOpen) {

@@ -59,6 +59,8 @@ Set `DATABASE_URL` first (e.g. in your shell) if you want the dry-run to count r
 
 Build context is the **monorepo root**. The container runs as user **`node`**, exposes **no HTTP port**, and loads secrets from **`apps/jobs/.env.production`** (gitignored; start from `.env.production.example`).
 
+The image **bakes in** `apps/jobs` at build time (`COPY` in `apps/jobs/Dockerfile`). **`docker compose restart` does not load new code** from `git pull`; you must **`build`** again (or use **`up -d --build`**). See **`§11`** in the runbook below.
+
 ```bash
 cp apps/jobs/.env.production.example apps/jobs/.env.production
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production config
@@ -68,7 +70,17 @@ docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production r
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production up -d fotocorp-jobs
 ```
 
-Operator-focused steps (Ubuntu, `/opt/fotocorp/app`, SSH-only firewall) live in [`docs/db-revamp/jobs-direct-vps-deployment-runbook.md`](../../docs/db-revamp/jobs-direct-vps-deployment-runbook.md).
+### Deploy or refresh after merging jobs code (VPS)
+
+From the repo root (example path `/opt/fotocorp/app`):
+
+```bash
+cd /opt/fotocorp/app
+git pull
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production up -d --build fotocorp-jobs
+```
+
+Operator-focused steps (Ubuntu, `/opt/fotocorp/app`, SSH-only firewall, logs, `restart` vs rebuild) live in **[`docs/db-revamp/jobs-direct-vps-deployment-runbook.md`](../../docs/db-revamp/jobs-direct-vps-deployment-runbook.md)**.
 
 **CapRover / DNS** are not required for this deployment path; they can be added later if you want a platform domain in front of other services. The jobs worker stays **off the public internet**.
 
@@ -78,7 +90,7 @@ Operator-focused steps (Ubuntu, `/opt/fotocorp/app`, SSH-only firewall) live in 
 - `src/config/env.ts` — typed env loader; dry-run tolerates missing service env vars with warnings; parses `IMAGE_PUBLISH_PROCESSING_ENABLED`.
 - `src/db/client.ts` — Node-native `pg.Pool` singleton and `withJobsTransaction` helper.
 - `src/lib/r2Client.ts` — AWS4-signed GET/HEAD/PUT for R2 (originals + previews buckets).
-- `src/media/publishImageDerivatives.ts` — Sharp WebP THUMB (clean) + CARD/DETAIL (watermarked); profiles aligned with `apps/api/scripts/media/process-image-publish-jobs.ts`.
+- `src/media/publishImageDerivatives.ts` — Sharp WebP **THUMB/CARD clean**, **DETAIL** watermarked; profiles aligned with `apps/api/scripts/media/process-image-publish-jobs.ts`.
 - `src/services/imagePublishJobService.ts` — publish job + item SQL (`claimNextPendingJob`, `markItemRunning`, `completeSuccessfulPublishItem`, `reconcilePublishJobAggregate`, failure helpers).
 - `src/services/imagePublishProcessor.ts` — orchestrates R2 reads/writes + DB promotion per claimed job.
 - `src/workers/imagePublishWorker.ts` — one-iteration orchestration with the safety flag gate.

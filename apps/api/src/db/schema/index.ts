@@ -13,6 +13,7 @@ export * from "./contributor-sessions";
 export * from "./contributor-upload-batches";
 export * from "./contributor-upload-items";
 export * from "./photo-events";
+export * from "./public-event-feed-items";
 export * from "./image-assets";
 export * from "./image-derivatives";
 export * from "./image-access-logs";

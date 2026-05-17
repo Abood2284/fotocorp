@@ -10,6 +10,9 @@
   "observability": {
     "enabled": true
   },
+  "triggers": {
+    "crons": ["0 3 * * *"]
+  },
   "r2_buckets": [
     {
       "binding": "MEDIA_ORIGINALS_BUCKET",

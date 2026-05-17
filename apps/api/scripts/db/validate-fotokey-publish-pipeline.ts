@@ -41,12 +41,12 @@ async function main() {
       failures.push("duplicate_fotokeys must be 0");
     }
 
-    console.log("\n--- 2. Fotokey format (FC + 6 date digits + ≥3 sequence digits) ---");
+    console.log("\n--- 2. Fotokey format (FC + DDMMYY + sequence, ≥8 digits after FC) ---");
     const badFormat = await pool.query<{ bad_format_fotokeys: string }>(`
       select count(*)::text as bad_format_fotokeys
       from image_assets
       where fotokey is not null
-        and fotokey !~ '^FC[0-9]{6}[0-9]{3,}$'
+        and fotokey !~ '^FC[0-9]{8,}$'
     `);
     console.log(badFormat.rows[0]);
     if (toNumber(badFormat.rows[0]?.bad_format_fotokeys) !== 0) {

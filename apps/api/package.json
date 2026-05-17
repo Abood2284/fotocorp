@@ -36,6 +36,7 @@
     "db:validate:photographer-uploads": "tsx scripts/db/validate-photographer-uploads.ts",
     "db:validate:admin-photographer-upload-review": "tsx scripts/db/validate-admin-photographer-upload-review.ts",
     "db:validate:fotokey-publish": "tsx scripts/db/validate-fotokey-publish-pipeline.ts",
+    "db:backfill:legacy-fotokeys": "tsx scripts/db/backfill-legacy-fotokeys.ts",
     "smoke:fotokey-publish": "tsx scripts/smoke/check-fotokey-publish-pipeline.ts",
     "smoke:photographer-auth": "tsx scripts/smoke/check-photographer-auth.ts",
     "smoke:photographer-analytics": "tsx scripts/smoke/check-photographer-analytics.ts",

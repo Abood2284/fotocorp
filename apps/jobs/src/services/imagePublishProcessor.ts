@@ -28,6 +28,8 @@ import {
 } from "../media/publishImageDerivatives"
 import type { ClaimedPublishJob, PublishJobItemRow } from "./imagePublishJobService"
 import { ImagePublishJobService } from "./imagePublishJobService"
+import { schedulePublicEventFeedSyncForAsset } from "../../../api/src/lib/assets/public-event-feed-projection"
+import { createHttpDb } from "../../../api/src/db/http"
 
 function guessOriginalContentType(canonicalKey: string): string {
   const lower = canonicalKey.toLowerCase()
@@ -216,6 +218,13 @@ export class ImagePublishProcessor {
       imageAssetId: item.imageAssetId,
       derivatives
     })
+
+    if (this.jobsEnv.databaseUrl) {
+      await schedulePublicEventFeedSyncForAsset(
+        createHttpDb(this.jobsEnv.databaseUrl),
+        item.imageAssetId,
+      )
+    }
 
     console.log("[fotocorp-jobs.publish-item-complete]", {
       itemId: item.id,

@@ -5,11 +5,9 @@ import { getCurrentAppUser } from "@/lib/app-user"
 import { getPublicAsset, listPublicAssets } from "@/lib/api/fotocorp-api"
 import { messageForDownloadRedirectError } from "@/lib/download-error-messages"
 import type { PublicAsset } from "@/features/assets/types"
-import { formatDate } from "@/components/assets/public-asset-card"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { AssetDetailActions, type AssetDetailAccessState, type AssetSizeOption } from "@/components/assets/asset-detail-actions"
-import { CopyFotokeyButton } from "@/components/assets/copy-fotokey-button"
-import { PublicAssetMosaic } from "@/components/assets/public-asset-mosaic"
+import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
 import { WatermarkDownloadButton } from "@/components/assets/watermark-download-button"
 import { FotoboxSaveButton } from "@/components/assets/fotobox-save-button"
 
@@ -20,25 +18,33 @@ interface AssetDetailPageProps {
 
 export const dynamic = "force-dynamic"
 
+const FOTOCORP_EDITORIAL_RESTRICTIONS =
+  "Contact Fotocorp for all commercial or promotional uses. Full editorial rights apply in India; additional territories are available under licence. Restricted editorial use may apply outside approved regions—please contact our Mumbai office for clearance."
+
 const SIZE_OPTIONS: AssetSizeOption[] = [
   {
     id: "web",
     label: "Low",
-    description: "72 DPI • 1200px • Best for web preview",
+    dimensions: "1200 px max edge • 72 dpi",
+    description: "Best for web and screen preview",
+    selectable: false,
     downloadAvailable: false,
     disabledReason: "Coming soon",
   },
   {
     id: "medium",
     label: "Medium",
-    description: "300 DPI • 2400px • Best for editorial",
+    dimensions: "2400 px max edge • 300 dpi",
+    description: "Best for editorial and digital publishing",
+    selectable: false,
     downloadAvailable: false,
     disabledReason: "Coming soon",
   },
   {
     id: "large",
     label: "High",
-    description: "300 DPI • Max px • Best for print & archive",
+    dimensions: "Maximum available resolution • 300 dpi",
+    description: "Best for print and archive delivery",
     downloadAvailable: true,
   },
 ]
@@ -77,13 +83,12 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
   const preview = asset.previews.detail ?? asset.previews.card ?? asset.previews.thumb
   const title = getAssetTitle(asset)
-  const caption = asset.caption?.trim()
+  const caption = formatCaptionWithPhotoCredit(asset.caption, asset.contributor?.displayName)
   const keywords = splitKeywords(asset.keywords)
   const assetHref = `/assets/${asset.id}`
   const downloadError = messageForDownloadRedirectError(resolvedSearchParams?.downloadError)
   const relatedResult = await getRelatedAssets(asset)
   const relatedAssets = relatedResult.items
-  const subtitle = getAssetSubtitle(asset)
   const relatedLabel = relatedResult.label
   const searchDefaultValue = resolvedSearchParams?.q ?? ""
   const actionMetadataRows = getActionMetadataRows(asset)
@@ -145,49 +150,45 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               <h1 className="max-w-5xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl lg:text-[2.45rem] lg:leading-[1.08]">
                 {title}
               </h1>
-              {subtitle && subtitle !== title && <p className="max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base">{subtitle}</p>}
               {caption && caption !== title && (
                 <p className="max-w-5xl text-sm leading-6 text-muted-foreground sm:text-base">
                   {caption}
                 </p>
               )}
-              <div className="inline-flex flex-wrap items-center gap-3 rounded-md border border-accent/35 bg-accent-wash px-3 py-2 text-sm">
-                <span className="font-semibold text-foreground">
-                  Fotokey: {asset.fotokey ? asset.fotokey : "Unavailable"}
-                </span>
-                <CopyFotokeyButton fotokey={asset.fotokey ?? null} />
-              </div>
             </header>
 
             <figure className="overflow-hidden rounded-xl bg-surface-stone/40">
               {preview ? (
-                <div
-                  style={getPreviewFrameStyle(preview.width, preview.height)}
-                  className="relative mx-auto flex w-full items-start justify-center px-4 pb-5 pt-2 sm:px-5 sm:pb-6 sm:pt-2 lg:px-6 lg:pb-7 lg:pt-2"
-                >
+                <div className="relative mx-auto flex w-full justify-center px-4 pb-5 pt-2 sm:px-5 sm:pb-6 sm:pt-2 lg:px-6 lg:pb-7 lg:pt-2">
                   <PreviewImage
                     src={preview.url}
                     alt={getAssetAlt(asset)}
-                    className="h-full max-h-[86vh] w-full object-contain drop-shadow-2xl"
+                    width={preview.width}
+                    height={preview.height}
+                    className="block h-auto max-h-[86vh] w-auto max-w-full object-contain drop-shadow-2xl"
                     loading="eager"
                   />
-                  <div className="absolute right-4 top-4 flex items-center gap-2">
-                    <FotoboxSaveButton
-                      assetId={asset.id}
-                      variant="ghost"
-                      className="!space-y-0 m-0"
-                      buttonClassName="h-9 px-3 bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white border-0"
-                      text="Save to fotobox"
-                      icon={<Plus className="h-4 w-4 mr-2" />}
-                    />
+                  <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
                     <WatermarkDownloadButton
                       previewUrl={preview.url}
                       assetId={asset.id}
                       fotokey={asset.fotokey ?? null}
+                      hoverLabel="Download this image"
+                    />
+                    <FotoboxSaveButton
+                      assetId={asset.id}
+                      stub
+                      variant="ghost"
+                      iconOnly
+                      className="m-0"
+                      buttonClassName="rounded-md bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/60 hover:text-white"
+                      icon={<Plus className="h-5 w-5" strokeWidth={2.5} />}
+                      text="Save as"
+                      hoverLabel="Save as"
                     />
                   </div>
-                  <div className="pointer-events-none absolute bottom-5 right-5 hidden rounded-md bg-black/40 px-3 py-2 text-xs font-medium text-white/90 backdrop-blur-md sm:block">
-                    Fotocorp preview{asset.contributor?.displayName ? ` • ${asset.contributor.displayName}` : ""}
+                  <div className="pointer-events-none absolute bottom-5 right-5 rounded-md bg-black/40 px-3 py-2 text-xs font-medium text-white/90 backdrop-blur-md">
+                    {asset.fotokey ?? "Unavailable"}
                   </div>
                 </div>
               ) : (
@@ -216,6 +217,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               assetHref={assetHref}
               downloadHref={`/api/assets/${asset.id}/download`}
               sizeOptions={SIZE_OPTIONS}
+              restrictions={FOTOCORP_EDITORIAL_RESTRICTIONS}
               metadataRows={actionMetadataRows}
               keywords={keywords}
             />
@@ -224,21 +226,19 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
 
 
-        <section className="mt-12 border-t border-border pt-8">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-foreground">{relatedLabel}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Continue browsing related watermarked previews.
-              </p>
-            </div>
-            <Link href={relatedResult.browseHref} className="inline-flex text-sm font-medium text-foreground underline underline-offset-4">
-              Browse more
+        <section className="mt-6 pt-2">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">{relatedLabel}</h2>
+            <Link
+              href={relatedResult.browseHref}
+              className="text-sm font-normal text-primary underline underline-offset-4 hover:text-primary-hover"
+            >
+              View all
             </Link>
           </div>
           {relatedAssets.length > 0 ? (
             <div className="mt-6">
-              <PublicAssetMosaic assets={relatedAssets} />
+              <PublicAssetGrid assets={relatedAssets} limit={12} />
             </div>
           ) : (
             <div className="mt-6 rounded-xl bg-muted/20 p-8 text-center text-sm text-muted-foreground">
@@ -249,6 +249,13 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
       </div>
     </div>
   )
+}
+
+function formatCaptionWithPhotoCredit(caption: string | null | undefined, photographerName?: string | null) {
+  const trimmed = caption?.trim()
+  if (!trimmed) return null
+  if (!photographerName) return trimmed
+  return `${trimmed} (Photo by ${photographerName} / Fotocorp)`
 }
 
 function getAssetTitle(asset: PublicAsset) {
@@ -357,34 +364,19 @@ function relatedLabelForSource(
   source: "event" | "category" | "photographer" | "archive",
   asset: PublicAsset,
 ) {
-  if (source === "event") return "More from this event"
+  if (source === "event") return "More images from this event"
   if (source === "category") return asset.category?.name ? `More from ${asset.category.name}` : "More from this category"
   if (source === "photographer") return asset.contributor?.displayName ? `More by ${asset.contributor.displayName}` : "More by this photographer"
   return "More from the archive"
 }
 
-function getAssetSubtitle(asset: PublicAsset) {
-  const parts = [
-    asset.event?.name ?? asset.category?.name ?? null,
-    asset.event?.location ?? null,
-    formatDate(asset.imageDate ?? asset.event?.eventDate),
-  ].filter((value): value is string => Boolean(value))
-
-  return parts.length > 0 ? parts.join(" • ") : null
-}
-
-function getPreviewFrameStyle(width?: number, height?: number) {
-  if (!width || !height) return undefined
-  if (width <= 0 || height <= 0) return undefined
-  return { aspectRatio: `${width} / ${height}` }
-}
-
 function getActionMetadataRows(asset: PublicAsset) {
   return [
-    { label: "Photographer", value: asset.contributor?.displayName ?? "Unavailable" },
-    { label: "Event", value: asset.event?.name ?? "Unavailable" },
-    { label: "Category", value: asset.category?.name ?? "Unavailable" },
-    { label: "Source", value: asset.source ? humanizeEnum(asset.source) : "Unavailable" },
+    { label: "Credit:", value: asset.contributor?.displayName ?? "—" },
+    { label: "Fotokey #:", value: asset.fotokey ?? "—" },
+    { label: "Event:", value: asset.event?.name ?? "—" },
+    { label: "Category:", value: asset.category?.name ?? "—" },
+    { label: "Source:", value: asset.source ? humanizeEnum(asset.source) : "—" },
   ]
 }
 

@@ -18,8 +18,8 @@ interface ApiEnvelope<TData> {
   };
 }
 
-export function json<T>(body: T, status = 200): Response {
-  return Response.json(body, { status });
+export function json<T>(body: T, status = 200, init?: ResponseInit): Response {
+  return Response.json(body, { status, ...init });
 }
 
 export function jsonEnvelope<TData>(data: TData, status = 200, meta?: ResponseMeta): Response {

@@ -7,6 +7,7 @@ import {
   getDefaultStaffLandingPath,
   staffRoleCanAccessPath,
 } from "@/lib/staff/staff-route-access"
+import { traceHomepageSessionCall } from "@/lib/server/session-latency-trace"
 
 export async function getStaffCookieHeader() {
   const cookieStore = await cookies()
@@ -17,12 +18,14 @@ export async function getStaffCookieHeader() {
 }
 
 export async function getOptionalStaffSession(): Promise<StaffMeResponse | null> {
-  try {
-    return await getStaffMe({ cookieHeader: await getStaffCookieHeader() })
-  } catch (caught) {
-    if (caught instanceof StaffApiError) return null
-    throw caught
-  }
+  return traceHomepageSessionCall("/api/v1/staff/auth/me", async () => {
+    try {
+      return await getStaffMe({ cookieHeader: await getStaffCookieHeader() })
+    } catch (caught) {
+      if (caught instanceof StaffApiError) return null
+      throw caught
+    }
+  })
 }
 
 export async function requireStaff() {

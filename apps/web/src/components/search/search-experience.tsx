@@ -22,6 +22,7 @@ import type {
   PublicAssetSort,
 } from "@/features/assets/types"
 import { PublicAssetCard } from "@/components/assets/public-asset-card"
+import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -299,17 +300,7 @@ export function SearchExperience({
             {items.length > 0 ? (
               <>
                 {viewMode === "grid" ? (
-                  <div className="columns-2 gap-2 sm:columns-3 lg:columns-4 xl:columns-5">
-                    {items.map((asset, index) => (
-                      <PublicAssetCard
-                        key={asset.id}
-                        asset={asset}
-                        variant="grid"
-                        priority={index < 8}
-                        className="mb-2 break-inside-avoid"
-                      />
-                    ))}
-                  </div>
+                  <PublicAssetGrid assets={items} limit={items.length} priorityCount={8} />
                 ) : (
                   <div className="grid grid-cols-1 border-l border-t border-border bg-background sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                     {items.map((asset, index) => (

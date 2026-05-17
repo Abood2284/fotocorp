@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils"
 interface PreviewImageProps {
   src: string
   alt: string
+  width?: number
+  height?: number
   className?: string
   loading?: "lazy" | "eager"
 }
@@ -13,6 +15,8 @@ interface PreviewImageProps {
 export function PreviewImage({
   src,
   alt,
+  width,
+  height,
   className,
   loading = "lazy",
 }: PreviewImageProps) {
@@ -31,6 +35,8 @@ export function PreviewImage({
     <img
       src={src}
       alt={alt}
+      width={width}
+      height={height}
       className={className}
       loading={loading}
       decoding="async"

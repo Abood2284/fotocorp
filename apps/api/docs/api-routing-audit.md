@@ -65,12 +65,15 @@ This makes route behavior hard to reason about and slows root-cause analysis whe
 | `GET` | `/api/v1/assets/filters` | `publicAssetFiltersRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed filters. PR-16I: category counts use resolved category `coalesce(asset, event)`. |
 | `GET` | `/api/v1/assets/collections` | `publicAssetCollectionsRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed collections. PR-16I: same resolved category for grouping/preview pick. |
 | `GET` | `/api/v1/assets/:id` | `publicAssetDetailRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public asset detail. PR-16I: same `fotokey` + category rules as list. |
+| `GET` | `/api/v1/public/homepage` | `getPublicHomepageFeed` | `apps/api/src/routes/public/homepage-routes.ts` | Lightweight homepage feed: first-page latest-events preview only, ordered by `created_at`; no newest/editorial asset slices. |
+| `GET` | `/api/v1/public/events/latest` | `listPublicLatestEvents` | `apps/api/src/routes/public/homepage-routes.ts` | Cursor-paginated Latest Events from `public_event_feed_items` projection (`windowDays`, `limit`, optional cursor); stable `/api/media/assets/:id/preview/card` URLs precomputed at sync time. |
 
 ### Public Media Routes
 
 | Method | Path | Handler | Source file | Notes |
 |---|---|---|---|---|
-| `GET` | `/api/v1/media/assets/:assetId/preview` | `securePreviewMediaRoute` | `apps/api/src/routes/secureMedia.ts` | Token-verified watermarked preview route. |
+| `GET` | `/api/v1/media/assets/:assetId/preview` | `securePreviewMediaRoute` | `apps/api/src/routes/secureMedia.ts` | Token-verified preview route (legacy signed URLs). |
+| `GET` | `/api/media/assets/:assetId/preview/:variant` | `stablePreviewMediaRoute` | `apps/api/src/routes/public/stable-preview-media.ts` | Stable public preview (no token). Same handler on `/api/v1/media/assets/:assetId/preview/:variant`. |
 
 ### Internal Admin Routes
 

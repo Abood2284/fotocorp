@@ -7,14 +7,24 @@ import { cn } from "@/lib/utils"
 
 interface PublicAssetSaveButtonProps {
   assetId: string
+  compact?: boolean
+  compactLabel?: string
+  /** Placeholder — no API call (e.g. future “Save as” flow). */
+  stub?: boolean
 }
 
-export function PublicAssetSaveButton({ assetId }: PublicAssetSaveButtonProps) {
+export function PublicAssetSaveButton({
+  assetId,
+  compact = false,
+  compactLabel = "save",
+  stub = false,
+}: PublicAssetSaveButtonProps) {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
 
   async function saveToFotobox(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
     event.stopPropagation()
+    if (stub) return
     if (saveState === "saving" || saveState === "saved") return
 
     setSaveState("saving")
@@ -27,26 +37,40 @@ export function PublicAssetSaveButton({ assetId }: PublicAssetSaveButtonProps) {
     setSaveState(response?.ok ? "saved" : "error")
   }
 
+  const saveLabel = stub
+    ? compactLabel
+    : saveState === "saving"
+      ? "Saving"
+      : saveState === "saved"
+        ? "Saved"
+        : compact
+          ? compactLabel
+          : "Save to FotoBox"
+  const saveIcon =
+    saveState === "saving" ? (
+      <Loader2 className="h-4 w-4 animate-spin" />
+    ) : saveState === "saved" ? (
+      <Check className="h-4 w-4" />
+    ) : (
+      <Plus className="h-4 w-4" strokeWidth={2.5} />
+    )
+
   return (
     <button
       type="button"
       onClick={saveToFotobox}
       className={cn(
-        "flex h-10 items-center justify-center gap-2 bg-black/65 px-3 text-sm font-bold text-white backdrop-blur-md transition-colors hover:bg-black/80",
+        "flex items-center justify-center gap-1.5 bg-black/65 text-sm font-bold text-white backdrop-blur-md transition-colors hover:bg-black/80",
+        compact ? "h-8 rounded-sm px-2.5" : "h-10 px-3",
         saveState === "saved" && "bg-accent text-accent-foreground hover:bg-accent",
         saveState === "error" && "bg-destructive text-destructive-foreground hover:bg-destructive",
       )}
-      aria-label={saveState === "saved" ? "Saved to Fotobox" : "Save image to Fotobox"}
-      disabled={saveState === "saving" || saveState === "saved"}
+      aria-label={stub ? "Save as" : saveState === "saved" ? "Saved to Fotobox" : "Save image to Fotobox"}
+      disabled={!stub && (saveState === "saving" || saveState === "saved")}
     >
-      {saveState === "saving" ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : saveState === "saved" ? (
-        <Check className="h-4 w-4" />
-      ) : (
-        <Plus className="h-4 w-4" strokeWidth={2.5} />
-      )}
-      <span>{saveState === "saving" ? "Saving" : saveState === "saved" ? "Saved" : "Save to FotoBox"}</span>
+      {!compact && saveIcon}
+      <span>{saveLabel}</span>
+      {compact && saveIcon}
     </button>
   )
 }

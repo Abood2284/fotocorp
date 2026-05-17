@@ -28,7 +28,7 @@ interface DownloadHistoryRow {
   title: string | null
   headline: string | null
   caption: string | null
-  legacy_imagecode: string | null
+  fotokey: string | null
   card_width: number | null
   card_height: number | null
   thumb_width: number | null
@@ -107,7 +107,7 @@ async function listDownloadRows(
       a.title,
       a.headline,
       a.caption,
-      a.legacy_image_code as legacy_imagecode,
+      a.fotokey,
       card.width as card_width,
       card.height as card_height,
       thumb.width as thumb_width,
@@ -142,7 +142,7 @@ async function toDownloadHistoryItem(row: DownloadHistoryRow, env: Env) {
     headline: row.headline,
     title: row.title,
     caption: row.caption,
-    fotokey: row.legacy_imagecode,
+    fotokey: row.fotokey,
     previewUrl: row.asset_id ? await previewUrl(row.asset_id, row.card_width, row.card_height, "card", env) : null,
     thumbUrl: row.asset_id ? await previewUrl(row.asset_id, row.thumb_width, row.thumb_height, "thumb", env) : null,
   }

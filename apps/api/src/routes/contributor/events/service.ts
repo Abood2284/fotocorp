@@ -1,6 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { DrizzleClient } from "../../../db";
 import { AppError } from "../../../lib/errors";
+import { schedulePublicEventFeedSync } from "../../../lib/assets/public-event-feed-projection";
 import type { ContributorSessionResult } from "../auth/service";
 import type {
   PhotographerEventCreateBody,
@@ -212,6 +213,7 @@ export async function createPhotographerEvent(
   );
   const newId = inserted[0]?.id;
   if (!newId) throw new AppError(500, "EVENT_CREATE_FAILED", "Could not create event.");
+  await schedulePublicEventFeedSync(db, newId);
   return getPhotographerEvent(db, session, newId);
 }
 
@@ -262,6 +264,7 @@ export async function patchPhotographerEvent(
     where id = ${eventId}::uuid
   `);
 
+  await schedulePublicEventFeedSync(db, eventId);
   return getPhotographerEvent(db, session, eventId);
 }
 

@@ -8,11 +8,13 @@ import {
   imageAccessLogs,
   imageDownloadLogs,
   imagePublishJobItems,
+  contributorUploadBatches,
   contributorUploadItems,
   staffAccounts,
 } from "../../db/schema"
 import type { DrizzleClient } from "../../db"
 import type { Env } from "../../appTypes"
+import { schedulePublicEventFeedSync } from "../assets/public-event-feed-projection"
 
 export interface AdminEventListFilters {
   q?: string
@@ -125,6 +127,7 @@ export async function updateInternalAdminEvent(
     .returning()
 
   if (!updated) throw new AppError(404, "EVENT_NOT_FOUND", "Event not found.")
+  await schedulePublicEventFeedSync(db, eventId)
   return updated
 }
 
@@ -171,53 +174,48 @@ export async function purgeInternalAdminEvent(
   const assetIds = assets.map((a: any) => a.id)
   const originalKeysToDelete = assets.map((a: any) => a.originalStorageKey).filter(Boolean) as string[]
 
-  let previewKeysToDelete: string[] = []
-  let contributorKeysToDelete: string[] = []
+  const derivRows =
+    assetIds.length > 0
+      ? await db
+          .select({ id: imageDerivatives.id, storageKey: imageDerivatives.storageKey })
+          .from(imageDerivatives)
+          .where(inArray(imageDerivatives.imageAssetId, assetIds))
+      : []
 
-  // 2. Perform DB deletion in transaction
-  await db.transaction(async (tx: any) => {
-    if (assetIds.length > 0) {
-      // Find derivatives
-      const derivs = await tx
-        .select({ id: imageDerivatives.id, storageKey: imageDerivatives.storageKey })
-        .from(imageDerivatives)
-        .where(inArray(imageDerivatives.imageAssetId, assetIds))
-      
-      const derivIds = derivs.map((d: any) => d.id)
-      previewKeysToDelete = derivs.map((d: any) => d.storageKey).filter(Boolean)
+  const derivIds = derivRows.map((d) => d.id)
+  const previewKeysToDelete = derivRows.map((d) => d.storageKey).filter(Boolean) as string[]
 
-      // Delete Access Logs
-      await tx.delete(imageAccessLogs).where(inArray(imageAccessLogs.imageAssetId, assetIds))
-      if (derivIds.length > 0) {
-        await tx.delete(imageAccessLogs).where(inArray(imageAccessLogs.imageDerivativeId, derivIds))
-      }
+  const contributorUploadRowsForEvent = await db
+    .select({ storageKey: contributorUploadItems.storageKey })
+    .from(contributorUploadItems)
+    .innerJoin(
+      contributorUploadBatches,
+      eq(contributorUploadItems.batchId, contributorUploadBatches.id),
+    )
+    .where(eq(contributorUploadBatches.eventId, eventId))
 
-      // Delete Download Logs
-      await tx.delete(imageDownloadLogs).where(inArray(imageDownloadLogs.imageAssetId, assetIds))
+  const contributorKeysToDelete = [...new Set(contributorUploadRowsForEvent.map((r: { storageKey: string }) => r.storageKey).filter(Boolean))] as string[]
 
-      // Delete Publish Job Items
-      await tx.delete(imagePublishJobItems).where(inArray(imagePublishJobItems.imageAssetId, assetIds))
+  // neon-http (createHttpDb) rejects db.transaction(); use Neon's transactional HTTP batch instead.
+  const deletes = [
+    // Removes upload items (FK cascade); contributor_upload_batches.event_id -> photo_events is RESTRICT.
+    db.delete(contributorUploadBatches).where(eq(contributorUploadBatches.eventId, eventId)),
+    ...(assetIds.length > 0
+      ? [
+          db.delete(imageAccessLogs).where(inArray(imageAccessLogs.imageAssetId, assetIds)),
+          ...(derivIds.length > 0
+            ? [db.delete(imageAccessLogs).where(inArray(imageAccessLogs.imageDerivativeId, derivIds))]
+            : []),
+          db.delete(imageDownloadLogs).where(inArray(imageDownloadLogs.imageAssetId, assetIds)),
+          db.delete(imagePublishJobItems).where(inArray(imagePublishJobItems.imageAssetId, assetIds)),
+          db.delete(imageDerivatives).where(inArray(imageDerivatives.imageAssetId, assetIds)),
+          db.delete(imageAssets).where(inArray(imageAssets.id, assetIds)),
+        ]
+      : []),
+    db.delete(photoEvents).where(eq(photoEvents.id, eventId)),
+  ] as const satisfies readonly unknown[]
 
-      // Gather upload items for storage key deletion, then delete the rows
-      const uploads = await tx
-        .select({ storageKey: contributorUploadItems.storageKey })
-        .from(contributorUploadItems)
-        .where(inArray(contributorUploadItems.imageAssetId, assetIds))
-      
-      contributorKeysToDelete = uploads.map((u: any) => u.storageKey).filter(Boolean)
-      
-      await tx.delete(contributorUploadItems).where(inArray(contributorUploadItems.imageAssetId, assetIds))
-
-      // Delete derivatives
-      await tx.delete(imageDerivatives).where(inArray(imageDerivatives.imageAssetId, assetIds))
-
-      // Delete Image Assets
-      await tx.delete(imageAssets).where(inArray(imageAssets.id, assetIds))
-    }
-
-    // Finally, delete the event
-    await tx.delete(photoEvents).where(eq(photoEvents.id, eventId))
-  })
+  await db.batch(deletes as unknown as Parameters<DrizzleClient["batch"]>[0])
 
   // 3. Delete R2 objects
   const r2Results = {

@@ -101,6 +101,60 @@ export interface PublicEventListResponse {
   items: PublicEvent[]
 }
 
+export interface PublicHomepageEvent {
+  id: string
+  title: string
+  slug?: string | null
+  eventDate?: string | null
+  createdAt: string
+  assetCount: number
+  previewUrl: string
+  previewWidth?: number | null
+  previewHeight?: number | null
+}
+
+export type PublicHomepageEditorialSectionKey = "news" | "sports" | "entertainment" | "retro"
+
+export interface PublicHomepageAsset {
+  id: string
+  title?: string | null
+  caption?: string | null
+  fotokey?: string | null
+  eventName?: string | null
+  categoryName?: string | null
+  imageDate?: string | null
+  createdAt: string
+  previewUrl: string
+  previewWidth?: number | null
+  previewHeight?: number | null
+}
+
+export interface PublicHomepageAssetSection {
+  key: PublicHomepageEditorialSectionKey
+  title: string
+  items: PublicHomepageAsset[]
+}
+
+export interface PublicLatestEventsResponse {
+  items: PublicHomepageEvent[]
+  nextCursor: string | null
+  hasMore: boolean
+  generatedAt: string
+}
+
+export interface PublicHomepageFeed {
+  latestEventsPreview: {
+    items: PublicHomepageEvent[]
+    nextCursor: string | null
+    hasMore: boolean
+  }
+  generatedAt: string
+}
+
+export type PublicHomepageFeedResult =
+  | { ok: true; feed: PublicHomepageFeed; durationMs: number }
+  | { ok: false; error: string; code?: string; status?: number; durationMs: number }
+
 export interface PublicAssetListParams {
   q?: string
   categoryId?: string

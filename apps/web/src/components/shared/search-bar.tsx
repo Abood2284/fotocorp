@@ -11,6 +11,8 @@ interface SearchBarProps {
   size?: "default" | "lg"
   variant?: "default" | "pill" | "minimal"
   showTypeSelect?: boolean
+  /** Where the Photos/Videos menu opens relative to the trigger. Use "above" when content sits directly below the bar. */
+  typeSelectMenuPlacement?: "above" | "below"
   className?: string
   /** If true, navigation happens on submit. If false, calls onSearch. */
   navigate?: boolean
@@ -23,6 +25,7 @@ export function SearchBar({
   size = "default",
   variant = "pill",
   showTypeSelect = false,
+  typeSelectMenuPlacement = "below",
   className,
   navigate = true,
   onSearch,
@@ -67,7 +70,7 @@ export function SearchBar({
       role="search"
     >
       {showTypeSelect && (
-        <div className="relative pl-2 py-2 flex shrink-0 items-center" ref={dropdownRef}>
+        <div className="relative z-50 pl-2 py-2 flex shrink-0 items-center" ref={dropdownRef}>
           <button
             type="button"
             onClick={() => setIsTypeSelectOpen(!isTypeSelectOpen)}
@@ -79,7 +82,15 @@ export function SearchBar({
           </button>
           
           {isTypeSelectOpen && (
-            <div className="absolute left-2 top-[calc(100%+8px)] z-50 w-40 overflow-hidden rounded-xl bg-background p-2 shadow-lg border border-border/40">
+            <div
+              role="listbox"
+              className={cn(
+                "absolute left-2 z-50 w-40 overflow-hidden rounded-xl bg-background p-2 shadow-lg border border-border/40",
+                typeSelectMenuPlacement === "above"
+                  ? "bottom-[calc(100%+8px)]"
+                  : "top-[calc(100%+8px)]",
+              )}
+            >
               <button
                 type="button"
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted"

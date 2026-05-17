@@ -15,6 +15,8 @@ import {
   DETAIL_WATERMARKED_PROFILE,
   THUMB_CLEAN_PROFILE,
 } from "../../src/lib/media/watermark.js";
+import { createHttpDb } from "../../src/db/index.js";
+import { schedulePublicEventFeedSyncForAsset } from "../../src/lib/assets/public-event-feed-projection.js";
 
 type Variant = "thumb" | "card" | "detail";
 type GenerationStatus = "READY" | "FAILED" | "STALE";
@@ -561,6 +563,11 @@ async function processAsset(
   if (generatedVariants.length > 0) {
     try {
       await upsertDerivativesBatch(pool, asset.id, generatedVariants, options, "READY", counters);
+      const wroteReadyCard = generatedVariants.some((item) => item.variant === "card");
+      const databaseUrl = process.env.DATABASE_URL;
+      if (wroteReadyCard && databaseUrl) {
+        await schedulePublicEventFeedSyncForAsset(createHttpDb(databaseUrl), asset.id);
+      }
     } catch (error) {
       counters.dbWriteFailures += 1;
       counters.failedVariants += generatedVariants.length;

@@ -4,6 +4,7 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth"
 import { upsertAppUserProfile } from "@/lib/app-user-profile-store"
+import { traceHomepageSessionCall } from "@/lib/server/session-latency-trace"
 import type { AppRole } from "@/lib/app-user-profile-store"
 
 export {
@@ -23,11 +24,13 @@ export interface AuthUser {
 }
 
 export async function getCurrentAuthUser() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  })
+  return traceHomepageSessionCall("/api/auth/get-session", async () => {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    })
 
-  return (session?.user ?? null) as AuthUser | null
+    return (session?.user ?? null) as AuthUser | null
+  })
 }
 
 export async function getOrCreateAppUser(authUser: AuthUser) {
