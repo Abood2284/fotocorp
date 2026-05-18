@@ -18,7 +18,8 @@ Drizzle schema: `apps/api/src/db/schema/public-event-feed-items.ts`.
 
 - `syncPublicEventFeedForEvent(eventId)` — loads event, applies 30-day + ACTIVE + public asset + clean CARD rules, upserts or hides/deletes projection row
 - `deleteOldPublicEventFeedItems({ windowDays })` — deletes rows older than the window by `created_at`
-- `schedulePublicEventFeedSync` / `schedulePublicEventFeedSyncForAsset` — non-throwing wrappers with structured logs
+- `schedulePublicEventFeedSync` / `schedulePublicEventFeedSyncForAsset` — structured logs; **publish paths** (`apps/jobs` publish processor + `process-image-publish-jobs.ts`) pass `{ critical: true }` for **3 attempts with backoff** on transient DB errors, then log `public_event_feed_sync_post_publish_exhausted` if still failing (does not roll back already-COMPLETED publish items)
+- `reconcilePublicEventFeedProjectionDrift({ limit })` — finds projection drift (hidden row but public-ready assets exist, or missing projection row for a recent ACTIVE event that has public-ready assets) and re-runs `syncPublicEventFeedForEvent` per candidate; invoked from the **daily** Worker cron after cleanup
 
 Preview URL uses `buildPublicStablePreviewPath` → `/api/media/assets/{assetId}/preview/card` (same stable public path as the rest of the homepage feed).
 
@@ -37,11 +38,11 @@ Preview URL uses `buildPublicStablePreviewPath` → `/api/media/assets/{assetId}
 
 Event purge deletes `photo_events` → projection row cascades via FK.
 
-Daily cleanup: Cloudflare cron `0 3 * * *` → `scheduled` in `apps/api/src/index.ts` → `runPublicEventFeedCleanup`.
+Daily maintenance: Cloudflare cron `0 3 * * *` → `scheduled` in `apps/api/src/index.ts` → `runPublicEventFeedCleanup` (see report §7: age cleanup + drift reconcile).
 
 ## 4. No one-time script
 
-Initial fill is operator-run SQL in Neon only (see §5). Ongoing correctness is maintained by the sync hooks above.
+Initial fill is operator-run SQL in Neon only (see §5). Ongoing correctness is maintained by the sync hooks above plus **daily drift reconciliation** (see §7).
 
 ## 5. One-time Neon SQL (backfill)
 
@@ -157,11 +158,12 @@ _Fill after running SQL in Neon:_
 | `deleted_old_rows` | _TBD_ |
 | `public_last_30_days_rows` | _TBD_ |
 
-## 7. Scheduled cleanup
+## 7. Scheduled cleanup + projection reconcile
 
 - Wrangler: `"triggers": { "crons": ["0 3 * * *"] }`
-- Handler: `runPublicEventFeedCleanup` logs `{ event: "public_event_feed_cleanup", windowDays, deletedOldRows, durationMs, status }`
-- Deletes `public_event_feed_items` where `created_at < now() - interval '30 days'`
+- Handler: `runPublicEventFeedCleanup` in `apps/api/src/lib/assets/public-event-feed-scheduled.ts`
+  1. `deleteOldPublicEventFeedItems` — deletes `public_event_feed_items` where `created_at < now() - interval '30 days'` (default window); logs `{ event: "public_event_feed_cleanup", windowDays, deletedOldRows, durationMs, status }`
+  2. `reconcilePublicEventFeedProjectionDrift` — self-heal drift; logs `{ event: "public_event_feed_projection_reconcile", candidateEventCount, upsertedPublicCount, hiddenOrDeletedCount, errorCount, durationMs, status }`
 
 ## 8. Projection row counts
 

@@ -5,6 +5,9 @@ import { joinPublicCardDerivative, publicAssetPredicate } from "./public-catalog
 
 export const PUBLIC_EVENT_FEED_WINDOW_DAYS = 30
 
+const POST_PUBLISH_SYNC_ATTEMPTS = 3
+const POST_PUBLISH_SYNC_BASE_DELAY_MS = 250
+
 export interface SyncPublicEventFeedResult {
   eventId: string
   action: "upserted" | "hidden" | "deleted" | "not_found"
@@ -16,6 +19,26 @@ export interface CleanupResult {
   deletedOldRows: number
   durationMs: number
   status: "ok"
+}
+
+/** Options for feed projection sync (retries when `critical` for publish paths). */
+export interface SchedulePublicEventFeedSyncOptions {
+  /**
+   * When true (publish worker / publish CLI only): run a few sync attempts with backoff
+   * so transient DB errors do not leave `public_event_feed_items` stale. Does not throw
+   * after `image_publish_job_items` is already COMPLETED — see `public_event_feed_sync_post_publish_exhausted` logs + daily reconcile.
+   */
+  critical?: boolean
+}
+
+export interface ReconcilePublicEventFeedProjectionResult {
+  candidateEventCount: number
+  upsertedPublicCount: number
+  hiddenOrDeletedCount: number
+  errorCount: number
+  durationMs: number
+  status: "ok" | "error"
+  errorMessage?: string
 }
 
 interface EventRow {
@@ -264,36 +287,17 @@ export async function deleteOldPublicEventFeedItems(
 export async function schedulePublicEventFeedSync(
   db: DrizzleClient,
   eventId: string | null | undefined,
+  options?: SchedulePublicEventFeedSyncOptions,
 ): Promise<void> {
   if (!eventId) return
-  try {
-    const result = await syncPublicEventFeedForEvent(db, eventId)
-    console.info(
-      JSON.stringify({
-        event: "public_event_feed_sync",
-        eventId,
-        action: result.action,
-        isPublic: result.isPublic,
-        status: "ok",
-      }),
-    )
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.error(
-      JSON.stringify({
-        event: "public_event_feed_sync",
-        eventId,
-        status: "error",
-        errorMessage: message,
-      }),
-    )
-  }
+  await runPublicEventFeedSyncWithRetries(db, eventId, Boolean(options?.critical))
 }
 
 export async function schedulePublicEventFeedSyncForAsset(
   db: DrizzleClient,
   assetId: string,
   previousEventId?: string | null,
+  options?: SchedulePublicEventFeedSyncOptions,
 ): Promise<void> {
   const rows = await executeRows<{ event_id: string | null }>(
     db,
@@ -303,7 +307,161 @@ export async function schedulePublicEventFeedSyncForAsset(
   const eventIds = new Set<string>()
   if (previousEventId) eventIds.add(previousEventId)
   if (currentEventId) eventIds.add(currentEventId)
-  await Promise.all([...eventIds].map((id) => schedulePublicEventFeedSync(db, id)))
+  const critical = Boolean(options?.critical)
+  await Promise.all([...eventIds].map((id) => runPublicEventFeedSyncWithRetries(db, id, critical)))
+}
+
+/**
+ * Repairs `public_event_feed_items` when it lags behind real public-ready assets (e.g. post-publish sync missed).
+ * Intended for the daily Worker cron after age-based cleanup.
+ */
+export async function reconcilePublicEventFeedProjectionDrift(
+  db: DrizzleClient,
+  options?: { limit?: number },
+): Promise<ReconcilePublicEventFeedProjectionResult> {
+  const startedAt = Date.now()
+  const limit = Math.min(Math.max(options?.limit ?? 250, 1), 2000)
+  const half = Math.ceil(limit / 2)
+
+  try {
+    const hiddenButEligible = await executeRows<{ event_id: string }>(
+      db,
+      sql`
+        select distinct f.event_id::text as event_id
+        from public_event_feed_items f
+        inner join photo_events pe on pe.id = f.event_id
+        where pe.status = 'ACTIVE'
+          and f.is_public = false
+          and exists (
+            select 1
+            from image_assets a
+            ${joinPublicCardDerivative("a", "card")}
+            where a.event_id = f.event_id
+              and ${publicAssetPredicate("a")}
+          )
+        limit ${half}
+      `,
+    )
+
+    const missingRowButEligible = await executeRows<{ event_id: string }>(
+      db,
+      sql`
+        select pe.id::text as event_id
+        from photo_events pe
+        where pe.status = 'ACTIVE'
+          and pe.created_at >= now() - (${PUBLIC_EVENT_FEED_WINDOW_DAYS}::int * interval '1 day')
+          and not exists (select 1 from public_event_feed_items f where f.event_id = pe.id)
+          and exists (
+            select 1
+            from image_assets a
+            ${joinPublicCardDerivative("a", "card")}
+            where a.event_id = pe.id
+              and ${publicAssetPredicate("a")}
+          )
+        limit ${half}
+      `,
+    )
+
+    const orderedIds: string[] = []
+    const seen = new Set<string>()
+    for (const row of [...hiddenButEligible, ...missingRowButEligible]) {
+      if (!row.event_id || seen.has(row.event_id)) continue
+      seen.add(row.event_id)
+      orderedIds.push(row.event_id)
+      if (orderedIds.length >= limit) break
+    }
+
+    let upsertedPublicCount = 0
+    let hiddenOrDeletedCount = 0
+    let errorCount = 0
+
+    for (const eventId of orderedIds) {
+      try {
+        const result = await syncPublicEventFeedForEvent(db, eventId)
+        if (result.action === "upserted" && result.isPublic) upsertedPublicCount += 1
+        else if (result.action === "hidden" || result.action === "deleted") hiddenOrDeletedCount += 1
+      } catch {
+        errorCount += 1
+      }
+    }
+
+    return {
+      candidateEventCount: orderedIds.length,
+      upsertedPublicCount,
+      hiddenOrDeletedCount,
+      errorCount,
+      durationMs: Date.now() - startedAt,
+      status: "ok",
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return {
+      candidateEventCount: 0,
+      upsertedPublicCount: 0,
+      hiddenOrDeletedCount: 0,
+      errorCount: 0,
+      durationMs: Date.now() - startedAt,
+      status: "error",
+      errorMessage: message,
+    }
+  }
+}
+
+async function runPublicEventFeedSyncWithRetries(
+  db: DrizzleClient,
+  eventId: string,
+  critical: boolean,
+): Promise<void> {
+  const maxAttempts = critical ? POST_PUBLISH_SYNC_ATTEMPTS : 1
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const result = await syncPublicEventFeedForEvent(db, eventId)
+      console.info(
+        JSON.stringify({
+          event: "public_event_feed_sync",
+          eventId,
+          action: result.action,
+          isPublic: result.isPublic,
+          status: "ok",
+          attempt,
+          maxAttempts,
+        }),
+      )
+      return
+    } catch (error) {
+      lastError = error
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(
+        JSON.stringify({
+          event: "public_event_feed_sync",
+          eventId,
+          status: "error",
+          attempt,
+          maxAttempts,
+          errorMessage: message,
+        }),
+      )
+      if (attempt < maxAttempts) await sleep(POST_PUBLISH_SYNC_BASE_DELAY_MS * attempt)
+    }
+  }
+
+  if (critical) {
+    const message = lastError instanceof Error ? lastError.message : String(lastError)
+    console.error(
+      JSON.stringify({
+        event: "public_event_feed_sync_post_publish_exhausted",
+        eventId,
+        errorMessage: message,
+        mitigation: "Daily reconcilePublicEventFeedProjectionDrift should repair projection rows",
+      }),
+    )
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 async function isEventWithinFeedWindow(

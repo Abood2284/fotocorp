@@ -1,33 +1,41 @@
 /**
  * Parses legacy-import Fotokey strings (FC + DD + MM + YY + sequence).
- * Sequence length varies in legacy data; new allocator keys use the same date prefix
- * with a minimum 3-digit sequence.
+ *
+ * Legacy sequence length varies:
+ * - FC0703191    -> sequence 1
+ * - FC08051427   -> sequence 27
+ * - FC180316154  -> sequence 154
+ *
+ * Canonical Fotokey output pads the sequence to a minimum of 3 digits:
+ * - FC0703191    -> FC070319001
+ * - FC08051427   -> FC080514027
+ * - FC180316154  -> FC180316154
  */
 export interface ParsedLegacyFotokey {
-  fotokey: string
-  fotokeyDate: string
-  fotokeySequence: number
+  fotokey: string;
+  fotokeyDate: string;
+  fotokeySequence: number;
 }
 
-const LEGACY_FOTOKEY_PATTERN = /^FC[0-9]{8,}$/i
+const LEGACY_FOTOKEY_PATTERN = /^FC(\d{2})(\d{2})(\d{2})(\d+)$/i;
 
 export function isLegacyImportFotokeyShape(value: string): boolean {
-  return LEGACY_FOTOKEY_PATTERN.test(value.trim())
+  return LEGACY_FOTOKEY_PATTERN.test(value.trim());
 }
 
-export function parseLegacyFotokeyCode(raw: string): ParsedLegacyFotokey | null {
-  const fotokey = raw.trim().toUpperCase()
-  if (!LEGACY_FOTOKEY_PATTERN.test(fotokey)) return null
+export function parseLegacyFotokeyCode(
+  raw: string,
+): ParsedLegacyFotokey | null {
+  const value = raw.trim().toUpperCase();
+  const match = LEGACY_FOTOKEY_PATTERN.exec(value);
+  if (!match) return null;
 
-  const digits = fotokey.slice(2)
-  const dateDigits = digits.slice(0, 6)
-  const sequenceDigits = digits.slice(6)
-  if (!sequenceDigits) return null
+  const [, dayDigits, monthDigits, yearDigits, sequenceDigits] = match;
 
-  const day = Number(dateDigits.slice(0, 2))
-  const month = Number(dateDigits.slice(2, 4))
-  const yearTwoDigit = Number(dateDigits.slice(4, 6))
-  const fotokeySequence = Number(sequenceDigits)
+  const day = Number(dayDigits);
+  const month = Number(monthDigits);
+  const yearTwoDigit = Number(yearDigits);
+  const fotokeySequence = Number(sequenceDigits);
 
   if (
     !Number.isInteger(day) ||
@@ -40,15 +48,29 @@ export function parseLegacyFotokeyCode(raw: string): ParsedLegacyFotokey | null 
     !Number.isInteger(fotokeySequence) ||
     fotokeySequence < 1
   ) {
-    return null
+    return null;
   }
 
-  const fullYear = yearTwoDigit <= 30 ? 2000 + yearTwoDigit : 1900 + yearTwoDigit
-  const fotokeyDate = `${fullYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+  const fullYear =
+    yearTwoDigit <= 30 ? 2000 + yearTwoDigit : 1900 + yearTwoDigit;
+  const fotokeyDate = `${fullYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-  const parsed = new Date(`${fotokeyDate}T12:00:00.000Z`)
-  if (Number.isNaN(parsed.getTime())) return null
-  if (parsed.getUTCDate() !== day || parsed.getUTCMonth() + 1 !== month) return null
+  const parsedDate = new Date(`${fotokeyDate}T12:00:00.000Z`);
+  if (Number.isNaN(parsedDate.getTime())) return null;
 
-  return { fotokey, fotokeyDate, fotokeySequence }
+  if (
+    parsedDate.getUTCDate() !== day ||
+    parsedDate.getUTCMonth() + 1 !== month ||
+    parsedDate.getUTCFullYear() !== fullYear
+  ) {
+    return null;
+  }
+
+  const fotokey = `FC${dayDigits}${monthDigits}${yearDigits}${String(fotokeySequence).padStart(3, "0")}`;
+
+  return {
+    fotokey,
+    fotokeyDate,
+    fotokeySequence,
+  };
 }

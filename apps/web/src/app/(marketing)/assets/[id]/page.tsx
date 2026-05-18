@@ -145,9 +145,9 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
           )}
         </div>
 
-        <div className="grid gap-7 lg:grid-cols-[minmax(0,1.62fr)_minmax(340px,0.58fr)] lg:items-start">
-          <section className="min-w-0 space-y-5">
-            <header className="space-y-3">
+        <div className="grid gap-7 lg:grid-cols-[minmax(0,1.62fr)_minmax(340px,0.58fr)] lg:items-stretch">
+          <section className="min-w-0 space-y-5 lg:flex lg:min-h-0 lg:flex-col lg:gap-5">
+            <header className="shrink-0 space-y-3">
               <h1 className="max-w-5xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl lg:text-[2.45rem] lg:leading-[1.08]">
                 {title}
               </h1>
@@ -158,15 +158,15 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               )}
             </header>
 
-            <figure className="overflow-hidden rounded-xl bg-surface-stone/40">
+            <figure className="overflow-hidden rounded-xl bg-surface-stone/40 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
               {preview ? (
-                <div className="flex w-full justify-center px-4 pb-2 pt-2 sm:px-5 sm:pb-3 sm:pt-2 lg:px-6 lg:pb-3 lg:pt-2">
+                <div className="flex w-full flex-col px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:px-6 lg:pb-6 lg:pt-2">
                   <AssetPreviewChrome
                     src={preview.url}
                     alt={getAssetAlt(asset)}
                     width={preview.width}
                     height={preview.height}
-                    className="block h-auto max-h-[86vh] w-auto max-w-full object-contain drop-shadow-2xl"
+                    className="block h-auto max-h-[86vh] w-auto max-w-full object-contain drop-shadow-2xl lg:max-h-full"
                     loading="eager"
                     whoIsInPicture={asset.whoIsInPicture}
                     fotokey={asset.fotokey ?? null}
@@ -279,54 +279,70 @@ async function resolveAssetDetailAccessState(): Promise<AssetDetailAccessState> 
 
 async function getRelatedAssets(asset: PublicAsset) {
   const targetCount = 12
-  const deduped = new Map<string, PublicAsset>()
-  let primarySource: "event" | "category" | "photographer" | "archive" = "archive"
-  let totalCount: number | undefined
 
   if (asset.event?.id) {
     const eventResult = await listPublicAssets({ eventId: asset.event.id, limit: 20 }).catch(() => null)
-    const eventItems = eventResult?.items ?? []
-    const added = appendRelated(deduped, eventItems, asset.id, targetCount)
-    if (added > 0) {
-      primarySource = "event"
-      totalCount = eventResult?.totalCount
+    const items = collectRelatedItems(
+      eventResult?.items ?? [],
+      asset.id,
+      targetCount,
+      (item) => item.event?.id === asset.event?.id,
+    )
+    if (items.length > 0) {
+      return {
+        items,
+        label: relatedLabelForSource("event", asset),
+        browseHref: relatedBrowseHref("event", asset),
+        totalCount: eventResult?.totalCount,
+      }
     }
   }
 
-  if (deduped.size < targetCount && asset.category?.id) {
+  if (asset.category?.id) {
     const categoryResult = await listPublicAssets({ categoryId: asset.category.id, limit: 20 }).catch(() => null)
-    const categoryItems = categoryResult?.items ?? []
-    const added = appendRelated(deduped, categoryItems, asset.id, targetCount)
-    if (added > 0 && primarySource === "archive") {
-      primarySource = "category"
-      totalCount = categoryResult?.totalCount
+    const items = collectRelatedItems(categoryResult?.items ?? [], asset.id, targetCount)
+    if (items.length > 0) {
+      return {
+        items,
+        label: relatedLabelForSource("category", asset),
+        browseHref: relatedBrowseHref("category", asset),
+        totalCount: categoryResult?.totalCount,
+      }
     }
   }
 
-  if (deduped.size < targetCount && asset.contributor?.id) {
+  if (asset.contributor?.id) {
     const photographerResult = await listPublicAssets({ contributorId: asset.contributor.id, limit: 20 }).catch(() => null)
-    const photographerItems = photographerResult?.items ?? []
-    const added = appendRelated(deduped, photographerItems, asset.id, targetCount)
-    if (added > 0 && primarySource === "archive") {
-      primarySource = "photographer"
-      totalCount = photographerResult?.totalCount
+    const items = collectRelatedItems(photographerResult?.items ?? [], asset.id, targetCount)
+    if (items.length > 0) {
+      return {
+        items,
+        label: relatedLabelForSource("photographer", asset),
+        browseHref: relatedBrowseHref("photographer", asset),
+        totalCount: photographerResult?.totalCount,
+      }
     }
   }
 
-  if (deduped.size < targetCount) {
-    const newestItems = await listPublicAssets({ limit: 20, sort: "newest" })
-      .then((result) => result.items)
-      .catch(() => [])
-    appendRelated(deduped, newestItems, asset.id, targetCount)
-  }
-
-  const items = Array.from(deduped.values()).slice(0, targetCount)
+  const archiveResult = await listPublicAssets({ limit: 20, sort: "newest" }).catch(() => null)
+  const items = collectRelatedItems(archiveResult?.items ?? [], asset.id, targetCount)
   return {
     items,
-    label: relatedLabelForSource(primarySource, asset),
-    browseHref: relatedBrowseHref(primarySource, asset),
-    totalCount,
+    label: relatedLabelForSource("archive", asset),
+    browseHref: relatedBrowseHref("archive", asset),
+    totalCount: archiveResult?.totalCount,
   }
+}
+
+function collectRelatedItems(
+  candidates: PublicAsset[],
+  currentAssetId: string,
+  targetCount: number,
+  predicate?: (item: PublicAsset) => boolean,
+) {
+  const deduped = new Map<string, PublicAsset>()
+  appendRelated(deduped, candidates, currentAssetId, targetCount, predicate)
+  return Array.from(deduped.values()).slice(0, targetCount)
 }
 
 function formatRelatedCountLabel(totalCount: number | undefined) {
@@ -340,10 +356,12 @@ function appendRelated(
   candidates: PublicAsset[],
   currentAssetId: string,
   targetCount: number,
+  predicate?: (item: PublicAsset) => boolean,
 ) {
   let added = 0
   for (const item of candidates) {
     if (item.id === currentAssetId) continue
+    if (predicate && !predicate(item)) continue
     if (bucket.has(item.id)) continue
     bucket.set(item.id, item)
     added += 1

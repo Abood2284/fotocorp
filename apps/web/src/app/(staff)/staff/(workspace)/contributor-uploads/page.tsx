@@ -12,6 +12,8 @@ export const metadata = {
   title: "Contributor Uploads — Fotocorp",
 }
 
+export const dynamic = "force-dynamic"
+
 const STATUS_DEFAULT = "SUBMITTED"
 const LIMIT_DEFAULT = 24
 

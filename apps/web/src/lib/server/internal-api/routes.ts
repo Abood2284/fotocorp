@@ -60,6 +60,19 @@ export const internalApiRoutes = {
   adminContributorUploadBatchDetail: (batchId: string) =>
     `/api/v1/internal/admin/contributor-uploads/batches/${encodeURIComponent(batchId)}`,
 
+  adminStaffUploadWizardContributors: () => "/api/v1/internal/admin/staff-upload-wizard/contributors",
+  adminStaffUploadWizardAssetCategories: () => "/api/v1/internal/admin/staff-upload-wizard/asset-categories",
+  adminStaffUploadWizardEvents: () => "/api/v1/internal/admin/staff-upload-wizard/events",
+  adminStaffUploadWizardUploadBatches: () => "/api/v1/internal/admin/staff-upload-wizard/upload-batches",
+  adminStaffUploadWizardUploadBatchFiles: (batchId: string) =>
+    `/api/v1/internal/admin/staff-upload-wizard/upload-batches/${encodeURIComponent(batchId)}/files`,
+  adminStaffUploadWizardUploadBatchFileComplete: (batchId: string, itemId: string) =>
+    `/api/v1/internal/admin/staff-upload-wizard/upload-batches/${encodeURIComponent(batchId)}/files/${encodeURIComponent(itemId)}/complete`,
+  adminStaffUploadWizardUploadBatchSubmit: (batchId: string) =>
+    `/api/v1/internal/admin/staff-upload-wizard/upload-batches/${encodeURIComponent(batchId)}/submit`,
+  adminStaffUploadWizardUploadBatchAssetMetadata: (batchId: string, imageAssetId: string) =>
+    `/api/v1/internal/admin/staff-upload-wizard/upload-batches/${encodeURIComponent(batchId)}/assets/${encodeURIComponent(imageAssetId)}/metadata`,
+
   adminEvents: () => "/api/v1/internal/admin/events",
 
   adminEvent: (eventId: string) =>

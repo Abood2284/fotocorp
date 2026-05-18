@@ -223,6 +223,8 @@ export class ImagePublishProcessor {
       await schedulePublicEventFeedSyncForAsset(
         createHttpDb(this.jobsEnv.databaseUrl),
         item.imageAssetId,
+        undefined,
+        { critical: true },
       )
     }
 

@@ -1,9 +1,10 @@
 import Link from "next/link"
-import { ArrowRight, AlertTriangle } from "lucide-react"
+import { ArrowRight, AlertTriangle, Upload } from "lucide-react"
 import { getAdminAssetStats } from "@/lib/api/admin-assets-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EmptyState } from "@/components/shared/empty-state"
 import { staffNavItemsForRole } from "@/lib/staff/staff-navigation"
+import { staffRoleCanAccessPath } from "@/lib/staff/staff-route-access"
 import { requireStaff } from "@/lib/staff-session"
 
 export const metadata = {
@@ -28,11 +29,22 @@ export default async function StaffDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight">Dashboard</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Operational snapshot for assets, previews, and ingestion coverage.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Dashboard</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Operational snapshot for assets, previews, and ingestion coverage.
+          </p>
+        </div>
+        {staffRoleCanAccessPath(staff.role, "/staff/contributor-uploads/new") ? (
+          <Link
+            href="/staff/contributor-uploads/new"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+          >
+            <Upload className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            New upload
+          </Link>
+        ) : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

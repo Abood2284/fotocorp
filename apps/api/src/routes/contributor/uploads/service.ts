@@ -141,6 +141,92 @@ export async function createPhotographerUploadBatch(
   };
 }
 
+/** Staff/internal delegate: create an OPEN batch for `targetContributorId` (caller must enforce auth). */
+export async function staffDelegateCreatePhotographerUploadBatch(
+  db: DrizzleClient,
+  body: CreateUploadBatchBody & { targetContributorId: string },
+) {
+  const eventRows = await executeRows<EventCheckRow>(
+    db,
+    sql`
+      select id, status
+      from photo_events
+      where id = ${body.eventId}::uuid
+      limit 1
+    `,
+  );
+  const event = eventRows[0];
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found.");
+  if (event.status !== "ACTIVE") throw new AppError(400, "EVENT_NOT_ACTIVE", "Only ACTIVE events accept uploads.");
+
+  const accountRows = await executeRows<{ id: string }>(
+    db,
+    sql`
+      select id
+      from contributor_accounts
+      where contributor_id = ${body.targetContributorId}::uuid
+        and status = 'ACTIVE'
+      order by created_at asc
+      limit 1
+    `,
+  );
+  const accountId = accountRows[0]?.id;
+  if (!accountId) {
+    throw new AppError(
+      400,
+      "CONTRIBUTOR_ACCOUNT_REQUIRED",
+      "The selected photographer has no active portal account. They must sign in once before staff can upload on their behalf.",
+    );
+  }
+
+  const inserted = await executeRows<BatchRow>(
+    db,
+    sql`
+      insert into contributor_upload_batches (
+        contributor_id,
+        contributor_account_id,
+        event_id,
+        asset_type,
+        common_title,
+        common_caption,
+        common_keywords
+      )
+      values (
+        ${body.targetContributorId}::uuid,
+        ${accountId}::uuid,
+        ${body.eventId}::uuid,
+        ${body.assetType},
+        ${body.commonTitle ?? null},
+        ${body.commonCaption ?? null},
+        ${body.commonKeywords ?? null}
+      )
+      returning
+        id,
+        contributor_id,
+        contributor_account_id,
+        event_id,
+        status,
+        asset_type,
+        common_title,
+        common_caption,
+        common_keywords,
+        total_files,
+        uploaded_files,
+        failed_files,
+        submitted_at,
+        created_at,
+        updated_at
+    `,
+  );
+  const batch = inserted[0];
+  if (!batch) throw new AppError(500, "BATCH_CREATE_FAILED", "Could not create upload batch.");
+
+  return {
+    ok: true as const,
+    batch: mapBatch(batch),
+  };
+}
+
 export async function listPhotographerUploadBatches(
   db: DrizzleClient,
   session: ContributorSessionResult,
@@ -325,8 +411,28 @@ export async function preparePhotographerUploadFiles(
   body: PrepareUploadFilesBody,
 ) {
   const batch = await requireOpenBatchForPhotographer(db, session, batchId);
-  const photographerId = session.contributor.id;
-  const accountId = session.account.id;
+  return preparePhotographerUploadFilesCore(db, env, batch, body);
+}
+
+/** Internal/staff delegate: open batch without contributor session (caller must enforce auth). */
+export async function staffDelegatePreparePhotographerUploadFiles(
+  db: DrizzleClient,
+  env: Env,
+  batchId: string,
+  body: PrepareUploadFilesBody,
+) {
+  const batch = await requireOpenBatchById(db, batchId);
+  return preparePhotographerUploadFilesCore(db, env, batch, body);
+}
+
+async function preparePhotographerUploadFilesCore(
+  db: DrizzleClient,
+  env: Env,
+  batch: BatchRow,
+  body: PrepareUploadFilesBody,
+) {
+  const photographerId = batch.contributor_id;
+  const accountId = batch.contributor_account_id;
 
   const items: Array<{
     itemId: string;
@@ -429,7 +535,29 @@ export async function completePhotographerUploadItem(
   batchId: string,
   itemId: string,
 ) {
-  const photographerId = session.contributor.id;
+  const batch = await requireOpenBatchForPhotographer(db, session, batchId);
+  return completePhotographerUploadItemCore(db, env, batch, itemId);
+}
+
+/** Internal/staff delegate: complete item for an open batch (caller must enforce auth). */
+export async function staffDelegateCompletePhotographerUploadItem(
+  db: DrizzleClient,
+  env: Env,
+  batchId: string,
+  itemId: string,
+) {
+  const batch = await requireOpenBatchById(db, batchId);
+  return completePhotographerUploadItemCore(db, env, batch, itemId);
+}
+
+async function completePhotographerUploadItemCore(
+  db: DrizzleClient,
+  env: Env,
+  batch: BatchRow,
+  itemId: string,
+) {
+  const batchId = batch.id;
+  const photographerId = batch.contributor_id;
   const rows = await executeRows<CompleteUploadItemRow>(
     db,
     sql`
@@ -605,34 +733,19 @@ export async function completePhotographerUploadItem(
 }
 
 export async function submitPhotographerUploadBatch(db: DrizzleClient, session: ContributorSessionResult, batchId: string) {
-  const photographerId = session.contributor.id;
-  const batchRows = await executeRows<BatchRow>(
-    db,
-    sql`
-      select
-        id,
-        contributor_id,
-        contributor_account_id,
-        event_id,
-        status,
-        asset_type,
-        common_title,
-        common_caption,
-        common_keywords,
-        total_files,
-        uploaded_files,
-        failed_files,
-        submitted_at,
-        created_at,
-        updated_at
-      from contributor_upload_batches
-      where id = ${batchId}::uuid
-        and contributor_id = ${photographerId}::uuid
-      limit 1
-    `,
-  );
-  const batch = batchRows[0];
-  if (!batch) throw new AppError(404, "UPLOAD_BATCH_NOT_FOUND", "Upload batch was not found.");
+  const batch = await requireOpenBatchForPhotographer(db, session, batchId);
+  return submitPhotographerUploadBatchCore(db, batch);
+}
+
+/** Internal/staff delegate (caller must enforce auth). */
+export async function staffDelegateSubmitPhotographerUploadBatch(db: DrizzleClient, batchId: string) {
+  const batch = await requireOpenBatchById(db, batchId);
+  return submitPhotographerUploadBatchCore(db, batch);
+}
+
+async function submitPhotographerUploadBatchCore(db: DrizzleClient, batch: BatchRow) {
+  const batchId = batch.id;
+  const photographerId = batch.contributor_id;
 
   if (batch.status === "SUBMITTED" || batch.status === "COMPLETED") {
     return {
@@ -746,6 +859,37 @@ async function requireOpenBatchForPhotographer(db: DrizzleClient, session: Contr
   return batch;
 }
 
+async function requireOpenBatchById(db: DrizzleClient, batchId: string): Promise<BatchRow> {
+  const rows = await executeRows<BatchRow>(
+    db,
+    sql`
+      select
+        id,
+        contributor_id,
+        contributor_account_id,
+        event_id,
+        status,
+        asset_type,
+        common_title,
+        common_caption,
+        common_keywords,
+        total_files,
+        uploaded_files,
+        failed_files,
+        submitted_at,
+        created_at,
+        updated_at
+      from contributor_upload_batches
+      where id = ${batchId}::uuid
+      limit 1
+    `,
+  );
+  const batch = rows[0];
+  if (!batch) throw new AppError(404, "UPLOAD_BATCH_NOT_FOUND", "Upload batch was not found.");
+  if (batch.status !== "OPEN") throw new AppError(400, "UPLOAD_BATCH_NOT_OPEN", "The batch is not open for new upload instructions.");
+  return batch;
+}
+
 export async function patchPhotographerUploadAssetMetadata(
   db: DrizzleClient,
   session: ContributorSessionResult,
@@ -753,8 +897,29 @@ export async function patchPhotographerUploadAssetMetadata(
   imageAssetId: string,
   body: PatchUploadAssetMetadataBody,
 ) {
-  const photographerId = session.contributor.id;
   const batch = await requireOpenBatchForPhotographer(db, session, batchId);
+  return patchPhotographerUploadAssetMetadataCore(db, batch, imageAssetId, body);
+}
+
+/** Internal/staff delegate (caller must enforce auth). */
+export async function staffDelegatePatchPhotographerUploadAssetMetadata(
+  db: DrizzleClient,
+  batchId: string,
+  imageAssetId: string,
+  body: PatchUploadAssetMetadataBody,
+) {
+  const batch = await requireOpenBatchById(db, batchId);
+  return patchPhotographerUploadAssetMetadataCore(db, batch, imageAssetId, body);
+}
+
+async function patchPhotographerUploadAssetMetadataCore(
+  db: DrizzleClient,
+  batch: BatchRow,
+  imageAssetId: string,
+  body: PatchUploadAssetMetadataBody,
+) {
+  const photographerId = batch.contributor_id;
+  const batchId = batch.id;
 
   const linkRows = await executeRows<{ id: string }>(
     db,

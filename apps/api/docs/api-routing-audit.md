@@ -287,3 +287,18 @@ Implementation: `apps/api/src/routes/contributor/uploads/route.ts` + `service.ts
 | `GET` | `/api/v1/internal/admin/contributor-uploads/batches/:batchId` | Batch detail + items. |
 
 Implementation: `apps/api/src/routes/internal/admin-contributor-uploads/route.ts` + `service.ts` + `validators.ts`. Same-origin web BFF: `apps/web/src/app/api/staff/contributor-uploads/*` (approve, reject, `[imageAssetId]/metadata`, `replace-presign`, `replace-complete`).
+
+## Internal admin — staff upload wizard (delegated contributor batches)
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/api/v1/internal/admin/staff-upload-wizard/contributors` | Active photographers for staff picker (`q`, `limit`). |
+| `GET` | `/api/v1/internal/admin/staff-upload-wizard/asset-categories` | Same category list as contributor catalog. |
+| `POST` | `/api/v1/internal/admin/staff-upload-wizard/events` | Create `photo_events` row as staff delegate (`targetContributorId`, `eventDate` required). |
+| `POST` | `/api/v1/internal/admin/staff-upload-wizard/upload-batches` | Create `contributor_upload_batches` for `targetContributorId` + primary active `contributor_accounts` row. |
+| `POST` | `/api/v1/internal/admin/staff-upload-wizard/upload-batches/:batchId/files` | Prepare JPEG uploads (same as contributor prepare). |
+| `POST` | `/api/v1/internal/admin/staff-upload-wizard/upload-batches/:batchId/files/:itemId/complete` | Complete item. |
+| `POST` | `/api/v1/internal/admin/staff-upload-wizard/upload-batches/:batchId/submit` | Submit batch. |
+| `PATCH` | `/api/v1/internal/admin/staff-upload-wizard/upload-batches/:batchId/assets/:imageAssetId/metadata` | Metadata patch on open batch. |
+
+Implementation: `apps/api/src/routes/internal/admin-staff-upload-wizard/route.ts` + `service.ts` + `validators.ts`; reuses `staffDelegate*` helpers in `contributor/uploads/service.ts`. Web BFF: `apps/web/src/app/api/staff/upload-wizard/*` (staff session + same roles as contributor upload review).

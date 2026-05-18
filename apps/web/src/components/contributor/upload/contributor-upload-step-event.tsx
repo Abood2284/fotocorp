@@ -18,6 +18,8 @@ interface ContributorUploadStepEventProps {
   categories: ContributorAssetCategoryDto[]
   contributors: ContributorPortalContributorDto[]
   isPortalAdmin: boolean
+  /** Staff wizard: photographer dropdown always required; session only used for non-staff fallback label */
+  staffMode?: boolean
   session: ContributorAuthResponse
   newEventName: string
   newCategoryId: string
@@ -39,6 +41,7 @@ export function ContributorUploadStepEvent({
   categories,
   contributors,
   isPortalAdmin,
+  staffMode = false,
   session,
   newEventName,
   newCategoryId,
@@ -52,11 +55,15 @@ export function ContributorUploadStepEvent({
   onTargetContributorIdChange,
   onChangeEvent,
 }: ContributorUploadStepEventProps) {
-  const photographerOptions = isPortalAdmin
+  const photographerOptions = staffMode
+    ? contributors
+    : isPortalAdmin
     ? contributors.length > 0
       ? contributors
       : [{ id: session.contributor.id, displayName: session.contributor.displayName, email: session.contributor.email }]
     : [{ id: session.contributor.id, displayName: session.contributor.displayName, email: session.contributor.email }]
+
+  const selectValue = staffMode ? targetContributorId : targetContributorId || session.contributor.id
 
   return (
     <ContributorUploadStepCard active={active} className="p-5 sm:p-6 md:p-7">
@@ -130,15 +137,16 @@ export function ContributorUploadStepEvent({
 
           <div className="space-y-2 sm:space-y-2.5">
             <label htmlFor="inline-photo" className={uploadFieldLabelClass}>
-              Photographer
+              Photographer{staffMode ? <span className="text-destructive"> *</span> : null}
             </label>
             <select
               id="inline-photo"
-              className={cn(uploadSelectClass, !isPortalAdmin && "bg-muted/40 text-foreground")}
-              value={targetContributorId || session.contributor.id}
-              disabled={createBusy || !isPortalAdmin}
+              className={cn(uploadSelectClass, !isPortalAdmin && !staffMode && "bg-muted/40 text-foreground")}
+              value={selectValue}
+              disabled={createBusy || (!staffMode && !isPortalAdmin)}
               onChange={(e) => onTargetContributorIdChange(e.target.value)}
             >
+              {staffMode ? <option value="">Select photographer…</option> : null}
               {photographerOptions.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.displayName}

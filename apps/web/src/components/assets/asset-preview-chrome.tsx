@@ -3,7 +3,6 @@
 import { HelpCircle, Plus } from "lucide-react"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { FotoboxSaveButton } from "@/components/assets/fotobox-save-button"
-import { cn } from "@/lib/utils"
 
 interface AssetPreviewChromeProps {
   src: string
@@ -31,23 +30,21 @@ export function AssetPreviewChrome({
   const peopleLabel = whoIsInPicture?.trim()
 
   return (
-    <div className="mx-auto flex w-fit max-w-full flex-col overflow-hidden rounded-xl shadow-sm">
-      <PreviewImage
-        src={src}
-        alt={alt}
-        width={width}
-        height={height}
-        className={className}
-        loading={loading}
-      />
+    <div className="flex h-full w-full max-w-full flex-col gap-3 lg:gap-4">
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <div className="overflow-hidden rounded-xl shadow-sm">
+          <PreviewImage
+            src={src}
+            alt={alt}
+            width={width}
+            height={height}
+            className={className}
+            loading={loading}
+          />
+        </div>
+      </div>
       <div
-        className={cn(
-          "flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2",
-          "border-t border-white/70 bg-white/45",
-          "bg-gradient-to-b from-white/40 via-white/65 to-white/85",
-          "px-4 pb-3 pt-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]",
-          "backdrop-blur-2xl backdrop-saturate-150",
-        )}
+        className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1 sm:px-0"
         aria-label="Image actions"
       >
         {peopleLabel ? (

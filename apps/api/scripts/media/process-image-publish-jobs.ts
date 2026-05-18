@@ -277,7 +277,9 @@ async function processSingleItem(pool: PgPool, r2: R2Config, item: JobItemRow): 
 
     const databaseUrl = process.env.DATABASE_URL;
     if (databaseUrl) {
-      await schedulePublicEventFeedSyncForAsset(createHttpDb(databaseUrl), item.image_asset_id);
+      await schedulePublicEventFeedSyncForAsset(createHttpDb(databaseUrl), item.image_asset_id, undefined, {
+        critical: true,
+      });
     }
 
     return true;

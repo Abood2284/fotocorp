@@ -225,22 +225,8 @@ export function StaffContributorUploadsClient({
     }
   }
 
-  function buildQuery(overrides: Partial<StaffContributorUploadsClientProps["currentParams"]> = {}) {
-    const next = new URLSearchParams()
-    const merged = { ...currentParams, ...overrides }
-    if (merged.status && merged.status !== "SUBMITTED") next.set("status", merged.status)
-    if (merged.eventId) next.set("eventId", merged.eventId)
-    if (merged.contributorId) next.set("contributorId", merged.contributorId)
-    if (merged.batchId) next.set("batchId", merged.batchId)
-    if (merged.q) next.set("q", merged.q)
-    if (merged.from) next.set("from", merged.from)
-    if (merged.to) next.set("to", merged.to)
-    if (merged.assetType && merged.assetType !== "all") next.set("assetType", merged.assetType)
-    if (merged.sort) next.set("sort", merged.sort)
-    if (merged.order) next.set("order", merged.order)
-    if (merged.limit && merged.limit !== 24) next.set("limit", String(merged.limit))
-    if (merged.offset && merged.offset > 0) next.set("offset", String(merged.offset))
-    return next.toString()
+  function buildQuery(overrides: Partial<ContributorUploadsQueryParams> = {}) {
+    return contributorUploadsQueryToSearch(mergeContributorUploadsQuery(currentParams, overrides))
   }
 
   function hrefForSort(column: "submitted" | "contributor" | "event") {
@@ -551,7 +537,13 @@ export function StaffContributorUploadsClient({
             Review submitted contributor assets before publishing.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/staff/contributor-uploads/new">
+              <Upload className="mr-1.5 h-4 w-4" />
+              New upload
+            </Link>
+          </Button>
           <span className="relative inline-flex" title="Keyboard: Arrow keys move selection, Enter focuses detail">
             <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
             <span className="sr-only">Arrow keys change row, Enter focuses the detail panel</span>
@@ -1051,12 +1043,36 @@ function FilterBar({
   buildQuery,
 }: {
   filters: AdminCatalogFilters | null
-  currentParams: StaffContributorUploadsClientProps["currentParams"]
-  buildQuery: (overrides?: Partial<StaffContributorUploadsClientProps["currentParams"]>) => string
+  currentParams: ContributorUploadsQueryParams
+  buildQuery: (overrides?: Partial<ContributorUploadsQueryParams>) => string
 }) {
+  const router = useRouter()
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = event.currentTarget
+    const fd = new FormData(form)
+    const next = mergeContributorUploadsQuery(currentParams, {
+      status: parseFilterStatus(fd.get("status")),
+      assetType: parseFilterAssetType(fd.get("assetType")),
+      eventId: formValueToOptional(fd.get("eventId")),
+      contributorId: formValueToOptional(fd.get("contributorId")),
+      batchId: formValueToOptional(fd.get("batchId")),
+      q: formValueToOptional(fd.get("q")),
+      from: formValueToOptional(fd.get("from")),
+      to: formValueToOptional(fd.get("to")),
+      sort: parseFilterSort(fd.get("sort")),
+      order: parseFilterOrder(fd.get("order")),
+      offset: 0,
+    })
+    router.push(`/staff/contributor-uploads?${contributorUploadsQueryToSearch(next)}`)
+  }
+
   return (
     <form
+      action="/staff/contributor-uploads"
       method="get"
+      onSubmit={handleSubmit}
       className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card px-3 py-3"
     >
       <FilterField label="Status">
@@ -1158,7 +1174,7 @@ function FilterBar({
 
       <div className="flex items-center gap-2">
         <Button type="submit" size="sm" variant="outline">
-          Apply
+          Apply filters
         </Button>
         <Link
           href={`/staff/contributor-uploads?${buildQuery({
@@ -1192,15 +1208,86 @@ function FilterField({ label, children }: { label: string; children: React.React
   )
 }
 
+type ContributorUploadsQueryParams = StaffContributorUploadsClientProps["currentParams"]
+
+function mergeContributorUploadsQuery(
+  base: ContributorUploadsQueryParams,
+  overrides: Partial<ContributorUploadsQueryParams>,
+): ContributorUploadsQueryParams {
+  const next: ContributorUploadsQueryParams = { ...base }
+  for (const key of Object.keys(overrides) as (keyof ContributorUploadsQueryParams)[]) {
+    if (!(key in overrides)) continue
+    const value = overrides[key]
+    if (value === undefined) {
+      delete next[key]
+    } else {
+      next[key] = value as never
+    }
+  }
+  return next
+}
+
+function contributorUploadsQueryToSearch(params: ContributorUploadsQueryParams): string {
+  const next = new URLSearchParams()
+  if (params.status !== "SUBMITTED") next.set("status", params.status)
+  if (params.assetType && params.assetType !== "all") next.set("assetType", params.assetType)
+  if (params.eventId) next.set("eventId", params.eventId)
+  if (params.contributorId) next.set("contributorId", params.contributorId)
+  if (params.batchId) next.set("batchId", params.batchId)
+  if (params.q) next.set("q", params.q)
+  if (params.from) next.set("from", params.from)
+  if (params.to) next.set("to", params.to)
+  if (params.sort) next.set("sort", params.sort)
+  if (params.order) next.set("order", params.order)
+  if (params.limit !== 24) next.set("limit", String(params.limit))
+  if (params.offset > 0) next.set("offset", String(params.offset))
+  return next.toString()
+}
+
+function formValueToOptional(value: FormDataEntryValue | null): string | undefined {
+  if (typeof value !== "string") return undefined
+  const trimmed = value.trim()
+  return trimmed || undefined
+}
+
+function parseFilterStatus(value: FormDataEntryValue | null): ContributorUploadsQueryParams["status"] {
+  const raw = typeof value === "string" ? value : "SUBMITTED"
+  if (raw === "APPROVED" || raw === "ACTIVE" || raw === "all") return raw
+  return "SUBMITTED"
+}
+
+function parseFilterAssetType(
+  value: FormDataEntryValue | null,
+): ContributorUploadsQueryParams["assetType"] {
+  const raw = typeof value === "string" ? value : "all"
+  if (raw === "IMAGE" || raw === "VIDEO" || raw === "CARICATURE" || raw === "all") return raw
+  return "all"
+}
+
+function parseFilterSort(
+  value: FormDataEntryValue | null,
+): ContributorUploadsQueryParams["sort"] {
+  const raw = formValueToOptional(value)
+  if (raw === "submitted" || raw === "contributor" || raw === "event") return raw
+  return undefined
+}
+
+function parseFilterOrder(
+  value: FormDataEntryValue | null,
+): ContributorUploadsQueryParams["order"] {
+  const raw = formValueToOptional(value)
+  if (raw === "asc" || raw === "desc") return raw
+  return undefined
+}
+
 function ActiveFilterChips({
   currentParams,
   buildQuery,
 }: {
-  currentParams: StaffContributorUploadsClientProps["currentParams"]
-  buildQuery: (overrides?: Partial<StaffContributorUploadsClientProps["currentParams"]>) => string
+  currentParams: ContributorUploadsQueryParams
+  buildQuery: (overrides?: Partial<ContributorUploadsQueryParams>) => string
 }) {
-  const chips: Array<{ key: string; label: string; clear: Partial<StaffContributorUploadsClientProps["currentParams"]> }> =
-    []
+  const chips: Array<{ key: string; label: string; clear: Partial<ContributorUploadsQueryParams> }> = []
   if (currentParams.status !== "SUBMITTED") chips.push({ key: "status", label: `Status: ${currentParams.status}`, clear: { status: "SUBMITTED" } })
   if (currentParams.assetType && currentParams.assetType !== "all") chips.push({ key: "assetType", label: `Type: ${currentParams.assetType}`, clear: { assetType: "all" } })
   if (currentParams.eventId) chips.push({ key: "eventId", label: `Event: ${currentParams.eventId.slice(0, 8)}…`, clear: { eventId: undefined } })
