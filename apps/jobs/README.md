@@ -93,6 +93,7 @@ Operator-focused steps (Ubuntu, `/opt/fotocorp/app`, SSH-only firewall, logs, `r
 - `src/media/publishImageDerivatives.ts` — Sharp WebP **THUMB/CARD clean**, **DETAIL** watermarked; profiles aligned with `apps/api/scripts/media/process-image-publish-jobs.ts`.
 - `src/services/imagePublishJobService.ts` — publish job + item SQL (`claimNextPendingJob`, `markItemRunning`, `completeSuccessfulPublishItem`, `reconcilePublishJobAggregate`, failure helpers).
 - `src/services/imagePublishProcessor.ts` — orchestrates R2 reads/writes + DB promotion per claimed job.
+- `src/lib/public-event-feed-projection.ts` — post-publish `public_event_feed_items` sync (`pg`; Docker-safe, no `apps/api` import).
 - `src/workers/imagePublishWorker.ts` — one-iteration orchestration with the safety flag gate.
 
 ## Environment

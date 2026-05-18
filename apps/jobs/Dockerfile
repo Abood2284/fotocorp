@@ -12,6 +12,7 @@ RUN apt-get update \
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="${PNPM_HOME}:${PATH}"
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable && corepack prepare pnpm@10.33.1 --activate
 
 WORKDIR /app
