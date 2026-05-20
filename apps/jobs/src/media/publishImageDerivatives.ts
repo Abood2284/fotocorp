@@ -2,12 +2,8 @@
  * WebP preview derivatives for the publish pipeline.
  * Uses @fotocorp/media-preview (tiered protected previews for thumb/card/detail).
  */
-import {
-  decodePreviewSource,
-  generateProtectedPreview,
-  toLowerPreviewVariant,
-  type PreviewVariant,
-} from "@fotocorp/media-preview"
+import { toLowerPreviewVariant, type PreviewVariant } from "@fotocorp/media-preview/profiles"
+import { decodePreviewSource, generateProtectedPreview } from "@fotocorp/media-preview/generate"
 import { PREVIEW_KEY_PREFIX } from "../lib/r2Client"
 
 export type PublishVariant = "THUMB" | "CARD" | "DETAIL"

@@ -1,3 +1,6 @@
+/**
+ * Worker-safe watermark profiles (no Sharp). Do not import `@fotocorp/media-preview/generate` here.
+ */
 export {
   THUMB_LIGHT_PREVIEW_PROFILE,
   CARD_LIGHT_PREVIEW_PROFILE,
@@ -5,4 +8,4 @@ export {
   expectedWatermarkProfile,
   variantIsWatermarked,
   type PreviewVariant,
-} from "@fotocorp/media-preview"
+} from "@fotocorp/media-preview/profiles"

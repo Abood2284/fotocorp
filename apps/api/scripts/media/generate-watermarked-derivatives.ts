@@ -13,11 +13,10 @@ import {
   CARD_LIGHT_PREVIEW_PROFILE,
   DETAIL_PREVIEW_PROFILE,
   THUMB_LIGHT_PREVIEW_PROFILE,
-  decodePreviewSource,
   expectedWatermarkProfile,
-  generateProtectedPreview,
   variantIsWatermarked,
-} from "@fotocorp/media-preview";
+} from "@fotocorp/media-preview/profiles";
+import { decodePreviewSource, generateProtectedPreview } from "@fotocorp/media-preview/generate";
 import { createHttpDb } from "../../src/db/index.js";
 import { schedulePublicEventFeedSyncForAsset } from "../../src/lib/assets/public-event-feed-projection.js";
 

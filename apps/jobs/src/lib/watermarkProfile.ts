@@ -4,4 +4,4 @@ export {
   DETAIL_PREVIEW_PROFILE,
   expectedWatermarkProfile,
   variantIsWatermarked,
-} from "@fotocorp/media-preview"
+} from "@fotocorp/media-preview/profiles"

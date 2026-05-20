@@ -2,9 +2,11 @@
   "name": "@fotocorp/media-preview",
   "private": true,
   "type": "module",
-  "main": "src/index.ts",
+  "main": "./src/profiles.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/profiles.ts",
+    "./profiles": "./src/profiles.ts",
+    "./generate": "./src/generate.ts"
   },
   "dependencies": {
     "sharp": "^0.34.5"

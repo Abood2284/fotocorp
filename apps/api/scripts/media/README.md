@@ -7,7 +7,7 @@
 
 Original images are read by this Node script only. Public preview routes read derivatives from the Worker `PREVIEW_BUCKET` binding.
 
-Shared renderer: `@fotocorp/media-preview` (`packages/media-preview/`).
+Shared renderer: `@fotocorp/media-preview/generate` (Node only). Worker code uses `@fotocorp/media-preview/profiles` via `src/lib/media/watermark.ts` (no Sharp).
 
 ## Variants and watermarking
 

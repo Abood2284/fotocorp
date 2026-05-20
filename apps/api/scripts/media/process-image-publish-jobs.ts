@@ -33,12 +33,8 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import pg from "pg";
 import type { Pool as PgPool, QueryResultRow } from "pg";
-import {
-  decodePreviewSource,
-  expectedWatermarkProfile,
-  generateProtectedPreview,
-  variantIsWatermarked,
-} from "@fotocorp/media-preview";
+import { expectedWatermarkProfile, variantIsWatermarked } from "@fotocorp/media-preview/profiles";
+import { decodePreviewSource, generateProtectedPreview } from "@fotocorp/media-preview/generate";
 import { createHttpDb } from "../../src/db";
 import { schedulePublicEventFeedSyncForAsset } from "../../src/lib/assets/public-event-feed-projection";
 
