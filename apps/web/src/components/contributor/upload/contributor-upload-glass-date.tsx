@@ -34,7 +34,7 @@ export function ContributorUploadGlassDate({
         aria-hidden
       />
       <div className="relative flex items-center gap-2 px-3 py-1 sm:px-4">
-        <CalendarDays className="h-5 w-5 shrink-0 text-primary/80 sm:h-5 sm:w-5" aria-hidden />
+        <CalendarDays className="shrink-0 text-primary/80 sm:h-5 sm:w-5" aria-hidden size={20} />
         <Input
           id={id}
           type="date"

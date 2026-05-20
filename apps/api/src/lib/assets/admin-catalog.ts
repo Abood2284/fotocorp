@@ -1,4 +1,5 @@
 import { sql, type SQL } from "drizzle-orm";
+import type { Env } from "../../appTypes";
 import type { DrizzleClient } from "../../db";
 import { ASSET_AUDIT_ACTION } from "../audit/actions";
 import { AppError } from "../errors";
@@ -6,6 +7,7 @@ import {
   schedulePublicEventFeedSync,
   schedulePublicEventFeedSyncForAsset,
 } from "./public-event-feed-projection";
+import { scheduleTypesenseSyncForAsset } from "../search/typesense-public-asset-sync";
 import { createPreviewUrl } from "../media/preview-token";
 import { getR2Object } from "../r2";
 
@@ -265,6 +267,7 @@ export async function getInternalAdminAssetById(
 
 export async function updateInternalAdminAssetEditorial(
   db: DrizzleClient,
+  env: Env,
   assetId: string,
   payload: UpdateEditorialInput,
   actor: AdminActor,
@@ -311,11 +314,13 @@ export async function updateInternalAdminAssetEditorial(
   }
 
   await schedulePublicEventFeedSyncForAsset(db, assetId, previousEventId)
+  await scheduleTypesenseSyncForAsset(db, env, assetId, previousEventId)
   return getInternalAdminAssetById(db, assetId, secret, ttlSeconds);
 }
 
 export async function updateInternalAdminAssetPublish(
   db: DrizzleClient,
+  env: Env,
   assetId: string,
   payload: UpdatePublishInput,
   actor: AdminActor,
@@ -354,11 +359,13 @@ export async function updateInternalAdminAssetPublish(
   }
 
   await schedulePublicEventFeedSyncForAsset(db, assetId, before.event_id)
+  await scheduleTypesenseSyncForAsset(db, env, assetId, before.event_id)
   return getInternalAdminAssetById(db, assetId, secret, ttlSeconds);
 }
 
 export async function updateInternalAdminAssetEditorialBulk(
   db: DrizzleClient,
+  env: Env,
   assetIds: string[],
   payload: { categoryId?: string | null; eventId?: string | null },
   actor: AdminActor,
@@ -407,6 +414,7 @@ export async function updateInternalAdminAssetEditorialBulk(
       }
 
       await schedulePublicEventFeedSyncForAsset(db, assetId, previousEventId)
+      await scheduleTypesenseSyncForAsset(db, env, assetId, previousEventId)
     }
     
     const result = await getInternalAdminAssetById(db, assetId, secret, ttlSeconds).catch(() => null);
@@ -417,6 +425,7 @@ export async function updateInternalAdminAssetEditorialBulk(
 
 export async function updateInternalAdminAssetPublishBulk(
   db: DrizzleClient,
+  env: Env,
   assetIds: string[],
   payload: UpdatePublishInput,
   actor: AdminActor,
@@ -426,7 +435,7 @@ export async function updateInternalAdminAssetPublishBulk(
   const updatedAssets = [];
   for (const assetId of assetIds) {
     try {
-      const result = await updateInternalAdminAssetPublish(db, assetId, payload, actor, secret, ttlSeconds);
+      const result = await updateInternalAdminAssetPublish(db, env, assetId, payload, actor, secret, ttlSeconds);
       updatedAssets.push(result.asset);
     } catch {
       // skip errors on individual bulk operations

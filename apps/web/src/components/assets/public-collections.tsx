@@ -1,5 +1,6 @@
-import Link from "next/link"
 import { ArrowRight, Images } from "lucide-react"
+import Link from "next/link"
+
 import type { PublicAssetCollection } from "@/features/assets/types"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { EmptyState } from "@/components/shared/empty-state"
@@ -47,7 +48,7 @@ export function PublicCollections({ collections }: PublicCollectionsProps) {
                 {collection.assetCount.toLocaleString()} public images
               </p>
             </div>
-            <ArrowRight className="h-5 w-5 shrink-0 text-white/80 transition-transform group-hover:translate-x-1" />
+            <ArrowRight className="shrink-0 text-white/80 transition-transform group-hover:translate-x-1" size={20} />
           </div>
         </Link>
       ))}

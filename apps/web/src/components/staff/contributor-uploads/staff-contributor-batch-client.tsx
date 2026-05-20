@@ -1,9 +1,10 @@
 "use client"
 
+import { CheckCircle, ChevronLeft, Eye, FileImage, ImageOff, X } from "lucide-react"
 import { useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, FileImage, ImageOff, CheckCircle2, Eye, X } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import type {
   StaffContributorUploadBatchDetailResponse,
@@ -82,7 +83,7 @@ export function StaffContributorBatchClient({
           href="/staff/contributor-uploads"
           className="inline-flex items-center hover:text-foreground"
         >
-          <ChevronLeft className="h-4 w-4" /> Back to queue
+          <ChevronLeft size={16} /> Back to queue
         </Link>
       </div>
 
@@ -100,7 +101,7 @@ export function StaffContributorBatchClient({
             disabled={approvableItems.length === 0 || isApproving || isPending}
             onClick={() => approveIds(approvableItems.map((u) => u.imageAssetId))}
           >
-            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+            <CheckCircle className="mr-1.5" size={16} />
             {isApproving
               ? "Queueing…"
               : `Approve All Approvable (${approvableItems.length})`}
@@ -163,7 +164,7 @@ export function StaffContributorBatchClient({
         <h3 className="text-sm font-semibold">Uploaded Assets ({items.length})</h3>
         {items.length === 0 ? (
           <div className="rounded-lg border border-border bg-card px-6 py-12 text-center">
-            <ImageOff className="mx-auto h-8 w-8 text-muted-foreground" />
+            <ImageOff className="mx-auto  text-muted-foreground" size={32} />
             <h3 className="mt-3 text-sm font-medium">No assets found in this batch</h3>
           </div>
         ) : (
@@ -199,7 +200,7 @@ export function StaffContributorBatchClient({
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <FileImage className="h-4 w-4 text-muted-foreground" />
+                        <FileImage className="text-muted-foreground" size={16} />
                         <span className="font-medium">{item.originalFileName}</span>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -227,7 +228,7 @@ export function StaffContributorBatchClient({
                         onClick={() => setOpenModalFor(item)}
                         className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium hover:bg-muted"
                       >
-                        <Eye className="h-3.5 w-3.5" />
+                        <Eye size={14} />
                         Review
                       </button>
                     </td>
@@ -281,7 +282,7 @@ function ReviewModal({
             className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label="Close review"
           >
-            <X className="h-4 w-4" />
+            <X size={16} />
           </button>
         </header>
 
@@ -322,7 +323,7 @@ function ReviewModal({
               onClick={onApprove}
               disabled={!upload.canApprove || isApproving}
             >
-              <CheckCircle2 className="mr-1 h-4 w-4" />
+              <CheckCircle className="mr-1" size={16} />
               {isApproving
                 ? "Queueing…"
                 : upload.canApprove

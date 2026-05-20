@@ -1,9 +1,10 @@
 "use client"
 
+import { Download, Eye, Loader2, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { Download, Eye, Loader2, Trash2 } from "lucide-react"
+
 import { PreviewImage } from "@/components/assets/preview-image"
 import type { FotoboxItem } from "@/lib/api/account-api"
 import { formatDate } from "@/components/assets/public-asset-card"
@@ -54,7 +55,7 @@ export function FotoboxGrid({
                   href={`/assets/${item.assetId}`}
                   className="inline-flex h-9 items-center justify-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-muted"
                 >
-                  <Eye className="h-3.5 w-3.5" />
+                  <Eye size={14} />
                   View
                 </Link>
                 {isSubscriber ? (
@@ -62,7 +63,7 @@ export function FotoboxGrid({
                     href={`/api/assets/${item.assetId}/download?size=large`}
                     className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-primary px-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                   >
-                    <Download className="h-3.5 w-3.5" />
+                    <Download size={14} />
                     Large
                   </a>
                 ) : (
@@ -70,7 +71,7 @@ export function FotoboxGrid({
                     href="/account/subscription"
                     className="inline-flex h-9 items-center justify-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-muted-foreground hover:bg-muted"
                   >
-                    <Download className="h-3.5 w-3.5" />
+                    <Download size={14} />
                     Locked
                   </Link>
                 )}
@@ -81,7 +82,7 @@ export function FotoboxGrid({
                   aria-label="Remove image from Fotobox"
                   className="inline-flex h-9 items-center justify-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-60"
                 >
-                  {removing === item.assetId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  {removing === item.assetId ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
                   Remove
                 </button>
               </div>

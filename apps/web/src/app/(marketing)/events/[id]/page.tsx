@@ -1,5 +1,6 @@
-import Link from "next/link"
 import { ArrowRight } from "lucide-react"
+import Link from "next/link"
+
 import { getPublicAssetFilters, listPublicAssets } from "@/lib/api/fotocorp-api"
 import { formatDate } from "@/components/assets/public-asset-card"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
@@ -52,7 +53,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
           href={`/search?eventId=${encodeURIComponent(id)}`}
           className="inline-flex items-center gap-2 text-sm font-semibold text-foreground"
         >
-          Open in search <ArrowRight className="h-4 w-4" />
+          Open in search <ArrowRight size={16} />
         </Link>
       </div>
 

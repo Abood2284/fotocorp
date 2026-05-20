@@ -15,6 +15,10 @@ import {
 import type { DrizzleClient } from "../../db"
 import type { Env } from "../../appTypes"
 import { schedulePublicEventFeedSync } from "../assets/public-event-feed-projection"
+import {
+  scheduleTypesenseDeleteForEvent,
+  scheduleTypesenseSyncForEvent,
+} from "../search/typesense-public-asset-sync"
 
 export interface AdminEventListFilters {
   q?: string
@@ -114,6 +118,7 @@ export async function getInternalAdminEventById(db: DrizzleClient, eventId: stri
 
 export async function updateInternalAdminEvent(
   db: DrizzleClient,
+  env: Env,
   eventId: string,
   payload: Partial<typeof photoEvents.$inferInsert>
 ) {
@@ -128,6 +133,7 @@ export async function updateInternalAdminEvent(
 
   if (!updated) throw new AppError(404, "EVENT_NOT_FOUND", "Event not found.")
   await schedulePublicEventFeedSync(db, eventId)
+  await scheduleTypesenseSyncForEvent(db, env, eventId)
   return updated
 }
 
@@ -195,6 +201,8 @@ export async function purgeInternalAdminEvent(
     .where(eq(contributorUploadBatches.eventId, eventId))
 
   const contributorKeysToDelete = [...new Set(contributorUploadRowsForEvent.map((r: { storageKey: string }) => r.storageKey).filter(Boolean))] as string[]
+
+  await scheduleTypesenseDeleteForEvent(env, eventId)
 
   // neon-http (createHttpDb) rejects db.transaction(); use Neon's transactional HTTP batch instead.
   const deletes = [

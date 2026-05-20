@@ -1,3 +1,4 @@
+
 import { Download, Lock, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -20,7 +21,7 @@ export function GatedActionBlock({ accessLevel }: GatedActionBlockProps) {
         {isGated ? (
           <>
             <Badge variant="warning" className="w-fit">
-              <Lock className="h-3 w-3" />
+              <Lock size={12} />
               Free preview only
             </Badge>
             <p className="text-sm text-muted-foreground">
@@ -32,11 +33,11 @@ export function GatedActionBlock({ accessLevel }: GatedActionBlockProps) {
               disabled
               className="inline-flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-md border border-border bg-muted px-4 text-sm font-semibold text-muted-foreground"
             >
-              <Download className="h-4 w-4" />
+              <Download size={16} />
               Download original (locked)
             </button>
             <Button variant="accent" size="default" className="w-full">
-              <Sparkles className="h-4 w-4" />
+              <Sparkles size={16} />
               Upgrade to unlock original
             </Button>
           </>
@@ -52,7 +53,7 @@ export function GatedActionBlock({ accessLevel }: GatedActionBlockProps) {
               disabled
               className="inline-flex h-10 w-full cursor-not-allowed items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground opacity-70"
             >
-              <Download className="h-4 w-4" />
+              <Download size={16} />
               Download original (coming soon)
             </button>
           </>

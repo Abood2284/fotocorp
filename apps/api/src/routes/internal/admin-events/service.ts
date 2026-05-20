@@ -28,7 +28,7 @@ export async function getAdminEventByIdService(env: Env, eventId: string) {
 }
 
 export async function updateAdminEventService(env: Env, eventId: string, payload: any) {
-  return json(await updateInternalAdminEvent(db(env), eventId, payload))
+  return json(await updateInternalAdminEvent(db(env), env, eventId, payload))
 }
 
 export async function purgeAdminEventService(

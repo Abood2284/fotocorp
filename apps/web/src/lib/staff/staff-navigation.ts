@@ -1,19 +1,7 @@
-import type { LucideIcon } from "lucide-react"
-import {
-  Images,
-  Inbox,
-  LayoutDashboard,
-  Mail,
-  ShieldCheck,
-  Subtitles,
-  Users,
-  Workflow,
-  Database,
-  Gauge,
-  UserCog,
-  Calendar,
-} from "lucide-react"
+
 import type { StaffRole } from "@/lib/staff/staff-route-access"
+import { Images, ClosedCaption, Database, Gauge, Calendar, LayoutDashboard, Inbox, MessageCircle, ShieldCheck, Users, ArrowRight } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
 export interface StaffNavItem {
   label: string
@@ -33,13 +21,13 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
   {
     label: "Uploads",
     href: "/staff/contributor-uploads",
-    icon: Inbox,
+        icon: Inbox,
     roles: ["SUPER_ADMIN", "CATALOG_MANAGER", "REVIEWER"],
   },
   {
     label: "Inquiries",
     href: "/staff/access-inquiries",
-    icon: Mail,
+    icon: MessageCircle,
     roles: ["SUPER_ADMIN", "SUPPORT", "FINANCE"],
   },
   {
@@ -57,7 +45,7 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
   {
     label: "Captions",
     href: "/staff/captions",
-    icon: Subtitles,
+    icon: ClosedCaption,
     roles: ["SUPER_ADMIN", "CAPTION_MANAGER"],
   },
   {
@@ -69,7 +57,7 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
   {
     label: "Ingestion",
     href: "/staff/ingestion",
-    icon: Workflow,
+    icon: ArrowRight,
     roles: ["SUPER_ADMIN"],
   },
   {
@@ -93,7 +81,7 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
   {
     label: "Staff",
     href: "/staff/staff-users",
-    icon: UserCog,
+    icon: Users,
     roles: ["SUPER_ADMIN"],
   },
 ]

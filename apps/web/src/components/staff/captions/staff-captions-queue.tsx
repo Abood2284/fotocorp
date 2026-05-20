@@ -1,8 +1,9 @@
 "use client"
 
+import { AlertCircle, Calendar, Folder, Type } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import { AlertCircle, Calendar, Folder, Type } from "lucide-react"
+
 import type { AdminCatalogAssetItem } from "@/features/assets/admin-catalog-types"
 import { Button } from "@/components/ui/button"
 
@@ -71,17 +72,17 @@ export function StaffCaptionsQueue({ assets, selectedId, onSelect, nextCursor }:
                 <div className="flex items-center gap-1.5 mt-1">
                   {(isMissingTitle || isMissingCaption) && (
                     <div title="Missing Title or Caption" className="text-destructive">
-                      <Type className="h-3.5 w-3.5" />
+                      <Type size={14} />
                     </div>
                   )}
                   {isMissingEvent && (
                     <div title="No Event" className="text-amber-500">
-                      <Calendar className="h-3.5 w-3.5" />
+                      <Calendar size={14} />
                     </div>
                   )}
                   {isMissingCategory && (
                     <div title="No Category" className="text-amber-500">
-                      <Folder className="h-3.5 w-3.5" />
+                      <Folder size={14} />
                     </div>
                   )}
                   {(!isMissingTitle && !isMissingCaption && !isMissingEvent && !isMissingCategory) && (

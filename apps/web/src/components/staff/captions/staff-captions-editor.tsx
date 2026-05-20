@@ -1,8 +1,9 @@
 "use client"
 
+import { ExternalLink, Check, ChevronLeft, ChevronRight } from "lucide-react"
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import { ExternalLink, Check, ChevronLeft, ChevronRight } from "lucide-react"
+
 import type { AdminCatalogAssetItem, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -81,16 +82,16 @@ export function StaffCaptionsEditor({ asset, filters, onSaveAndNext, onSkip, onP
       <div className="flex items-center justify-between p-4 border-b">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={onPrevious} disabled={isFirst}>
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft size={16} />
           </Button>
           <Button variant="outline" size="icon" onClick={onSkip} disabled={isLast}>
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRight size={16} />
           </Button>
           <span className="text-sm font-medium ml-2 text-muted-foreground">
             {asset.legacyImageCode || asset.id}
           </span>
           <a href={`/staff/catalog?q=${asset.id}`} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground">
-            <ExternalLink className="h-4 w-4" />
+            <ExternalLink size={16} />
           </a>
         </div>
         <div className="flex gap-2">
@@ -206,7 +207,7 @@ export function StaffCaptionsEditor({ asset, filters, onSaveAndNext, onSkip, onP
             <div className="pt-4 flex items-center justify-end gap-3 border-t">
               {justSaved && (
                 <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
-                  <Check className="h-4 w-4" /> Saved
+                  <Check size={16} /> Saved
                 </span>
               )}
               <Button type="submit" name="save" variant="secondary" disabled={isSaving}>

@@ -1,5 +1,6 @@
-import Link from "next/link"
 import { Image as ImageIcon } from "lucide-react"
+import Link from "next/link"
+
 import { PreviewImage } from "@/components/assets/preview-image"
 import type { PublicEvent } from "@/features/assets/types"
 
@@ -32,7 +33,7 @@ export function PublicEventsGrid({ events }: PublicEventsGridProps) {
           
           {event.assetCount > 0 && (
             <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-sm bg-black/50 px-2 py-1 text-[13px] font-medium text-white backdrop-blur-md">
-              <ImageIcon className="h-4 w-4" strokeWidth={2} />
+              <ImageIcon  strokeWidth={2} size={16} />
               <span>{event.assetCount} {event.assetCount === 1 ? 'image' : 'images'}</span>
             </div>
           )}

@@ -1,5 +1,6 @@
 "use client"
 
+import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -37,7 +38,6 @@ import {
 import type { MetadataDraft } from "@/components/contributor/upload/contributor-upload-metadata-item"
 import { keywordsToTags, normalizeWhoIsInPicture, tagsToKeywords } from "@/lib/contributor-upload-metadata"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
 
 function portalRoleOf(session: ContributorAuthResponse) {
   return session.account.portalRole ?? "STANDARD"
@@ -485,7 +485,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
               >
                 {submitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2  animate-spin" size={16} />
                     Submitting…
                   </>
                 ) : (
@@ -569,7 +569,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
                 >
                   {createBusy ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2  animate-spin" size={16} />
                       Creating…
                     </>
                   ) : eventCreated ? (
@@ -588,7 +588,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
                 >
                   {phase === "running" ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2  animate-spin" size={16} />
                       Uploading…
                     </>
                   ) : (

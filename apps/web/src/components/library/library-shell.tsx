@@ -1,7 +1,8 @@
 "use client"
 
-import Link from "next/link"
 import { Download, Heart, CalendarDays, BadgeCheck } from "lucide-react"
+import Link from "next/link"
+
 import { useMockSession } from "@/features/session/mock-session-provider"
 import { EntitlementBanner } from "@/components/entitlement/entitlement-banner"
 import { EntitlementCtaBlock } from "@/components/entitlement/entitlement-cta-block"
@@ -57,7 +58,7 @@ export function LibraryShell({ mode }: LibraryShellProps) {
                           <p className="text-xs text-muted-foreground">{item.license} license</p>
                         </div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <CalendarDays className="h-3.5 w-3.5" />
+                          <CalendarDays size={14} />
                           {item.downloadedAt}
                         </div>
                       </div>
@@ -82,7 +83,7 @@ export function LibraryShell({ mode }: LibraryShellProps) {
                   Total downloaded: <span className="font-medium text-foreground">{downloads.length}</span>
                 </p>
                 <Link href="/favorites" className="inline-flex items-center gap-1 text-primary hover:underline">
-                  <Heart className="h-3.5 w-3.5" />
+                  <Heart size={14} />
                   View favorites
                 </Link>
               </CardContent>
@@ -119,7 +120,7 @@ export function LibraryShell({ mode }: LibraryShellProps) {
                 <span className="font-semibold text-foreground">{favorites.length}</span> saved assets
               </p>
               <Badge variant="secondary">
-                <BadgeCheck className="h-3.5 w-3.5" />
+                <BadgeCheck size={14} />
                 Synced in mock session
               </Badge>
             </div>

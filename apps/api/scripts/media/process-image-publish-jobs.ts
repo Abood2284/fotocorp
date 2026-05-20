@@ -36,7 +36,9 @@ import type { Pool as PgPool, QueryResultRow } from "pg";
 import { expectedWatermarkProfile, variantIsWatermarked } from "@fotocorp/media-preview/profiles";
 import { decodePreviewSource, generateProtectedPreview } from "@fotocorp/media-preview/generate";
 import { createHttpDb } from "../../src/db";
+import type { Env } from "../../src/appTypes";
 import { schedulePublicEventFeedSyncForAsset } from "../../src/lib/assets/public-event-feed-projection";
+import { scheduleTypesenseSyncForAsset } from "../../src/lib/search/typesense-public-asset-sync";
 
 type Variant = "THUMB" | "CARD" | "DETAIL";
 type DerivativeStatus = "READY" | "STALE" | "FAILED";
@@ -261,7 +263,12 @@ async function processSingleItem(pool: PgPool, r2: R2Config, item: JobItemRow): 
 
     const databaseUrl = process.env.DATABASE_URL;
     if (databaseUrl) {
-      await schedulePublicEventFeedSyncForAsset(createHttpDb(databaseUrl), item.image_asset_id, undefined, {
+      const db = createHttpDb(databaseUrl);
+      const workerEnv = process.env as Env;
+      await schedulePublicEventFeedSyncForAsset(db, item.image_asset_id, undefined, {
+        critical: true,
+      });
+      await scheduleTypesenseSyncForAsset(db, workerEnv, item.image_asset_id, undefined, {
         critical: true,
       });
     }

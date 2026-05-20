@@ -29,6 +29,7 @@ import {
 import type { ClaimedPublishJob, PublishJobItemRow } from "./imagePublishJobService"
 import { ImagePublishJobService } from "./imagePublishJobService"
 import { schedulePublicEventFeedSyncForAsset } from "../lib/public-event-feed-projection"
+import { notifyTypesenseSyncAsset } from "../lib/typesense-sync-client"
 
 function guessOriginalContentType(canonicalKey: string): string {
   const lower = canonicalKey.toLowerCase()
@@ -218,6 +219,13 @@ export class ImagePublishProcessor {
         critical: true,
       })
     }
+
+    await notifyTypesenseSyncAsset({
+      apiBaseUrl: this.jobsEnv.fotocorpApiBaseUrl,
+      internalSecret: this.jobsEnv.internalApiSecret,
+      assetId: item.imageAssetId,
+      critical: true,
+    })
 
     console.log("[fotocorp-jobs.publish-item-complete]", {
       itemId: item.id,

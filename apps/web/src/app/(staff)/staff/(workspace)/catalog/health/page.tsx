@@ -1,4 +1,5 @@
-import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react"
+
+import { AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 import { getAdminCatalogStats } from "@/lib/api/admin-catalog-api"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -46,7 +47,7 @@ export default async function AdminCatalogHealthPage() {
           <Card key={check.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">{check.label}</CardTitle>
-              {check.healthy ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <XCircle className="h-4 w-4 text-rose-600" />}
+              {check.healthy ? <CheckCircle className="text-emerald-600" size={16} /> : <XCircle className="text-rose-600" size={16} />}
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold">{check.value}</p>

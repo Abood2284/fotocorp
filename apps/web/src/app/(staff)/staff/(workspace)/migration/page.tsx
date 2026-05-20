@@ -1,5 +1,6 @@
+import { AlertTriangle, CheckCircle, Database, Files, RefreshCw, Search } from "lucide-react"
 import Link from "next/link"
-import { AlertTriangle, CheckCircle2, Database, Files, RefreshCw, SearchX } from "lucide-react"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getPgPool } from "@/lib/db"
 
@@ -37,7 +38,7 @@ export default async function AdminMigrationPage({ searchParams }: MigrationPage
         <Card>
           <CardContent className="p-8">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 text-muted-foreground" />
+              <AlertTriangle className="mt-0.5  text-muted-foreground" size={20} />
               <div>
                 <p className="font-medium">Migration tables are not available yet.</p>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -101,8 +102,8 @@ function SelectFilter({ label, name, value, options }: SelectFilterProps) {
 function SummaryCards({ summary }: { summary: MigrationSummary }) {
   const cards = [
     { label: "Total assets imported", value: summary.totalAssetsImported, icon: Files },
-    { label: "R2 matched", value: summary.r2Matched, icon: CheckCircle2 },
-    { label: "R2 missing", value: summary.r2Missing, icon: SearchX },
+    { label: "R2 matched", value: summary.r2Matched, icon: CheckCircle },
+    { label: "R2 missing", value: summary.r2Missing, icon: Search },
     { label: "Public approved assets", value: summary.publicApprovedAssets, icon: Database },
     { label: "Duplicate imagecode issues", value: summary.duplicateImagecodeIssues, icon: AlertTriangle },
     { label: "Missing event issues", value: summary.missingEventIssues, icon: AlertTriangle },
@@ -205,6 +206,7 @@ function IssuesTable({ issues }: { issues: ImportIssueRow[] }) {
           </div>
         ) : (
           <EmptyState>No import issues match the current filters.</EmptyState>
+
         )}
       </CardContent>
     </Card>

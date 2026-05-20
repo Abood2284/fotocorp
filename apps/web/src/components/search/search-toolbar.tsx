@@ -1,6 +1,6 @@
 "use client"
 
-import { Grid2X2, List, SlidersHorizontal } from "lucide-react"
+import { LayoutGrid, List, SlidersHorizontal } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { AssetSort, AssetViewMode } from "@/features/assets/filter-utils"
@@ -45,7 +45,7 @@ export function SearchToolbar({
           className="md:hidden"
           onClick={onMobileFilterOpen}
         >
-          <SlidersHorizontal className="h-3.5 w-3.5" />
+          <SlidersHorizontal size={14} />
           Filters
         </Button>
 
@@ -72,7 +72,7 @@ export function SearchToolbar({
             className={`rounded p-1.5 transition-colors ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             aria-label="Grid view"
           >
-            <Grid2X2 className="h-3.5 w-3.5" />
+            <LayoutGrid size={14} />
           </button>
           <button
             type="button"
@@ -80,7 +80,7 @@ export function SearchToolbar({
             className={`rounded p-1.5 transition-colors ${viewMode === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
             aria-label="List view"
           >
-            <List className="h-3.5 w-3.5" />
+            <List size={14} />
           </button>
         </div>
       </div>

@@ -1,3 +1,4 @@
+
 import { AlertTriangle } from "lucide-react"
 import { EmptyState } from "@/components/shared/empty-state"
 import { getAdminMediaPipelineStatus } from "@/lib/api/admin-catalog-api"
@@ -141,6 +142,7 @@ export default async function StaffMediaPipelinePage() {
         <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
           <li><code>pnpm --dir apps/api media:pipeline-status</code></li>
           <li><code>pnpm --dir apps/api legacy:import -- --only assets --skip-r2-check --limit 10000 --batch-size 1000</code></li>
+
           <li><code>pnpm --dir apps/api media:verify-r2-originals -- --limit 10000 --batch-size 500 --concurrency 20</code></li>
           <li><code>pnpm --dir apps/api media:generate-derivatives -- --scope all-verified --dry-run --limit 200</code></li>
           <li><code>pnpm --dir apps/api media:generate-derivatives -- --scope all-verified --limit 200 --batch-size 50 --concurrency 4</code></li>

@@ -1,18 +1,10 @@
 "use client"
 
+import { CalendarDays, Camera, ChevronDown, Key, LayoutGrid, LogOut, CloudUpload, UserRound } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import {
-  CalendarDays,
-  Camera,
-  ChevronDown,
-  KeyRound,
-  LayoutDashboard,
-  LogOut,
-  UploadCloud,
-  UserRound,
-  type LucideIcon,
-} from "lucide-react"
+
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { logoutContributor, type ContributorAuthResponse } from "@/lib/api/contributor-api"
 import { cn } from "@/lib/utils"
@@ -23,18 +15,18 @@ const navLinks: {
   icon: LucideIcon
   activePrefix?: string
 }[] = [
-  { label: "Dashboard", href: "/contributor/dashboard", icon: LayoutDashboard },
+  { label: "Dashboard", href: "/contributor/dashboard", icon: LayoutGrid },
   {
     label: "Uploads",
     href: "/contributor/uploads",
-    icon: UploadCloud,
+    icon: CloudUpload,
     activePrefix: "/contributor/uploads",
   },
   { label: "Events", href: "/contributor/events", icon: CalendarDays, activePrefix: "/contributor/events" },
   {
     label: "Account",
     href: "/contributor/change-password",
-    icon: KeyRound,
+    icon: Key,
     activePrefix: "/contributor/change-password",
   },
 ]
@@ -79,9 +71,8 @@ function ContributorProfileMenu({
         </span>
         <span className="hidden truncate sm:inline">{session.contributor.displayName}</span>
         <ChevronDown
-          className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
-          aria-hidden
-        />
+          className={cn(" shrink-0 text-muted-foreground transition-transform", open &&"rotate-180")}
+          aria-hidden size={16} />
       </button>
       {open ? (
         <div
@@ -98,7 +89,7 @@ function ContributorProfileMenu({
             className="flex items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-muted"
             onClick={() => setOpen(false)}
           >
-            <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <Key className="shrink-0 text-muted-foreground" aria-hidden size={16} />
             Change password
           </Link>
           <button
@@ -110,7 +101,7 @@ function ContributorProfileMenu({
               void onLogout()
             }}
           >
-            <LogOut className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <LogOut className="shrink-0 text-muted-foreground" aria-hidden size={16} />
             Log out
           </button>
         </div>
@@ -185,7 +176,7 @@ export function ContributorShell({
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-14 items-center justify-between gap-3 sm:gap-4">
             <Link href="/contributor/dashboard" className="flex shrink-0 items-center gap-2.5">
-              <Camera className="h-5 w-5 text-accent" aria-hidden />
+              <Camera className="text-accent" aria-hidden size={20} />
               <span className="fc-brand text-lg font-semibold leading-none">
                 foto<span className="text-accent">corp</span>
               </span>

@@ -1,3 +1,4 @@
+
 import { AlertTriangle, ChevronLeft } from "lucide-react"
 import Link from "next/link"
 import { getStaffContributorUploadBatch } from "@/lib/api/staff-contributor-uploads-api"
@@ -26,7 +27,7 @@ export default async function AdminContributorBatchPage({ params }: AdminContrib
             href="/staff/contributor-uploads"
             className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground"
           >
-            <ChevronLeft className="mr-1 h-4 w-4" />
+            <ChevronLeft className="mr-1" size={16} />
             Back to queue
           </Link>
         </div>

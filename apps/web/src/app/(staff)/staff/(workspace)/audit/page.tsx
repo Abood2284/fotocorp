@@ -1,3 +1,4 @@
+
 import { ShieldCheck } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -20,7 +21,7 @@ export default function AdminAuditPage() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
           <div className="inline-flex items-center gap-2 rounded border border-border bg-background px-2.5 py-1.5 text-xs">
-            <ShieldCheck className="h-3.5 w-3.5" />
+            <ShieldCheck size={14} />
             Read endpoint UI is pending. Logs are being written server-side.
           </div>
         </CardContent>

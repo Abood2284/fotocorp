@@ -1,6 +1,7 @@
 import Link from "next/link"
-import { Archive } from "lucide-react"
+
 import { FotocorpLogoLink } from "@/components/layout/fotocorp-logo-link"
+import { Archive } from "lucide-react"
 
 interface FooterLink {
   label: string
@@ -52,7 +53,7 @@ export function Footer() {
               href="/account/fotobox"
               className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-muted-foreground"
             >
-              <Archive className="h-5 w-5 shrink-0" />
+              <Archive className="shrink-0" size={20} />
               Fotobox
             </Link>
           </div>

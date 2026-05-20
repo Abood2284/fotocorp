@@ -84,7 +84,7 @@ function StepIndicator({
   if (complete) {
     return (
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-        <Check className="h-4 w-4" strokeWidth={2.5} aria-hidden />
+        <Check aria-hidden size={16} />
         <span className="sr-only">Step {stepNumber} complete</span>
       </span>
     )

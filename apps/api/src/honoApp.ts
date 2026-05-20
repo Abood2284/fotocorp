@@ -77,12 +77,14 @@ honoApp.route("/", photographerAnalyticsRoutes);
 honoApp.route("/", photographerUploadRoutes);
 
 import { internalAdminEventsRoutes } from "./routes/internal/admin-events/route";
+import { internalSearchTypesenseRoutes } from "./routes/internal/search-typesense/route";
 
 honoApp.route("/", fotoboxRoutes);
 honoApp.route("/", internalDownloadRoutes);
 honoApp.route("/", internalAccountRoutes);
 honoApp.route("/", internalAdminRoutes);
 honoApp.route("/", internalAdminEventsRoutes);
+honoApp.route("/", internalSearchTypesenseRoutes);
 honoApp.route("/", internalAdminContributorUploadRoutes);
 honoApp.route("/", internalAdminStaffUploadWizardRoutes);
 honoApp.route("/", publicCatalogRoutes);

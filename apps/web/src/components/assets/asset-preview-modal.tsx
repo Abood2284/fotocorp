@@ -1,8 +1,9 @@
 "use client"
 
+import { ExternalLink, X } from "lucide-react"
 import { useEffect } from "react"
 import Link from "next/link"
-import { ExternalLink, X } from "lucide-react"
+
 import { Badge } from "@/components/ui/badge"
 import { AssetPreviewFrame } from "@/components/assets/asset-preview-frame"
 import type { AssetListItem } from "@/types"
@@ -40,7 +41,7 @@ export function AssetPreviewModal({ asset, open, onClose }: AssetPreviewModalPro
         <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
           <Link href={`/assets/${asset.id}`} onClick={onClose} className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-black/40 px-4 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/60">
              View details
-             <ExternalLink className="h-3.5 w-3.5" />
+             <ExternalLink size={14} />
           </Link>
           <button
             type="button"
@@ -48,7 +49,7 @@ export function AssetPreviewModal({ asset, open, onClose }: AssetPreviewModalPro
             className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-black/60"
             aria-label="Close preview"
           >
-            <X className="h-4 w-4" />
+            <X size={16} />
           </button>
         </div>
 

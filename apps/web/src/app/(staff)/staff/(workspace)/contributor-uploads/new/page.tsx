@@ -1,5 +1,6 @@
-import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
+import Link from "next/link"
+
 import { StaffUploadFlow } from "@/components/staff/staff-upload-flow"
 import { assertStaffRouteAccess, requireStaff } from "@/lib/staff-session"
 
@@ -20,7 +21,7 @@ export default async function StaffNewContributorUploadPage() {
           href="/staff/contributor-uploads"
           className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft size={16} />
           Back to contributor uploads
         </Link>
         <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">New upload batch</h1>

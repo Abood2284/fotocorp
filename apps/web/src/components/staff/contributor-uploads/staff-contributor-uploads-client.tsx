@@ -1,22 +1,10 @@
 "use client"
 
+import { ArrowDown, ArrowUp, CheckCircle, ChevronLeft, ChevronRight, Download, CircleHelp, ImageOff, Loader2, Upload, X, XCircle } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  ArrowDown,
-  ArrowUp,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  HelpCircle,
-  ImageOff,
-  Loader2,
-  Upload,
-  X,
-  XCircle,
-} from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type {
@@ -540,12 +528,12 @@ export function StaffContributorUploadsClient({
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href="/staff/contributor-uploads/new">
-              <Upload className="mr-1.5 h-4 w-4" />
+              <Upload className="mr-1.5" size={16} />
               New upload
             </Link>
           </Button>
           <span className="relative inline-flex" title="Keyboard: Arrow keys move selection, Enter focuses detail">
-            <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <CircleHelp className="text-muted-foreground" aria-hidden size={16} />
             <span className="sr-only">Arrow keys change row, Enter focuses the detail panel</span>
           </span>
           <Button
@@ -554,7 +542,7 @@ export function StaffContributorUploadsClient({
             disabled={approvableSelected.length === 0 || isApproving || isPending}
             onClick={() => approveIds(approvableSelected.map((upload) => upload.imageAssetId))}
           >
-            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+            <CheckCircle className="mr-1.5" size={16} />
             {isApproving
               ? "Queueing…"
               : `Approve & Queue Publish (${approvableSelected.length})`}
@@ -581,7 +569,7 @@ export function StaffContributorUploadsClient({
 
       {uploads.length === 0 ? (
         <div className="rounded-lg border border-border bg-card px-6 py-16 text-center">
-          <ImageOff className="mx-auto h-8 w-8 text-muted-foreground" />
+          <ImageOff className="mx-auto  text-muted-foreground" size={32} />
           <h3 className="mt-3 text-base font-semibold">No contributor uploads to review</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Try changing filters or check that contributors have submitted batches.
@@ -742,7 +730,7 @@ export function StaffContributorUploadsClient({
                     aria-label="Close detail panel"
                     onClick={() => setSelectedId(null)}
                   >
-                    <X className="h-4 w-4" />
+                    <X size={16} />
                   </button>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -751,7 +739,7 @@ export function StaffContributorUploadsClient({
                       href={`${getOriginalUrl(selectedUpload.imageAssetId)}?v=${encodeURIComponent(previewBust[selectedUpload.imageAssetId] ?? selectedUpload.updatedAt)}`}
                       download={selectedUpload.originalFileName}
                     >
-                      <Download className="mr-1 h-3.5 w-3.5" />
+                      <Download className="mr-1" size={14} />
                       Download
                     </a>
                   </Button>
@@ -762,7 +750,7 @@ export function StaffContributorUploadsClient({
                     disabled={!selectedUpload.canApprove}
                     onClick={() => replaceInputRef.current?.click()}
                   >
-                    <Upload className="mr-1 h-3.5 w-3.5" />
+                    <Upload className="mr-1" size={14} />
                     Replace file
                   </Button>
                   <input
@@ -803,7 +791,7 @@ export function StaffContributorUploadsClient({
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {panelSave === "saving" ? (
                     <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Loader2 className="animate-spin" size={14} />
                       Saving…
                     </>
                   ) : panelSave === "saved" ? (
@@ -864,7 +852,7 @@ export function StaffContributorUploadsClient({
                               setDraftKeywordTags((prev) => prev.filter((t) => t !== tag))
                             }
                           >
-                            <X className="h-3 w-3" />
+                            <X size={12} />
                           </button>
                         ) : null}
                       </span>
@@ -919,7 +907,7 @@ export function StaffContributorUploadsClient({
                     disabled={!selectedUpload.canApprove || isRejecting}
                     onClick={() => rejectIds([selectedUpload.imageAssetId])}
                   >
-                    <XCircle className="mr-1 h-4 w-4" />
+                    <XCircle className="mr-1" size={16} />
                     Reject
                   </Button>
                   <Button
@@ -929,7 +917,7 @@ export function StaffContributorUploadsClient({
                     disabled={!selectedUpload.canApprove || isApproving}
                     onClick={() => approveIds([selectedUpload.imageAssetId])}
                   >
-                    <CheckCircle2 className="mr-1 h-4 w-4" />
+                    <CheckCircle className="mr-1" size={16} />
                     Approve
                   </Button>
                 </div>
@@ -953,7 +941,7 @@ export function StaffContributorUploadsClient({
               hasPrev ? "hover:bg-muted" : "pointer-events-none opacity-50"
             }`}
           >
-            <ChevronLeft className="h-3.5 w-3.5" /> Previous
+            <ChevronLeft size={14} /> Previous
           </Link>
           <Link
             aria-disabled={!hasMore}
@@ -963,7 +951,7 @@ export function StaffContributorUploadsClient({
               hasMore ? "hover:bg-muted" : "pointer-events-none opacity-50"
             }`}
           >
-            Next <ChevronRight className="h-3.5 w-3.5" />
+            Next <ChevronRight size={14} />
           </Link>
         </div>
       </footer>
@@ -982,7 +970,7 @@ export function StaffContributorUploadsClient({
                 disabled={isRejecting}
                 onClick={() => rejectIds(approvableSelected.map((u) => u.imageAssetId))}
               >
-                <XCircle className="mr-1 h-4 w-4" />
+                <XCircle className="mr-1" size={16} />
                 {isRejecting ? "Rejecting…" : "Reject selected"}
               </Button>
               <Button
@@ -991,7 +979,7 @@ export function StaffContributorUploadsClient({
                 disabled={isApproving}
                 onClick={() => approveIds(approvableSelected.map((u) => u.imageAssetId))}
               >
-                <CheckCircle2 className="mr-1 h-4 w-4" />
+                <CheckCircle className="mr-1" size={16} />
                 {isApproving ? "Queueing…" : "Approve selected"}
               </Button>
             </div>
@@ -1312,7 +1300,7 @@ function ActiveFilterChips({
           className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-xs"
         >
           {chip.label}
-          <X className="h-3 w-3" />
+          <X size={12} />
         </Link>
       ))}
     </div>

@@ -1,9 +1,10 @@
 "use client"
 
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { RefObject } from "react"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+
 import { PublicEventsGrid } from "@/components/assets/public-events-grid"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
 import { fetchPublicLatestEvents, listPublicAssets } from "@/lib/api/fotocorp-api"
@@ -372,14 +373,14 @@ export function HomeCategorySection() {
                 className="absolute left-2 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/50 p-2 text-white opacity-0 backdrop-blur transition-opacity hover:bg-black/70 group-hover:opacity-100 sm:left-4 sm:block"
                 aria-label="Scroll left"
               >
-                <ChevronLeft className="h-6 w-6" />
+                <ChevronLeft size={24} />
               </button>
               <button
                 onClick={scrollRight}
                 className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/50 p-2 text-white opacity-0 backdrop-blur transition-opacity hover:bg-black/70 group-hover:opacity-100 sm:right-4 sm:block"
                 aria-label="Scroll right"
               >
-                <ChevronRight className="h-6 w-6" />
+                <ChevronRight size={24} />
               </button>
             </div>
 

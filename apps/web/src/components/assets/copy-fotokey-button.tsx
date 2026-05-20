@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
 import { Check, Copy } from "lucide-react"
+import { useState } from "react"
+
 import { Button } from "@/components/ui/button"
 
 interface CopyFotokeyButtonProps {
@@ -31,7 +32,7 @@ export function CopyFotokeyButton({ fotokey }: CopyFotokeyButtonProps) {
       disabled={!fotokey}
       aria-label="Copy Fotokey"
     >
-      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      {copied ? <Check size={14} /> : <Copy size={14} />}
       {copied ? "Copied" : "Copy Fotokey"}
     </Button>
   )

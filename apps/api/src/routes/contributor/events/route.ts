@@ -38,7 +38,7 @@ photographerEventRoutes.post(
   async (c) => {
     const database = db(c.env);
     const session = await requirePhotographerSession(database, getCookie(c, CONTRIBUTOR_SESSION_COOKIE));
-    return json(await createPhotographerEvent(database, session, c.req.valid("json")), 201);
+    return json(await createPhotographerEvent(database, c.env, session, c.req.valid("json")), 201);
   },
 );
 
@@ -61,7 +61,7 @@ photographerEventRoutes.patch(
     const database = db(c.env);
     const session = await requirePhotographerSession(database, getCookie(c, CONTRIBUTOR_SESSION_COOKIE));
     const { eventId } = c.req.valid("param");
-    return json(await patchPhotographerEvent(database, session, eventId, c.req.valid("json")));
+    return json(await patchPhotographerEvent(database, c.env, session, eventId, c.req.valid("json")));
   },
 );
 

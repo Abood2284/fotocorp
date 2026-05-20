@@ -1,10 +1,11 @@
 "use client"
 
+import { Images } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { PublicAsset } from "@/features/assets/types"
 import { PublicAssetCard } from "@/components/assets/public-asset-card"
 import { EmptyState } from "@/components/shared/empty-state"
-import { Images } from "lucide-react"
+
 import {
   computeJustifiedRows,
   getPreviewAspectRatio,

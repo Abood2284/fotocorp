@@ -1,3 +1,4 @@
+
 import { Lock, Sparkles, ShieldCheck, Eye } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { EntitlementState } from "@/features/session/mock-session-provider"

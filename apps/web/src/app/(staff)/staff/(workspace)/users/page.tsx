@@ -1,3 +1,4 @@
+
 import { Users } from "lucide-react"
 import { revalidatePath } from "next/cache"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,7 +24,7 @@ export default async function AdminUsersPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-4">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Users className="h-4 w-4" />
+            <Users size={16} />
             Profiles
           </CardTitle>
         </CardHeader>

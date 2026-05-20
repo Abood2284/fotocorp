@@ -1,8 +1,9 @@
 "use client"
 
+import { Search, X, Image as ImageIcon, PlayCircle, ChevronDown, ChevronUp } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useRef, useState, useEffect } from "react"
-import { Search, X, Image as ImageIcon, PlayCircle, ChevronDown, ChevronUp } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 
 interface SearchBarProps {
@@ -103,12 +104,12 @@ export function SearchBar({
                 : "gap-2 px-4 py-2 text-[0.95rem]",
             )}
           >
-            <ImageIcon className={cn("text-muted-foreground", isCompact ? "h-4 w-4" : "h-4 w-4")} />
+            <ImageIcon className={cn("text-muted-foreground", isCompact ?"" :"h-4 w-4")} size={16} />
             <span>{selectedType === "photos" ? "Photos" : "Videos"}</span>
             {isTypeSelectOpen ? (
-              <ChevronUp className="h-4 w-4" />
+              <ChevronUp size={16} />
             ) : (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown size={16} />
             )}
           </button>
           
@@ -134,7 +135,7 @@ export function SearchBar({
                   setIsTypeSelectOpen(false)
                 }}
               >
-                <ImageIcon className={cn("h-5 w-5", selectedType === "photos" ? "text-emerald-500" : "text-muted-foreground")} />
+                <ImageIcon className={cn("", selectedType ==="photos" ?"text-emerald-500" :"text-muted-foreground")} size={20} />
                 <span className={cn(selectedType === "photos" ? "text-emerald-500" : "text-foreground")}>Photos</span>
               </button>
               <button
@@ -148,7 +149,7 @@ export function SearchBar({
                   setIsTypeSelectOpen(false)
                 }}
               >
-                <PlayCircle className={cn("h-5 w-5", selectedType === "videos" ? "text-emerald-500" : "text-muted-foreground")} />
+                <PlayCircle className={cn("", selectedType ==="videos" ?"text-emerald-500" :"text-muted-foreground")} size={20} />
                 <span className={cn(selectedType === "videos" ? "text-emerald-500" : "text-foreground")}>Videos</span>
               </button>
             </div>
@@ -162,12 +163,10 @@ export function SearchBar({
       >
         {!showTypeSelect && (
           <Search
-            className={cn(
-              "pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted-foreground/60",
-              isLarge ? "left-5 h-5 w-5" : isCompact ? "left-3.5 h-3.5 w-3.5" : "left-5 h-4 w-4",
+            className={cn("pointer-events-none absolute top-1/2 -translate-y-1/2 text-muted-foreground/60",
+              isLarge ?"left-5 h-5 w-5" : isCompact ?"left-3.5" :"left-5 h-4 w-4",
             )}
-            strokeWidth={1.5}
-          />
+            strokeWidth={1.5} size={14} />
         )}
         <input
           ref={inputRef}
@@ -204,7 +203,7 @@ export function SearchBar({
             )}
             aria-label="Clear search"
           >
-            <X className="h-4 w-4" />
+            <X size={16} />
           </button>
         )}
       </div>
@@ -217,7 +216,7 @@ export function SearchBar({
         )}
         aria-label="Submit search"
       >
-        <Search className={isCompact ? "h-[1.125rem] w-[1.125rem]" : "h-5 w-5"} strokeWidth={2} />
+        <Search className={isCompact ?"h-[1.125rem] w-[1.125rem]" :""} strokeWidth={2} size={20} />
       </button>
     </form>
   )

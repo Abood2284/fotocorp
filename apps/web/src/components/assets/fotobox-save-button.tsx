@@ -1,8 +1,9 @@
 "use client"
 
+import { Archive, Check, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
-import { Archive, Check, Loader2 } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -56,11 +57,11 @@ export function FotoboxSaveButton({
   const tooltip = stub ? (hoverLabel || "Save as") : hoverLabel
   const actionIcon =
     state === "saving" ? (
-      <Loader2 className="h-5 w-5 animate-spin" />
+      <Loader2 className="animate-spin" size={20} />
     ) : state === "saved" ? (
-      <Check className="h-5 w-5" />
+      <Check size={20} />
     ) : (
-      icon ?? <Archive className="h-5 w-5" />
+      icon ?? <Archive size={20} />
     )
 
   return (
@@ -79,7 +80,7 @@ export function FotoboxSaveButton({
       >
         {iconOnly ? actionIcon : (
           <>
-            {state === "saving" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : state === "saved" ? <Check className="h-4 w-4 mr-2" /> : icon ? icon : <Archive className="h-4 w-4 mr-2" />}
+            {state === "saving" ? <Loader2 className="animate-spin mr-2" size={16} /> : state === "saved" ? <Check className="mr-2" size={16} /> : icon ? icon : <Archive className="mr-2" size={16} />}
             {label}
           </>
         )}

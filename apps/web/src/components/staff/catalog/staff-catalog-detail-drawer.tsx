@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
 import { ExternalLink, X, Loader2 } from "lucide-react"
+import { useEffect, useState, useTransition } from "react"
+
 import { fetchAdminAssetAction, updateAdminAssetEditorialAction, updateAdminAssetStateAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
 import type { AdminCatalogAssetItem, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
 import { PreviewImage } from "@/components/assets/preview-image"
@@ -83,13 +84,13 @@ export function StaffCatalogDetailDrawer({ assetId, onClose, onUpdate, filters }
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold tracking-tight">Edit Asset</h3>
           <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted text-muted-foreground transition-colors">
-            <X className="h-5 w-5" />
+            <X size={20} />
           </button>
         </div>
 
         {isLoading ? (
           <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="animate-spin text-muted-foreground" size={24} />
           </div>
         ) : !asset ? (
           <div className="p-4 text-center text-muted-foreground">Asset not found.</div>
@@ -127,7 +128,7 @@ export function StaffCatalogDetailDrawer({ assetId, onClose, onUpdate, filters }
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
               >
-                Open Public Page <ExternalLink className="h-3 w-3" />
+                Open Public Page <ExternalLink size={12} />
               </a>
             </div>
 

@@ -18,7 +18,9 @@ import {
 } from "@fotocorp/media-preview/profiles";
 import { decodePreviewSource, generateProtectedPreview } from "@fotocorp/media-preview/generate";
 import { createHttpDb } from "../../src/db/index.js";
+import type { Env } from "../../src/appTypes.js";
 import { schedulePublicEventFeedSyncForAsset } from "../../src/lib/assets/public-event-feed-projection.js";
+import { scheduleTypesenseSyncForAsset } from "../../src/lib/search/typesense-public-asset-sync.js";
 
 type Variant = "thumb" | "card" | "detail";
 type GenerationStatus = "READY" | "FAILED" | "STALE";
@@ -534,7 +536,10 @@ async function processAsset(
       const wroteReadyCard = generatedVariants.some((item) => item.variant === "card");
       const databaseUrl = process.env.DATABASE_URL;
       if (wroteReadyCard && databaseUrl) {
-        await schedulePublicEventFeedSyncForAsset(createHttpDb(databaseUrl), asset.id);
+        const db = createHttpDb(databaseUrl);
+        const workerEnv = process.env as Env;
+        await schedulePublicEventFeedSyncForAsset(db, asset.id);
+        await scheduleTypesenseSyncForAsset(db, workerEnv, asset.id);
       }
     } catch (error) {
       counters.dbWriteFailures += 1;

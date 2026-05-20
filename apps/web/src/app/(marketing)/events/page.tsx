@@ -1,5 +1,6 @@
-import Link from "next/link"
 import { ArrowRight } from "lucide-react"
+import Link from "next/link"
+
 import { getPublicAssetFilters } from "@/lib/api/fotocorp-api"
 import { PlaceholderPage } from "@/components/layout/placeholder-page"
 
@@ -33,7 +34,7 @@ export default async function EventsPage() {
           </p>
         </div>
         <Link href="/search?sort=latest" className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
-          Latest images <ArrowRight className="h-4 w-4" />
+          Latest images <ArrowRight size={16} />
         </Link>
       </div>
       <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

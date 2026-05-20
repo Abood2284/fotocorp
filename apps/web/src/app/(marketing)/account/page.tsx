@@ -1,6 +1,7 @@
+import { Archive, Download, ShieldCheck } from "lucide-react"
 import Link from "next/link"
 import type { ReactNode } from "react"
-import { Archive, Download, ShieldCheck } from "lucide-react"
+
 import { AccountShell } from "@/components/account/account-shell"
 import { requireAuth } from "@/lib/app-user"
 import { formatDownloadQuotaLabel, getActiveSubscriberEntitlementQuota } from "@/lib/app-user-profile-store"
@@ -25,7 +26,7 @@ export default async function AccountPage() {
         <section className="rounded-2xl border border-border bg-background p-5">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
-              <ShieldCheck className="h-5 w-5" />
+              <ShieldCheck size={20} />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-foreground">Account status</h2>
@@ -49,19 +50,19 @@ export default async function AccountPage() {
         <section className="grid gap-3">
           <QuickLink
             href="/account/fotobox"
-            icon={<Archive className="h-5 w-5" />}
+            icon={<Archive size={20} />}
             title="My Fotobox"
             description="Review saved archive images and decide what to license."
           />
           <QuickLink
             href="/account/downloads"
-            icon={<Download className="h-5 w-5" />}
+            icon={<Download size={20} />}
             title="My Downloads"
             description="See subscriber download history and re-download eligible files."
           />
           <QuickLink
             href={subscriber ? "/account/subscription" : "/request-access"}
-            icon={<ShieldCheck className="h-5 w-5" />}
+            icon={<ShieldCheck size={20} />}
             title={subscriber ? "Download access" : "Request access"}
             description={subscriber ? "Check access status and quota summary." : "Tell our team what you need; we will email you."}
           />

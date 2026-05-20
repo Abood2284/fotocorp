@@ -1,10 +1,11 @@
 "use client"
 
+import { AlertTriangle } from "lucide-react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle } from "lucide-react"
+
 import { purgeAdminEventAction } from "@/app/(staff)/staff/(workspace)/events/actions"
 
 const STAFF_EVENTS_LIST_PATH = "/staff/events"
@@ -72,7 +73,7 @@ export function StaffEventPurgeModal({ eventId, eventName }: { eventId: string; 
   return (
     <div className="rounded-lg border border-destructive bg-destructive/5 p-4">
       <div className="mb-4 flex items-center gap-2 font-semibold text-destructive">
-        <AlertTriangle className="h-5 w-5" />
+        <AlertTriangle size={20} />
         Confirm Permanent Purge
       </div>
       

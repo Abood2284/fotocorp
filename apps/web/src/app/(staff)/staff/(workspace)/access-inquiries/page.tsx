@@ -1,5 +1,6 @@
-import Link from "next/link"
 import { AlertTriangle } from "lucide-react"
+import Link from "next/link"
+
 import { getStaffAccessInquiries, StaffApiError } from "@/lib/api/staff-api"
 import { formatAssetInterestType, formatInquiryStatus } from "@/lib/staff/access-inquiry-labels"
 import { getStaffCookieHeader } from "@/lib/staff-session"

@@ -1,7 +1,9 @@
 import { sql, type SQL } from "drizzle-orm";
+import type { Env } from "../../../appTypes";
 import type { DrizzleClient } from "../../../db";
 import { AppError } from "../../../lib/errors";
 import { schedulePublicEventFeedSync } from "../../../lib/assets/public-event-feed-projection";
+import { scheduleTypesenseSyncForEvent } from "../../../lib/search/typesense-public-asset-sync";
 import type { ContributorSessionResult } from "../auth/service";
 import type {
   PhotographerEventCreateBody,
@@ -145,6 +147,7 @@ export async function getPhotographerEvent(db: DrizzleClient, session: Contribut
 
 export async function createPhotographerEvent(
   db: DrizzleClient,
+  env: Env,
   session: ContributorSessionResult,
   body: PhotographerEventCreateBody,
 ) {
@@ -214,11 +217,13 @@ export async function createPhotographerEvent(
   const newId = inserted[0]?.id;
   if (!newId) throw new AppError(500, "EVENT_CREATE_FAILED", "Could not create event.");
   await schedulePublicEventFeedSync(db, newId);
+  await scheduleTypesenseSyncForEvent(db, env, newId);
   return getPhotographerEvent(db, session, newId);
 }
 
 export async function patchPhotographerEvent(
   db: DrizzleClient,
+  env: Env,
   session: ContributorSessionResult,
   eventId: string,
   body: PhotographerEventPatchBody,
@@ -265,6 +270,7 @@ export async function patchPhotographerEvent(
   `);
 
   await schedulePublicEventFeedSync(db, eventId);
+  await scheduleTypesenseSyncForEvent(db, env, eventId);
   return getPhotographerEvent(db, session, eventId);
 }
 

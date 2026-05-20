@@ -1,10 +1,10 @@
 import Link from "next/link"
-import { CalendarDays, Pencil } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { getContributorEvents } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
-
+import { CalendarDays, Pencil } from "lucide-react";
 export const metadata = {
   title: "Contributor Events",
 }
@@ -39,7 +39,7 @@ export default async function ContributorEventsPage({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contributor portal</p>
           <h1 className="mt-2 flex items-center gap-2 text-3xl font-semibold tracking-tight text-foreground">
-            <CalendarDays className="h-8 w-8 text-muted-foreground" />
+            <CalendarDays className="text-muted-foreground" size={32} />
             Events
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -125,7 +125,7 @@ export default async function ContributorEventsPage({
                     {event.canEdit ? (
                       <Button variant="ghost" size="sm" asChild>
                         <Link href={`/contributor/events/${event.id}/edit`}>
-                          <Pencil className="mr-1 h-3.5 w-3.5" />
+                          <Pencil className="mr-1" size={14} />
                           Edit
                         </Link>
                       </Button>

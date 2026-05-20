@@ -1,8 +1,9 @@
 "use client"
 
+import { Download, Eye, Heart, Images, Lock, ShieldCheck } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { Download, Eye, Heart, Images, Lock, ShieldCheck } from "lucide-react"
+
 import { isAssetLocked as resolveAssetLocked } from "@/features/assets/access"
 import type { AssetListItem } from "@/types"
 import { Badge } from "@/components/ui/badge"
@@ -70,7 +71,7 @@ export function AssetCard({
         {locked && (
           <div className="absolute left-2 top-2 z-10">
             <div className="flex h-6 w-6 items-center justify-center rounded-sm bg-black/40 text-white backdrop-blur-sm">
-              <Lock className="h-3 w-3" />
+              <Lock size={12} />
             </div>
           </div>
         )}
@@ -88,7 +89,7 @@ export function AssetCard({
               }}
               className="p-1.5 text-white/80 transition-all duration-200 hover:scale-110 hover:text-white drop-shadow-md"
             >
-              <Eye className="h-5 w-5" />
+              <Eye size={20} />
             </button>
             <div className="flex gap-1">
               <button
@@ -97,7 +98,7 @@ export function AssetCard({
                 onClick={(e) => e.preventDefault()}
                 className="p-1.5 text-white/80 transition-all duration-200 hover:scale-110 hover:text-white drop-shadow-md"
               >
-                <Heart className="h-5 w-5" />
+                <Heart size={20} />
               </button>
               {!locked && (
                 <button
@@ -106,7 +107,7 @@ export function AssetCard({
                   onClick={(e) => e.preventDefault()}
                   className="p-1.5 text-white/80 transition-all duration-200 hover:scale-110 hover:text-white drop-shadow-md"
                 >
-                  <Download className="h-5 w-5" />
+                  <Download size={20} />
                 </button>
               )}
             </div>

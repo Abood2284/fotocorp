@@ -1,6 +1,7 @@
+import { ChevronLeft, ImageOff, Search } from "lucide-react"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft, ImageOff, Search } from "lucide-react"
+
 import { getCurrentAppUser } from "@/lib/app-user"
 import { getPublicAsset, listPublicAssets } from "@/lib/api/fotocorp-api"
 import { messageForDownloadRedirectError } from "@/lib/download-error-messages"
@@ -99,7 +100,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
       <div className="border-b border-border bg-surface-warm/70">
         <div className="mx-auto w-full max-w-[1600px] px-3 py-3 sm:px-5 lg:px-8">
           <form action="/search" className="flex min-h-12 items-center gap-3 rounded-none border border-border-strong bg-background px-4 shadow-sm">
-            <Search className="h-5 w-5 shrink-0 text-foreground" aria-hidden />
+            <Search className="shrink-0 text-foreground" aria-hidden size={20} />
             <label htmlFor="detail-search" className="sr-only">Search Fotocorp photos</label>
             <input
               id="detail-search"
@@ -124,7 +125,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
       <div className="mx-auto w-full max-w-[1600px] px-3 py-5 sm:px-5 lg:px-8 lg:py-7">
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <Link href="/search" className="inline-flex items-center gap-1 transition-colors hover:text-foreground">
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft size={16} />
             Back to results
           </Link>
           {asset.category?.name && (
@@ -174,7 +175,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                 </div>
               ) : (
                 <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
-                  <ImageOff className="h-8 w-8" />
+                  <ImageOff size={32} />
                   <span className="text-base font-semibold text-foreground">Image preview unavailable</span>
                   <span className="max-w-md text-sm leading-6">
                     We found this asset record, but preview generation has not completed yet.
@@ -205,8 +206,6 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             />
           </aside>
         </div>
-
-
 
         <section className="mt-6 pt-2">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -252,8 +251,6 @@ function getAssetTitle(asset: PublicAsset) {
 function getAssetAlt(asset: PublicAsset) {
   return asset.headline || asset.caption || asset.event?.name || asset.category?.name || "Fotocorp archive image"
 }
-
-
 
 function splitKeywords(value: string | null) {
   if (!value) return []
@@ -406,5 +403,4 @@ function humanizeEnum(value: string) {
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ")
 }
-
 

@@ -1,9 +1,9 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Camera } from "lucide-react"
+
 import { ContributorLoginForm } from "@/components/contributor/contributor-login-form"
 import { getOptionalContributorSession } from "@/lib/contributor-session"
-
+import { Camera } from "lucide-react"
 export const metadata = {
   title: "Contributor Login",
 }
@@ -17,7 +17,7 @@ export default async function ContributorLoginPage() {
       <section className="mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-5xl items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="hidden rounded-[2rem] border border-border bg-background p-8 shadow-sm lg:block">
           <div className="flex items-center gap-2">
-            <Camera className="h-6 w-6 text-accent" />
+            <Camera className="text-accent" size={24} />
             <span className="fc-brand text-2xl font-semibold">
               foto<span className="text-accent">corp</span>
             </span>
@@ -36,7 +36,7 @@ export default async function ContributorLoginPage() {
         <div className="rounded-[2rem] border border-border bg-background p-6 shadow-sm sm:p-8">
           <div className="mb-8 lg:hidden">
             <div className="flex items-center gap-2">
-              <Camera className="h-5 w-5 text-accent" />
+              <Camera className="text-accent" size={20} />
               <span className="fc-brand text-xl font-semibold">
                 foto<span className="text-accent">corp</span>
               </span>

@@ -1,9 +1,10 @@
 "use client"
 
+import { AlertTriangle, SquareCheck, ChevronLeft, ChevronRight, Pencil, ImageOff, Square, X, Filter, Search, Ellipsis, FileImage } from "lucide-react"
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { AlertTriangle, CheckSquare, ChevronLeft, ChevronRight, Edit3, ImageOff, Square, X, Filter, Search, MoreHorizontal, FileImage } from "lucide-react"
+
 import type { AdminCatalogAssetItem, AdminCatalogAssetsResponse, AdminCatalogFilters, AdminCatalogStats } from "@/features/assets/admin-catalog-types"
 import { updateAdminAssetStateBulkAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
 import { EmptyState } from "@/components/shared/empty-state"
@@ -110,9 +111,9 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
               <th className="px-3 py-2 text-left w-10">
                 <button onClick={toggleAll} className="text-muted-foreground hover:text-foreground">
                   {selectedIds.size === initialResponse.items.length && initialResponse.items.length > 0 ? (
-                    <CheckSquare className="h-4 w-4" />
+                    <SquareCheck size={16} />
                   ) : (
-                    <Square className="h-4 w-4" />
+                    <Square size={16} />
                   )}
                 </button>
               </th>
@@ -174,7 +175,7 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                 <tr key={asset.id} className={`border-t border-border align-middle transition-colors hover:bg-muted/30 ${selectedIds.has(asset.id) ? 'bg-primary/5' : ''}`}>
                   <td className="px-3 py-2">
                     <button onClick={() => toggleSelection(asset.id)} className="text-muted-foreground hover:text-foreground">
-                      {selectedIds.has(asset.id) ? <CheckSquare className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                      {selectedIds.has(asset.id) ? <SquareCheck size={16} /> : <Square size={16} />}
                     </button>
                   </td>
                   <td className="px-3 py-2">
@@ -188,7 +189,7 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                       </div>
                     ) : (
                       <div className="h-12 w-20 flex items-center justify-center rounded border border-border bg-muted text-muted-foreground">
-                        <FileImage className="h-5 w-5" />
+                        <FileImage size={20} />
                       </div>
                     )}
                   </td>
@@ -215,7 +216,7 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                       onClick={() => setInspectAssetId(asset.id)}
                       className="inline-flex items-center justify-center rounded border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
                     >
-                      <Edit3 className="mr-1.5 h-3.5 w-3.5" />
+                      <Pencil className="mr-1.5" size={14} />
                       Edit
                     </button>
                   </td>
@@ -228,13 +229,13 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
 
       <div className="flex items-center justify-between gap-3">
         <Link href={`/staff/catalog?${previousQuery.toString()}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-3.5 w-3.5" />
+          <ChevronLeft size={14} />
           Reset cursor
         </Link>
         {initialResponse.nextCursor ? (
           <Link href={`/staff/catalog?${nextQuery.toString()}`} className="inline-flex items-center gap-1 rounded border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
             Load more
-            <ChevronRight className="h-3.5 w-3.5" />
+            <ChevronRight size={14} />
           </Link>
         ) : (
           <span className="text-xs text-muted-foreground">End of results</span>
@@ -307,7 +308,7 @@ function HeaderSearchFilter({ query }: { query: URLSearchParams }) {
   return (
     <details className="relative">
       <summary className="inline-flex cursor-pointer list-none items-center rounded p-1 hover:bg-muted/50" aria-label="Search">
-        <Search className="h-3.5 w-3.5" />
+        <Search size={14} />
       </summary>
       <form method="get" className="absolute left-0 z-20 mt-1 w-64 rounded-md border border-border bg-card p-3 shadow-xl">
         <PreserveQuery query={query} omit={["q", "cursor"]} />
@@ -340,7 +341,7 @@ function HeaderSelectFilter({ query, name, options }: { query: URLSearchParams; 
   return (
     <details className="relative">
       <summary className="inline-flex cursor-pointer list-none items-center rounded p-1 hover:bg-muted/50">
-        <Filter className="h-3.5 w-3.5" />
+        <Filter size={14} />
       </summary>
       <form method="get" className="absolute right-0 z-20 mt-1 w-56 rounded-md border border-border bg-card p-2 shadow-xl">
         <PreserveQuery query={query} omit={[name, "cursor"]} />
@@ -382,7 +383,7 @@ function ActiveFilterChips({ query }: { query: URLSearchParams }) {
           className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs transition-colors hover:bg-muted"
         >
           <span className="font-medium text-muted-foreground">{item.label}:</span> {item.value}
-          <X className="ml-1 h-3 w-3" />
+          <X className="ml-1" size={12} />
         </Link>
       ))}
       <Link href="/staff/catalog" className="text-xs font-medium text-primary hover:underline">

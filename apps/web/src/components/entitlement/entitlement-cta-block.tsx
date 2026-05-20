@@ -1,3 +1,4 @@
+
 import { ArrowRight, Sparkles } from "lucide-react"
 import type { EntitlementState } from "@/features/session/mock-session-provider"
 import { Button } from "@/components/ui/button"
@@ -33,7 +34,7 @@ export function EntitlementCtaBlock({ state }: EntitlementCtaBlockProps) {
         </CardHeader>
         <CardContent>
           <Button variant="accent" className="w-full">
-            <Sparkles className="h-4 w-4" />
+            <Sparkles size={16} />
             Upgrade plan
           </Button>
         </CardContent>
@@ -50,7 +51,7 @@ export function EntitlementCtaBlock({ state }: EntitlementCtaBlockProps) {
       <CardContent className="space-y-2">
         <Button variant="accent" className="w-full">
           Choose plan
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight size={16} />
         </Button>
         <Button variant="secondary" className="w-full">
           Continue preview-only

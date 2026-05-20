@@ -1,9 +1,10 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ContributorApiError, getContributorUploadBatch } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
+import { ArrowLeft } from "lucide-react";
 
 export async function generateMetadata({ params }: { params: Promise<{ batchId: string }> }) {
   const { batchId } = await params
@@ -40,7 +41,7 @@ export default async function ContributorUploadBatchDetailPage({ params }: { par
           href="/contributor/uploads"
           className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft size={16} />
           All uploads
         </Link>
         <p className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contributor portal</p>

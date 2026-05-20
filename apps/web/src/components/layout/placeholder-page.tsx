@@ -1,5 +1,5 @@
-import Link from "next/link"
 import { ArrowRight } from "lucide-react"
+import Link from "next/link"
 
 interface PlaceholderPageProps {
   eyebrow?: string
@@ -43,7 +43,7 @@ export function PlaceholderPage({
               }
             >
               {action.label}
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight size={16} />
             </Link>
           ))}
         </div>

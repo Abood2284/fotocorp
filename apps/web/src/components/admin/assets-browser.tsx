@@ -1,8 +1,9 @@
 "use client"
 
+import { Search, LayoutGrid, Table, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useState } from "react"
-import { Search, LayoutGrid, Table2, ArrowRight } from "lucide-react"
+
 import type { AdminAssetRecord } from "@/lib/fixtures/admin"
 import { AssetStatusChip } from "@/components/admin/status-chip"
 import { Badge } from "@/components/ui/badge"
@@ -40,7 +41,7 @@ export function AssetsBrowser({ records, initialQuery = "" }: AssetsBrowserProps
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
         <div className="relative min-w-[260px] flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-2.5 top-1/2  -translate-y-1/2 text-muted-foreground" size={16} />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -54,7 +55,7 @@ export function AssetsBrowser({ records, initialQuery = "" }: AssetsBrowserProps
             onClick={() => setViewMode("table")}
             className={`inline-flex h-8 items-center gap-1 rounded px-2 text-xs font-medium ${viewMode === "table" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
           >
-            <Table2 className="h-3.5 w-3.5" />
+            <Table size={14} />
             Table
           </button>
           <button
@@ -62,7 +63,7 @@ export function AssetsBrowser({ records, initialQuery = "" }: AssetsBrowserProps
             onClick={() => setViewMode("grid")}
             className={`inline-flex h-8 items-center gap-1 rounded px-2 text-xs font-medium ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
           >
-            <LayoutGrid className="h-3.5 w-3.5" />
+            <LayoutGrid size={14} />
             Grid
           </button>
         </div>
@@ -106,7 +107,7 @@ export function AssetsBrowser({ records, initialQuery = "" }: AssetsBrowserProps
                   <td className="px-3 py-2 text-right">
                     <Link href={`/admin/assets/${record.asset.id}`}>
                       <Button variant="ghost" size="sm" className="gap-1">
-                        Inspect <ArrowRight className="h-3.5 w-3.5" />
+                        Inspect <ArrowRight size={14} />
                       </Button>
                     </Link>
                   </td>

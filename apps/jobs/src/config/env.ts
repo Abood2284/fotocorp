@@ -14,6 +14,8 @@ export interface JobsEnvConfig {
   r2OriginalsBucket: string | undefined
   r2PreviewsBucket: string | undefined
   imagePublishProcessingEnabled: boolean
+  fotocorpApiBaseUrl: string | undefined
+  internalApiSecret: string | undefined
 }
 
 const ENV_DATABASE_URL = "DATABASE_URL"
@@ -24,6 +26,8 @@ const ENV_R2_CONTRIBUTOR_STAGING_BUCKET = "R2_CONTRIBUTOR_STAGING_BUCKET"
 const ENV_R2_ORIGINALS_BUCKET = "R2_ORIGINALS_BUCKET"
 const ENV_R2_PREVIEWS_BUCKET = "R2_PREVIEWS_BUCKET"
 const ENV_IMAGE_PUBLISH_PROCESSING_ENABLED = "IMAGE_PUBLISH_PROCESSING_ENABLED"
+const ENV_FOTOCORP_API_BASE_URL = "FOTOCORP_API_BASE_URL"
+const ENV_INTERNAL_API_SECRET = "INTERNAL_API_SECRET"
 
 const REQUIRED_SERVICE_ENV_NAMES = [
   ENV_DATABASE_URL,
@@ -93,7 +97,9 @@ export function loadJobsEnv(dryRun: boolean): JobsEnvConfig {
       r2ContributorStagingBucket: readOptionalEnv(ENV_R2_CONTRIBUTOR_STAGING_BUCKET),
       r2OriginalsBucket: readOptionalEnv(ENV_R2_ORIGINALS_BUCKET),
       r2PreviewsBucket: readOptionalEnv(ENV_R2_PREVIEWS_BUCKET),
-      imagePublishProcessingEnabled
+      imagePublishProcessingEnabled,
+      fotocorpApiBaseUrl: readOptionalEnv(ENV_FOTOCORP_API_BASE_URL),
+      internalApiSecret: readOptionalEnv(ENV_INTERNAL_API_SECRET),
     }
   }
 
@@ -102,6 +108,14 @@ export function loadJobsEnv(dryRun: boolean): JobsEnvConfig {
     throw new Error(
       `[fotocorp-jobs] missing required env vars (${missing.length}): ${missing.join(", ")}`
     )
+
+  const fotocorpApiBaseUrl = readOptionalEnv(ENV_FOTOCORP_API_BASE_URL)
+  const internalApiSecret = readOptionalEnv(ENV_INTERNAL_API_SECRET)
+  if (!fotocorpApiBaseUrl || !internalApiSecret) {
+    console.log(
+      `[fotocorp-jobs] warn: ${ENV_FOTOCORP_API_BASE_URL} and/or ${ENV_INTERNAL_API_SECRET} not set; Typesense post-publish sync callbacks will be skipped`
+    )
+  }
 
   return {
     dryRun: false,
@@ -112,6 +126,8 @@ export function loadJobsEnv(dryRun: boolean): JobsEnvConfig {
     r2ContributorStagingBucket: requireEnv(ENV_R2_CONTRIBUTOR_STAGING_BUCKET),
     r2OriginalsBucket: requireEnv(ENV_R2_ORIGINALS_BUCKET),
     r2PreviewsBucket: requireEnv(ENV_R2_PREVIEWS_BUCKET),
-    imagePublishProcessingEnabled
+    imagePublishProcessingEnabled,
+    fotocorpApiBaseUrl,
+    internalApiSecret,
   }
 }

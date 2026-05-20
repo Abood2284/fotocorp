@@ -1,8 +1,9 @@
 import Link from "next/link"
-import { Calendar, ImageIcon, MapPin } from "lucide-react"
+
 import { Badge } from "@/components/ui/badge"
 import { getContributorImages, type ContributorImageItem } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
+import { Calendar, Image, MapPin } from "lucide-react";
 
 export const metadata = {
   title: "Contributor Images",
@@ -77,7 +78,7 @@ function ContributorImageCard({ item }: { item: ContributorImageItem }) {
     <article className="overflow-hidden rounded-3xl border border-border bg-background shadow-sm">
       <div className="flex aspect-[4/3] items-center justify-center bg-muted/40">
         <div className="flex flex-col items-center text-muted-foreground">
-          <ImageIcon className="h-8 w-8" />
+          <Image size={32} />
           <span className="mt-2 text-xs">Preview not exposed</span>
         </div>
       </div>
@@ -97,13 +98,13 @@ function ContributorImageCard({ item }: { item: ContributorImageItem }) {
           {item.event.name && <p className="font-medium text-foreground">{item.event.name}</p>}
           {item.event.date && (
             <p className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
+              <Calendar size={16} />
               {formatDate(item.event.date)}
             </p>
           )}
           {item.event.location && (
             <p className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
+              <MapPin size={16} />
               {item.event.location}
             </p>
           )}

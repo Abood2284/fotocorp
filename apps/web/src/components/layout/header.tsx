@@ -2,14 +2,20 @@
 "use client"
 
 import Link from "next/link"
-import type { LucideIcon } from "lucide-react"
+
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { Suspense } from "react"
+
+import { FotocorpLogoLink } from "@/components/layout/fotocorp-logo-link"
+import { buttonVariants } from "@/components/ui/button"
+import { authClient } from "@/lib/auth-client"
+import { cn } from "@/lib/utils"
 import {
   Archive,
   Camera,
   ChevronDown,
+  CloudUpload,
   Download,
   Gauge,
   HardDrive,
@@ -18,15 +24,11 @@ import {
   LogOut,
   Menu,
   Shield,
-  UploadCloud,
   UserRound,
   Users,
   X,
+  type LucideIcon,
 } from "lucide-react"
-import { FotocorpLogoLink } from "@/components/layout/fotocorp-logo-link"
-import { buttonVariants } from "@/components/ui/button"
-import { authClient } from "@/lib/auth-client"
-import { cn } from "@/lib/utils"
 
 /** Matches homepage hero (`--surface-warm` / #faf8f5) */
 const HEADER_SHELL_CLASS =
@@ -140,7 +142,7 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
             href="/account/fotobox"
             className="hidden items-center gap-2 fc-label text-[#6b7280] transition-colors hover:text-foreground lg:flex"
           >
-            <Archive className="h-4.5 w-4.5" />
+            <Archive size={18} />
             Fotobox
           </Link>
 
@@ -156,7 +158,7 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
             aria-controls="mobile-nav-panel"
             aria-label="Toggle menu"
           >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileOpen ? <X size={20} /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
@@ -234,7 +236,7 @@ function HeaderStatic({ userProfile, staffBrief }: HeaderProps) {
             href="/account/fotobox"
             className="hidden items-center gap-2 fc-label text-[#6b7280] transition-colors hover:text-foreground lg:flex"
           >
-            <Archive className="h-4.5 w-4.5" />
+            <Archive size={18} />
             Fotobox
           </Link>
 
@@ -250,7 +252,7 @@ function HeaderStatic({ userProfile, staffBrief }: HeaderProps) {
             aria-controls="mobile-nav-panel"
             aria-label="Toggle menu"
           >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileOpen ? <X size={20} /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
@@ -298,7 +300,7 @@ function MegaMenu({ link, pathname, sortParam }: { link: HeaderLink; pathname: s
         )}
       >
         {link.label}
-        <ChevronDown className="h-3 w-3 opacity-60 transition-transform duration-200 group-hover:rotate-180" />
+        <ChevronDown className="opacity-60 transition-transform duration-200 group-hover:rotate-180" size={12} />
       </Link>
 
       {/* Dropdown panel */}
@@ -370,7 +372,7 @@ function MoreMenu() {
           open ? "text-foreground" : "text-muted-foreground"
         )}
       >
-        More <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
+        More <ChevronDown className={cn(" transition-transform", open &&"rotate-180")} size={12} />
       </button>
       {open && (
         <div className="absolute top-full right-0 z-50 mt-1 w-48 rounded-xl border border-border bg-background p-2 shadow-xl">
@@ -484,7 +486,7 @@ function AccountMenu({
               {getUserInitial(staffLabel)}
             </span>
             <span className="truncate">{staffLabel}</span>
-            <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />
+            <ChevronDown className={cn(" text-muted-foreground transition-transform", open &&"rotate-180")} size={16} />
           </button>
           {open && (
             <div
@@ -516,7 +518,7 @@ function AccountMenu({
                   onClick={() => void handleStaffSignOut()}
                   className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                  <LogOut className="h-4 w-4" />
+                  <LogOut size={16} />
                   Staff sign out
                 </button>
               </div>
@@ -554,7 +556,7 @@ function AccountMenu({
           {getUserInitial(displayName)}
         </span>
         <span className="truncate">{displayName}</span>
-        <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />
+        <ChevronDown className={cn(" text-muted-foreground transition-transform", open &&"rotate-180")} size={16} />
       </button>
 
       {open && (
@@ -578,7 +580,7 @@ function AccountMenu({
               onClick={() => void handleStaffSignOut()}
               className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut size={16} />
               Staff sign out
             </button>
           ) : null}
@@ -588,7 +590,7 @@ function AccountMenu({
             onClick={handleSignOut}
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut size={16} />
             Sign out
           </button>
         </div>
@@ -715,7 +717,7 @@ function MobileAccountMenu({
               onClick={() => void handleStaffSignOut()}
               className="flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut size={16} />
               Staff sign out
             </button>
             <Link href="/sign-in" className={cn(buttonVariants(), "w-full bg-primary text-primary-foreground hover:bg-primary/90 font-semibold")}>
@@ -758,7 +760,7 @@ function MobileAccountMenu({
             onClick={() => void handleStaffSignOut()}
             className="flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut size={16} />
             Staff sign out
           </button>
         ) : null}
@@ -767,7 +769,7 @@ function MobileAccountMenu({
           onClick={handleSignOut}
           className="flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut size={16} />
           Sign out
         </button>
       </div>
@@ -846,7 +848,7 @@ function getAccountLinks(userProfile?: HeaderUserProfile | null, staffBrief?: St
     return [
       ...staffPrefix,
       { label: "Contributor dashboard", href: "/contributor/dashboard", icon: Camera },
-      { label: "Uploads", href: "/contributor/uploads", icon: UploadCloud },
+      { label: "Uploads", href: "/contributor/uploads", icon: CloudUpload },
       { label: "Download reports", href: "/contributor/download-reports", icon: Download },
       { label: "My account", href: "/account", icon: UserRound },
     ]

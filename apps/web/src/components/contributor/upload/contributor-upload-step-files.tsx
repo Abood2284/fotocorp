@@ -1,11 +1,11 @@
 "use client"
 
+import { Loader2 } from "lucide-react"
 import type { TrackedFile } from "@/components/contributor/contributor-upload-types"
 import { ContributorUploadStepCard } from "@/components/contributor/upload/contributor-upload-layout"
 import { formatFileSize, labelForStatus } from "@/components/contributor/upload/contributor-upload-utils"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Loader2 } from "lucide-react"
 
 interface ContributorUploadStepFilesProps {
   active: boolean
@@ -130,7 +130,7 @@ export function ContributorUploadStepFiles({
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     {phase === "running" && row.status !== "done" && row.status !== "failed" ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" aria-hidden />
+                      <Loader2 className="animate-spin text-primary" aria-hidden size={16} />
                     ) : null}
                     {phase !== "running" && row.status !== "done" ? (
                       <button

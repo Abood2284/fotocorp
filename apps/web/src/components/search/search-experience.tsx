@@ -3,19 +3,7 @@
 import { useRouter } from "next/navigation"
 import type React from "react"
 import { useEffect, useMemo, useState, useTransition } from "react"
-import {
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Grid3X3,
-  Images,
-  ListFilter,
-  Rows3,
-  Search,
-  SlidersHorizontal,
-  X,
-} from "lucide-react"
+
 import type {
   PublicAssetFiltersResponse,
   PublicAssetListResponse,
@@ -32,6 +20,7 @@ import { useSearchFilters } from "@/components/search/search-filters-context"
 import { Button } from "@/components/ui/button"
 import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 import { cn, formatInteger } from "@/lib/utils"
+import {  Calendars, ChevronDown, ChevronLeft, ChevronRight, Images, Rows, SlidersHorizontal, X, Grid3x3, SearchIcon, ListFilterIcon  } from "lucide-react"
 
 export type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 
@@ -264,7 +253,7 @@ export function SearchExperience({
       >
         <form onSubmit={submitSearch} className="grid min-h-[72px] grid-cols-[1fr_auto] items-stretch border-b border-border bg-background focus-within:outline-none md:grid-cols-[1fr_260px_auto]">
           <label className="flex min-w-0 items-center gap-3 px-4 sm:px-6 lg:px-8">
-            <Search className="h-6 w-6 shrink-0 text-foreground" strokeWidth={2.1} />
+            <SearchIcon className="shrink-0 text-foreground" strokeWidth={2.1} size={24} />
             <span className="sr-only">Search the Fotocorp archive</span>
             <input
               value={queryDraft}
@@ -276,7 +265,7 @@ export function SearchExperience({
 
           <div className="hidden items-center justify-center border-l border-border px-6 text-base font-medium text-foreground md:flex">
             Editorial images
-            <ChevronDown className="ml-3 h-4 w-4" />
+            <ChevronDown className="ml-3" size={16} />
           </div>
 
           <div className="flex items-center border-l border-border">
@@ -287,7 +276,7 @@ export function SearchExperience({
                 className="flex h-full w-14 items-center justify-center text-foreground hover:bg-muted"
                 aria-label="Clear search text"
               >
-                <X className="h-6 w-6" />
+                <X size={24} />
               </button>
             )}
             <Button type="submit" className="m-3 h-12 rounded-none px-5" disabled={isPending} aria-busy={isPending}>
@@ -307,10 +296,10 @@ export function SearchExperience({
             aria-expanded={showFilters}
           >
             <span className="inline-flex items-center gap-3">
-              <SlidersHorizontal className="h-5 w-5" />
+              <SlidersHorizontal size={20} />
               Filters
             </span>
-            <ChevronLeft className={cn("h-5 w-5 transition-transform", !showFilters && "rotate-180")} />
+            <ChevronLeft className={cn(" transition-transform", !showFilters &&"rotate-180")} size={20} />
           </button>
 
           {filtersLoading ? (
@@ -442,7 +431,7 @@ function FilterPanel({
     <aside className="border border-border bg-background">
       <div className="flex items-center justify-between border-b border-border bg-primary px-4 py-4 text-primary-foreground">
         <span className="inline-flex items-center gap-3 text-base font-semibold uppercase tracking-wide">
-          <ListFilter className="h-5 w-5" />
+          <ListFilterIcon className="h-5 w-5" />
           Filters
         </span>
         <button type="button" onClick={onClearAll} className="text-sm font-medium underline underline-offset-4">
@@ -473,7 +462,7 @@ function FilterPanel({
 
       <section className="border-b border-border p-4">
         <h2 className="mb-3 flex items-center gap-2 text-base font-semibold uppercase tracking-wide text-foreground">
-          <CalendarDays className="h-5 w-5" />
+          <Calendars size={20} />
           Date range
         </h2>
         <div className="grid grid-cols-2 gap-3">
@@ -638,7 +627,7 @@ function ViewToggle({
         className={cn("flex w-14 items-center justify-center border-r border-border-strong transition-colors", value === "grid" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
         aria-label="Grid view"
       >
-        <Grid3X3 className="h-6 w-6" />
+        <Grid3x3 className="h-6 w-6" />
       </button>
       <button
         type="button"
@@ -646,7 +635,7 @@ function ViewToggle({
         className={cn("flex w-14 items-center justify-center transition-colors", value === "card" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
         aria-label="Card view"
       >
-        <Rows3 className="h-6 w-6" />
+        <Rows className="h-6 w-6" />
       </button>
     </div>
   )
@@ -678,7 +667,7 @@ function Pagination({
           disabled={disabled}
           className="inline-flex h-10 items-center justify-center gap-1.5 border border-border bg-background px-4 text-sm font-medium uppercase tracking-wide text-foreground transition-colors hover:bg-muted disabled:opacity-50"
         >
-          <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+          <ChevronLeft  strokeWidth={2} size={16} />
           Previous
         </button>
       )}
@@ -698,7 +687,7 @@ function Pagination({
           className="inline-flex h-10 items-center justify-center gap-1.5 border border-primary bg-primary px-5 text-sm font-medium uppercase tracking-wide text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-50"
         >
           Next
-          <ChevronRight className="h-4 w-4" strokeWidth={2} />
+          <ChevronRight  strokeWidth={2} size={16} />
         </button>
       )}
     </div>
@@ -735,7 +724,7 @@ function LabeledSelect({
         >
           {children}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2  -translate-y-1/2 text-muted-foreground" size={16} />
       </div>
     </label>
   )
@@ -762,7 +751,7 @@ function ActiveChips({
           className="inline-flex h-8 items-center gap-2 rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted"
         >
           <span>{chip.label}</span>
-          <X className="h-3.5 w-3.5" />
+          <X size={14} />
         </button>
       ))}
       <button

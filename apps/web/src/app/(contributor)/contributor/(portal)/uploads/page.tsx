@@ -1,10 +1,11 @@
 import Link from "next/link"
-import { UploadCloud } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { getContributorEvents, getContributorUploadBatches } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
+import { CloudUpload } from "lucide-react";
 
 export const metadata = {
   title: "Upload batches",
@@ -53,7 +54,7 @@ export default async function ContributorUploadsPage({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contributor portal</p>
           <h1 className="mt-2 flex items-center gap-2 text-3xl font-semibold tracking-tight text-foreground">
-            <UploadCloud className="h-8 w-8 text-muted-foreground" />
+            <CloudUpload className="text-muted-foreground" size={32} />
             Uploads
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">

@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
 import { AlertTriangle } from "lucide-react"
+import { useState } from "react"
+
 import type { IngestionRun } from "@/lib/fixtures/admin"
 import { RunStatusChip } from "@/components/admin/status-chip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -97,7 +98,7 @@ export function IngestionRunsPanel({ runs }: IngestionRunsPanelProps) {
                   {selectedRun.errors.map((error) => (
                     <div key={error.id} className="rounded-md border border-red-200 bg-red-50 p-2.5">
                       <div className="flex items-center gap-1 text-xs font-medium text-red-700">
-                        <AlertTriangle className="h-3.5 w-3.5" />
+                        <AlertTriangle size={14} />
                         {error.assetId} · {error.stage}
                       </div>
                       <p className="mt-1 text-xs text-red-800">{error.message}</p>

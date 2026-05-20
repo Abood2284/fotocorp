@@ -1,6 +1,7 @@
+import { AlertTriangle, ChevronLeft, Calendar as Calendar, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { AlertTriangle, ChevronLeft, Calendar as CalendarIcon, ExternalLink } from "lucide-react"
+
 import { getAdminEvent } from "@/lib/api/admin-events-api"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -38,14 +39,14 @@ export default async function StaffEventDetailPage({ params }: StaffEventDetailP
     <div className="space-y-6">
       <div>
         <Link href="/staff/events" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft size={16} />
           Back to events
         </Link>
         <div className="mt-2 flex items-center justify-between">
           <h2 className="text-xl font-semibold tracking-tight">Event: {event.name}</h2>
           <Button asChild variant="outline" size="sm">
             <Link href={`/staff/catalog?eventId=${event.id}`} className="flex items-center gap-2">
-              <ExternalLink className="h-4 w-4" />
+              <ExternalLink size={16} />
               View Assets in Catalog
             </Link>
           </Button>
@@ -90,7 +91,7 @@ export default async function StaffEventDetailPage({ params }: StaffEventDetailP
           <Card className="border-destructive/50">
             <CardHeader>
               <CardTitle className="text-base text-destructive flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
+                <AlertTriangle size={16} />
                 Danger Zone
               </CardTitle>
             </CardHeader>

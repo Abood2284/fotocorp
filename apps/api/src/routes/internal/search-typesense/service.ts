@@ -1,0 +1,38 @@
+import type { Env } from "../../../appTypes"
+import { createHttpDb } from "../../../db"
+import { AppError } from "../../../lib/errors"
+import { json } from "../../../lib/http"
+import {
+  scheduleTypesenseDeleteForEvent,
+  scheduleTypesenseSyncForAsset,
+  scheduleTypesenseSyncForEvent,
+} from "../../../lib/search/typesense-public-asset-sync"
+
+function db(env: Env) {
+  if (!env.DATABASE_URL) throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
+  return createHttpDb(env.DATABASE_URL)
+}
+
+export async function syncTypesenseAssetService(
+  env: Env,
+  body: { assetId: string; critical?: boolean },
+) {
+  await scheduleTypesenseSyncForAsset(db(env), env, body.assetId, undefined, { critical: body.critical })
+  return json({ ok: true, assetId: body.assetId })
+}
+
+export async function syncTypesenseEventService(
+  env: Env,
+  body: { eventId: string; critical?: boolean },
+) {
+  await scheduleTypesenseSyncForEvent(db(env), env, body.eventId, { critical: body.critical })
+  return json({ ok: true, eventId: body.eventId })
+}
+
+export async function deleteTypesenseEventService(
+  env: Env,
+  body: { eventId: string; critical?: boolean },
+) {
+  await scheduleTypesenseDeleteForEvent(env, body.eventId, { critical: body.critical })
+  return json({ ok: true, eventId: body.eventId })
+}

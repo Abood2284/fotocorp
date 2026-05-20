@@ -1,7 +1,8 @@
+import { AlertTriangle, ChevronLeft } from "lucide-react"
 import Link from "next/link"
 import { revalidatePath } from "next/cache"
 import { notFound } from "next/navigation"
-import { AlertTriangle, ChevronLeft } from "lucide-react"
+
 import {
   getAdminAsset,
   getAdminAssetFilters,
@@ -96,7 +97,7 @@ export default async function AdminAssetDetailPage({ params, searchParams }: Adm
     <div className="space-y-5">
       <div>
         <Link href="/staff/catalog" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft size={16} />
           Back to assets
         </Link>
         <h2 className="mt-2 text-xl font-semibold tracking-tight">Asset: {asset.legacyImageCode ?? asset.id}</h2>

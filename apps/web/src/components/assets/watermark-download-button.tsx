@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
 import { Download, Loader2 } from "lucide-react"
+import { useState } from "react"
 
 interface WatermarkDownloadButtonProps {
   previewUrl: string
@@ -53,7 +53,7 @@ export function WatermarkDownloadButton({
         className="rounded-md bg-black/40 p-2 text-white/90 backdrop-blur-md transition-colors hover:bg-black/60 disabled:opacity-50"
         aria-label={hoverLabel}
       >
-        {downloading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
+        {downloading ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
       </button>
       <span className="pointer-events-none absolute right-0 top-full z-30 mt-2 whitespace-nowrap rounded-md bg-black/40 px-3 py-2 text-xs font-medium text-white/90 opacity-0 backdrop-blur-md transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
         {hoverLabel}

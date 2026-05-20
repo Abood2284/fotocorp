@@ -1,6 +1,14 @@
-import { BarChart3, Download, ImagePlus, Layers, TrendingUp, type LucideIcon } from "lucide-react"
+
 import { getContributorAnalyticsSummary } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
+import {
+  BarChart3,
+  Download,
+  ImagePlus,
+  Layers,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 
 export const metadata = {
   title: "Contributor Dashboard",
@@ -22,27 +30,35 @@ function StatCard({
   return (
     <div className="group flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-6 md:p-8 transition-all hover:bg-muted/30">
       <div className="flex items-center justify-between text-muted-foreground">
-        <span className="text-xs font-semibold uppercase tracking-[0.15em]">{title}</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.15em]">
+          {title}
+        </span>
         <Icon className="h-4 w-4" />
       </div>
 
       <div className="mt-8 md:mt-12">
-        <p className="text-4xl md:text-5xl font-light tabular-nums tracking-tighter text-foreground">{primaryValue}</p>
+        <p className="text-4xl md:text-5xl font-light tabular-nums tracking-tighter text-foreground">
+          {primaryValue}
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">{primaryLabel}</p>
       </div>
 
       {secondaryStats.length > 0 && (
         <div className="mt-6 flex items-center gap-6 border-t border-border pt-4">
-          {secondaryStats.map(stat => (
+          {secondaryStats.map((stat) => (
             <div key={stat.label}>
-              <p className="text-lg md:text-xl font-medium tabular-nums text-foreground">{stat.value}</p>
-              <p className="mt-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+              <p className="text-lg md:text-xl font-medium tabular-nums text-foreground">
+                {stat.value}
+              </p>
+              <p className="mt-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                {stat.label}
+              </p>
             </div>
           ))}
         </div>
       )}
     </div>
-  )
+  );
 }
 
 export default async function ContributorDashboardPage() {
@@ -81,7 +97,7 @@ export default async function ContributorDashboardPage() {
             <div className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-6 md:p-8 transition-all hover:bg-muted/30">
                <div className="relative z-10 flex items-center justify-between text-muted-foreground">
                  <span className="text-xs font-semibold uppercase tracking-[0.15em]">Published</span>
-                 <BarChart3 className="h-4 w-4" />
+                 <BarChart3 size={16} />
                </div>
                <div className="relative z-10 mt-12 md:mt-16">
                  <p className="text-4xl md:text-5xl font-light tracking-tighter tabular-nums text-foreground">{summary.approvedImages}</p>
@@ -132,7 +148,7 @@ export default async function ContributorDashboardPage() {
         <section className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium text-foreground flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-muted-foreground" />
+              <TrendingUp className="text-muted-foreground" size={20} />
               Top Downloaded Images
             </h2>
           </div>
@@ -163,7 +179,7 @@ export default async function ContributorDashboardPage() {
                         <span className="rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground">Preview pending</span>
                       )}
                       <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-4 py-1.5 text-sm font-medium tabular-nums text-foreground transition-colors group-hover:bg-muted">
-                        <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Download className="text-muted-foreground" size={14} />
                         {row.downloadCount}
                       </span>
                     </div>

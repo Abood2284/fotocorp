@@ -1,9 +1,10 @@
 "use client"
 
+import { Download, CircleHelp } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useRef, useState } from "react"
-import { Download, HelpCircle } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { messageForSubscriberDownloadErrorCode } from "@/lib/download-error-messages"
 import { cn } from "@/lib/utils"
@@ -208,7 +209,7 @@ export function AssetDetailActions({
               className="w-full justify-center"
               onClick={handleDownloadClick}
             >
-              <Download className="h-4 w-4" />
+              <Download size={16} />
               Download now
             </Button>
           </div>
@@ -222,7 +223,7 @@ export function AssetDetailActions({
             onClick={handleDownloadClick}
             aria-label={`Download ${selectedOption?.label ?? "selected"} size`}
           >
-            <Download className="h-4 w-4" />
+            <Download size={16} />
             {downloadBusy ? "Starting download..." : "Download now"}
           </Button>
         )}
@@ -314,7 +315,7 @@ function ImageUsageHelp() {
         aria-expanded={open}
         aria-label="How you can use this image"
       >
-        <HelpCircle className="h-4 w-4" aria-hidden />
+        <CircleHelp  aria-hidden size={16} />
       </button>
       {open ? (
         <div

@@ -1,8 +1,9 @@
 "use client"
 
+import { Calendar, Search } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Calendar, Search } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { AdminEventListResponse } from "@/features/events/admin-events-types"
@@ -47,7 +48,7 @@ export function StaffEventsClient({ initialData }: { initialData: AdminEventList
       <div className="flex items-center gap-4 border-b border-border pb-4">
         <form onSubmit={handleSearch} className="flex flex-1 items-center gap-2">
           <div className="relative max-w-xs flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5  text-muted-foreground" size={16} />
             <Input
               name="q"
               defaultValue={q}
@@ -122,7 +123,7 @@ export function StaffEventsClient({ initialData }: { initialData: AdminEventList
               <tr key={event.id} className="border-b last:border-0 hover:bg-muted/50">
                 <td className="px-4 py-3 font-medium">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <Calendar className="text-muted-foreground" size={16} />
                     <span>{event.name}</span>
                   </div>
                 </td>

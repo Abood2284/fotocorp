@@ -1,6 +1,6 @@
 "use client"
 
-import { HelpCircle, Plus } from "lucide-react"
+import { CircleHelp, Plus } from "lucide-react"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { FotoboxSaveButton } from "@/components/assets/fotobox-save-button"
 import { cn } from "@/lib/utils"
@@ -57,7 +57,7 @@ export function AssetPreviewChrome({
               className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-foreground/8 text-foreground/70"
               aria-hidden
             >
-              <HelpCircle className="h-4 w-4" />
+              <CircleHelp size={16} />
             </span>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -81,7 +81,7 @@ export function AssetPreviewChrome({
             variant="ghost"
             className="m-0 shrink-0"
             buttonClassName="h-9 gap-1.5 rounded-md border-0 bg-neutral-800 px-4 text-sm font-medium text-white shadow-sm hover:bg-neutral-900 hover:text-white"
-            icon={<Plus className="h-4 w-4" strokeWidth={2.5} />}
+            icon={<Plus  strokeWidth={2.5} size={16} />}
             text="Save"
             hoverLabel="Save as"
           />

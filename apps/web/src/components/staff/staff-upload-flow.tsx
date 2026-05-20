@@ -1,5 +1,6 @@
 "use client"
 
+import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
@@ -36,7 +37,7 @@ import {
   staffWizardSubmitBatch,
 } from "@/lib/staff-upload-wizard-client"
 import { Button } from "@/components/ui/button"
-import { Loader2 } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 
 /** Placeholder session for shared event step UI (photographer picker uses `staffMode`). */
@@ -547,7 +548,7 @@ export function StaffUploadFlow() {
               >
                 {submitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2  animate-spin" size={16} />
                     Submitting…
                   </>
                 ) : (
@@ -632,7 +633,7 @@ export function StaffUploadFlow() {
                   >
                     {createBusy ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2  animate-spin" size={16} />
                         Creating…
                       </>
                     ) : eventCreated ? (
@@ -651,7 +652,7 @@ export function StaffUploadFlow() {
                   >
                     {phase === "running" ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2  animate-spin" size={16} />
                         Uploading…
                       </>
                     ) : (

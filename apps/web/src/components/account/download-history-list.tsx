@@ -1,5 +1,6 @@
-import Link from "next/link"
 import { Download, Eye, Lock } from "lucide-react"
+import Link from "next/link"
+
 import { PreviewImage } from "@/components/assets/preview-image"
 import type { DownloadHistoryItem } from "@/lib/api/account-api"
 
@@ -45,7 +46,7 @@ export function DownloadHistoryList({
                     href={`/assets/${item.assetId}`}
                     className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-3 text-xs font-medium text-foreground hover:bg-muted"
                   >
-                    <Eye className="h-3.5 w-3.5" />
+                    <Eye size={14} />
                     View
                   </Link>
                 )}
@@ -54,7 +55,7 @@ export function DownloadHistoryList({
                     href={`/api/assets/${item.assetId}/download?size=large`}
                     className="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                   >
-                    <Download className="h-3.5 w-3.5" />
+                    <Download size={14} />
                     Download again
                   </a>
                 ) : (
@@ -62,7 +63,7 @@ export function DownloadHistoryList({
                     href="/account/subscription"
                     className="inline-flex h-9 items-center gap-1 rounded-md border border-border px-3 text-xs font-medium text-muted-foreground hover:bg-muted"
                   >
-                    <Lock className="h-3.5 w-3.5" />
+                    <Lock size={14} />
                     Locked
                   </Link>
                 )}

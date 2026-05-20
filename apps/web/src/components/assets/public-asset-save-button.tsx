@@ -1,8 +1,9 @@
 "use client"
 
+import { Check, Loader2, Plus } from "lucide-react"
 import { useState } from "react"
 import type React from "react"
-import { Check, Loader2, Plus } from "lucide-react"
+
 import { cn } from "@/lib/utils"
 
 interface PublicAssetSaveButtonProps {
@@ -48,11 +49,11 @@ export function PublicAssetSaveButton({
           : "Save to FotoBox"
   const saveIcon =
     saveState === "saving" ? (
-      <Loader2 className="h-4 w-4 animate-spin" />
+      <Loader2 className="animate-spin" size={16} />
     ) : saveState === "saved" ? (
-      <Check className="h-4 w-4" />
+      <Check size={16} />
     ) : (
-      <Plus className="h-4 w-4" strokeWidth={2.5} />
+      <Plus  strokeWidth={2.5} size={16} />
     )
 
   return (
