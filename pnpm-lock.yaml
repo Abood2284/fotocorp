@@ -38,6 +38,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.1045.0
         version: 3.1045.0
+      '@fotocorp/media-preview':
+        specifier: workspace:*
+        version: link:../../packages/media-preview
       '@fotocorp/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -93,6 +96,9 @@ importers:
 
   apps/jobs:
     dependencies:
+      '@fotocorp/media-preview':
+        specifier: workspace:*
+        version: link:../../packages/media-preview
       pg:
         specifier: ^8.20.0
         version: 8.20.0
@@ -190,6 +196,19 @@ importers:
         version: 4.91.0(@cloudflare/workers-types@4.20260423.1)
 
   packages/db: {}
+
+  packages/media-preview:
+    dependencies:
+      sharp:
+        specifier: ^0.34.5
+        version: 0.34.5
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.39
+        version: 20.19.39
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
 
   packages/shared: {}
 

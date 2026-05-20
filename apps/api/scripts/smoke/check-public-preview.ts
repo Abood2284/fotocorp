@@ -47,7 +47,10 @@ if (!previewUrl) {
   throw new Error("Expected first public asset to include a signed card preview URL.");
 }
 
-const previewResponse = await app.fetch(new Request(`https://api.local${previewUrl}`), env);
+const previewResponse = await app.fetch(
+  new Request(previewUrl.startsWith("http") ? previewUrl : `https://api.local${previewUrl}`),
+  env,
+);
 const contentType = previewResponse.headers.get("content-type");
 
 if (previewResponse.status !== 200) {

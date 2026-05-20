@@ -158,15 +158,14 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               )}
             </header>
 
-            <figure className="overflow-hidden rounded-xl bg-surface-stone/40 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+            <figure className="overflow-hidden bg-background lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
               {preview ? (
-                <div className="flex w-full flex-col px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:px-6 lg:pb-6 lg:pt-2">
+                <div className="flex w-full flex-col bg-background px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:px-6 lg:pb-6 lg:pt-2">
                   <AssetPreviewChrome
                     src={preview.url}
                     alt={getAssetAlt(asset)}
                     width={preview.width}
                     height={preview.height}
-                    className="block h-auto max-h-[86vh] w-auto max-w-full object-contain drop-shadow-2xl lg:max-h-full"
                     loading="eager"
                     whoIsInPicture={asset.whoIsInPicture}
                     fotokey={asset.fotokey ?? null}

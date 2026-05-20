@@ -1,5 +1,6 @@
 import Link from "next/link"
-import { Archive, Camera } from "lucide-react"
+import { Archive } from "lucide-react"
+import { FotocorpLogoLink } from "@/components/layout/fotocorp-logo-link"
 
 interface FooterLink {
   label: string
@@ -43,16 +44,7 @@ export function Footer() {
       <div className="mx-auto max-w-[1600px] px-4 py-12 sm:px-6 lg:px-8 lg:py-14">
         <div className="flex flex-col gap-10 border-b border-border/70 pb-10 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-sm">
-            <Link
-              href="/"
-              className="fc-brand inline-flex items-center gap-2 rounded-md py-1 font-semibold tracking-tight transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Fotocorp home"
-            >
-              <Camera className="h-8 w-8 text-primary" />
-              <span className="text-2xl">
-                foto<span className="text-accent">corp</span>
-              </span>
-            </Link>
+            <FotocorpLogoLink imageClassName="h-8 sm:h-9" />
             <p className="mt-4 text-sm leading-6 text-muted-foreground">
               Authentic editorial archive — preview watermarked assets, then license clean files when you are ready.
             </p>

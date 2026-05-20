@@ -46,7 +46,7 @@ export async function getAdminCatalogStats() {
 
 export interface AdminMediaPipelineStatusResponse {
   watermarkProfile: string
-  /** Expected `watermark_profile` strings per variant (thumb/card clean, detail watermarked). */
+  /** Expected `watermark_profile` strings per variant (all protected / watermarked). */
   derivativeProfiles: {
     thumbProfile: string
     cardProfile: string

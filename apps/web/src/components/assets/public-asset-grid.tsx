@@ -1,14 +1,52 @@
+"use client"
+
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { PublicAsset } from "@/features/assets/types"
 import { PublicAssetCard } from "@/components/assets/public-asset-card"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Images } from "lucide-react"
+import {
+  computeJustifiedRows,
+  getPreviewAspectRatio,
+  type JustifiedRowsOptions,
+} from "@/lib/layout/justified-rows"
 import { cn } from "@/lib/utils"
 
-/** Column layout for public browse grids (search, homepage sections, related assets). */
-export const PUBLIC_ASSET_GRID_COLUMNS =
-  "columns-2 gap-2 sm:columns-3 lg:columns-4 xl:columns-5"
+export const DEFAULT_JUSTIFIED_OPTIONS: JustifiedRowsOptions = {
+  gap: 8,
+  targetRowHeight: 200,
+  minRowHeight: 140,
+  maxRowHeight: 320,
+  justifyLastRow: true,
+  minTileWidth: 150,
+}
 
-export const PUBLIC_ASSET_GRID_CARD_CLASS = "mb-2 break-inside-avoid"
+export const DENSE_JUSTIFIED_OPTIONS: JustifiedRowsOptions = {
+  gap: 0,
+  targetRowHeight: 140,
+  minRowHeight: 110,
+  maxRowHeight: 220,
+  justifyLastRow: true,
+  minTileWidth: 120,
+}
+
+const MOBILE_CONTAINER_BREAKPOINT = 640
+
+function resolveJustifiedOptions(
+  dense: boolean,
+  containerWidth: number,
+): JustifiedRowsOptions {
+  const base = dense ? DENSE_JUSTIFIED_OPTIONS : DEFAULT_JUSTIFIED_OPTIONS
+  if (containerWidth >= MOBILE_CONTAINER_BREAKPOINT) return base
+
+  return {
+    ...base,
+    targetRowHeight: Math.min(base.targetRowHeight, 160),
+    minRowHeight: Math.min(base.minRowHeight, 120),
+    maxRowHeight: Math.min(base.maxRowHeight, 240),
+    minTileWidth: Math.min(base.minTileWidth ?? 150, 130),
+  }
+}
 
 export interface PublicAssetGridProps {
   assets: PublicAsset[]
@@ -24,7 +62,7 @@ export interface PublicAssetGridProps {
 }
 
 /**
- * Canonical public asset mosaic — same cards and layout as `/search` grid view.
+ * Canonical public asset browse grid — Getty/Shutterstock-style justified rows.
  */
 export function PublicAssetGrid({
   assets,
@@ -35,6 +73,56 @@ export function PublicAssetGrid({
   emptyTitle = "Previews are being prepared",
   emptyDescription = "The public archive will appear here as soon as watermarked previews are ready.",
 }: PublicAssetGridProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
+
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const nextWidth = Math.floor(entry.contentRect.width)
+      setContainerWidth((current) => (current === nextWidth ? current : nextWidth))
+    })
+
+    observer.observe(element)
+    setContainerWidth(Math.floor(element.getBoundingClientRect().width))
+
+    return () => observer.disconnect()
+  }, [])
+
+  const items = useMemo(() => assets.slice(0, limit), [assets, limit])
+  const layoutOptions = useMemo(
+    () => resolveJustifiedOptions(dense, containerWidth),
+    [dense, containerWidth],
+  )
+  const gap = layoutOptions.gap
+
+  const layoutItems = useMemo(
+    () =>
+      items.map((asset) => {
+        const preview = asset.previews.card ?? asset.previews.thumb
+        return {
+          id: asset.id,
+          aspectRatio: getPreviewAspectRatio(preview?.width, preview?.height),
+        }
+      }),
+    [items],
+  )
+
+  const rows = useMemo(
+    () => computeJustifiedRows(layoutItems, containerWidth, layoutOptions),
+    [layoutItems, containerWidth, layoutOptions],
+  )
+
+  const assetById = useMemo(() => new Map(items.map((asset) => [asset.id, asset])), [items])
+  const priorityIds = useMemo(
+    () => new Set(items.slice(0, priorityCount).map((asset) => asset.id)),
+    [items, priorityCount],
+  )
+
   if (assets.length === 0) {
     return (
       <EmptyState
@@ -46,26 +134,75 @@ export function PublicAssetGrid({
     )
   }
 
-  const items = assets.slice(0, limit)
+  const showPlaceholder = containerWidth <= 0
 
   return (
-    <div
-      className={cn(
-        dense ? "columns-2 gap-0 sm:columns-3 lg:columns-4 xl:columns-5" : PUBLIC_ASSET_GRID_COLUMNS,
-        className,
+    <div ref={containerRef} className={cn("w-full min-w-0", className)}>
+      {showPlaceholder ? (
+        <JustifiedGridPlaceholder dense={dense} />
+      ) : (
+        rows.map((row) => (
+          <div
+            key={row.key}
+            className="flex w-full"
+            style={{
+              gap,
+              height: row.height,
+              marginBottom: gap,
+            }}
+          >
+            {row.items.map((tile, tileIndex) => {
+              const asset = assetById.get(tile.id)
+              if (!asset) return null
+              const isLastTile = tileIndex === row.items.length - 1
+
+              return (
+                <div
+                  key={tile.id}
+                  className={cn(
+                    "overflow-hidden",
+                    dense && "!rounded-none",
+                    isLastTile ? "min-w-0 flex-1" : "shrink-0",
+                  )}
+                  style={
+                    isLastTile
+                      ? { flexBasis: tile.width, height: row.height }
+                      : { width: tile.width, flex: `0 0 ${tile.width}px`, height: row.height }
+                  }
+                >
+                  <PublicAssetCard
+                    asset={asset}
+                    variant="grid"
+                    gridLayout="justified"
+                    priority={priorityIds.has(tile.id)}
+                    className={cn("h-full w-full", dense && "!rounded-none")}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        ))
       )}
-    >
-      {items.map((asset, index) => (
-        <PublicAssetCard
-          key={asset.id}
-          asset={asset}
-          variant="grid"
-          priority={index < priorityCount}
-          className={cn(
-            "break-inside-avoid",
-            dense ? "mb-0 !rounded-none" : PUBLIC_ASSET_GRID_CARD_CLASS,
-          )}
-        />
+    </div>
+  )
+}
+
+function JustifiedGridPlaceholder({ dense }: { dense: boolean }) {
+  const rowHeight = dense ? 140 : 200
+  const gap = dense ? 0 : 8
+
+  return (
+    <div className="w-full animate-pulse" aria-hidden>
+      {[0, 1, 2].map((rowIndex) => (
+        <div
+          key={rowIndex}
+          className="flex w-full"
+          style={{ gap, height: rowHeight, marginBottom: gap }}
+        >
+          <div className="h-full flex-[3] bg-muted" />
+          <div className="h-full flex-[2] bg-muted" />
+          <div className="h-full flex-1 bg-muted" />
+        </div>
       ))}
     </div>
   )

@@ -15,6 +15,7 @@ import {
   logLatencyTrace,
 } from "../../lib/latency-trace"
 import { json } from "../../lib/http"
+import { parsePublicPreviewCdnConfig } from "../../lib/media/public-preview-cdn-url"
 import { methodNotAllowed } from "../../lib/route-errors"
 
 export const publicHomepageRoutes = new Hono<{ Bindings: Env; Variables: AppRequestVariables }>()
@@ -30,7 +31,8 @@ publicHomepageRoutes.get("/api/v1/public/homepage", async (c) => {
       throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
     }
 
-    const feed = await getPublicHomepageFeed(createHttpDb(c.env.DATABASE_URL))
+    const cdn = parsePublicPreviewCdnConfig(c.env)
+    const feed = await getPublicHomepageFeed(createHttpDb(c.env.DATABASE_URL), cdn)
     const durationMs = Date.now() - startedAt
 
     console.info(
@@ -84,12 +86,13 @@ publicHomepageRoutes.get("/api/v1/public/events/latest", async (c) => {
       throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
     }
 
+    const cdn = parsePublicPreviewCdnConfig(c.env)
     const db = createHttpDb(c.env.DATABASE_URL)
     const query = parseLatestEventsQuery(input)
     tracker.mark("parse")
     const { rows, dbTrace } = await fetchPublicLatestEventsRows(db, query)
     tracker.mark("db")
-    const response = buildLatestEventsResponse(rows, query)
+    const response = buildLatestEventsResponse(rows, query, cdn)
     tracker.mark("map")
     tracker.mark("response_build")
 

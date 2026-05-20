@@ -4,6 +4,7 @@ import { Grid2X2, List, SlidersHorizontal } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { AssetSort, AssetViewMode } from "@/features/assets/filter-utils"
+import { formatInteger } from "@/lib/utils"
 
 const SORT_OPTIONS: Array<{ label: string; value: AssetSort }> = [
   { label: "Relevance", value: "relevance" },
@@ -34,7 +35,7 @@ export function SearchToolbar({
   return (
     <div className="flex flex-wrap items-center gap-3 py-0">
       <p className="text-sm text-muted-foreground">
-        <span className="font-medium text-foreground">{total.toLocaleString()}</span> results
+        <span className="font-medium text-foreground">{formatInteger(total)}</span> results
       </p>
 
       <div className="ml-auto flex items-center gap-2">

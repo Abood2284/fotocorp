@@ -52,7 +52,16 @@ export interface PublicAsset {
 export interface PublicAssetListResponse {
   items: PublicAsset[]
   nextCursor: string | null
+  hasMore?: boolean
   totalCount?: number
+  page?: number
+  perPage?: number
+  totalPages?: number
+  filters?: PublicAssetFiltersResponse
+  timing?: {
+    backend: "typesense" | "postgres"
+    tookMs: number
+  }
 }
 
 export interface PublicAssetDetailResponse {
@@ -75,6 +84,8 @@ export interface PublicAssetFilterEvent {
 export interface PublicAssetFiltersResponse {
   categories: PublicAssetFilterCategory[]
   events: PublicAssetFilterEvent[]
+  cities?: Array<{ id: string; name: string; assetCount: number }>
+  sources?: Array<{ id: string; name: string; assetCount: number }>
 }
 
 export interface PublicAssetCollection {
@@ -158,11 +169,15 @@ export type PublicHomepageFeedResult =
 export interface PublicAssetListParams {
   q?: string
   categoryId?: string
+  category?: string
   eventId?: string
+  event?: string
+  city?: string
   contributorId?: string
   year?: number
   month?: number
   cursor?: string
+  page?: number
   limit?: number
   sort?: PublicAssetSort
 }

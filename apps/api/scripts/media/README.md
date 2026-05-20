@@ -7,136 +7,59 @@
 
 Original images are read by this Node script only. Public preview routes read derivatives from the Worker `PREVIEW_BUCKET` binding.
 
+Shared renderer: `@fotocorp/media-preview` (`packages/media-preview/`).
+
 ## Variants and watermarking
 
-| Variant | Watermark on pixels | `image_derivatives.is_watermarked` | Stored `watermark_profile` (examples) | R2 key prefix (unchanged) |
-|---------|---------------------|------------------------------------|---------------------------------------|---------------------------|
-| `thumb` | No (clean) | `false` | `fotocorp-thumb-clean-v1` | `previews/watermarked/thumb/...` |
-| `card` | No (clean) | `false` | `fotocorp-card-clean-v1` | `previews/watermarked/card/...` |
-| `detail` | Yes (tiled profile) | `true` | `fotocorp-preview-v4-dense-dark-lowquality` (detail; do not rename casually) | `previews/watermarked/detail/...` |
+| Variant | Protection | `image_derivatives.is_watermarked` | Stored `watermark_profile` | R2 key prefix |
+|---------|------------|------------------------------------|----------------------------|---------------|
+| `thumb` | Light diagonal `fotocorp` | `true` | `fotocorp_thumb_light_preview_v1` | `previews/watermarked/thumb/...` |
+| `card` | Diagonal + lower-right strip | `true` | `fotocorp_card_light_preview_v1` | `previews/watermarked/card/...` |
+| `detail` | Tab + diagonal + strip | `true` | `fotocorp_detail_preview_v1` | `previews/watermarked/detail/...` |
 
-The **folder name** `previews/watermarked/...` is intentionally unchanged for all variants so public URLs, BFF routes, and clients keep working during migration; only the bytes and DB flags/profiles reflect clean vs watermarked.
+The folder segment `previews/watermarked/...` is unchanged for URL stability; only bytes and DB metadata change during migration.
 
 ## Pipeline
 
-1. Import/mapping
-   - Legacy metadata import creates asset rows and maps `assets.r2_original_key`.
-   - It does not generate images.
-   - It does not upload images.
-
-2. R2 check
-   - Import/reconciliation checks whether original objects exist in the originals bucket.
-   - It updates `assets.r2_exists`.
-   - It should run in chunks.
-
-3. Derivative generation
-   - Reads originals from `CLOUDFLARE_R2_ORIGINALS_BUCKET`.
-   - Generates `thumb`, `card`, and `detail` WebP derivatives (`thumb` and `card` clean; `detail` watermarked).
-   - Writes objects to `CLOUDFLARE_R2_PREVIEWS_BUCKET` under `previews/watermarked/<variant>/...` (same paths as before).
-   - Upserts `image_derivatives` with `is_watermarked` matching the table above.
-
-4. Public API listing
-   - Shows assets through signed API preview URLs.
-   - Does not expose original keys, derivative keys, bucket names, or R2 URLs.
-
-5. Preview delivery
-   - Browser receives a signed API URL.
-   - API validates token and DB state (including per-variant watermark expectations).
-   - API reads the derivative from the preview bucket.
-   - Original bytes never touch the browser.
+1. Import/mapping — legacy import maps assets; does not generate images.
+2. R2 check — `media:verify-r2-originals` sets `original_exists_in_storage`.
+3. Derivative generation — reads originals, writes WebP to `previews/watermarked/<variant>/...`, upserts `image_derivatives`.
+4. Public API — signed or CDN preview URLs; never exposes R2 keys to the browser.
 
 ## Idempotency
 
-By default, the generator skips a derivative only when the DB row is `READY`, uses the **expected profile for that variant**, and **`is_watermarked` matches the variant** (`false` for thumb and card; `true` for detail). This avoids redoing already-good work while catching failed or legacy rows (for example card rows still marked watermarked).
-
-The script may GET original objects and PUT derivative objects. It does not delete originals. For **thumb/card** regeneration it **overwrites** the existing object at the same key (no delete-first).
+Skips when DB row is `READY` with the expected profile and `is_watermarked = true` for that variant. Use `--force` to overwrite R2 objects and refresh rows.
 
 ## Commands
 
-Regenerate **thumb and/or card** (dry run, then real); use `--force` to overwrite existing objects and refresh DB rows. Omit `detail` unless you intend to regenerate watermarked detail:
+Mac pilot (100 assets):
 
 ```bash
-pnpm --dir apps/api run media:generate-derivatives -- \
-  --dry-run --force --variants thumb,card --limit 50
-
-pnpm --dir apps/api run media:generate-derivatives -- \
-  --force --variants thumb,card --limit 10 --batch-size 5 --asset-concurrency 2 --upload-concurrency 4
+pnpm --dir apps/api run media:generate-derivatives -- --scope all-verified --variants thumb,card,detail --force --limit 100 --batch-size 25 --asset-concurrency 2 --upload-concurrency 4
 ```
 
-Regenerate **thumbs only** (subset of the above):
+Windows shard 0 (repeat `--shard-index` 0–4, same `--shard-count 5`):
 
 ```bash
-pnpm --dir apps/api run media:generate-derivatives -- \
-  --dry-run --force --variants thumb --limit 50
-
-pnpm --dir apps/api run media:generate-derivatives -- \
-  --force --variants thumb --limit 10 --batch-size 5 --asset-concurrency 2 --upload-concurrency 4
+pnpm --dir apps/api run media:generate-derivatives -- --scope all-verified --variants thumb,card,detail --force --shard-count 5 --shard-index 0 --batch-size 50 --asset-concurrency 1 --upload-concurrency 3 --report-file logs/derivative-shard-0-report.json
 ```
 
-Generate a 100-image smoke batch (all variants):
+Status:
 
 ```bash
-pnpm --dir apps/api run media:generate-derivatives -- \
-  --limit 100 \
-  --batch-size 25 \
-  --variants thumb,card,detail
-```
-
-Larger backfill (all variants):
-
-```bash
-pnpm --dir apps/api run media:generate-derivatives -- \
-  --limit 10000 \
-  --batch-size 25 \
-  --variants thumb,card,detail
-```
-
-Deterministic shard backfill (run one terminal per index, keeping the same shard count for the whole wave):
-
-```bash
-pnpm --dir apps/api run media:generate-derivatives -- \
-  --scope all-verified \
-  --variants thumb,card,detail \
-  --limit 40000 \
-  --batch-size 100 \
-  --asset-concurrency 1 \
-  --upload-concurrency 3 \
-  --shard-count 6 \
-  --shard-index 0
-```
-
-Run indexes `0..shardCount-1`. Use a dry run on two shards first, and do not use `--force` for normal cleanup.
-
-Shard assignment smoke:
-
-```bash
-pnpm --dir apps/api run smoke:derivative-shards
+pnpm --dir apps/api media:pipeline-status
 ```
 
 Dry run:
 
 ```bash
-pnpm --dir apps/api run media:generate-derivatives -- \
-  --dry-run \
-  --limit 10 \
-  --batch-size 5 \
-  --variants thumb,card,detail
+pnpm --dir apps/api run media:generate-derivatives -- --dry-run --limit 10 --variants thumb,card,detail
 ```
 
-Generate all variants for one asset:
+## R2 safety
 
-```bash
-pnpm --dir apps/api run media:generate-derivatives -- \
-  --asset-id <uuid> \
-  --variants thumb,card,detail
-```
-
-## R2 Safety
-
-Originals live at the root of the originals bucket, for example `FC0101072.jpg`. Generated derivatives are written to:
+Originals: `FC0101072.jpg` at bucket root. Derivatives:
 
 ```text
 previews/watermarked/<variant>/<object-id>.webp
 ```
-
-Per-variant **`watermark_profile`** and **`is_watermarked`** must match the table in [Variants and watermarking](#variants-and-watermarking) (thumb/card clean profiles vs detail tiled profile). Storage remains `image/webp`.

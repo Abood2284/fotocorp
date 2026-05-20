@@ -7,9 +7,13 @@ import { cn } from "@/lib/utils"
 /** Grid tile (search + browse). List/card are search alternate layouts only. */
 export type PublicAssetCardVariant = "grid" | "list" | "card"
 
+/** `justified` fills a fixed row tile (uniform row height). `intrinsic` uses preview aspect ratio. */
+export type PublicAssetGridLayout = "intrinsic" | "justified"
+
 interface PublicAssetCardProps {
   asset: PublicAsset
   variant?: PublicAssetCardVariant
+  gridLayout?: PublicAssetGridLayout
   className?: string
   priority?: boolean
 }
@@ -17,14 +21,18 @@ interface PublicAssetCardProps {
 export function PublicAssetCard({
   asset,
   variant = "grid",
+  gridLayout = "intrinsic",
   className,
   priority = false,
 }: PublicAssetCardProps) {
   const preview = asset.previews.card ?? asset.previews.thumb
   const title = getAssetAlt(asset)
   const href = `/assets/${asset.id}`
+  const isJustifiedGrid = variant === "grid" && gridLayout === "justified"
   const gridFrameStyle =
-    variant === "grid" ? { aspectRatio: getPreviewAspectRatio(preview) } : undefined
+    variant === "grid" && gridLayout === "intrinsic"
+      ? { aspectRatio: getPreviewAspectRatio(preview) }
+      : undefined
 
   return (
     <article
@@ -32,6 +40,7 @@ export function PublicAssetCard({
         "group relative overflow-hidden bg-muted text-white transition-all duration-300",
         variant === "grid" && "public-grid-card",
         variant === "grid" && "hover:-translate-y-[2px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)]",
+        variant === "grid" && isJustifiedGrid && "flex h-full w-full flex-col",
         variant === "grid" ? "rounded-none" : "rounded-lg",
         variant === "list" && "grid grid-cols-1 border border-border bg-card text-foreground sm:grid-cols-[280px_minmax(0,1fr)]",
         variant === "card" && "rounded-none border-b border-r border-border bg-card text-foreground shadow-none",
@@ -43,7 +52,8 @@ export function PublicAssetCard({
         className={cn(
           "relative overflow-hidden bg-muted",
           variant === "list" ? "aspect-[4/3] sm:h-full sm:aspect-auto" : "h-full min-h-[220px]",
-          variant === "grid" && "h-auto min-h-0 bg-background",
+          variant === "grid" && !isJustifiedGrid && "h-auto min-h-0 bg-background",
+          variant === "grid" && isJustifiedGrid && "min-h-0 flex-1 bg-background",
           variant === "card" && "m-4 mb-0 aspect-[4/3] h-auto min-h-0 bg-background",
         )}
       >
@@ -53,7 +63,9 @@ export function PublicAssetCard({
             alt={title}
             className={cn(
               "block w-full transition-transform duration-700 ease-out group-hover:scale-[1.025] group-focus-within:scale-[1.025]",
-              variant === "grid" ? "h-full object-contain" : "h-full object-cover",
+              variant === "grid" && isJustifiedGrid && "h-full object-cover",
+              variant === "grid" && !isJustifiedGrid && "h-full object-contain",
+              variant !== "grid" && "h-full object-cover",
             )}
             loading={priority ? "eager" : "lazy"}
           />

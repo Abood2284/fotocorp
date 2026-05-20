@@ -1,6 +1,9 @@
 import { sql, type SQL } from "drizzle-orm"
 import type { DrizzleClient } from "../../db/http"
-import { buildPublicStablePreviewPath } from "../media/stable-preview-path"
+import {
+  type PublicPreviewCdnConfig,
+  resolvePublicStablePreviewUrl,
+} from "../media/public-preview-cdn-url"
 import { joinPublicCardDerivative, publicAssetPredicate } from "./public-catalog-sql"
 
 export const PUBLIC_EVENT_FEED_WINDOW_DAYS = 30
@@ -53,12 +56,14 @@ interface FeedPreviewRow {
   preview_asset_id: string
   preview_width: number | null
   preview_height: number | null
+  preview_storage_key: string | null
   asset_count: number | string
 }
 
 export async function syncPublicEventFeedForEvent(
   db: DrizzleClient,
   eventId: string,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ): Promise<SyncPublicEventFeedResult> {
   const events = await executeRows<EventRow>(
     db,
@@ -140,7 +145,8 @@ export async function syncPublicEventFeedForEvent(
           a.image_date,
           a.created_at,
           card.width,
-          card.height
+          card.height,
+          card.storage_key
         from image_assets a
         ${joinPublicCardDerivative("a", "card")}
         where a.event_id = ${eventId}::uuid
@@ -154,7 +160,8 @@ export async function syncPublicEventFeedForEvent(
         select
           asset_id as preview_asset_id,
           width as preview_width,
-          height as preview_height
+          height as preview_height,
+          storage_key as preview_storage_key
         from eligible_assets
         order by coalesce(image_date, created_at) desc, asset_id desc
         limit 1
@@ -163,6 +170,7 @@ export async function syncPublicEventFeedForEvent(
         ep.preview_asset_id,
         ep.preview_width,
         ep.preview_height,
+        ep.preview_storage_key,
         ec.asset_count
       from event_counts ec
       left join event_previews ep on true
@@ -217,7 +225,11 @@ export async function syncPublicEventFeedForEvent(
     return { eventId, action: "hidden", isPublic: false }
   }
 
-  const previewUrl = buildPublicStablePreviewPath(feed.preview_asset_id, "card")
+  const previewUrl = resolvePublicStablePreviewUrl(cdn, {
+    storageKey: feed.preview_storage_key,
+    assetId: feed.preview_asset_id,
+    variant: "card",
+  })
   await db.execute(sql`
     insert into public_event_feed_items (
       event_id,
@@ -287,17 +299,17 @@ export async function deleteOldPublicEventFeedItems(
 export async function schedulePublicEventFeedSync(
   db: DrizzleClient,
   eventId: string | null | undefined,
-  options?: SchedulePublicEventFeedSyncOptions,
+  options?: SchedulePublicEventFeedSyncOptions & { cdn?: PublicPreviewCdnConfig },
 ): Promise<void> {
   if (!eventId) return
-  await runPublicEventFeedSyncWithRetries(db, eventId, Boolean(options?.critical))
+  await runPublicEventFeedSyncWithRetries(db, eventId, Boolean(options?.critical), options?.cdn)
 }
 
 export async function schedulePublicEventFeedSyncForAsset(
   db: DrizzleClient,
   assetId: string,
   previousEventId?: string | null,
-  options?: SchedulePublicEventFeedSyncOptions,
+  options?: SchedulePublicEventFeedSyncOptions & { cdn?: PublicPreviewCdnConfig },
 ): Promise<void> {
   const rows = await executeRows<{ event_id: string | null }>(
     db,
@@ -308,7 +320,8 @@ export async function schedulePublicEventFeedSyncForAsset(
   if (previousEventId) eventIds.add(previousEventId)
   if (currentEventId) eventIds.add(currentEventId)
   const critical = Boolean(options?.critical)
-  await Promise.all([...eventIds].map((id) => runPublicEventFeedSyncWithRetries(db, id, critical)))
+  const cdn = options?.cdn
+  await Promise.all([...eventIds].map((id) => runPublicEventFeedSyncWithRetries(db, id, critical, cdn)))
 }
 
 /**
@@ -317,7 +330,7 @@ export async function schedulePublicEventFeedSyncForAsset(
  */
 export async function reconcilePublicEventFeedProjectionDrift(
   db: DrizzleClient,
-  options?: { limit?: number },
+  options?: { limit?: number; cdn?: PublicPreviewCdnConfig },
 ): Promise<ReconcilePublicEventFeedProjectionResult> {
   const startedAt = Date.now()
   const limit = Math.min(Math.max(options?.limit ?? 250, 1), 2000)
@@ -377,7 +390,7 @@ export async function reconcilePublicEventFeedProjectionDrift(
 
     for (const eventId of orderedIds) {
       try {
-        const result = await syncPublicEventFeedForEvent(db, eventId)
+        const result = await syncPublicEventFeedForEvent(db, eventId, options?.cdn)
         if (result.action === "upserted" && result.isPublic) upsertedPublicCount += 1
         else if (result.action === "hidden" || result.action === "deleted") hiddenOrDeletedCount += 1
       } catch {
@@ -411,13 +424,14 @@ async function runPublicEventFeedSyncWithRetries(
   db: DrizzleClient,
   eventId: string,
   critical: boolean,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ): Promise<void> {
   const maxAttempts = critical ? POST_PUBLISH_SYNC_ATTEMPTS : 1
   let lastError: unknown
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const result = await syncPublicEventFeedForEvent(db, eventId)
+      const result = await syncPublicEventFeedForEvent(db, eventId, cdn)
       console.info(
         JSON.stringify({
           event: "public_event_feed_sync",

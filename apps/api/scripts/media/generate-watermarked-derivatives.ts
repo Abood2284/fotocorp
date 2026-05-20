@@ -9,12 +9,15 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import pg from "pg";
 import type { Pool as PgPool, QueryResult, QueryResultRow } from "pg";
-import sharp from "sharp";
 import {
-  CARD_CLEAN_PROFILE,
-  DETAIL_WATERMARKED_PROFILE,
-  THUMB_CLEAN_PROFILE,
-} from "../../src/lib/media/watermark.js";
+  CARD_LIGHT_PREVIEW_PROFILE,
+  DETAIL_PREVIEW_PROFILE,
+  THUMB_LIGHT_PREVIEW_PROFILE,
+  decodePreviewSource,
+  expectedWatermarkProfile,
+  generateProtectedPreview,
+  variantIsWatermarked,
+} from "@fotocorp/media-preview";
 import { createHttpDb } from "../../src/db/index.js";
 import { schedulePublicEventFeedSyncForAsset } from "../../src/lib/assets/public-event-feed-projection.js";
 
@@ -58,8 +61,6 @@ interface CliOptions {
   retryFailed: boolean;
   verboseErrors: boolean;
   prefix: string;
-  /** Profile string stored for `detail` (watermarked) rows; defaults to `DETAIL_WATERMARKED_PROFILE`. */
-  detailWatermarkProfile: string;
 }
 
 interface R2Config {
@@ -98,20 +99,6 @@ interface GeneratedDerivative {
   selectedQuality: number;
   targetReached: boolean;
   variant: Variant;
-}
-
-interface PreviewVariantProfile {
-  width: number;
-  qualities: number[];
-  targetMaxBytes?: number;
-}
-
-interface GeneratedDerivativeCandidate {
-  width: number;
-  height: number;
-  byteSize: number;
-  quality: number;
-  buffer: Buffer;
 }
 
 interface Counters {
@@ -223,36 +210,12 @@ const TRANSIENT_DB_ERROR_CODES = new Set([
   "53300",
 ]);
 
-const PREVIEW_VARIANT_PROFILES: Record<Variant, PreviewVariantProfile> = {
-  thumb: {
-    width: 220,
-    qualities: [26, 22],
-  },
-  card: {
-    width: 300,
-    qualities: [14],
-    targetMaxBytes: 22 * 1024,
-  },
-  detail: {
-    width: 520,
-    qualities: [20, 16, 12],
-    targetMaxBytes: 120 * 1024,
-  },
-};
 const VARIANTS: Variant[] = ["thumb", "card", "detail"];
 const MIME_TYPE = "image/webp";
 
-/** Only `detail` uses the tiled watermark; `thumb` and `card` are clean WebPs under the legacy `previews/watermarked/...` paths. */
-function variantUsesWatermark(variant: Variant): boolean {
-  return variant === "detail";
+function expectedDerivativeProfile(variant: Variant): string {
+  return expectedWatermarkProfile(variant);
 }
-
-function expectedDerivativeProfile(variant: Variant, options: CliOptions): string {
-  if (variant === "thumb") return THUMB_CLEAN_PROFILE;
-  if (variant === "card") return CARD_CLEAN_PROFILE;
-  return options.detailWatermarkProfile;
-}
-const DEFAULT_LIMIT_INPUT_PIXELS = 268_402_689;
 
 loadLocalEnv();
 
@@ -433,7 +396,7 @@ async function processAsset(
         errorClass,
         error,
       });
-      await markDerivativeFailed(pool, asset.id, decision.variant, derivativeKey, expectedDerivativeProfile(decision.variant, options), counters).catch(async (markError) => {
+      await markDerivativeFailed(pool, asset.id, decision.variant, derivativeKey, expectedDerivativeProfile(decision.variant), counters).catch(async (markError) => {
         counters.dbWriteFailures += 1;
         await logDerivativeFailure(failureLogPath, {
           options,
@@ -452,7 +415,7 @@ async function processAsset(
   let decodedSource: Buffer;
   try {
     const decodeStart = performance.now();
-    decodedSource = await decodeSourceImage(original);
+    decodedSource = await decodePreviewSource(original);
     counters.totalSourceDecodeMs += performance.now() - decodeStart;
     counters.sourceDecodeCount += 1;
   } catch (error) {
@@ -472,7 +435,7 @@ async function processAsset(
         errorClass,
         error,
       });
-      await markDerivativeFailed(pool, asset.id, decision.variant, derivativeKey, expectedDerivativeProfile(decision.variant, options), counters).catch(async (markError) => {
+      await markDerivativeFailed(pool, asset.id, decision.variant, derivativeKey, expectedDerivativeProfile(decision.variant), counters).catch(async (markError) => {
         counters.dbWriteFailures += 1;
         await logDerivativeFailure(failureLogPath, {
           options,
@@ -497,7 +460,13 @@ async function processAsset(
     try {
       countRegenerationReason(counters, decision.reason);
       const transformStart = performance.now();
-      const generated = await generateDerivative(decodedSource, derivativeKey, decision.variant, asset.id, previewObjectId);
+      const generated = await generateDerivative(
+        decodedSource,
+        derivativeKey,
+        decision.variant,
+        previewObjectId,
+        asset.id,
+      );
       counters.totalSharpTransformMs += performance.now() - transformStart;
       counters.transformCount += 1;
 
@@ -533,7 +502,7 @@ async function processAsset(
         errorClass,
         error,
       });
-      await markDerivativeFailed(pool, asset.id, decision.variant, derivativeKey, expectedDerivativeProfile(decision.variant, options), counters).catch(async (markError) => {
+      await markDerivativeFailed(pool, asset.id, decision.variant, derivativeKey, expectedDerivativeProfile(decision.variant), counters).catch(async (markError) => {
         counters.dbWriteFailures += 1;
         await logDerivativeFailure(failureLogPath, {
           options,
@@ -649,9 +618,9 @@ async function selectAssets(pool: PgPool, options: CliOptions): Promise<AssetRow
   ];
   const params: unknown[] = [
     options.variants,
-    THUMB_CLEAN_PROFILE,
-    CARD_CLEAN_PROFILE,
-    options.detailWatermarkProfile,
+    THUMB_LIGHT_PREVIEW_PROFILE,
+    CARD_LIGHT_PREVIEW_PROFILE,
+    DETAIL_PREVIEW_PROFILE,
     options.retryFailed,
     options.force,
   ];
@@ -677,13 +646,7 @@ async function selectAssets(pool: PgPool, options: CliOptions): Promise<AssetRow
           $6::boolean = true
           or d.image_asset_id is null
           or d.generation_status <> 'READY'
-          or (
-            case upper(v.variant)
-              when 'THUMB' then d.is_watermarked is distinct from false
-              when 'CARD' then d.is_watermarked is distinct from false
-              else d.is_watermarked is distinct from true
-            end
-          )
+          or d.is_watermarked is distinct from true
           or (
             case upper(v.variant)
               when 'THUMB' then d.watermark_profile is distinct from $2::text
@@ -721,9 +684,9 @@ async function selectAssets(pool: PgPool, options: CliOptions): Promise<AssetRow
 async function getSelectionDiagnostics(pool: PgPool, options: CliOptions): Promise<SelectionDiagnostics> {
   const params: unknown[] = [
     options.variants,
-    THUMB_CLEAN_PROFILE,
-    CARD_CLEAN_PROFILE,
-    options.detailWatermarkProfile,
+    THUMB_LIGHT_PREVIEW_PROFILE,
+    CARD_LIGHT_PREVIEW_PROFILE,
+    DETAIL_PREVIEW_PROFILE,
     options.scope,
     options.force,
     options.retryFailed,
@@ -777,13 +740,7 @@ async function getSelectionDiagnostics(pool: PgPool, options: CliOptions): Promi
             $6::boolean = true
             or d.image_asset_id is null
             or d.generation_status <> 'READY'
-            or (
-              case upper(v.variant)
-                when 'THUMB' then d.is_watermarked is distinct from false
-                when 'CARD' then d.is_watermarked is distinct from false
-                else d.is_watermarked is distinct from true
-              end
-            )
+            or d.is_watermarked is distinct from true
             or (
               case upper(v.variant)
                 when 'THUMB' then d.watermark_profile is distinct from $2::text
@@ -812,13 +769,7 @@ async function getSelectionDiagnostics(pool: PgPool, options: CliOptions): Promi
             $6::boolean = true
             or d.image_asset_id is null
             or d.generation_status <> 'READY'
-            or (
-              case upper(v.variant)
-                when 'THUMB' then d.is_watermarked is distinct from false
-                when 'CARD' then d.is_watermarked is distinct from false
-                else d.is_watermarked is distinct from true
-              end
-            )
+            or d.is_watermarked is distinct from true
             or (
               case upper(v.variant)
                 when 'THUMB' then d.watermark_profile is distinct from $2::text
@@ -892,13 +843,7 @@ async function warnOnScopeMismatch(pool: PgPool, options: CliOptions, diagnostic
         and (
           d.image_asset_id is null
           or d.generation_status <> 'READY'
-          or (
-            case upper(v.variant)
-              when 'THUMB' then d.is_watermarked is distinct from false
-              when 'CARD' then d.is_watermarked is distinct from false
-              else d.is_watermarked is distinct from true
-            end
-          )
+          or d.is_watermarked is distinct from true
           or (
             case upper(v.variant)
               when 'THUMB' then d.watermark_profile is distinct from $2::text
@@ -908,7 +853,7 @@ async function warnOnScopeMismatch(pool: PgPool, options: CliOptions, diagnostic
           )
         )
     `,
-    [options.variants, THUMB_CLEAN_PROFILE, CARD_CLEAN_PROFILE, options.detailWatermarkProfile],
+    [options.variants, THUMB_LIGHT_PREVIEW_PROFILE, CARD_LIGHT_PREVIEW_PROFILE, DETAIL_PREVIEW_PROFILE],
   );
 
   const missingCount = Number(missing.rows[0]?.missing_count ?? 0);
@@ -963,16 +908,10 @@ function decideDerivativeAction(
 ): { variant: Variant; action: "skip" } | { variant: Variant; action: "generate"; reason: GenerateReason } {
   if (options.force) return { variant, action: "generate", reason: "force" };
   if (!existingDerivative) return { variant, action: "generate", reason: "new" };
-  if (variantUsesWatermark(variant)) {
-    if (existingDerivative.is_watermarked !== true) return { variant, action: "generate", reason: "not-watermarked" };
-  } else if (existingDerivative.is_watermarked !== false) {
-    return {
-      variant,
-      action: "generate",
-      reason: variant === "thumb" ? "thumb-watermarked" : "card-watermarked",
-    };
+  if (existingDerivative.is_watermarked !== true) {
+    return { variant, action: "generate", reason: "not-watermarked" };
   }
-  if (existingDerivative.watermark_profile !== expectedDerivativeProfile(variant, options)) {
+  if (existingDerivative.watermark_profile !== expectedDerivativeProfile(variant)) {
     return { variant, action: "generate", reason: "profile-changed" };
   }
   if (existingDerivative.generation_status === "FAILED") {
@@ -1006,114 +945,25 @@ async function generateDerivative(
   source: Buffer,
   key: string,
   variant: Variant,
+  label: string,
   assetId?: string,
-  previewObjectId?: string,
 ): Promise<GeneratedDerivative> {
-  const profile = PREVIEW_VARIANT_PROFILES[variant];
-  const metadata = await sharp(source, { failOn: "none", limitInputPixels: DEFAULT_LIMIT_INPUT_PIXELS }).metadata();
-  const targetWidth = metadata.width ? Math.min(metadata.width, profile.width) : profile.width;
-  let bestCandidate: GeneratedDerivativeCandidate | undefined;
-
-  for (const quality of profile.qualities) {
-    const candidate = variantUsesWatermark(variant)
-      ? await renderWatermarkedPreview(source, targetWidth, quality)
-      : await renderCleanPreview(source, targetWidth, quality);
-    if (!bestCandidate || candidate.byteSize < bestCandidate.byteSize) {
-      bestCandidate = candidate;
-    }
-
-    if (!profile.targetMaxBytes || candidate.byteSize <= profile.targetMaxBytes) {
-      return buildGeneratedDerivative(key, variant, candidate, true);
-    }
-  }
-
-  if (!bestCandidate) {
-    throw new Error("Unable to generate derivative candidate.");
-  }
-
-  console.warn("[derivative.detail_size_target_not_reached]", {
-    assetId,
-    preview_object_id: previewObjectId,
-    key,
+  const generated = await generateProtectedPreview({
+    source,
     variant,
-    finalByteSize: bestCandidate.byteSize,
-    targetMaxBytes: profile.targetMaxBytes ?? null,
-    finalWidth: bestCandidate.width,
-    finalQuality: bestCandidate.quality,
+    label,
   });
 
-  return buildGeneratedDerivative(key, variant, bestCandidate, false);
-}
-
-async function renderCleanPreview(
-  source: Buffer,
-  targetWidth: number,
-  quality: number,
-): Promise<GeneratedDerivativeCandidate> {
-  const encoded = await sharp(source, { failOn: "none", limitInputPixels: DEFAULT_LIMIT_INPUT_PIXELS })
-    .resize({ width: targetWidth, withoutEnlargement: true })
-    .webp({ quality, effort: 6, smartSubsample: true })
-    .toBuffer({ resolveWithObject: true });
-  const width = encoded.info.width;
-  const height = encoded.info.height;
-  if (!width || !height) {
-    throw new Error("Unable to determine derivative dimensions.");
-  }
-  return {
-    width,
-    height,
-    byteSize: encoded.data.byteLength,
-    quality,
-    buffer: encoded.data,
-  };
-}
-
-async function renderWatermarkedPreview(
-  source: Buffer,
-  targetWidth: number,
-  quality: number,
-): Promise<GeneratedDerivativeCandidate> {
-  const resized = await sharp(source, { failOn: "none", limitInputPixels: DEFAULT_LIMIT_INPUT_PIXELS })
-    .resize({ width: targetWidth, withoutEnlargement: true })
-    .toBuffer({ resolveWithObject: true });
-  const width = resized.info.width;
-  const height = resized.info.height;
-
-  if (!width || !height) {
-    throw new Error("Unable to determine derivative dimensions.");
-  }
-
-  const watermark = Buffer.from(buildWatermarkSvg(width, height));
-  const encoded = await sharp(resized.data, { failOn: "none" })
-    .composite([{ input: watermark, top: 0, left: 0 }])
-    .webp({ quality, effort: 6, smartSubsample: true })
-    .toBuffer({ resolveWithObject: true });
-
-  return {
-    width: encoded.info.width ?? width,
-    height: encoded.info.height ?? height,
-    byteSize: encoded.data.byteLength,
-    quality,
-    buffer: encoded.data,
-  };
-}
-
-function buildGeneratedDerivative(
-  key: string,
-  variant: Variant,
-  candidate: GeneratedDerivativeCandidate,
-  targetReached: boolean,
-): GeneratedDerivative {
   return {
     variant,
     key,
-    width: candidate.width,
-    height: candidate.height,
-    byteSize: candidate.byteSize,
-    checksum: createHash("sha256").update(candidate.buffer).digest("hex"),
-    buffer: candidate.buffer,
-    selectedQuality: candidate.quality,
-    targetReached,
+    width: generated.width,
+    height: generated.height,
+    byteSize: generated.byteSize,
+    checksum: generated.checksum,
+    buffer: generated.buffer,
+    selectedQuality: generated.quality,
+    targetReached: true,
   };
 }
 
@@ -1129,8 +979,8 @@ async function upsertDerivativesBatch(
   const tuples: string[] = [];
 
   for (const derivative of derivatives) {
-    const isWatermarked = variantUsesWatermark(derivative.variant);
-    const profile = expectedDerivativeProfile(derivative.variant, options);
+    const isWatermarked = variantIsWatermarked(derivative.variant);
+    const profile = expectedDerivativeProfile(derivative.variant);
     values.push(
       assetId,
       derivative.variant.toUpperCase(),
@@ -1220,7 +1070,7 @@ async function markDerivativeFailed(
         generation_status = 'FAILED',
         updated_at = now()
     `,
-    [assetId, variant.toUpperCase(), derivativeKey, MIME_TYPE, variantUsesWatermark(variant), watermarkProfile],
+    [assetId, variant.toUpperCase(), derivativeKey, MIME_TYPE, variantIsWatermarked(variant), watermarkProfile],
   );
   counters.totalDbWriteMs += performance.now() - dbStart;
   counters.dbWriteCount += 1;
@@ -1292,42 +1142,6 @@ async function signedR2Request(
   });
 }
 
-function buildWatermarkSvg(width: number, height: number) {
-  const tileWidth = 190;
-  const tileHeight = 105;
-  const tiles: string[] = [];
-
-  for (let y = -tileHeight; y < height + tileHeight; y += tileHeight) {
-    for (let x = -tileWidth; x < width + tileWidth; x += tileWidth) {
-      tiles.push(`
-       <g transform="translate(${x} ${y}) rotate(-28 95 52.5)">
-  <text
-    x="95"
-    y="57"
-    text-anchor="middle"
-    font-family="Arial, Helvetica, sans-serif"
-    font-size="27"
-    font-weight="800"
-    letter-spacing="3"
-    fill="#111111"
-    fill-opacity="0.52"
-    stroke="#ffffff"
-    stroke-opacity="0.20"
-    stroke-width="1.0"
-  >fotocorp</text>
-</g>
-      `);
-    }
-  }
-
-  return `
-    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${width}" height="${height}" fill="none"/>
-      ${tiles.join("\n")}
-    </svg>
-  `;
-}
-
 function getPreviewObjectId(asset: AssetRow) {
   const legacyImagecode = asset.legacy_image_code?.trim();
   if (legacyImagecode) return legacyImagecode;
@@ -1368,7 +1182,6 @@ function parseArgs(args: string[]): CliOptions {
     retryFailed: true,
     verboseErrors: false,
     prefix: "previews/watermarked",
-    detailWatermarkProfile: DETAIL_WATERMARKED_PROFILE,
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -1406,7 +1219,6 @@ function parseArgs(args: string[]): CliOptions {
     else if (arg === "--no-retry-failed") options.retryFailed = false;
     else if (arg === "--verbose-errors") options.verboseErrors = true;
     else if (arg === "--prefix") options.prefix = normalizePrefix(next());
-    else if (arg === "--watermark-profile") options.detailWatermarkProfile = next().trim();
     else if (arg === "--") continue;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -1442,14 +1254,12 @@ function parseArgs(args: string[]): CliOptions {
   if (!isAllowedDerivativePrefix(options.prefix)) {
     throw new Error("--prefix must stay under previews/watermarked.");
   }
-  if (!options.detailWatermarkProfile) throw new Error("--watermark-profile / detail profile cannot be empty.");
-
   return options;
 }
 
 function printHelp() {
   console.log(`
-Generate Fotocorp WebP preview derivatives: thumb and card are clean (no tiled watermark); detail is watermarked. Objects stay under previews/watermarked/<variant>/… for URL stability.
+Generate Fotocorp protected WebP preview derivatives (thumb/card/detail all watermarked). Objects stay under previews/watermarked/<variant>/… for URL stability.
 
 Examples:
   pnpm --dir apps/api media:generate-derivatives -- --dry-run --limit 1000
@@ -1493,7 +1303,6 @@ Options:
   --retry-failed
   --no-retry-failed
   --verbose-errors
-  --watermark-profile <name>  (detail / watermarked variant only; default ${DETAIL_WATERMARKED_PROFILE})
 `);
 } 
 
@@ -1791,12 +1600,6 @@ function printCheckpoint(
   });
 }
 
-async function decodeSourceImage(source: Buffer): Promise<Buffer> {
-  return sharp(source, { failOn: "none", limitInputPixels: DEFAULT_LIMIT_INPUT_PIXELS })
-    .rotate()
-    .toBuffer();
-}
-
 function classifyGenerationError(error: unknown, stage: string): ErrorClass {
   if (stage === "source_read") return "R2_READ_ERROR";
   if (stage === "db_update") return "DB_WRITE_ERROR";
@@ -1840,11 +1643,11 @@ function errorMessage(error: unknown) {
 
 function printStartup(options: CliOptions, failureLogPath: string, checkpointEvery: number) {
   console.log(
-    `Derivative generation dryRun=${options.dryRun} scope=${options.scope} variants=${options.variants.join(",")} limit=${options.limit ?? "all"} shard=${shardLabel(options)} batchSize=${options.batchSize} assetConcurrency=${options.assetConcurrency} uploadConcurrency=${options.uploadConcurrency} r2RetryAttempts=${options.r2RetryAttempts} r2RetryBaseMs=${options.r2RetryBaseMs} maxRuntimeMinutes=${options.maxRuntimeMinutes ?? "none"} reportFile=${options.reportFile ?? "none"} prefix=${options.prefix} retryFailed=${options.retryFailed} failOnItemErrors=${options.failOnItemErrors} force=${options.force} detailWatermarkProfile=${options.detailWatermarkProfile} checkpointEvery=${checkpointEvery} failureLogPath=${failureLogPath}`,
+    `Derivative generation dryRun=${options.dryRun} scope=${options.scope} variants=${options.variants.join(",")} limit=${options.limit ?? "all"} shard=${shardLabel(options)} batchSize=${options.batchSize} assetConcurrency=${options.assetConcurrency} uploadConcurrency=${options.uploadConcurrency} r2RetryAttempts=${options.r2RetryAttempts} r2RetryBaseMs=${options.r2RetryBaseMs} maxRuntimeMinutes=${options.maxRuntimeMinutes ?? "none"} reportFile=${options.reportFile ?? "none"} prefix=${options.prefix} retryFailed=${options.retryFailed} failOnItemErrors=${options.failOnItemErrors} force=${options.force} checkpointEvery=${checkpointEvery} failureLogPath=${failureLogPath}`,
   );
-  console.log("Variant policy: thumb=clean, card=clean, detail=watermarked");
+  console.log("Variant policy: thumb/card/detail=protected (all watermarked)");
   console.log(
-    `Stored profiles: thumb=${THUMB_CLEAN_PROFILE} card=${CARD_CLEAN_PROFILE} detail=${options.detailWatermarkProfile}`,
+    `Stored profiles: thumb=${THUMB_LIGHT_PREVIEW_PROFILE} card=${CARD_LIGHT_PREVIEW_PROFILE} detail=${DETAIL_PREVIEW_PROFILE}`,
   );
 }
 
@@ -1939,10 +1742,10 @@ function buildRunSummary(
       failOnItemErrors: options.failOnItemErrors,
       dryRun: options.dryRun,
       variants: options.variants,
-      variantPolicy: "thumb=clean, card=clean, detail=watermarked",
-      thumbDerivativeProfile: THUMB_CLEAN_PROFILE,
-      cardDerivativeProfile: CARD_CLEAN_PROFILE,
-      detailWatermarkProfile: options.detailWatermarkProfile,
+      variantPolicy: "thumb/card/detail=protected-watermarked",
+      thumbDerivativeProfile: THUMB_LIGHT_PREVIEW_PROFILE,
+      cardDerivativeProfile: CARD_LIGHT_PREVIEW_PROFILE,
+      detailDerivativeProfile: DETAIL_PREVIEW_PROFILE,
     },
   };
 }

@@ -21,9 +21,12 @@ WORKDIR /app
 # patches/ must exist before install: pnpm-lock.yaml applies patchedDependencies (e.g. pg-cloudflare).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches patches
+COPY packages/media-preview/package.json packages/media-preview/package.json
 COPY apps/jobs/package.json apps/jobs/package.json
 
 RUN pnpm install --frozen-lockfile --filter @fotocorp/jobs...
+
+COPY packages/media-preview packages/media-preview
 
 COPY apps/jobs apps/jobs
 

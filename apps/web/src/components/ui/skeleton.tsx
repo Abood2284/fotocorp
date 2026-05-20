@@ -28,6 +28,27 @@ export function AssetCardSkeleton({ viewMode = "grid" }: { viewMode?: AssetViewM
   )
 }
 
+function JustifiedGridSkeletonRows({ rows = 3 }: { rows?: number }) {
+  const rowHeight = 200
+  const gap = 8
+
+  return (
+    <div className="w-full">
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <div
+          key={rowIndex}
+          className="flex w-full"
+          style={{ gap, height: rowHeight, marginBottom: gap }}
+        >
+          <Skeleton className="h-full flex-[3] rounded-none" />
+          <Skeleton className="h-full flex-[2] rounded-none" />
+          <Skeleton className="h-full flex-1 rounded-none" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function AssetGridSkeleton({
   count = 8,
   viewMode = "grid",
@@ -35,8 +56,12 @@ export function AssetGridSkeleton({
   count?: number
   viewMode?: AssetViewMode
 }) {
+  if (viewMode === "grid") {
+    return <JustifiedGridSkeletonRows rows={Math.min(4, Math.max(2, Math.ceil(count / 4)))} />
+  }
+
   return (
-    <div className={cn(viewMode === "grid" ? "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6" : "flex flex-col gap-4")}>
+    <div className="flex flex-col gap-4">
       {Array.from({ length: count }).map((_, i) => (
         <AssetCardSkeleton key={i} viewMode={viewMode} />
       ))}

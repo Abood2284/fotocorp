@@ -22,9 +22,9 @@ import {
   type DerivativeProfilePolicyInput,
 } from "../../../lib/media/pipeline-status"
 import {
-  CARD_CLEAN_PROFILE,
-  DETAIL_WATERMARKED_PROFILE,
-  THUMB_CLEAN_PROFILE,
+  CARD_LIGHT_PREVIEW_PROFILE,
+  DETAIL_PREVIEW_PROFILE,
+  THUMB_LIGHT_PREVIEW_PROFILE,
 } from "../../../lib/media/watermark"
 
 interface AdminActor { authUserId: string | null; email: string | null }
@@ -82,9 +82,9 @@ export async function adminFiltersService(env: Env) { return json(await getInter
 export async function adminUsersService(env: Env, request: Request) { return json(await listInternalAdminUsers(db(env), request)) }
 export async function adminUserSubscriptionService(env: Env, authUserId: string, isSubscriber: boolean, actor: AdminActor) { return json(await updateInternalAdminUserSubscription(db(env), authUserId, isSubscriber, actor)) }
 const DEFAULT_DERIVATIVE_PROFILE_POLICY: DerivativeProfilePolicyInput = {
-  thumbProfile: THUMB_CLEAN_PROFILE,
-  cardProfile: CARD_CLEAN_PROFILE,
-  detailProfile: DETAIL_WATERMARKED_PROFILE,
+  thumbProfile: THUMB_LIGHT_PREVIEW_PROFILE,
+  cardProfile: CARD_LIGHT_PREVIEW_PROFILE,
+  detailProfile: DETAIL_PREVIEW_PROFILE,
 }
 
 export async function adminMediaPipelineStatusService(env: Env) {

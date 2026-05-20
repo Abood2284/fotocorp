@@ -24,24 +24,35 @@ import type {
 import { PublicAssetCard } from "@/components/assets/public-asset-card"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
 import { EmptyState } from "@/components/shared/empty-state"
+import {
+  SearchCategoryTabsSkeleton,
+  SearchFilterPanelSkeleton,
+} from "@/components/search/search-filter-skeletons"
+import { useSearchFilters } from "@/components/search/search-filters-context"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
+import { cn, formatInteger } from "@/lib/utils"
+
+export type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 
 interface SearchExperienceProps {
   initialParams: {
     q?: string
     categoryId?: string
     eventId?: string
+    city?: string
     contributorId?: string
     year?: number
     month?: number
     sort: PublicAssetSort
     cursor?: string
+    page?: number
     view?: SearchViewMode
   }
   initialResult: PublicAssetListResponse
-  filters: PublicAssetFiltersResponse
+  selectedEvent?: SearchSelectedEvent | null
   hasLoadError?: boolean
+  paginationMode?: "cursor" | "page"
 }
 
 type SearchViewMode = "grid" | "card"
@@ -72,16 +83,22 @@ const PAGE_SIZE = 50
 export function SearchExperience({
   initialParams,
   initialResult,
-  filters,
+  selectedEvent = null,
+  hasLoadError = false,
+  paginationMode = "cursor",
 }: SearchExperienceProps) {
   const router = useRouter()
+  const { filters, isLoading: filtersLoading } = useSearchFilters()
   const [isPending, startTransition] = useTransition()
   const [showFilters, setShowFilters] = useState(false)
   const [queryDraft, setQueryDraft] = useState(initialParams.q ?? "")
   const items = initialResult.items
   const nextCursor = initialResult.nextCursor
+  const hasMore = initialResult.hasMore ?? Boolean(nextCursor)
   const viewMode = initialParams.view ?? "grid"
-  const totalCount = initialResult.totalCount ?? items.length
+  const eventFilterCount = filters.events.find((item) => item.id === initialParams.eventId)?.assetCount
+  const totalCount = initialResult.totalCount ?? eventFilterCount ?? items.length
+  const isPagePagination = paginationMode === "page"
 
   const [history, setHistory] = useState<(string | undefined)[]>([undefined])
   const baseParamsKey = JSON.stringify({ ...initialParams, cursor: undefined })
@@ -95,15 +112,20 @@ export function SearchExperience({
   }, [initialParams.q])
 
   const categoryName = filters.categories.find((item) => item.id === initialParams.categoryId)?.name
-  const eventName = filters.events.find((item) => item.id === initialParams.eventId)?.name ?? undefined
-  const activeEventCount = initialParams.eventId ? 1 : filters.events.length
+  const eventName = selectedEvent?.name
+    ?? filters.events.find((item) => item.id === initialParams.eventId)?.name
+    ?? undefined
+  const cityName = filters.cities?.find((item) => item.id === initialParams.city)?.name ?? initialParams.city
+  const activeEventCount = initialParams.eventId ? 1 : filtersLoading ? 0 : filters.events.length
   const topCategories = filters.categories.slice(0, 5)
+  const eventChipLabel = eventName ?? (initialParams.eventId && filtersLoading ? "Loading event…" : undefined)
 
   const filterChips = useMemo(() => {
     const chips: Array<{ key: string; label: string; remove: () => void }> = []
     if (initialParams.q) chips.push({ key: "q", label: initialParams.q, remove: () => updateParams({ q: undefined }) })
     if (categoryName) chips.push({ key: "category", label: categoryName, remove: () => updateParams({ categoryId: undefined }) })
-    if (eventName) chips.push({ key: "event", label: eventName, remove: () => updateParams({ eventId: undefined }) })
+    if (eventChipLabel) chips.push({ key: "event", label: eventChipLabel, remove: () => updateParams({ eventId: undefined }) })
+    if (cityName) chips.push({ key: "city", label: cityName, remove: () => updateParams({ city: undefined }) })
     if (initialParams.year) chips.push({ key: "year", label: String(initialParams.year), remove: () => updateParams({ year: undefined }) })
     if (initialParams.month) {
       const monthLabel = MONTH_OPTIONS.find((item) => item.value === initialParams.month)?.label ?? String(initialParams.month)
@@ -111,7 +133,7 @@ export function SearchExperience({
     }
     return chips
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialParams.q, initialParams.categoryId, initialParams.eventId, initialParams.year, initialParams.month, categoryName, eventName])
+  }, [initialParams.q, initialParams.categoryId, initialParams.eventId, initialParams.city, initialParams.year, initialParams.month, categoryName, eventChipLabel, cityName])
 
   function updateParams(next: Partial<SearchExperienceProps["initialParams"]>, forceSort = true) {
     const params = new URLSearchParams()
@@ -120,10 +142,12 @@ export function SearchExperience({
     if (merged.q) params.set("q", merged.q)
     if (merged.categoryId) params.set("categoryId", merged.categoryId)
     if (merged.eventId) params.set("eventId", merged.eventId)
+    if (merged.city) params.set("city", merged.city)
     if (merged.contributorId) params.set("contributorId", merged.contributorId)
     if (merged.year) params.set("year", String(merged.year))
     if (merged.month) params.set("month", String(merged.month))
-    if (merged.cursor) params.set("cursor", merged.cursor)
+    if (!isPagePagination && merged.cursor) params.set("cursor", merged.cursor)
+    if (isPagePagination && merged.page && merged.page > 1) params.set("page", String(merged.page))
     if (merged.view === "card") params.set("view", "card")
 
     const effectiveSort = forceSort
@@ -136,6 +160,7 @@ export function SearchExperience({
 
     if (effectiveSort && effectiveSort !== "newest") params.set("sort", effectiveSort)
     if (!("cursor" in next)) params.delete("cursor")
+    if (isPagePagination && !("page" in next)) params.delete("page")
 
     startTransition(() => {
       router.replace(params.toString() ? `/search?${params.toString()}` : "/search")
@@ -144,10 +169,21 @@ export function SearchExperience({
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const q = queryDraft.trim()
     updateParams({
-      q: queryDraft.trim() || undefined,
-      sort: queryDraft.trim() ? "relevance" : "newest",
+      q: q || undefined,
+      sort: q ? "relevance" : "newest",
+      ...(q
+        ? {
+            eventId: undefined,
+            categoryId: undefined,
+            city: undefined,
+            year: undefined,
+            month: undefined,
+          }
+        : {}),
       cursor: undefined,
+      page: undefined,
     })
   }
 
@@ -157,15 +193,23 @@ export function SearchExperience({
       q: undefined,
       categoryId: undefined,
       eventId: undefined,
+      city: undefined,
       contributorId: undefined,
       year: undefined,
       month: undefined,
       sort: "newest",
       cursor: undefined,
+      page: undefined,
     })
   }
 
   function goToNext() {
+    if (isPagePagination) {
+      updateParams({ page: currentPage + 1 }, false)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+      return
+    }
+
     if (!nextCursor) return
     setHistory((prev) => {
       const nextHistory = [...prev]
@@ -182,16 +226,35 @@ export function SearchExperience({
   }
 
   function goToPrev() {
+    if (isPagePagination) {
+      updateParams({ page: currentPage > 2 ? currentPage - 1 : undefined }, false)
+      window.scrollTo({ top: 0, behavior: "smooth" })
+      return
+    }
+
     const currentIndex = history.indexOf(initialParams.cursor)
     updateParams({ cursor: currentIndex > 0 ? history[currentIndex - 1] : undefined }, false)
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   const currentIndex = history.indexOf(initialParams.cursor)
-  const displayPage = currentIndex !== -1 ? currentIndex + 1 : (initialParams.cursor ? 2 : 1)
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const displayPage = isPagePagination
+    ? (initialResult.page ?? initialParams.page ?? 1)
+    : currentIndex !== -1 ? currentIndex + 1 : (initialParams.cursor ? 2 : 1)
+  const exactTotalCount = initialResult.totalCount ?? eventFilterCount
+  const totalPages = initialResult.totalPages ?? (exactTotalCount !== undefined
+    ? Math.max(1, Math.ceil(exactTotalCount / PAGE_SIZE))
+    : Math.max(displayPage, hasMore ? displayPage + 1 : displayPage))
   const currentPage = Math.min(displayPage, totalPages)
-  const resultTitle = buildResultTitle(totalCount, initialParams.q, categoryName, eventName)
+  const displayCount = exactTotalCount
+    ?? Math.max(totalCount, (displayPage - 1) * PAGE_SIZE + items.length)
+  const resultTitle = buildResultTitle(
+    displayCount,
+    initialParams.q,
+    categoryName,
+    eventName,
+    exactTotalCount === undefined && hasMore,
+  )
   const hasActiveFilters = filterChips.length > 0 || initialParams.sort !== "newest"
 
   return (
@@ -227,8 +290,8 @@ export function SearchExperience({
                 <X className="h-6 w-6" />
               </button>
             )}
-            <Button type="submit" className="m-3 h-12 rounded-none px-5" disabled={isPending}>
-              Search
+            <Button type="submit" className="m-3 h-12 rounded-none px-5" disabled={isPending} aria-busy={isPending}>
+              {isPending ? "Searching…" : "Search"}
             </Button>
           </div>
         </form>
@@ -250,20 +313,24 @@ export function SearchExperience({
             <ChevronLeft className={cn("h-5 w-5 transition-transform", !showFilters && "rotate-180")} />
           </button>
 
-          <div className="flex min-w-0 items-center gap-3 overflow-x-auto px-4 py-3 sm:px-6">
-            <FilterTab active={!initialParams.categoryId} onClick={() => updateParams({ categoryId: undefined })}>
-              All
-            </FilterTab>
-            {topCategories.map((category) => (
-              <FilterTab
-                key={category.id}
-                active={initialParams.categoryId === category.id}
-                onClick={() => updateParams({ categoryId: category.id })}
-              >
-                {category.name}
+          {filtersLoading ? (
+            <SearchCategoryTabsSkeleton />
+          ) : (
+            <div className="flex min-w-0 items-center gap-3 overflow-x-auto px-4 py-3 sm:px-6">
+              <FilterTab active={!initialParams.categoryId} onClick={() => updateParams({ categoryId: undefined })}>
+                All
               </FilterTab>
-            ))}
-          </div>
+              {topCategories.map((category) => (
+                <FilterTab
+                  key={category.id}
+                  active={initialParams.categoryId === category.id}
+                  onClick={() => updateParams({ categoryId: category.id })}
+                >
+                  {category.name}
+                </FilterTab>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -277,7 +344,7 @@ export function SearchExperience({
           </div>
 
           <div className="flex items-end gap-8">
-            <ResultMetric active label="Images" value={totalCount} />
+            <ResultMetric active label="Images" value={displayCount} suffix={!exactTotalCount && hasMore ? "+" : undefined} />
             <ResultMetric label="Events" value={activeEventCount} />
           </div>
 
@@ -286,17 +353,28 @@ export function SearchExperience({
 
         <div className={cn("grid gap-5", showFilters && "lg:grid-cols-[300px_minmax(0,1fr)]")}>
           {showFilters && (
-            <FilterPanel
-              categories={filters.categories}
-              events={filters.events}
-              params={initialParams}
-              disabled={isPending}
-              onUpdate={updateParams}
-              onClearAll={clearAll}
-            />
+            filtersLoading ? (
+              <SearchFilterPanelSkeleton />
+            ) : (
+              <FilterPanel
+                categories={filters.categories}
+                events={filters.events}
+                cities={filters.cities ?? []}
+                params={initialParams}
+                disabled={isPending}
+                onUpdate={updateParams}
+                onClearAll={clearAll}
+              />
+            )
           )}
 
-          <main className="min-w-0">
+          <main className="relative min-w-0">
+            {isPending && (
+              <div
+                className="pointer-events-none absolute inset-0 z-10 bg-background/35"
+                aria-hidden="true"
+              />
+            )}
             {items.length > 0 ? (
               <>
                 {viewMode === "grid" ? (
@@ -318,7 +396,7 @@ export function SearchExperience({
                   currentPage={currentPage}
                   totalPages={totalPages}
                   isFirstPage={currentPage === 1}
-                  hasNextPage={!!nextCursor}
+                  hasNextPage={isPagePagination ? currentPage < totalPages : !!nextCursor}
                   disabled={isPending}
                   onPrev={goToPrev}
                   onNext={goToNext}
@@ -329,7 +407,9 @@ export function SearchExperience({
                 <EmptyState
                   icon={Images}
                   title="No matching images found."
-                  description={hasActiveFilters ? "Try a broader search or remove a few filters." : "Try a different search term."}
+                  description={hasLoadError
+                    ? "Search is temporarily unavailable. Try again in a moment."
+                    : hasActiveFilters ? "Try a broader search or remove a few filters." : "Try a different search term."}
                   action={{ label: "View latest", href: "/search" }}
                 />
               </div>
@@ -344,6 +424,7 @@ export function SearchExperience({
 function FilterPanel({
   categories,
   events,
+  cities,
   params,
   disabled,
   onUpdate,
@@ -351,6 +432,7 @@ function FilterPanel({
 }: {
   categories: PublicAssetFiltersResponse["categories"]
   events: PublicAssetFiltersResponse["events"]
+  cities: NonNullable<PublicAssetFiltersResponse["cities"]>
   params: SearchExperienceProps["initialParams"]
   disabled?: boolean
   onUpdate: (next: Partial<SearchExperienceProps["initialParams"]>, forceSort?: boolean) => void
@@ -440,6 +522,18 @@ function FilterPanel({
         activeId={params.eventId}
         onSelect={(id) => onUpdate({ eventId: id === params.eventId ? undefined : id })}
       />
+
+      <FilterList
+        title="Cities"
+        emptyLabel="No cities available"
+        items={cities.slice(0, 24).map((city) => ({
+          id: city.id,
+          label: city.name,
+          count: city.assetCount,
+        }))}
+        activeId={params.city}
+        onSelect={(id) => onUpdate({ city: id === params.city ? undefined : id })}
+      />
     </aside>
   )
 }
@@ -476,7 +570,7 @@ function FilterList({
                 <span className="block truncate font-medium">{item.label}</span>
                 {item.meta && <span className="block text-xs text-muted-foreground">{item.meta}</span>}
               </span>
-              <span className="shrink-0 text-xs text-muted-foreground">{item.count.toLocaleString()}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{formatInteger(item.count)}</span>
             </button>
           ))}
         </div>
@@ -514,14 +608,16 @@ function ResultMetric({
   active = false,
   label,
   value,
+  suffix,
 }: {
   active?: boolean
   label: string
   value: number
+  suffix?: string
 }) {
   return (
     <div className={cn("border-b-4 pb-1", active ? "border-accent" : "border-transparent")}>
-      <span className="text-2xl font-medium text-foreground">{value.toLocaleString()}</span>
+      <span className="text-2xl font-medium text-foreground">{formatInteger(value)}{suffix}</span>
       <span className="ml-2 text-2xl font-medium text-foreground">{label}</span>
     </div>
   )
@@ -680,8 +776,14 @@ function ActiveChips({
   )
 }
 
-function buildResultTitle(totalCount: number, query?: string, categoryName?: string, eventName?: string) {
-  const total = totalCount.toLocaleString()
+function buildResultTitle(
+  totalCount: number,
+  query?: string,
+  categoryName?: string,
+  eventName?: string,
+  approximate = false,
+) {
+  const total = `${formatInteger(totalCount)}${approximate ? "+" : ""}`
   if (query) return `${total} ${query} photos and high-res pictures`
   if (eventName) return `${total} photos from ${eventName}`
   if (categoryName) return `${total} ${categoryName} photos and high-res pictures`

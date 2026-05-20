@@ -10,6 +10,8 @@ interface RouteContext {
 
 const PUBLIC_UPSTREAM_BY_BFF_PATH: Record<string, string> = {
   assets: "/api/v1/assets",
+  "assets/filters": "/api/v1/assets/filters",
+  "search/assets": "/api/v1/search/assets",
   "events/latest": "/api/v1/public/events/latest",
 }
 
@@ -32,10 +34,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const query = request.nextUrl.search
   const upstreamUrl = buildApiAssetUrl(`${upstreamBase}${query}`)
 
+  const isAssetList = bffPath === "assets"
+  const isAssetFilters = bffPath === "assets/filters"
+
   return tracedUpstreamProxy({
     request,
     route: `/api/public/${bffPath}`,
     upstreamUrl,
-    cacheMode: "no-store",
+    cacheMode: isAssetList ? "revalidate-30" : isAssetFilters ? "revalidate-300" : "no-store",
+    upstreamRevalidateSeconds: isAssetList ? 30 : isAssetFilters ? 300 : undefined,
+    passthroughCacheControl: isAssetList || isAssetFilters,
   })
 }

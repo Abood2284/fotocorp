@@ -1,7 +1,11 @@
 // apps/web/src/app/(marketing)/search/page.tsx
+import { Suspense } from "react"
 import { SearchExperience } from "@/components/search/search-experience"
-import { getPublicAssetFilters, listPublicAssets } from "@/lib/api/fotocorp-api"
-import type { PublicAssetSort } from "@/features/assets/types"
+import { SearchFiltersLoader } from "@/components/search/search-filters-loader"
+import { SearchFiltersProvider } from "@/components/search/search-filters-context"
+import { isTypesenseSearchEnabled, searchAssets } from "@/lib/api/fotocorp-api"
+import type { PublicAssetListResponse, PublicAssetSort } from "@/features/assets/types"
+import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 
 interface SearchPageProps {
   searchParams: Promise<{
@@ -9,11 +13,14 @@ interface SearchPageProps {
     categoryId?: string
     category?: string
     eventId?: string
+    event?: string
+    city?: string
     contributorId?: string
     year?: string
     month?: string
     sort?: string
     cursor?: string
+    page?: string
     view?: string
   }>
 }
@@ -32,41 +39,91 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const year = parseOptionalNumber(params.year)
   const month = parseOptionalNumber(params.month)
   const cursor = normalized(params.cursor)
+  const page = parseOptionalNumber(params.page) ?? 1
   const view: "grid" | "card" = params.view === "card" ? "card" : "grid"
+  const useTypesense = isTypesenseSearchEnabled()
   const initialParams = {
     q,
     categoryId: normalized(params.categoryId ?? params.category),
-    eventId: normalized(params.eventId),
+    eventId: normalized(params.eventId ?? params.event),
+    city: normalized(params.city),
     contributorId: normalized(params.contributorId),
     year,
     month,
     sort,
-    cursor,
+    cursor: useTypesense ? undefined : cursor,
+    page: useTypesense ? page : undefined,
     view,
   }
 
-  const [initialResultState, filtersState] = await Promise.allSettled([
-    listPublicAssets({ ...initialParams, limit: 50 }),
-    getPublicAssetFilters(),
-  ])
+  const pageStartedAt = Date.now()
+  let assetsFetchMs = 0
 
-  const initialResult = initialResultState.status === "fulfilled"
-    ? initialResultState.value
-    : { items: [], nextCursor: null, totalCount: 0 }
-  const filters = filtersState.status === "fulfilled"
-    ? filtersState.value
-    : { categories: [], events: [] }
-  const hasLoadError = initialResultState.status === "rejected"
+  let initialResult: PublicAssetListResponse = { items: [], nextCursor: null }
+  let hasLoadError = false
+
+  try {
+    const startedAt = Date.now()
+    initialResult = await searchAssets({ ...initialParams, limit: 50 })
+    assetsFetchMs = Date.now() - startedAt
+  } catch {
+    assetsFetchMs = Date.now() - pageStartedAt
+    hasLoadError = true
+  }
+
+  const selectedEvent = deriveSelectedEvent(initialParams.eventId, initialResult.items)
+  const totalMs = Date.now() - pageStartedAt
+
+  console.info(
+    JSON.stringify({
+      route: "/search",
+      backend: initialResult.timing?.backend ?? "postgres",
+      eventId: initialParams.eventId ?? null,
+      city: initialParams.city ?? null,
+      timings: {
+        assets_fetch: assetsFetchMs,
+        upstream_took: initialResult.timing?.tookMs,
+        render_prepare: Math.max(0, totalMs - assetsFetchMs),
+        total: totalMs,
+      },
+    }),
+  )
 
   return (
-    <SearchExperience
-      key={JSON.stringify(initialParams)}
-      initialParams={initialParams}
-      initialResult={initialResult}
-      filters={filters}
-      hasLoadError={hasLoadError}
-    />
+    <SearchFiltersProvider initialFilters={initialResult.filters}>
+      <SearchExperience
+        key={JSON.stringify(initialParams)}
+        initialParams={initialParams}
+        initialResult={initialResult}
+        selectedEvent={selectedEvent}
+        hasLoadError={hasLoadError}
+        paginationMode={useTypesense ? "page" : "cursor"}
+      />
+      {!useTypesense && (
+        <Suspense fallback={null}>
+          <SearchFiltersLoader />
+        </Suspense>
+      )}
+    </SearchFiltersProvider>
   )
+}
+
+function deriveSelectedEvent(
+  eventId: string | undefined,
+  items: PublicAssetListResponse["items"],
+): SearchSelectedEvent | null {
+  if (!eventId) return null
+
+  const event = items[0]?.event
+  if (event?.id === eventId) {
+    return {
+      id: event.id,
+      name: event.name,
+      eventDate: event.eventDate,
+    }
+  }
+
+  return { id: eventId, name: null, eventDate: null }
 }
 
 function normalized(value: string | undefined) {

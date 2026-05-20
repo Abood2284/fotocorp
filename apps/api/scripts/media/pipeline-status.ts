@@ -7,9 +7,9 @@ import dotenv from "dotenv"
 import { createDbFromUrl } from "../../src/db"
 import { getMediaPipelineStatus } from "../../src/lib/media/pipeline-status"
 import {
-  CARD_CLEAN_PROFILE,
-  DETAIL_WATERMARKED_PROFILE,
-  THUMB_CLEAN_PROFILE,
+  CARD_LIGHT_PREVIEW_PROFILE,
+  DETAIL_PREVIEW_PROFILE,
+  THUMB_LIGHT_PREVIEW_PROFILE,
 } from "../../src/lib/media/watermark"
 
 interface CliOptions {
@@ -32,8 +32,8 @@ async function main() {
   const { db, close } = createDbFromUrl(databaseUrl)
   try {
     const policy = {
-      thumbProfile: THUMB_CLEAN_PROFILE,
-      cardProfile: CARD_CLEAN_PROFILE,
+      thumbProfile: THUMB_LIGHT_PREVIEW_PROFILE,
+      cardProfile: CARD_LIGHT_PREVIEW_PROFILE,
       detailProfile: options.detailWatermarkProfile,
     }
     const status = await getMediaPipelineStatus(db, policy, options.failedLimit)
@@ -128,8 +128,7 @@ Usage:
   pnpm --dir apps/api media:pipeline-status
   pnpm --dir apps/api media:pipeline-status -- --detail-watermark-profile fotocorp-preview-v4-dense-dark-lowquality --failed-limit 30
 
-Thumb/card READY counts assume clean profiles (${THUMB_CLEAN_PROFILE}, ${CARD_CLEAN_PROFILE}).
-Detail READY counts assume watermarked detail profile (default: ${DETAIL_WATERMARKED_PROFILE}).
+Thumb/card/detail READY counts assume protected profiles (${THUMB_LIGHT_PREVIEW_PROFILE}, ${CARD_LIGHT_PREVIEW_PROFILE}, ${DETAIL_PREVIEW_PROFILE}).
 `)
 }
 

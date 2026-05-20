@@ -8,11 +8,8 @@ import {
   verifyPreviewToken,
   type MediaPreviewVariant,
 } from "../lib/media/preview-token";
-import {
-  CARD_CLEAN_PROFILE,
-  CURRENT_WATERMARK_PROFILE,
-  THUMB_CLEAN_PROFILE,
-} from "../lib/media/watermark";
+import { expectedWatermarkProfile } from "../lib/media/watermark";
+import { publicPreviewIsWatermarked } from "../lib/assets/public-catalog-sql";
 import type { Env } from "../appTypes";
 
 type MediaAccessOutcome =
@@ -116,9 +113,8 @@ export async function securePreviewMediaRoute(params: PreviewRouteParams): Promi
   }
 
   const derivative = await findDerivative(params.db, asset.id, variant);
-  const watermarkOk =
-    variant === "detail" ? derivative?.isWatermarked === true : derivative?.isWatermarked === false;
-  const expectedProfile = expectedSecurePreviewProfile(variant);
+  const watermarkOk = derivative?.isWatermarked === publicPreviewIsWatermarked(variant);
+  const expectedProfile = expectedWatermarkProfile(variant);
   if (
     !derivative ||
     !watermarkOk ||
@@ -323,12 +319,6 @@ async function writeAccessLog(
   } catch {
     // Access logging must not make media serving less reliable.
   }
-}
-
-function expectedSecurePreviewProfile(variant: MediaPreviewVariant): string {
-  if (variant === "thumb") return THUMB_CLEAN_PROFILE;
-  if (variant === "card") return CARD_CLEAN_PROFILE;
-  return CURRENT_WATERMARK_PROFILE;
 }
 
 function toCleanVariant(variant: MediaPreviewVariant): CleanMediaPreviewVariant {

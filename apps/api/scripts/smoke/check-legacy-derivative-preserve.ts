@@ -2,8 +2,8 @@
 import dotenv from "dotenv"
 import pg from "pg"
 import {
-  CARD_CLEAN_PROFILE,
-  THUMB_CLEAN_PROFILE,
+  CARD_LIGHT_PREVIEW_PROFILE,
+  THUMB_LIGHT_PREVIEW_PROFILE,
 } from "../../src/lib/media/watermark.js"
 import { IMAGE_DERIVATIVES_UPSERT } from "../legacy/sync-clean-schema-after-import.js"
 
@@ -125,10 +125,10 @@ async function main() {
           updated_at
         )
         values
-          ($1::uuid, $3::uuid, 'THUMB', 'modern/thumb.webp', 'image/webp', 220, 140, 1000, 'modern-thumb', false, $4, 'READY', now(), 'GENERATED', now(), now()),
-          ($2::uuid, $3::uuid, 'CARD', 'modern/card.webp', 'image/webp', 300, 190, 2000, 'modern-card', false, $5, 'READY', now(), 'GENERATED', now(), now())
+          ($1::uuid, $3::uuid, 'THUMB', 'modern/thumb.webp', 'image/webp', 220, 140, 1000, 'modern-thumb', true, $4, 'READY', now(), 'GENERATED', now(), now()),
+          ($2::uuid, $3::uuid, 'CARD', 'modern/card.webp', 'image/webp', 300, 190, 2000, 'modern-card', true, $5, 'READY', now(), 'GENERATED', now(), now())
       `,
-      [modernThumbId, modernCardId, assetId, THUMB_CLEAN_PROFILE, CARD_CLEAN_PROFILE],
+      [modernThumbId, modernCardId, assetId, THUMB_LIGHT_PREVIEW_PROFILE, CARD_LIGHT_PREVIEW_PROFILE],
     )
 
     await client.query(
@@ -186,14 +186,14 @@ async function main() {
     const card = result.rows.find((row) => row.variant === "CARD")
     const failures: string[] = []
 
-    if (!thumb || thumb.generation_status !== "READY" || thumb.is_watermarked !== false || thumb.watermark_profile !== THUMB_CLEAN_PROFILE) {
-      failures.push("THUMB clean READY profile was overwritten by legacy sync")
+    if (!thumb || thumb.generation_status !== "READY" || thumb.is_watermarked !== true || thumb.watermark_profile !== THUMB_LIGHT_PREVIEW_PROFILE) {
+      failures.push("THUMB protected READY profile was overwritten by legacy sync")
     }
     if (thumb?.storage_key !== "modern/thumb.webp" || thumb?.source !== "GENERATED") {
       failures.push("THUMB modern storage/source metadata was overwritten by legacy sync")
     }
-    if (!card || card.generation_status !== "READY" || card.is_watermarked !== false || card.watermark_profile !== CARD_CLEAN_PROFILE) {
-      failures.push("CARD clean READY profile was overwritten by legacy sync")
+    if (!card || card.generation_status !== "READY" || card.is_watermarked !== true || card.watermark_profile !== CARD_LIGHT_PREVIEW_PROFILE) {
+      failures.push("CARD protected READY profile was overwritten by legacy sync")
     }
     if (card?.storage_key !== "modern/card.webp" || card?.source !== "GENERATED") {
       failures.push("CARD modern storage/source metadata was overwritten by legacy sync")

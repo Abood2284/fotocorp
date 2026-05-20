@@ -3,6 +3,7 @@
 import { HelpCircle, Plus } from "lucide-react"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { FotoboxSaveButton } from "@/components/assets/fotobox-save-button"
+import { cn } from "@/lib/utils"
 
 interface AssetPreviewChromeProps {
   src: string
@@ -30,18 +31,21 @@ export function AssetPreviewChrome({
   const peopleLabel = whoIsInPicture?.trim()
 
   return (
-    <div className="flex h-full w-full max-w-full flex-col gap-3 lg:gap-4">
-      <div className="flex min-h-0 flex-1 items-center justify-center">
-        <div className="overflow-hidden rounded-xl shadow-sm">
-          <PreviewImage
-            src={src}
-            alt={alt}
-            width={width}
-            height={height}
-            className={className}
-            loading={loading}
-          />
-        </div>
+    <div className="flex h-full w-full max-w-full flex-col gap-3 bg-background lg:gap-4">
+      <div
+        className="flex min-h-[55vh] w-full max-h-[78vh] flex-1 items-center justify-center bg-background sm:min-h-[58vh] lg:min-h-0 lg:max-h-none"
+      >
+        <PreviewImage
+          src={src}
+          alt={alt}
+          width={width}
+          height={height}
+          className={cn(
+            "h-full w-full max-h-full max-w-full object-contain",
+            className,
+          )}
+          loading={loading}
+        />
       </div>
       <div
         className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1 sm:px-0"

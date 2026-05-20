@@ -25,9 +25,9 @@ export default async function HomePage() {
     const res = await fetchPublicLatestEvents({ windowDays: 60, limit: 24 })
     heroEvents = shuffleArray(
       res.items.filter((e) => e.previewUrl && e.assetCount > 0),
-    ).slice(0, 10)
+    ).slice(0, 9)
   } catch {
-    // Fall through — HeroFallingEventCards gracefully renders gradient placeholders
+    // Fall through — hero backdrop strip renders gradient placeholders when events are unavailable
   }
 
   return (

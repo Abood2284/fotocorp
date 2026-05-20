@@ -4,11 +4,27 @@ import { createHttpDb } from "../../db";
 import { getPublicAssetCollections, getPublicAssetDetail, getPublicAssetEvents, getPublicAssetFilters, listPublicAssets, parsePreviewTtl } from "../../lib/assets/public-assets";
 import { AppError } from "../../lib/errors";
 import { json } from "../../lib/http";
+import { parsePublicPreviewCdnConfig } from "../../lib/media/public-preview-cdn-url";
 import { methodNotAllowed } from "../../lib/route-errors";
+import {
+  buildTypesensePublicAssetFilterSummary,
+  isTypesenseNotConfiguredError,
+  isTypesenseSearchFailedError,
+  isTypesenseSearchInputError,
+  parseTypesensePublicAssetSearchQuery,
+  searchTypesensePublicAssets,
+} from "../../lib/search/typesense-public-assets";
 
 export const publicCatalogRoutes = new Hono<{ Bindings: Env }>();
 
+export const PUBLIC_CATALOG_LIST_CACHE_CONTROL =
+  "public, max-age=30, s-maxage=120, stale-while-revalidate=300";
+
+export const PUBLIC_CATALOG_FILTERS_CACHE_CONTROL =
+  "public, max-age=300, s-maxage=900, stale-while-revalidate=1800";
+
 publicCatalogRoutes.get("/api/v1/assets", async (c) => {
+  const cdn = parsePublicPreviewCdnConfig(c.env);
   return json(
     await listPublicAssets(
       db(c.env),
@@ -25,24 +41,148 @@ publicCatalogRoutes.get("/api/v1/assets", async (c) => {
       },
       c.env.MEDIA_PREVIEW_TOKEN_SECRET,
       ttl(c.env),
+      cdn,
     ),
+    200,
+    { headers: { "Cache-Control": PUBLIC_CATALOG_LIST_CACHE_CONTROL } },
   );
 });
 
 publicCatalogRoutes.all("/api/v1/assets", () => methodNotAllowed());
 
+publicCatalogRoutes.get("/api/v1/search/assets", async (c) => {
+  const route = "/api/v1/search/assets";
+  const startedAt = Date.now();
+  let q = "*";
+  let page = 1;
+  let limit = 50;
+  let filters = "";
+
+  try {
+    const query = parseTypesensePublicAssetSearchQuery(new URL(c.req.url).searchParams);
+    q = query.q;
+    page = query.page;
+    limit = query.limit;
+    filters = buildTypesensePublicAssetFilterSummary(query);
+
+    const response = await searchTypesensePublicAssets(c.env, query);
+    const durationMs = Date.now() - startedAt;
+
+    console.info(
+      JSON.stringify({
+        event: "typesense_public_asset_search",
+        route,
+        durationMs,
+        status: "ok",
+        statusCode: 200,
+        backend: "typesense",
+        q,
+        filters,
+        page,
+        limit,
+        found: response.total,
+        hits: response.items.length,
+        facetCount:
+          response.facets.categories.length +
+          response.facets.events.length +
+          response.facets.cities.length +
+          response.facets.sources.length,
+        tookMs: response.timing.tookMs,
+        timeout: false,
+      }),
+    );
+
+    return json(response, 200, {
+      headers: {
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+
+    if (isTypesenseNotConfiguredError(error)) {
+      console.error(
+        JSON.stringify({
+          event: "typesense_public_asset_search",
+          route,
+          durationMs,
+          status: "error",
+          statusCode: 503,
+          backend: "typesense",
+          q,
+          filters,
+          page,
+          limit,
+          timeout: false,
+        }),
+      );
+      return json({ error: "typesense_not_configured" }, 503);
+    }
+
+    if (isTypesenseSearchInputError(error)) {
+      console.warn(
+        JSON.stringify({
+          event: "typesense_public_asset_search",
+          route,
+          durationMs,
+          status: "error",
+          statusCode: 400,
+          backend: "typesense",
+          q,
+          filters,
+          page,
+          limit,
+          timeout: false,
+          error: error.code,
+        }),
+      );
+      return json({ error: error.code }, 400);
+    }
+
+    if (isTypesenseSearchFailedError(error)) {
+      console.error(
+        JSON.stringify({
+          event: "typesense_public_asset_search",
+          route,
+          durationMs,
+          status: "error",
+          statusCode: 502,
+          backend: "typesense",
+          q,
+          filters,
+          page,
+          limit,
+          tookMs: durationMs,
+          timeout: error.timedOut,
+          upstreamStatusCode: error.statusCode ?? null,
+        }),
+      );
+      return json({ error: "typesense_search_failed" }, 502);
+    }
+
+    throw error;
+  }
+});
+
+publicCatalogRoutes.all("/api/v1/search/assets", () => methodNotAllowed());
+
 publicCatalogRoutes.get("/api/v1/assets/filters", async (c) => {
-  return json(await getPublicAssetFilters(db(c.env)));
+  return json(await getPublicAssetFilters(db(c.env)), 200, {
+    headers: { "Cache-Control": PUBLIC_CATALOG_FILTERS_CACHE_CONTROL },
+  });
 });
 
 publicCatalogRoutes.all("/api/v1/assets/filters", () => methodNotAllowed());
 
 publicCatalogRoutes.get("/api/v1/assets/collections", async (c) => {
+  const cdn = parsePublicPreviewCdnConfig(c.env);
   return json(
     await getPublicAssetCollections(
       db(c.env),
       c.env.MEDIA_PREVIEW_TOKEN_SECRET,
       ttl(c.env),
+      cdn,
     ),
   );
 });
@@ -50,11 +190,13 @@ publicCatalogRoutes.get("/api/v1/assets/collections", async (c) => {
 publicCatalogRoutes.all("/api/v1/assets/collections", () => methodNotAllowed());
 
 publicCatalogRoutes.get("/api/v1/assets/events", async (c) => {
+  const cdn = parsePublicPreviewCdnConfig(c.env);
   return json(
     await getPublicAssetEvents(
       db(c.env),
       c.env.MEDIA_PREVIEW_TOKEN_SECRET,
       ttl(c.env),
+      cdn,
     ),
   );
 });
@@ -62,12 +204,14 @@ publicCatalogRoutes.get("/api/v1/assets/events", async (c) => {
 publicCatalogRoutes.all("/api/v1/assets/events", () => methodNotAllowed());
 
 publicCatalogRoutes.get("/api/v1/assets/:assetId", async (c) => {
+  const cdn = parsePublicPreviewCdnConfig(c.env);
   return json(
     await getPublicAssetDetail(
       db(c.env),
       c.req.param("assetId"),
       c.env.MEDIA_PREVIEW_TOKEN_SECRET,
       ttl(c.env),
+      cdn,
     ),
   );
 });

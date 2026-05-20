@@ -1,0 +1,132 @@
+import assert from "node:assert/strict"
+import { describe, it } from "node:test"
+import { buildLatestEventsResponse, parseLatestEventsQuery } from "../src/lib/assets/public-homepage"
+import {
+  buildPublicPreviewCdnUrl,
+  resolvePublicStablePreviewUrl,
+} from "../src/lib/media/public-preview-cdn-url"
+
+const SAMPLE_ASSET_ID = "11111111-1111-4111-8111-111111111111"
+
+describe("buildPublicPreviewCdnUrl", () => {
+  it("builds CDN URL from derivative storage key", () => {
+    const url = buildPublicPreviewCdnUrl({
+      baseUrl: "https://media.fotocorp.com",
+      version: "v1",
+      storageKey: "previews/v1/card/abc.webp",
+      assetId: SAMPLE_ASSET_ID,
+      variant: "card",
+    })
+
+    assert.equal(url, "https://media.fotocorp.com/previews/v1/card/abc.webp")
+  })
+
+  it("strips duplicate slashes from base URL and storage key", () => {
+    const url = buildPublicPreviewCdnUrl({
+      baseUrl: "https://media.fotocorp.com/",
+      storageKey: "/previews/v1/card/abc.webp",
+      variant: "card",
+    })
+
+    assert.equal(url, "https://media.fotocorp.com/previews/v1/card/abc.webp")
+  })
+
+  it("returns null when base URL is missing", () => {
+    const url = buildPublicPreviewCdnUrl({
+      baseUrl: "",
+      storageKey: "previews/v1/card/abc.webp",
+      variant: "card",
+    })
+
+    assert.equal(url, null)
+  })
+
+  it("falls back to deterministic path when storage key is unavailable", () => {
+    const url = buildPublicPreviewCdnUrl({
+      baseUrl: "https://media.fotocorp.com",
+      version: "v1",
+      assetId: SAMPLE_ASSET_ID,
+      variant: "detail",
+    })
+
+    assert.equal(
+      url,
+      `https://media.fotocorp.com/previews/v1/detail/${SAMPLE_ASSET_ID}.webp`,
+    )
+  })
+})
+
+describe("resolvePublicStablePreviewUrl", () => {
+  it("prefers CDN URL and falls back to stable API preview path", () => {
+    const cdn = { baseUrl: "https://media.fotocorp.com", version: "v1" }
+
+    assert.equal(
+      resolvePublicStablePreviewUrl(cdn, {
+        storageKey: "previews/v1/card/abc.webp",
+        assetId: SAMPLE_ASSET_ID,
+        variant: "card",
+      }),
+      "https://media.fotocorp.com/previews/v1/card/abc.webp",
+    )
+
+    assert.equal(
+      resolvePublicStablePreviewUrl({ baseUrl: null, version: null }, {
+        storageKey: "previews/v1/card/abc.webp",
+        assetId: SAMPLE_ASSET_ID,
+        variant: "card",
+      }),
+      `/api/media/assets/${encodeURIComponent(SAMPLE_ASSET_ID)}/preview/card`,
+    )
+  })
+})
+
+describe("buildLatestEventsResponse", () => {
+  it("returns CDN previewUrl for public event cards when configured", () => {
+    const query = parseLatestEventsQuery({ windowDays: "30", limit: "15", cursor: null })
+    const response = buildLatestEventsResponse(
+      [
+        {
+          event_id: "22222222-2222-4222-8222-222222222222",
+          title: "Sample event",
+          event_date: "2026-05-01T00:00:00.000Z",
+          created_at: "2026-05-01T12:00:00.000Z",
+          asset_count: 3,
+          preview_asset_id: SAMPLE_ASSET_ID,
+          preview_width: 612,
+          preview_height: 408,
+          preview_url: `/api/media/assets/${SAMPLE_ASSET_ID}/preview/card`,
+          preview_storage_key: "previews/v1/card/abc.webp",
+        },
+      ],
+      query,
+      { baseUrl: "https://media.fotocorp.com", version: "v1" },
+    )
+
+    assert.equal(response.items[0]?.previewUrl, "https://media.fotocorp.com/previews/v1/card/abc.webp")
+  })
+
+  it("keeps stable preview path when CDN env is missing", () => {
+    const query = parseLatestEventsQuery({ windowDays: "30", limit: "15", cursor: null })
+    const stablePath = `/api/media/assets/${SAMPLE_ASSET_ID}/preview/card`
+    const response = buildLatestEventsResponse(
+      [
+        {
+          event_id: "22222222-2222-4222-8222-222222222222",
+          title: "Sample event",
+          event_date: null,
+          created_at: "2026-05-01T12:00:00.000Z",
+          asset_count: 1,
+          preview_asset_id: SAMPLE_ASSET_ID,
+          preview_width: 612,
+          preview_height: 408,
+          preview_url: stablePath,
+          preview_storage_key: "previews/v1/card/abc.webp",
+        },
+      ],
+      query,
+      { baseUrl: null, version: null },
+    )
+
+    assert.equal(response.items[0]?.previewUrl, stablePath)
+  })
+})

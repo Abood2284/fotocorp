@@ -213,8 +213,7 @@ export async function getInternalAdminAssetPreview(
   if (row.media_type !== "IMAGE") {
     throw new AppError(409, "PREVIEW_NOT_AVAILABLE", "Preview is not available.");
   }
-  const watermarkOk =
-    variant === "detail" ? row.is_watermarked === true : row.is_watermarked === false;
+  const watermarkOk = row.is_watermarked === true;
   if (
     !row.r2_key ||
     row.generation_status !== "READY" ||
@@ -503,7 +502,7 @@ export async function getInternalAdminCatalogStats(db: DrizzleClient) {
       count(*) filter (where a.original_exists_in_storage = false)::bigint as missing_r2_count,
       count(*) filter (
         where card.generation_status = 'READY'
-          and card.is_watermarked = false
+          and card.is_watermarked = true
       )::bigint as ready_card_preview_count,
       count(*) filter (
         where card.id is null
@@ -881,7 +880,7 @@ function derivativeSummary(
   updatedAt: Date | string | null,
 ) {
   const hasCompleteMetadata = width !== null && height !== null;
-  const watermarkOk = variant === "detail" ? isWatermarked === true : isWatermarked === false;
+  const watermarkOk = isWatermarked === true;
   const ready = status === "READY" && watermarkOk && hasCompleteMetadata;
   const state = mapDerivativeState(status);
   return {
@@ -930,11 +929,11 @@ function previewStateSql(): SQL {
 }
 
 function cardReadySql(): SQL {
-  return sql`(card.generation_status = 'READY' and card.is_watermarked = false and card.mime_type is not null and card.width is not null and card.height is not null)`;
+  return sql`(card.generation_status = 'READY' and card.is_watermarked = true and card.mime_type is not null and card.width is not null and card.height is not null)`;
 }
 
 function thumbReadySql(): SQL {
-  return sql`(thumb.generation_status = 'READY' and thumb.is_watermarked = false and thumb.mime_type is not null and thumb.width is not null and thumb.height is not null)`;
+  return sql`(thumb.generation_status = 'READY' and thumb.is_watermarked = true and thumb.mime_type is not null and thumb.width is not null and thumb.height is not null)`;
 }
 
 function detailReadySql(): SQL {
@@ -942,7 +941,7 @@ function detailReadySql(): SQL {
 }
 
 function thumbReadyOrMissingSql(): SQL {
-  return sql`(thumb.id is null or (thumb.generation_status = 'READY' and thumb.is_watermarked = false and thumb.mime_type is not null and thumb.width is not null and thumb.height is not null))`;
+  return sql`(thumb.id is null or (thumb.generation_status = 'READY' and thumb.is_watermarked = true and thumb.mime_type is not null and thumb.width is not null and thumb.height is not null))`;
 }
 
 function detailReadyOrMissingSql(): SQL {
@@ -1171,14 +1170,14 @@ async function getPublishEligibility(db: DrizzleClient, assetId: string) {
       a.original_exists_in_storage as r2_exists,
       (
         thumb.generation_status = 'READY'
-        and thumb.is_watermarked = false
+        and thumb.is_watermarked = true
         and thumb.mime_type is not null
         and thumb.width is not null
         and thumb.height is not null
       ) as thumb_ready,
       (
         card.generation_status = 'READY'
-        and card.is_watermarked = false
+        and card.is_watermarked = true
         and card.mime_type is not null
         and card.width is not null
         and card.height is not null

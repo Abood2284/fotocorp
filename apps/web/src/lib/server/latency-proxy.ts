@@ -15,6 +15,8 @@ interface TracedProxyOptions {
   upstreamUrl: string
   cacheMode?: string
   accept?: string
+  upstreamRevalidateSeconds?: number
+  passthroughCacheControl?: boolean
 }
 
 export async function tracedUpstreamProxy(options: TracedProxyOptions): Promise<Response> {
@@ -26,15 +28,21 @@ export async function tracedUpstreamProxy(options: TracedProxyOptions): Promise<
   let upstream: Response | null = null
   let fetchError: ReturnType<typeof serializeFetchError> | null = null
 
+  const upstreamFetchInit: RequestInit & { next?: { revalidate: number } } = {
+    method: "GET",
+    headers: {
+      Accept: options.accept ?? "application/json",
+      ...requestIdHeaders(requestId),
+    },
+  }
+  if (options.upstreamRevalidateSeconds) {
+    upstreamFetchInit.next = { revalidate: options.upstreamRevalidateSeconds }
+  } else {
+    upstreamFetchInit.cache = "no-store"
+  }
+
   try {
-    upstream = await fetch(options.upstreamUrl, {
-      method: "GET",
-      cache: "no-store",
-      headers: {
-        Accept: options.accept ?? "application/json",
-        ...requestIdHeaders(requestId),
-      },
-    })
+    upstream = await fetch(options.upstreamUrl, upstreamFetchInit)
     tracker.mark("upstream_fetch")
   } catch (error) {
     fetchError = serializeFetchError(error)
@@ -97,7 +105,9 @@ export async function tracedUpstreamProxy(options: TracedProxyOptions): Promise<
       },
       tracker.total(),
     ),
-    cacheControl: "private, no-store",
+    cacheControl: options.passthroughCacheControl
+      ? (upstream.headers.get("cache-control") ?? "private, no-store")
+      : "private, no-store",
     contentType: upstream.headers.get("content-type") ?? "application/json",
     upstreamRequestId: upstream.headers.get(FOTOCORP_REQUEST_ID_HEADER),
   })

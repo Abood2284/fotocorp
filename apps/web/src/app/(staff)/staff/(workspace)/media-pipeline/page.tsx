@@ -29,8 +29,7 @@ export default async function StaffMediaPipelinePage() {
           Temporary operational view for production derivative migration tracking.
         </p>
         <p className="text-xs text-muted-foreground">
-          Preview derivatives: thumb and card are clean (no tiled watermark); detail remains watermarked (
-          {status.watermarkProfile}).
+          Preview derivatives: thumb, card, and detail use protected watermarks (tiered profiles).
         </p>
         <p className="text-xs text-muted-foreground">
           Expected profiles — thumb: {status.derivativeProfiles.thumbProfile}, card:{" "}

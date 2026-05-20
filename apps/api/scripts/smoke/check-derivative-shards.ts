@@ -2,9 +2,9 @@
 import dotenv from "dotenv";
 import pg from "pg";
 import {
-  CARD_CLEAN_PROFILE,
-  DETAIL_WATERMARKED_PROFILE,
-  THUMB_CLEAN_PROFILE,
+  CARD_LIGHT_PREVIEW_PROFILE,
+  DETAIL_PREVIEW_PROFILE,
+  THUMB_LIGHT_PREVIEW_PROFILE,
 } from "../../src/lib/media/watermark.js";
 
 dotenv.config({ path: ".dev.vars" });
@@ -56,13 +56,7 @@ async function main() {
                 $6::boolean = true
                 or d.image_asset_id is null
                 or d.generation_status <> 'READY'
-                or (
-                  case upper(v.variant)
-                    when 'THUMB' then d.is_watermarked is distinct from false
-                    when 'CARD' then d.is_watermarked is distinct from false
-                    else d.is_watermarked is distinct from true
-                  end
-                )
+                or d.is_watermarked is distinct from true
                 or (
                   case upper(v.variant)
                     when 'THUMB' then d.watermark_profile is distinct from $2::text
@@ -113,9 +107,9 @@ async function main() {
       `,
       [
         ["thumb", "card", "detail"],
-        THUMB_CLEAN_PROFILE,
-        CARD_CLEAN_PROFILE,
-        DETAIL_WATERMARKED_PROFILE,
+        THUMB_LIGHT_PREVIEW_PROFILE,
+        CARD_LIGHT_PREVIEW_PROFILE,
+        DETAIL_PREVIEW_PROFILE,
         true,
         false,
         limit,

@@ -9,6 +9,29 @@ This runbook is for production cutover sequencing before large derivative genera
 3. Generate preview derivatives only for verified assets. **Client policy:** `thumb` and `card` are **clean** (no tiled watermark); **`detail` remains watermarked**. Objects stay under the historical prefix `previews/watermarked/<variant>/…` for all three (the folder name is misleading for thumb/card until a later migration).
 4. Check status after every batch.
 
+## Public preview CDN delivery
+
+Public **preview derivatives** (thumb, card, detail) are served from the R2 previews bucket behind the custom domain configured as `PUBLIC_PREVIEW_CDN_BASE_URL` (optional `PUBLIC_PREVIEW_CDN_VERSION`, default `v1`). Public catalog, homepage, and latest-events API responses build CDN URLs from each derivative's `image_derivatives.storage_key` when the env var is set; otherwise they fall back to existing same-origin API preview routes. **Originals and paid-size downloads remain protected** behind authenticated entitlement routes and are never exposed via the public CDN domain.
+
+Helper: `apps/api/src/lib/media/public-preview-cdn-url.ts`.
+
+Typesense public search indexing and the parallel `/api/v1/search/assets` route are documented in:
+
+- [`typesense-cloudflare-access-runbook.md`](typesense-cloudflare-access-runbook.md)
+- [`reports/typesense-public-indexer-report.md`](reports/typesense-public-indexer-report.md)
+- [`reports/typesense-public-search-api-report.md`](reports/typesense-public-search-api-report.md)
+
+Current Typesense cutover target: build and validate `public_assets_20260519_v2`, then point alias `public_assets_current` at it. The v2 search contract indexes `who_is_in_picture` and does not search `title`; frontend cutover waits until that alias swap is complete.
+
+Production Typesense access must go through a secured Cloudflare Tunnel hostname, not a public raw Typesense port. The production Worker cannot use the VPS-local `127.0.0.1:8108`; configure `TYPESENSE_HOST=https://search.fotocorp.com`, keep `TYPESENSE_API_KEY` as an API Worker secret, and set both `TYPESENSE_CF_ACCESS_CLIENT_ID` and `TYPESENSE_CF_ACCESS_CLIENT_SECRET` when Cloudflare Access service auth protects the hostname. If any Typesense API key or Access secret is exposed, rotate it.
+
+Smoke search connectivity without the browser:
+
+```bash
+TYPESENSE_HOST=http://127.0.0.1:8108 pnpm --dir apps/api search:smoke-typesense
+TYPESENSE_HOST=https://search.fotocorp.com TYPESENSE_CF_ACCESS_CLIENT_ID=... TYPESENSE_CF_ACCESS_CLIENT_SECRET=... pnpm --dir apps/api search:smoke-typesense
+```
+
 ## Current status
 
 ```bash
@@ -96,40 +119,92 @@ Force re-check:
 pnpm --dir apps/api media:verify-r2-originals -- --force --limit 20000 --batch-size 500 --concurrency 20
 ```
 
-## Derivative generation (after verification)
+## Protected preview migration (big-bang)
 
-**Thumb and card** are **clean** (no tiled watermark) but keep the historical R2 prefixes `previews/watermarked/thumb/` and `previews/watermarked/card/` so URLs and keys stay stable. **`Detail` stays watermarked** at `previews/watermarked/detail/…`. Do **not** delete existing preview objects first; use `--force` only for the variants you intend to overwrite.
+All variants (`thumb`, `card`, `detail`) use the tiered protected renderer in `@fotocorp/media-preview`. R2 keys stay at `previews/watermarked/<variant>/…` (overwrite in place). DB profiles: `fotocorp_thumb_light_preview_v1`, `fotocorp_card_light_preview_v1`, `fotocorp_detail_preview_v1`; `is_watermarked = true` for all three.
 
-Backfill thumb and/or card after code deploy (dry-run first):
+### Prerequisites (Mac + each Windows shard machine)
+
+- Repo at migration commit; `pnpm install` at monorepo root.
+- `apps/api/.dev.vars` (or env) with `DATABASE_URL` and R2 credentials for originals + previews buckets.
+- Use single-line commands (PowerShell-safe); avoid bash `\` line continuations on Windows.
+
+### Maintenance window order
+
+1. `SITE_UNDER_CONSTRUCTION=true` on production **web** Worker; use `?preview=<bypass_secret>` to verify.
+2. Deploy **API Worker** with new profile gates (unregenerated assets 404 until processed).
+3. Rebuild **VPS jobs** (`docker compose … up -d --build fotocorp-jobs`) so new publishes match backfill.
+4. Optionally `IMAGE_PUBLISH_PROCESSING_ENABLED=false` on VPS during bulk backfill.
+5. Run generation shards; then Typesense reindex; purge CDN cache for preview hostname.
+6. Set `PUBLIC_PREVIEW_CDN_VERSION=v2` on API if using versioned fallback URLs.
+7. `SITE_UNDER_CONSTRUCTION=false`.
+
+### Mac pilot — 100 assets
 
 ```bash
-pnpm --dir apps/api media:generate-derivatives -- --scope all-verified --dry-run --force --variants thumb,card --limit 200
-pnpm --dir apps/api media:generate-derivatives -- --scope all-verified --force --variants thumb,card --limit 500 --batch-size 50 --concurrency 4
+pnpm --dir apps/api run media:generate-derivatives -- --scope all-verified --variants thumb,card,detail --force --limit 100 --batch-size 25 --asset-concurrency 2 --upload-concurrency 4
 ```
 
-Avoid regenerating **`detail`** unless explicitly requested (`--variants` must include `detail`). Originals remain private and must never be exposed directly to the browser.
+Verify with bypass cookie on homepage/search/asset detail; then `pnpm --dir apps/api media:pipeline-status`.
 
-Dry run first:
+### Windows — 5 parallel shards
+
+One terminal per machine; keep `--shard-count 5` fixed for the whole wave. Create `apps/api/logs` if missing.
+
+Shard 0:
+
+```bash
+pnpm --dir apps/api run media:generate-derivatives -- --scope all-verified --variants thumb,card,detail --force --shard-count 5 --shard-index 0 --batch-size 50 --asset-concurrency 1 --upload-concurrency 3 --report-file logs/derivative-shard-0-report.json
+```
+
+Shards 1–4: same command with `--shard-index 1` … `4` and matching `--report-file logs/derivative-shard-N-report.json`.
+
+Dry-run on Windows first: add `--dry-run --limit 20`.
+
+### VPS jobs redeploy (after jobs code merge)
+
+From repo root on VPS (e.g. `/opt/fotocorp/app`):
+
+```bash
+cd /opt/fotocorp/app
+git pull
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production build fotocorp-jobs
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs pnpm --dir apps/jobs smoke:sharp
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production up -d --build fotocorp-jobs
+docker compose -f docker-compose.jobs.yml logs -f --tail=100 fotocorp-jobs
+```
+
+`docker compose restart` does **not** load new code; always `up -d --build` after `git pull`.
+
+### Typesense (after backfill)
+
+No collection schema change. Reindex so eligibility matches new CARD/THUMB profiles:
+
+```bash
+pnpm --dir apps/api run typesense:index-public-assets
+```
+
+If using versioned collections, build a new collection, validate counts, swap alias `public_assets_current`. Smoke:
+
+```bash
+TYPESENSE_HOST=... pnpm --dir apps/api search:smoke-typesense
+```
+
+Run reindex **before** lifting under-construction when search is Typesense-backed.
+
+### CDN cache
+
+Most URLs use `{CDN}/{storage_key}`; `PUBLIC_PREVIEW_CDN_VERSION` does not bust those paths. After overwrite, **purge Cloudflare cache** for the previews CDN hostname or `previews/watermarked/*`.
+
+### General backfill (non-sharded)
 
 ```bash
 pnpm --dir apps/api media:generate-derivatives -- --scope all-verified --dry-run --limit 200
+pnpm --dir apps/api media:generate-derivatives -- --scope all-verified --limit 200 --batch-size 50 --asset-concurrency 4 --upload-concurrency 8
 ```
 
-Small controlled real batch:
-
-```bash
-pnpm --dir apps/api media:generate-derivatives -- --scope all-verified --limit 200 --batch-size 50 --concurrency 4
-```
-
-Migration batch command:
-
-```bash
-pnpm --dir apps/api media:generate-derivatives -- \
-  --scope all-verified \
-  --limit 10000 \
-  --batch-size 100 \
-  --concurrency 4
-```
+Use `--force` to overwrite existing objects. Originals remain private.
 
 Benchmark 1k with split concurrency + retries:
 
@@ -166,7 +241,7 @@ pnpm --dir apps/api media:generate-derivatives -- \
   - `public-ready`: only `APPROVED + PUBLIC` assets with verified originals.
   - `all-verified`: all verified image assets with mapped originals, regardless of current public listing status.
 - Pipeline status labels:
-  - `assetsReadyForPublicListing`: strict gate (`APPROVED`, `PUBLIC`, verified original, all required READY derivatives: **`THUMB`/`CARD` with `is_watermarked=false`** and expected clean profiles; **`DETAIL` with `is_watermarked=true`** and the expected detail `watermark_profile`).
+  - `assetsReadyForPublicListing`: strict gate (`APPROVED`, `PUBLIC`, verified original, all required READY derivatives with **`is_watermarked=true`** and expected protected profiles for thumb/card/detail).
   - `assetsCurrentlyVisibleInPublicApi`: assets that satisfy current public API listing conditions (can differ from strict publish-ready gate during migration windows).
 - Derivative generation exit behavior:
   - Default (recommended for bulk migration): item-level failures are logged/classified and the run exits `0`.

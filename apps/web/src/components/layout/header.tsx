@@ -23,6 +23,7 @@ import {
   Users,
   X,
 } from "lucide-react"
+import { FotocorpLogoLink } from "@/components/layout/fotocorp-logo-link"
 import { buttonVariants } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
@@ -112,16 +113,7 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
   return (
     <header className={HEADER_SHELL_CLASS}>
       <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <Link
-          href="/"
-          className="fc-brand flex shrink-0 items-center gap-2 rounded-md py-1 pr-3 font-semibold tracking-tight transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Fotocorp home"
-        >
-          <Camera className="h-7 w-7 text-primary" />
-          <span className="hidden text-2xl sm:inline-block">
-            foto<span className="text-accent">corp</span>
-          </span>
-        </Link>
+        <FotocorpLogoLink className="pr-3" priority />
 
         <nav
           className="hidden min-w-0 flex-1 items-center gap-1 lg:flex"
@@ -215,16 +207,7 @@ function HeaderStatic({ userProfile, staffBrief }: HeaderProps) {
   return (
     <header className={HEADER_SHELL_CLASS}>
       <div className="mx-auto flex w-full max-w-[1600px] items-center gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <Link
-          href="/"
-          className="fc-brand flex shrink-0 items-center gap-2 rounded-md py-1 pr-3 font-semibold tracking-tight transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Fotocorp home"
-        >
-          <Camera className="h-7 w-7 text-primary" />
-          <span className="hidden text-2xl sm:inline-block">
-            foto<span className="text-accent">corp</span>
-          </span>
-        </Link>
+        <FotocorpLogoLink className="pr-3" priority />
 
         <nav
           className="hidden min-w-0 flex-1 items-center gap-1 lg:flex"

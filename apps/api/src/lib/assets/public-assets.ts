@@ -1,8 +1,16 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { DrizzleClient } from "../../db";
 import { AppError } from "../errors";
+import {
+  buildPublicPreviewCdnUrl,
+  type PublicPreviewCdnConfig,
+} from "../media/public-preview-cdn-url";
 import { createPreviewUrl, type MediaPreviewVariant } from "../media/preview-token";
-import { CARD_CLEAN_PROFILE, CURRENT_WATERMARK_PROFILE, THUMB_CLEAN_PROFILE } from "../media/watermark";
+import {
+  CARD_LIGHT_PREVIEW_PROFILE,
+  DETAIL_PREVIEW_PROFILE,
+  THUMB_LIGHT_PREVIEW_PROFILE,
+} from "../media/watermark";
 
 type SortMode = "newest" | "oldest" | "relevance";
 
@@ -66,10 +74,13 @@ interface AssetRow {
   contributor_display_name: string | null;
   thumb_width: number | null;
   thumb_height: number | null;
+  thumb_storage_key: string | null;
   card_width: number | null;
   card_height: number | null;
+  card_storage_key: string | null;
   detail_width: number | null;
   detail_height: number | null;
+  detail_storage_key: string | null;
 }
 
 interface FilterRow {
@@ -78,10 +89,6 @@ interface FilterRow {
   event_date?: Date | string | null;
   asset_count: number | string;
 }
-interface CountRow {
-  total_count: number | string;
-}
-
 interface CollectionRow {
   id: string;
   name: string | null;
@@ -89,6 +96,7 @@ interface CollectionRow {
   preview_asset_id: string;
   preview_width: number | null;
   preview_height: number | null;
+  preview_storage_key: string | null;
 }
 
 interface EventRow {
@@ -100,6 +108,7 @@ interface EventRow {
   preview_asset_id: string;
   preview_width: number | null;
   preview_height: number | null;
+  preview_storage_key: string | null;
 }
 
 interface PreviewDto {
@@ -138,19 +147,19 @@ export async function listPublicAssets(
   input: PublicAssetListQueryInput,
   secret: string | undefined,
   ttlSeconds: number,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ) {
   const query = parseListQuery(input);
   const rows = await executeRows<AssetRow>(db, buildListSql(query));
-  const countRows = await executeRows<CountRow>(db, buildCountSql(query));
+  const hasMore = rows.length > query.limit;
   const pageRows = rows.slice(0, query.limit);
-  const items = await Promise.all(pageRows.map((row) => toAssetDto(row, secret, ttlSeconds, false)));
+  const items = await Promise.all(pageRows.map((row) => toAssetDto(row, secret, ttlSeconds, false, cdn)));
   const lastReturnedRow = pageRows.at(-1);
-  const nextCursor = rows.length > query.limit && lastReturnedRow
+  const nextCursor = hasMore && lastReturnedRow
     ? encodeCursor(toCursor(lastReturnedRow, query.sort))
     : null;
-  const totalCount = Number(countRows[0]?.total_count ?? 0);
 
-  return { items, nextCursor, totalCount };
+  return { items, nextCursor, hasMore };
 }
 
 export async function getPublicAssetDetail(
@@ -158,6 +167,7 @@ export async function getPublicAssetDetail(
   assetId: string,
   secret: string | undefined,
   ttlSeconds: number,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ) {
   if (!isUuid(assetId)) {
     throw new AppError(400, "INVALID_ASSET_ID", "Asset id is invalid.");
@@ -169,19 +179,19 @@ export async function getPublicAssetDetail(
     throw new AppError(404, "ASSET_NOT_FOUND", "Asset was not found.");
   }
 
-  return { asset: await toAssetDto(row, secret, ttlSeconds, true) };
+  return { asset: await toAssetDto(row, secret, ttlSeconds, true, cdn) };
 }
 
 export async function getPublicAssetFilters(db: DrizzleClient) {
-  const categories = await executeRows<FilterRow>(db, sql`
+  const categoriesSql = sql`
     select c.id, c.name, count(*)::int as asset_count
     from image_assets a
     join image_derivatives card
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = false
-      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
+      and card.is_watermarked = true
+      and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
     left join photo_events ev on ev.id = a.event_id
     join asset_categories c on c.id = coalesce(a.category_id, ev.category_id)
     where ${publicAssetPredicate("a")}
@@ -189,23 +199,28 @@ export async function getPublicAssetFilters(db: DrizzleClient) {
     group by c.id, c.name
     order by asset_count desc, c.name asc
     limit 100
-  `);
+  `;
 
-  const events = await executeRows<FilterRow>(db, sql`
+  const eventsSql = sql`
     select e.id, e.name, e.event_date, count(*)::int as asset_count
     from image_assets a
     join image_derivatives card
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = false
-      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
+      and card.is_watermarked = true
+      and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
     join photo_events e on e.id = a.event_id
     where ${publicAssetPredicate("a")}
     group by e.id, e.name, e.event_date
     order by e.event_date desc nulls last, asset_count desc, e.id desc
     limit 100
-  `);
+  `;
+
+  const [categories, events] = await Promise.all([
+    executeRows<FilterRow>(db, categoriesSql),
+    executeRows<FilterRow>(db, eventsSql),
+  ]);
 
   return {
     categories: categories.map((row) => ({
@@ -226,6 +241,7 @@ export async function getPublicAssetCollections(
   db: DrizzleClient,
   secret: string | undefined,
   ttlSeconds: number,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ) {
   const rows = await executeRows<CollectionRow>(db, sql`
     select
@@ -234,7 +250,8 @@ export async function getPublicAssetCollections(
       count(*)::int as asset_count,
       preview.asset_id as preview_asset_id,
       preview.width as preview_width,
-      preview.height as preview_height
+      preview.height as preview_height,
+      preview.storage_key as preview_storage_key
     from asset_categories c
     join image_assets a
       on coalesce(
@@ -245,17 +262,17 @@ export async function getPublicAssetCollections(
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = false
-      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
+      and card.is_watermarked = true
+      and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
     join lateral (
-      select a2.id as asset_id, card2.width, card2.height
+      select a2.id as asset_id, card2.width, card2.height, card2.storage_key
       from image_assets a2
       join image_derivatives card2
         on card2.image_asset_id = a2.id
         and card2.variant = 'CARD'
         and card2.generation_status = 'READY'
-        and card2.is_watermarked = false
-        and card2.watermark_profile = ${CARD_CLEAN_PROFILE}
+        and card2.is_watermarked = true
+        and card2.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
       where ${publicAssetPredicate("a2")}
         and coalesce(
           a2.category_id,
@@ -265,7 +282,7 @@ export async function getPublicAssetCollections(
       limit 1
     ) preview on true
     where ${publicAssetPredicate("a")}
-    group by c.id, c.name, preview.asset_id, preview.width, preview.height
+    group by c.id, c.name, preview.asset_id, preview.width, preview.height, preview.storage_key
     order by asset_count desc, c.name asc
     limit 12
   `);
@@ -277,7 +294,14 @@ export async function getPublicAssetCollections(
       assetCount: Number(row.asset_count),
       preview: row.preview_width && row.preview_height
         ? {
-            url: await createPreviewUrl(row.preview_asset_id, "card", secret, ttlSeconds),
+            url: await resolvePublicCatalogPreviewUrl(
+              cdn,
+              row.preview_asset_id,
+              row.preview_storage_key,
+              "card",
+              secret,
+              ttlSeconds,
+            ),
             width: row.preview_width,
             height: row.preview_height,
           }
@@ -290,6 +314,7 @@ export async function getPublicAssetEvents(
   db: DrizzleClient,
   secret: string | undefined,
   ttlSeconds: number,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ) {
   const rows = await executeRows<EventRow>(db, sql`
     select
@@ -300,31 +325,32 @@ export async function getPublicAssetEvents(
       count(*)::int as asset_count,
       preview.asset_id as preview_asset_id,
       preview.width as preview_width,
-      preview.height as preview_height
+      preview.height as preview_height,
+      preview.storage_key as preview_storage_key
     from photo_events e
     join image_assets a on a.event_id = e.id
     join image_derivatives card
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = false
-      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
+      and card.is_watermarked = true
+      and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
     join lateral (
-      select a2.id as asset_id, card2.width, card2.height
+      select a2.id as asset_id, card2.width, card2.height, card2.storage_key
       from image_assets a2
       join image_derivatives card2
         on card2.image_asset_id = a2.id
         and card2.variant = 'CARD'
         and card2.generation_status = 'READY'
-        and card2.is_watermarked = false
-        and card2.watermark_profile = ${CARD_CLEAN_PROFILE}
+        and card2.is_watermarked = true
+        and card2.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
       where ${publicAssetPredicate("a2")}
         and a2.event_id = e.id
       order by coalesce(a2.image_date, a2.created_at) desc, a2.id desc
       limit 1
     ) preview on true
     where ${publicAssetPredicate("a")}
-    group by e.id, e.name, e.event_date, e.created_at, preview.asset_id, preview.width, preview.height
+    group by e.id, e.name, e.event_date, e.created_at, preview.asset_id, preview.width, preview.height, preview.storage_key
     order by coalesce(e.event_date, e.created_at) desc nulls last, asset_count desc, e.id desc
     limit 100
   `);
@@ -338,7 +364,14 @@ export async function getPublicAssetEvents(
       assetCount: Number(row.asset_count),
       preview: row.preview_width && row.preview_height
         ? {
-            url: await createPreviewUrl(row.preview_asset_id, "card", secret, ttlSeconds),
+            url: await resolvePublicCatalogPreviewUrl(
+              cdn,
+              row.preview_asset_id,
+              row.preview_storage_key,
+              "card",
+              secret,
+              ttlSeconds,
+            ),
             width: row.preview_width,
             height: row.preview_height,
           }
@@ -384,19 +417,6 @@ function buildListSql(query: PublicAssetQuery): SQL {
     where ${sql.join(where, sql` and `)}
     ${order}
     limit ${pageSize}
-  `;
-}
-
-function buildCountSql(query: PublicAssetQuery): SQL {
-  const where = buildWhere({
-    ...query,
-    cursor: undefined,
-  });
-
-  return sql`
-    select count(*)::int as total_count
-    ${fromAssetSql()}
-    where ${sql.join(where, sql` and `)}
   `;
 }
 
@@ -470,10 +490,13 @@ function selectAssetSql(q: string | undefined): SQL {
       p.display_name as contributor_display_name,
       thumb.width as thumb_width,
       thumb.height as thumb_height,
+      thumb.storage_key as thumb_storage_key,
       card.width as card_width,
       card.height as card_height,
+      card.storage_key as card_storage_key,
       detail.width as detail_width,
-      detail.height as detail_height
+      detail.height as detail_height,
+      detail.storage_key as detail_storage_key
   `;
 }
 
@@ -486,20 +509,20 @@ function fromAssetSql(requireDetail = false): SQL {
       on card.image_asset_id = a.id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
-      and card.is_watermarked = false
-      and card.watermark_profile = ${CARD_CLEAN_PROFILE}
+      and card.is_watermarked = true
+      and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
     left join image_derivatives thumb
       on thumb.image_asset_id = a.id
       and thumb.variant = 'THUMB'
       and thumb.generation_status = 'READY'
-      and thumb.is_watermarked = false
-      and thumb.watermark_profile = ${THUMB_CLEAN_PROFILE}
+      and thumb.is_watermarked = true
+      and thumb.watermark_profile = ${THUMB_LIGHT_PREVIEW_PROFILE}
     ${detailJoin} image_derivatives detail
       on detail.image_asset_id = a.id
       and detail.variant = 'DETAIL'
       and detail.generation_status = 'READY'
       and detail.is_watermarked = true
-      and detail.watermark_profile = ${CURRENT_WATERMARK_PROFILE}
+      and detail.watermark_profile = ${DETAIL_PREVIEW_PROFILE}
     left join asset_categories ac on ac.id = a.category_id
     left join photo_events e on e.id = a.event_id
     left join asset_categories ec on ec.id = e.category_id
@@ -543,6 +566,7 @@ async function toAssetDto(
   secret: string | undefined,
   ttlSeconds: number,
   includeDetail: boolean,
+  cdn: PublicPreviewCdnConfig,
 ): Promise<AssetDto> {
   return {
     id: row.id,
@@ -567,23 +591,59 @@ async function toAssetDto(
       ? { id: row.contributor_id, displayName: row.contributor_display_name }
       : null,
     previews: {
-      thumb: await preview(row, "thumb", secret, ttlSeconds),
-      card: await preview(row, "card", secret, ttlSeconds),
-      ...(includeDetail ? { detail: await preview(row, "detail", secret, ttlSeconds) } : {}),
+      thumb: await preview(row, "thumb", secret, ttlSeconds, cdn),
+      card: await preview(row, "card", secret, ttlSeconds, cdn),
+      ...(includeDetail ? { detail: await preview(row, "detail", secret, ttlSeconds, cdn) } : {}),
     },
   };
 }
 
-async function preview(row: AssetRow, variant: MediaPreviewVariant, secret: string | undefined, ttlSeconds: number) {
+async function preview(
+  row: AssetRow,
+  variant: MediaPreviewVariant,
+  secret: string | undefined,
+  ttlSeconds: number,
+  cdn: PublicPreviewCdnConfig,
+) {
   const width = row[`${variant}_width` as keyof AssetRow];
   const height = row[`${variant}_height` as keyof AssetRow];
   if (typeof width !== "number" || typeof height !== "number") return null;
 
+  const storageKey = row[`${variant}_storage_key` as keyof AssetRow];
+  const normalizedStorageKey = typeof storageKey === "string" ? storageKey : null;
+
   return {
-    url: await createPreviewUrl(row.id, variant, secret, ttlSeconds),
+    url: await resolvePublicCatalogPreviewUrl(
+      cdn,
+      row.id,
+      normalizedStorageKey,
+      variant,
+      secret,
+      ttlSeconds,
+    ),
     width,
     height,
   };
+}
+
+async function resolvePublicCatalogPreviewUrl(
+  cdn: PublicPreviewCdnConfig,
+  assetId: string,
+  storageKey: string | null,
+  variant: MediaPreviewVariant,
+  secret: string | undefined,
+  ttlSeconds: number,
+): Promise<string> {
+  const cdnUrl = storageKey
+    ? buildPublicPreviewCdnUrl({
+        baseUrl: cdn.baseUrl ?? "",
+        version: cdn.version,
+        storageKey,
+        variant,
+      })
+    : null;
+  if (cdnUrl) return cdnUrl;
+  return createPreviewUrl(assetId, variant, secret, ttlSeconds);
 }
 
 function toCursor(row: AssetRow, sort: SortMode): CursorPayload {

@@ -7,14 +7,14 @@
  * operator backfill / local runs against Neon + R2 when not using the jobs package.
  *
  * Reads queued items from `image_publish_jobs`/`image_publish_job_items`, generates required
- * WebP derivatives (clean THUMB; watermarked CARD/DETAIL) for each canonical Fotokey original, upserts
+ * WebP derivatives (protected thumb/card/detail) for each canonical Fotokey original, upserts
  * `image_derivatives`, and only then promotes the image asset to ACTIVE+PUBLIC.
  *
  * Lifecycle:
  *   pre-pipeline (admin approve): image_assets → APPROVED + PRIVATE, fotokey set, original copied
  *                                 to canonical originals bucket as FCddmmyyNNN.<ext>.
  *   this script:                  read canonical original → generate THUMB/CARD/DETAIL into the
- *                                 previews bucket (THUMB unwatermarked under previews/watermarked/thumb) → upsert image_derivatives → on success only
+ *                                 previews bucket under previews/watermarked/<variant>/ → upsert image_derivatives → on success only
  *                                 set image_assets.status=ACTIVE, visibility=PUBLIC.
  *   on failure:                   leave image_assets APPROVED + PRIVATE, mark job item FAILED.
  *
@@ -33,12 +33,12 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import pg from "pg";
 import type { Pool as PgPool, QueryResultRow } from "pg";
-import sharp from "sharp";
 import {
-  CARD_CLEAN_PROFILE,
-  DETAIL_WATERMARKED_PROFILE,
-  THUMB_CLEAN_PROFILE,
-} from "../../src/lib/media/watermark";
+  decodePreviewSource,
+  expectedWatermarkProfile,
+  generateProtectedPreview,
+  variantIsWatermarked,
+} from "@fotocorp/media-preview";
 import { createHttpDb } from "../../src/db";
 import { schedulePublicEventFeedSyncForAsset } from "../../src/lib/assets/public-event-feed-projection";
 
@@ -76,18 +76,6 @@ interface JobItemRow extends QueryResultRow {
   ia_visibility: string;
   fotokey_assigned_at: Date | string | null;
 }
-
-interface PreviewVariantProfile {
-  width: number;
-  qualities: number[];
-  targetMaxBytes?: number;
-}
-
-const PREVIEW_VARIANT_PROFILES: Record<Variant, PreviewVariantProfile> = {
-  THUMB: { width: 220, qualities: [26, 22] },
-  CARD: { width: 300, qualities: [14], targetMaxBytes: 22 * 1024 },
-  DETAIL: { width: 520, qualities: [20, 16, 12], targetMaxBytes: 120 * 1024 },
-};
 
 const REQUIRED_VARIANTS: Variant[] = ["THUMB", "CARD", "DETAIL"];
 const PREVIEW_KEY_PREFIX = "previews/watermarked";
@@ -364,104 +352,22 @@ interface GeneratedPreview {
 }
 
 async function generateDerivative(original: Buffer, variant: Variant, fotokey: string): Promise<GeneratedPreview> {
-  const profile = PREVIEW_VARIANT_PROFILES[variant];
-  const metadata = await sharp(original, { failOn: "none" }).metadata();
-  const targetWidth = metadata.width ? Math.min(metadata.width, profile.width) : profile.width;
-  let bestCandidate: GeneratedPreview | undefined;
-
-  for (const quality of profile.qualities) {
-    const candidate =
-      variant === "DETAIL"
-        ? await renderWatermarkedPreview(original, targetWidth, quality)
-        : await renderCleanPreview(original, targetWidth, quality);
-    if (!bestCandidate || candidate.byteSize < bestCandidate.byteSize) bestCandidate = candidate;
-    if (!profile.targetMaxBytes || candidate.byteSize <= profile.targetMaxBytes) return candidate;
-  }
-
-  if (!bestCandidate) {
-    throw new Error(`Unable to generate ${variant} derivative for ${fotokey}.`);
-  }
-  return bestCandidate;
-}
-
-async function renderCleanPreview(original: Buffer, targetWidth: number, quality: number): Promise<GeneratedPreview> {
-  const encoded = await sharp(original, { failOn: "none" })
-    .rotate()
-    .resize({ width: targetWidth, withoutEnlargement: true })
-    .webp({ quality, effort: 6, smartSubsample: true })
-    .toBuffer({ resolveWithObject: true });
-  const width = encoded.info.width;
-  const height = encoded.info.height;
-  if (!width || !height) throw new Error("Unable to determine derivative dimensions.");
-  return {
-    buffer: encoded.data,
-    width,
-    height,
-    byteSize: encoded.data.byteLength,
-    checksum: createHash("sha256").update(encoded.data).digest("hex"),
-    selectedQuality: quality,
-  };
-}
-
-async function renderWatermarkedPreview(original: Buffer, targetWidth: number, quality: number): Promise<GeneratedPreview> {
-  const resized = await sharp(original, { failOn: "none" })
-    .rotate()
-    .resize({ width: targetWidth, withoutEnlargement: true })
-    .toBuffer({ resolveWithObject: true });
-  const width = resized.info.width;
-  const height = resized.info.height;
-  if (!width || !height) throw new Error("Unable to determine derivative dimensions.");
-
-  const watermark = Buffer.from(buildWatermarkSvg(width, height));
-  const encoded = await sharp(resized.data, { failOn: "none" })
-    .composite([{ input: watermark, top: 0, left: 0 }])
-    .webp({ quality, effort: 6, smartSubsample: true })
-    .toBuffer({ resolveWithObject: true });
+  const previewVariant = variant.toLowerCase() as "thumb" | "card" | "detail";
+  const decoded = await decodePreviewSource(original);
+  const generated = await generateProtectedPreview({
+    source: decoded,
+    variant: previewVariant,
+    label: fotokey,
+  });
 
   return {
-    buffer: encoded.data,
-    width: encoded.info.width ?? width,
-    height: encoded.info.height ?? height,
-    byteSize: encoded.data.byteLength,
-    checksum: createHash("sha256").update(encoded.data).digest("hex"),
-    selectedQuality: quality,
+    buffer: generated.buffer,
+    width: generated.width,
+    height: generated.height,
+    byteSize: generated.byteSize,
+    checksum: generated.checksum,
+    selectedQuality: generated.quality,
   };
-}
-
-function buildWatermarkSvg(width: number, height: number) {
-  const tileWidth = 190;
-  const tileHeight = 105;
-  const tiles: string[] = [];
-
-  for (let y = -tileHeight; y < height + tileHeight; y += tileHeight) {
-    for (let x = -tileWidth; x < width + tileWidth; x += tileWidth) {
-      tiles.push(`
-       <g transform="translate(${x} ${y}) rotate(-28 95 52.5)">
-         <text
-           x="95"
-           y="57"
-           text-anchor="middle"
-           font-family="Arial, Helvetica, sans-serif"
-           font-size="27"
-           font-weight="800"
-           letter-spacing="3"
-           fill="#111111"
-           fill-opacity="0.52"
-           stroke="#ffffff"
-           stroke-opacity="0.20"
-           stroke-width="1.0"
-         >fotocorp</text>
-       </g>
-      `);
-    }
-  }
-
-  return `
-    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
-      <rect width="${width}" height="${height}" fill="none"/>
-      ${tiles.join("\n")}
-    </svg>
-  `;
 }
 
 function buildDerivativeKey(variant: Variant, fotokey: string): string {
@@ -476,9 +382,8 @@ async function upsertDerivative(
   derivative: GeneratedPreview,
   status: DerivativeStatus,
 ) {
-  const isWatermarked = variant === "DETAIL";
-  const watermarkProfile =
-    variant === "THUMB" ? THUMB_CLEAN_PROFILE : variant === "CARD" ? CARD_CLEAN_PROFILE : DETAIL_WATERMARKED_PROFILE;
+  const isWatermarked = variantIsWatermarked(variant);
+  const watermarkProfile = expectedWatermarkProfile(variant);
   await pool.query(
     `
       insert into image_derivatives (

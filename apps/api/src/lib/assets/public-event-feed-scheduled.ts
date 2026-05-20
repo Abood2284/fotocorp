@@ -1,5 +1,6 @@
 import type { Env } from "../../appTypes"
 import { createHttpDb } from "../../db/http"
+import { parsePublicPreviewCdnConfig } from "../media/public-preview-cdn-url"
 import {
   deleteOldPublicEventFeedItems,
   reconcilePublicEventFeedProjectionDrift,
@@ -46,8 +47,9 @@ export async function runPublicEventFeedCleanup(env: Env): Promise<void> {
   }
 
   const reconcileStartedAt = Date.now()
+  const cdn = parsePublicPreviewCdnConfig(env)
   try {
-    const reconcile = await reconcilePublicEventFeedProjectionDrift(db)
+    const reconcile = await reconcilePublicEventFeedProjectionDrift(db, { cdn })
     console.info(
       JSON.stringify({
         event: "public_event_feed_projection_reconcile",

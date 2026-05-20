@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "wrangler dev --port 8787 --remote",
     "check": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test test/**/*.test.ts",
     "deploy": "wrangler deploy",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
@@ -45,11 +46,14 @@
     "smoke:admin-photographer-upload-review": "tsx scripts/smoke/check-admin-photographer-upload-review.ts",
     "staff:bootstrap": "tsx scripts/staff/bootstrap-staff-account.ts",
     "media:pipeline-status": "tsx scripts/media/pipeline-status.ts",
-    "media:verify-r2-originals": "tsx scripts/media/verify-r2-originals.ts"
+    "media:verify-r2-originals": "tsx scripts/media/verify-r2-originals.ts",
+    "typesense:index-public-assets": "tsx scripts/search/index-public-assets-typesense.ts",
+    "search:smoke-typesense": "tsx scripts/search/smoke-typesense.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1045.0",
     "@aws-sdk/s3-request-presigner": "^3.1045.0",
+    "@fotocorp/media-preview": "workspace:*",
     "@fotocorp/shared": "workspace:*",
     "@hono/zod-validator": "^0.7.6",
     "@neondatabase/serverless": "^1.0.2",

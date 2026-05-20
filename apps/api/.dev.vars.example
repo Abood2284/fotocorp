@@ -10,6 +10,25 @@ FOTOCORP_SUPER_ADMIN_EMAIL=admin@example.com
 # Required for signed preview URLs. Store real values in .dev.vars or Wrangler secrets.
 MEDIA_PREVIEW_TOKEN_SECRET=replace-with-at-least-32-random-characters
 MEDIA_PREVIEW_TOKEN_TTL_SECONDS=1800
+#
+# Public preview CDN (optional). When set, public catalog/homepage/event preview URLs use this
+# custom domain instead of same-origin API proxy routes. Originals remain protected behind auth.
+PUBLIC_PREVIEW_CDN_BASE_URL=https://media.fotocorp.com
+# Bump to v2 after protected-preview backfill + CDN purge (storage_key URLs ignore version)
+PUBLIC_PREVIEW_CDN_VERSION=v1
+#
+# Typesense public search index
+# Local dev can use SSH tunnel:
+# ssh -N -L 8108:127.0.0.1:8108 root@YOUR_VPS_IP
+TYPESENSE_HOST=http://127.0.0.1:8108
+TYPESENSE_API_KEY=change-me
+TYPESENSE_COLLECTION_ALIAS=public_assets_current
+TYPESENSE_SEARCH_TIMEOUT_MS=1500
+# Optional for production Typesense behind Cloudflare Tunnel + Access service auth.
+# Store real values as Worker secrets, not browser env vars or committed files.
+TYPESENSE_CF_ACCESS_CLIENT_ID=
+TYPESENSE_CF_ACCESS_CLIENT_SECRET=
+#
 # Must match apps/web `.env.local` INTERNAL_API_SECRET. Web proxies /api/auth/* and internal routes here.
 INTERNAL_API_SECRET=replace-with-long-random-internal-secret
 

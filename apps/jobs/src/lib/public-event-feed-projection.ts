@@ -6,7 +6,7 @@
  */
 import type { Pool } from "pg"
 import { getJobsPool } from "../db/client"
-import { CARD_CLEAN_PROFILE } from "./watermarkProfile"
+import { CARD_LIGHT_PREVIEW_PROFILE } from "./watermarkProfile"
 
 export const PUBLIC_EVENT_FEED_WINDOW_DAYS = 30
 
@@ -45,7 +45,7 @@ function joinPublicCardDerivativeSql(assetAlias: string, cardAlias: string, prof
     on ${cardAlias}.image_asset_id = ${assetAlias}.id
     and ${cardAlias}.variant = 'CARD'
     and ${cardAlias}.generation_status = 'READY'
-    and ${cardAlias}.is_watermarked = false
+    and ${cardAlias}.is_watermarked = true
     and ${cardAlias}.watermark_profile = ${profileParam}`
 }
 
@@ -139,7 +139,7 @@ async function syncPublicEventFeedForEvent(pool: Pool, eventId: string): Promise
     left join event_previews ep on true
   `
 
-  const feedResult = await pool.query<FeedPreviewRow>(feedSql, [eventId, CARD_CLEAN_PROFILE])
+  const feedResult = await pool.query<FeedPreviewRow>(feedSql, [eventId, CARD_LIGHT_PREVIEW_PROFILE])
   const feed = feedResult.rows[0]
   const assetCount = Number(feed?.asset_count ?? 0)
 

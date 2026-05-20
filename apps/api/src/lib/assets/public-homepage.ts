@@ -1,6 +1,10 @@
 import { sql, type SQL } from "drizzle-orm"
 import type { DrizzleClient } from "../../db"
 import { AppError } from "../errors"
+import {
+  type PublicPreviewCdnConfig,
+  resolvePublicStablePreviewUrl,
+} from "../media/public-preview-cdn-url"
 
 export interface PublicHomepageEventDto {
   id: string
@@ -57,6 +61,7 @@ interface HomepageEventRow {
   preview_width: number | null
   preview_height: number | null
   preview_url: string
+  preview_storage_key: string | null
 }
 
 const DEFAULT_WINDOW_DAYS = 30
@@ -64,12 +69,15 @@ const DEFAULT_EVENT_LIMIT = 15
 const MAX_EVENT_LIMIT = 50
 const MAX_WINDOW_DAYS = 365
 
-export async function getPublicHomepageFeed(db: DrizzleClient): Promise<PublicHomepageFeedDto> {
+export async function getPublicHomepageFeed(
+  db: DrizzleClient,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
+): Promise<PublicHomepageFeedDto> {
   const latestEvents = await listPublicLatestEvents(db, {
     windowDays: String(DEFAULT_WINDOW_DAYS),
     limit: String(DEFAULT_EVENT_LIMIT),
     cursor: null,
-  })
+  }, cdn)
 
   return {
     latestEventsPreview: {
@@ -118,15 +126,17 @@ export async function fetchPublicLatestEventsRows(
 export async function listPublicLatestEvents(
   db: DrizzleClient,
   input: PublicLatestEventsQueryInput,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ): Promise<PublicLatestEventsResponseDto> {
   const query = parseLatestEventsQuery(input)
   const { rows } = await fetchPublicLatestEventsRows(db, query)
-  return buildLatestEventsResponse(rows, query)
+  return buildLatestEventsResponse(rows, query, cdn)
 }
 
 export function buildLatestEventsResponse(
   rows: HomepageEventRow[],
   query: PublicLatestEventsQuery,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ): PublicLatestEventsResponseDto {
   const pageRows = rows.slice(0, query.limit)
   const lastReturnedRow = pageRows.at(-1)
@@ -139,14 +149,22 @@ export function buildLatestEventsResponse(
     : null
 
   return {
-    items: pageRows.map(mapEventRow),
+    items: pageRows.map((row) => mapEventRow(row, cdn)),
     nextCursor,
     hasMore,
     generatedAt: new Date().toISOString(),
   }
 }
 
-function mapEventRow(row: HomepageEventRow): PublicHomepageEventDto {
+function mapEventRow(row: HomepageEventRow, cdn: PublicPreviewCdnConfig): PublicHomepageEventDto {
+  const previewUrl = row.preview_asset_id
+    ? resolvePublicStablePreviewUrl(cdn, {
+        storageKey: row.preview_storage_key,
+        assetId: row.preview_asset_id,
+        variant: "card",
+      })
+    : row.preview_url
+
   return {
     id: row.event_id,
     title: row.title ?? "Untitled event",
@@ -154,7 +172,7 @@ function mapEventRow(row: HomepageEventRow): PublicHomepageEventDto {
     eventDate: toIso(row.event_date),
     createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     assetCount: Number(row.asset_count),
-    previewUrl: row.preview_url,
+    previewUrl,
     previewWidth: row.preview_width,
     previewHeight: row.preview_height,
   }
@@ -182,8 +200,13 @@ function buildLatestEventsSql(query: PublicLatestEventsQuery): SQL {
       f.preview_asset_id,
       f.preview_width,
       f.preview_height,
-      f.preview_url
+      f.preview_url,
+      card.storage_key as preview_storage_key
     from public_event_feed_items f
+    left join image_derivatives card
+      on card.image_asset_id = f.preview_asset_id
+      and card.variant = 'CARD'
+      and card.generation_status = 'READY'
     where f.is_public = true
       and f.created_at >= (current_timestamp - (${query.windowDays}::int * interval '1 day'))
       ${cursorWhere}

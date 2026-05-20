@@ -236,9 +236,9 @@ export function HomeCategorySection() {
   const latestEventItems = latestEvents.map(mapHomepageEventToPublicEvent)
 
   return (
-    <section className="w-full bg-background pt-8 pb-10">
+    <section className="w-full bg-background pt-4 pb-10">
       <div className="mx-auto flex w-full flex-col items-center">
-        <div className="flex w-full flex-wrap justify-center gap-x-12 gap-y-4 pt-2 pb-0 text-base font-medium text-foreground sm:gap-x-16 sm:text-[17px]">
+        <div className="flex w-full flex-wrap justify-center gap-x-12 gap-y-4 pb-0 text-base font-medium text-foreground sm:gap-x-16 sm:text-[17px]">
           <button
             onClick={() => handleTabClick("Editorial")}
             className={`pb-1 transition-all ${

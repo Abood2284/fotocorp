@@ -9,7 +9,7 @@ interface SearchBarProps {
   defaultValue?: string
   placeholder?: string
   size?: "default" | "lg" | "compact"
-  variant?: "default" | "pill" | "minimal"
+  variant?: "default" | "pill" | "sharp" | "minimal"
   showTypeSelect?: boolean
   /** Where the Photos/Videos menu opens relative to the trigger. Use "above" when content sits directly below the bar. */
   typeSelectMenuPlacement?: "above" | "below"
@@ -60,20 +60,23 @@ export function SearchBar({
 
   const isCompact = size === "compact"
   const isLarge = size === "lg"
+  const isSharp = variant === "sharp"
 
   return (
     <form
       onSubmit={handleSubmit}
       className={cn(
         "relative flex w-full items-center transition-all duration-300",
-        "bg-[#F4F4F5]",
+        isSharp ? "bg-background" : "bg-[#F4F4F5]",
         variant === "pill"
           ? isCompact
             ? "rounded-[26px]"
             : "rounded-[32px]"
-          : isLarge
-            ? "rounded-xl"
-            : "rounded-md",
+          : isSharp
+            ? "rounded-sm"
+            : isLarge
+              ? "rounded-xl"
+              : "rounded-md",
         className
       )}
       role="search"
@@ -83,6 +86,7 @@ export function SearchBar({
           className={cn(
             "relative z-50 flex shrink-0 items-center",
             isCompact ? "py-1.5 pl-2" : "py-2 pl-2",
+            isSharp && "border-r border-border",
           )}
           ref={dropdownRef}
         >
@@ -90,7 +94,10 @@ export function SearchBar({
             type="button"
             onClick={() => setIsTypeSelectOpen(!isTypeSelectOpen)}
             className={cn(
-              "flex items-center rounded-full bg-[#E5E7EB] font-medium text-foreground outline-none transition-colors hover:bg-[#D1D5DB]",
+              "flex items-center font-medium text-foreground outline-none transition-colors",
+              isSharp
+                ? "rounded-sm border border-border bg-muted/50 hover:bg-muted"
+                : "rounded-full bg-[#E5E7EB] hover:bg-[#D1D5DB]",
               isCompact
                 ? "gap-1.5 px-3 py-1.5 text-sm"
                 : "gap-2 px-4 py-2 text-[0.95rem]",
@@ -109,7 +116,8 @@ export function SearchBar({
             <div
               role="listbox"
               className={cn(
-                "absolute left-2 z-50 w-40 overflow-hidden rounded-xl bg-background p-2 shadow-lg border border-border/40",
+                "absolute left-2 z-50 w-40 overflow-hidden bg-background p-2 shadow-lg border border-border",
+                isSharp ? "rounded-sm" : "rounded-xl border-border/40",
                 typeSelectMenuPlacement === "above"
                   ? "bottom-[calc(100%+8px)]"
                   : "top-[calc(100%+8px)]",
@@ -117,7 +125,10 @@ export function SearchBar({
             >
               <button
                 type="button"
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
+                className={cn(
+                  "flex w-full items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted",
+                  isSharp ? "rounded-sm" : "rounded-lg",
+                )}
                 onClick={() => {
                   setSelectedType("photos")
                   setIsTypeSelectOpen(false)
@@ -128,7 +139,10 @@ export function SearchBar({
               </button>
               <button
                 type="button"
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
+                className={cn(
+                  "flex w-full items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted",
+                  isSharp ? "rounded-sm" : "rounded-lg",
+                )}
                 onClick={() => {
                   setSelectedType("videos")
                   setIsTypeSelectOpen(false)

@@ -7,9 +7,9 @@ import dotenv from "dotenv"
 import pg from "pg"
 import { pathToFileURL } from "node:url"
 import {
-  CARD_CLEAN_PROFILE,
-  DETAIL_WATERMARKED_PROFILE,
-  THUMB_CLEAN_PROFILE,
+  CARD_LIGHT_PREVIEW_PROFILE,
+  DETAIL_PREVIEW_PROFILE,
+  THUMB_LIGHT_PREVIEW_PROFILE,
 } from "../../src/lib/media/watermark.js"
 
 dotenv.config({ path: ".dev.vars" })
@@ -437,20 +437,20 @@ WHERE NOT (
   (
     image_derivatives.variant = 'THUMB'
     AND image_derivatives.generation_status = 'READY'
-    AND image_derivatives.is_watermarked = false
-    AND image_derivatives.watermark_profile = '${THUMB_CLEAN_PROFILE}'
+    AND image_derivatives.is_watermarked = true
+    AND image_derivatives.watermark_profile = '${THUMB_LIGHT_PREVIEW_PROFILE}'
   )
   OR (
     image_derivatives.variant = 'CARD'
     AND image_derivatives.generation_status = 'READY'
-    AND image_derivatives.is_watermarked = false
-    AND image_derivatives.watermark_profile = '${CARD_CLEAN_PROFILE}'
+    AND image_derivatives.is_watermarked = true
+    AND image_derivatives.watermark_profile = '${CARD_LIGHT_PREVIEW_PROFILE}'
   )
   OR (
     image_derivatives.variant = 'DETAIL'
     AND image_derivatives.generation_status = 'READY'
     AND image_derivatives.is_watermarked = true
-    AND image_derivatives.watermark_profile = '${DETAIL_WATERMARKED_PROFILE}'
+    AND image_derivatives.watermark_profile = '${DETAIL_PREVIEW_PROFILE}'
   )
 );
 `

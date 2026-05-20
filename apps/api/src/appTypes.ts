@@ -9,6 +9,16 @@ export interface Env {
   MEDIA_CONTRIBUTOR_UPLOADS_BUCKET?: R2Bucket;
   MEDIA_PREVIEW_TOKEN_SECRET?: string;
   MEDIA_PREVIEW_TOKEN_TTL_SECONDS?: string;
+  /** Public R2 previews custom domain (no trailing slash). When set, public catalog/homepage preview URLs point here instead of API proxy routes. */
+  PUBLIC_PREVIEW_CDN_BASE_URL?: string;
+  /** Optional CDN path version segment for deterministic preview URLs when storage_key is unavailable. Defaults to v1. */
+  PUBLIC_PREVIEW_CDN_VERSION?: string;
+  TYPESENSE_HOST?: string;
+  TYPESENSE_API_KEY?: string;
+  TYPESENSE_COLLECTION_ALIAS?: string;
+  TYPESENSE_SEARCH_TIMEOUT_MS?: string;
+  TYPESENSE_CF_ACCESS_CLIENT_ID?: string;
+  TYPESENSE_CF_ACCESS_CLIENT_SECRET?: string;
   INTERNAL_API_SECRET?: string;
   LEGACY_FIXTURE_ROUTES_ENABLED?: string;
   /**

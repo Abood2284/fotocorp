@@ -133,8 +133,8 @@ function buildSummaryQuery(policy: DerivativeProfilePolicyInput): SQL {
       select d.image_asset_id
       from image_derivatives d
       where (
-        (d.variant = 'THUMB' and d.generation_status = 'READY' and d.is_watermarked = false and d.watermark_profile = ${policy.thumbProfile})
-        or (d.variant = 'CARD' and d.generation_status = 'READY' and d.is_watermarked = false and d.watermark_profile = ${policy.cardProfile})
+        (d.variant = 'THUMB' and d.generation_status = 'READY' and d.is_watermarked = true and d.watermark_profile = ${policy.thumbProfile})
+        or (d.variant = 'CARD' and d.generation_status = 'READY' and d.is_watermarked = true and d.watermark_profile = ${policy.cardProfile})
         or (d.variant = 'DETAIL' and d.generation_status = 'READY' and d.is_watermarked = true and d.watermark_profile = ${policy.detailProfile})
       )
       group by d.image_asset_id
@@ -170,7 +170,7 @@ function buildSummaryQuery(policy: DerivativeProfilePolicyInput): SQL {
           on card.image_asset_id = ia.id
          and card.variant = 'CARD'
          and card.generation_status = 'READY'
-         and card.is_watermarked = false
+         and card.is_watermarked = true
          and card.watermark_profile = ${policy.cardProfile}
         where ia.media_type = 'IMAGE'
           and ia.status = 'ACTIVE'
@@ -200,8 +200,8 @@ function buildVariantCountsQuery(policy: DerivativeProfilePolicyInput): SQL {
       count(*) filter (
         where d.generation_status = 'READY'
           and (
-            (v.variant = 'THUMB' and d.is_watermarked = false and d.watermark_profile = ${policy.thumbProfile})
-            or (v.variant = 'CARD' and d.is_watermarked = false and d.watermark_profile = ${policy.cardProfile})
+            (v.variant = 'THUMB' and d.is_watermarked = true and d.watermark_profile = ${policy.thumbProfile})
+            or (v.variant = 'CARD' and d.is_watermarked = true and d.watermark_profile = ${policy.cardProfile})
             or (v.variant = 'DETAIL' and d.is_watermarked = true and d.watermark_profile = ${policy.detailProfile})
           )
       )::bigint as ready_count,
@@ -210,8 +210,8 @@ function buildVariantCountsQuery(policy: DerivativeProfilePolicyInput): SQL {
         where d.image_asset_id is null
            or d.generation_status <> 'READY'
            or (
-             (v.variant = 'THUMB' and (d.is_watermarked is distinct from false or d.watermark_profile is distinct from ${policy.thumbProfile}))
-             or (v.variant = 'CARD' and (d.is_watermarked is distinct from false or d.watermark_profile is distinct from ${policy.cardProfile}))
+             (v.variant = 'THUMB' and (d.is_watermarked is distinct from true or d.watermark_profile is distinct from ${policy.thumbProfile}))
+             or (v.variant = 'CARD' and (d.is_watermarked is distinct from true or d.watermark_profile is distinct from ${policy.cardProfile}))
              or (v.variant = 'DETAIL' and (d.is_watermarked is distinct from true or d.watermark_profile is distinct from ${policy.detailProfile}))
            )
       )::bigint as missing_count

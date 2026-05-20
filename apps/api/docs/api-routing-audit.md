@@ -4,6 +4,18 @@
 
 - [DB revamp docs (README)](../../docs/db-revamp/README.md) — catalog/photographer DB revamp entry point, runbooks, and historical PR reports under `reports/`.
 - [Media pipeline operations (temporary)](../../docs/db-revamp/media-pipeline-operations.md) — one-time derivative migration status and generation commands.
+- [Typesense public search API report](../../docs/db-revamp/reports/typesense-public-search-api-report.md) — parallel public search route, BFF path, Typesense env, request mapping, and production access caveat.
+
+## Incremental update (2026-05-20)
+
+- Added parallel public search route: `GET /api/v1/search/assets`.
+- Route ownership: `apps/api/src/routes/public/catalog-routes.ts`.
+- Service/helper: `apps/api/src/lib/search/typesense-public-assets.ts`.
+- Web BFF path: `GET /api/public/search/assets` in `apps/web/src/app/api/public/[...path]/route.ts`.
+- Existing SQL-backed public routes `/api/v1/assets` and `/api/v1/assets/filters` are unchanged.
+- PR-3 correction: route `query_by` is `event_title,caption,who_is_in_picture,people,keywords,category_name,fotokey`; `title` is not searched.
+- PR-4 secure access: outbound Typesense fetches always send `X-TYPESENSE-API-KEY` and optionally send Cloudflare Access service-token headers when both `TYPESENSE_CF_ACCESS_CLIENT_ID` and `TYPESENSE_CF_ACCESS_CLIENT_SECRET` are configured. Partial Access config returns the existing `typesense_not_configured` path.
+- PR-5 compatibility cutover prep: the route now accepts `q`, `page`, `limit`, `category`, `event`, `city`, and `sort` while preserving legacy `categoryId` / `eventId` compatibility. It returns `total`, `page`, `perPage`, `totalPages`, `facets.categories/events/cities/sources`, and `timing.backend="typesense"` while keeping `totalCount`, `limit`, `hasMore`, and `meta` for existing consumers. The web `/search` page uses `/api/public/search/assets` only when `NEXT_PUBLIC_USE_TYPESENSE_SEARCH=true`; it does not call `/api/v1/assets/filters` in that mode.
 
 ## Incremental update (2026-05-14)
 
@@ -65,15 +77,16 @@ This makes route behavior hard to reason about and slows root-cause analysis whe
 | `GET` | `/api/v1/assets/filters` | `publicAssetFiltersRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed filters. PR-16I: category counts use resolved category `coalesce(asset, event)`. |
 | `GET` | `/api/v1/assets/collections` | `publicAssetCollectionsRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed collections. PR-16I: same resolved category for grouping/preview pick. |
 | `GET` | `/api/v1/assets/:id` | `publicAssetDetailRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public asset detail. PR-16I: same `fotokey` + category rules as list. |
+| `GET` | `/api/v1/search/assets` | `searchTypesensePublicAssets` | `apps/api/src/routes/public/catalog-routes.ts` + `apps/api/src/lib/search/typesense-public-assets.ts` | Parallel Typesense-backed public search/facet/count endpoint. Searches `event_title`, `caption`, `who_is_in_picture`, `people`, `keywords`, `category_name`, and `fotokey`; does not search `title`. Supports page pagination and category/event/city name filters for the feature-flagged `/search` cutover. Does not replace `/api/v1/assets` or `/api/v1/assets/filters`. |
 | `GET` | `/api/v1/public/homepage` | `getPublicHomepageFeed` | `apps/api/src/routes/public/homepage-routes.ts` | Lightweight homepage feed: first-page latest-events preview only, ordered by `created_at`; no newest/editorial asset slices. |
-| `GET` | `/api/v1/public/events/latest` | `listPublicLatestEvents` | `apps/api/src/routes/public/homepage-routes.ts` | Cursor-paginated Latest Events from `public_event_feed_items` projection (`windowDays`, `limit`, optional cursor); stable `/api/media/assets/:id/preview/card` URLs precomputed at sync time. |
+| `GET` | `/api/v1/public/events/latest` | `listPublicLatestEvents` | `apps/api/src/routes/public/homepage-routes.ts` | Cursor-paginated Latest Events from `public_event_feed_items` projection (`windowDays`, `limit`, optional cursor). Card `previewUrl` uses `PUBLIC_PREVIEW_CDN_BASE_URL` + derivative `storage_key` when configured; otherwise stable `/api/media/assets/:id/preview/card` fallback. |
 
 ### Public Media Routes
 
 | Method | Path | Handler | Source file | Notes |
 |---|---|---|---|---|
 | `GET` | `/api/v1/media/assets/:assetId/preview` | `securePreviewMediaRoute` | `apps/api/src/routes/secureMedia.ts` | Token-verified preview route (legacy signed URLs). |
-| `GET` | `/api/media/assets/:assetId/preview/:variant` | `stablePreviewMediaRoute` | `apps/api/src/routes/public/stable-preview-media.ts` | Stable public preview (no token). Same handler on `/api/v1/media/assets/:assetId/preview/:variant`. |
+| `GET` | `/api/media/assets/:assetId/preview/:variant` | `stablePreviewMediaRoute` | `apps/api/src/routes/public/stable-preview-media.ts` | Stable public preview (no token). Same handler on `/api/v1/media/assets/:assetId/preview/:variant`. Retained as fallback when `PUBLIC_PREVIEW_CDN_BASE_URL` is unset; public JSON responses prefer direct CDN URLs when configured. |
 
 ### Internal Admin Routes
 
