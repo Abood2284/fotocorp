@@ -7,6 +7,14 @@ export interface VariantStatusCounts {
   missing: number
 }
 
+export interface VariantMigrationCounts {
+  variant: string
+  readyCurrentProfile: number
+  readyStaleProfile: number
+  failed: number
+  missingOrNotReady: number
+}
+
 export interface PipelineFailedDerivativeRow {
   assetId: string
   legacyImageCode: string | null
@@ -18,6 +26,22 @@ export interface PipelineFailedDerivativeRow {
   hasErrorData: boolean
 }
 
+export interface PipelineRecentDerivativeRow {
+  assetId: string
+  fotokey: string | null
+  legacyImageCode: string | null
+  variant: string
+  generationStatus: string
+  watermarkProfile: string | null
+  isWatermarked: boolean
+  width: number | null
+  height: number | null
+  sizeBytes: number | null
+  profileMatchesPolicy: boolean
+  updatedAt: string | null
+  generatedAt: string | null
+}
+
 /** Expected `image_derivatives.watermark_profile` per variant for READY/missing counts. */
 export interface DerivativeProfilePolicyInput {
   thumbProfile: string
@@ -25,8 +49,14 @@ export interface DerivativeProfilePolicyInput {
   detailProfile: string
 }
 
+export interface MediaPipelineStatusOptions {
+  /** Set to 0 to skip the failed-derivatives sample query. */
+  failedSampleLimit?: number
+  /** Recent derivative row updates (R2 upload / DB upsert activity). */
+  recentActivityLimit?: number
+}
+
 export interface MediaPipelineStatus {
-  /** Expected profile for the watermarked detail variant (same as `derivativeProfiles.detailProfile`). */
   watermarkProfile: string
   derivativeProfiles: DerivativeProfilePolicyInput
   generatedAt: string
@@ -37,11 +67,17 @@ export interface MediaPipelineStatus {
   assetsWithR2ExistsNull: number
   assetsMissingOriginalOrR2Mapping: number
   derivativeByVariant: Record<string, VariantStatusCounts>
+  migrationByVariant: VariantMigrationCounts[]
+  verifiedAssetsWithOriginal: number
+  verifiedAssetsRemainingMigration: number
+  assetsWithAllCurrentProfilesReady: number
+  migrationPercentComplete: number
   assetsReadyForPublicListing: number
   assetsCurrentlyVisibleInPublicApi: number
   assetsEligibleForPublicListing: number
   assetsVisibleThroughCurrentPublicApiConditions: number
   latestFailedDerivatives: PipelineFailedDerivativeRow[]
+  recentDerivativeUpdates: PipelineRecentDerivativeRow[]
 }
 
 interface SummaryRow {
@@ -53,6 +89,8 @@ interface SummaryRow {
   assets_missing_original_or_r2_mapping: number | string
   assets_eligible_for_public_listing: number | string
   assets_visible_through_current_public_api_conditions: number | string
+  verified_assets_with_original: number | string
+  assets_with_all_current_profiles_ready: number | string
 }
 
 interface VariantRow {
@@ -60,6 +98,7 @@ interface VariantRow {
   ready_count: number | string
   failed_count: number | string
   missing_count: number | string
+  ready_stale_profile_count: number | string
 }
 
 interface FailedRow {
@@ -72,32 +111,86 @@ interface FailedRow {
   storage_key: string | null
 }
 
+interface RecentRow {
+  asset_id: string
+  fotokey: string | null
+  legacy_image_code: string | null
+  variant: string
+  generation_status: string
+  watermark_profile: string | null
+  is_watermarked: boolean
+  width: number | null
+  height: number | null
+  size_bytes: number | string | null
+  profile_matches_policy: boolean
+  updated_at: string | Date | null
+  generated_at: string | Date | null
+}
+
 const LEGACY_VARIANTS = ["thumb", "card", "detail"] as const
+
+function normalizeOptions(options: number | MediaPipelineStatusOptions): MediaPipelineStatusOptions {
+  if (typeof options === "number") {
+    return { failedSampleLimit: options, recentActivityLimit: 25 }
+  }
+  return {
+    failedSampleLimit: options.failedSampleLimit ?? 20,
+    recentActivityLimit: options.recentActivityLimit ?? 25,
+  }
+}
 
 export async function getMediaPipelineStatus(
   db: DrizzleClient,
   policy: DerivativeProfilePolicyInput,
-  failedSampleLimit = 20,
+  options: number | MediaPipelineStatusOptions = {},
 ): Promise<MediaPipelineStatus> {
-  const [summaryRows, variantRows, failedRows] = await Promise.all([
+  const normalized = normalizeOptions(options)
+  const failedLimit = normalized.failedSampleLimit ?? 0
+  const recentLimit = normalized.recentActivityLimit ?? 25
+
+  const [summaryRows, variantRows, failedRows, recentRows] = await Promise.all([
     executeRows<SummaryRow>(db, buildSummaryQuery(policy)),
     executeRows<VariantRow>(db, buildVariantCountsQuery(policy)),
-    executeRows<FailedRow>(db, buildLatestFailedRowsQuery(failedSampleLimit)),
+    failedLimit > 0
+      ? executeRows<FailedRow>(db, buildLatestFailedRowsQuery(failedLimit))
+      : Promise.resolve([]),
+    recentLimit > 0
+      ? executeRows<RecentRow>(db, buildRecentDerivativeUpdatesQuery(policy, recentLimit))
+      : Promise.resolve([]),
   ])
 
   const summary = summaryRows[0]
   const variantMap: Record<string, VariantStatusCounts> = {}
+  const migrationByVariant: VariantMigrationCounts[] = []
+
   for (const variant of LEGACY_VARIANTS) {
     variantMap[variant] = { ready: 0, failed: 0, missing: 0 }
   }
 
   for (const row of variantRows) {
+    const ready = toInt(row.ready_count)
     variantMap[row.variant] = {
-      ready: toInt(row.ready_count),
+      ready,
       failed: toInt(row.failed_count),
       missing: toInt(row.missing_count),
     }
+    migrationByVariant.push({
+      variant: row.variant,
+      readyCurrentProfile: ready,
+      readyStaleProfile: toInt(row.ready_stale_profile_count),
+      failed: toInt(row.failed_count),
+      missingOrNotReady: toInt(row.missing_count),
+    })
   }
+
+  migrationByVariant.sort((a, b) => a.variant.localeCompare(b.variant))
+
+  const verifiedAssetsWithOriginal = toInt(summary?.verified_assets_with_original)
+  const assetsWithAllCurrentProfilesReady = toInt(summary?.assets_with_all_current_profiles_ready)
+  const migrationPercentComplete =
+    verifiedAssetsWithOriginal > 0
+      ? Math.round((assetsWithAllCurrentProfilesReady / verifiedAssetsWithOriginal) * 10000) / 100
+      : 0
 
   return {
     watermarkProfile: policy.detailProfile,
@@ -110,10 +203,17 @@ export async function getMediaPipelineStatus(
     assetsWithR2ExistsNull: toInt(summary?.assets_with_r2_exists_null),
     assetsMissingOriginalOrR2Mapping: toInt(summary?.assets_missing_original_or_r2_mapping),
     derivativeByVariant: variantMap,
+    migrationByVariant,
+    verifiedAssetsWithOriginal,
+    verifiedAssetsRemainingMigration: Math.max(verifiedAssetsWithOriginal - assetsWithAllCurrentProfilesReady, 0),
+    assetsWithAllCurrentProfilesReady,
+    migrationPercentComplete,
     assetsReadyForPublicListing: toInt(summary?.assets_eligible_for_public_listing),
     assetsCurrentlyVisibleInPublicApi: toInt(summary?.assets_visible_through_current_public_api_conditions),
     assetsEligibleForPublicListing: toInt(summary?.assets_eligible_for_public_listing),
-    assetsVisibleThroughCurrentPublicApiConditions: toInt(summary?.assets_visible_through_current_public_api_conditions),
+    assetsVisibleThroughCurrentPublicApiConditions: toInt(
+      summary?.assets_visible_through_current_public_api_conditions,
+    ),
     latestFailedDerivatives: failedRows.map((row) => ({
       assetId: row.asset_id,
       legacyImageCode: row.legacy_imagecode,
@@ -123,6 +223,21 @@ export async function getMediaPipelineStatus(
       updatedAt: toIso(row.updated_at),
       storageKeyMasked: maskStorageKey(row.storage_key),
       hasErrorData: false,
+    })),
+    recentDerivativeUpdates: recentRows.map((row) => ({
+      assetId: row.asset_id,
+      fotokey: row.fotokey,
+      legacyImageCode: row.legacy_image_code,
+      variant: row.variant,
+      generationStatus: row.generation_status,
+      watermarkProfile: row.watermark_profile,
+      isWatermarked: row.is_watermarked,
+      width: row.width,
+      height: row.height,
+      sizeBytes: toInt(row.size_bytes),
+      profileMatchesPolicy: row.profile_matches_policy,
+      updatedAt: toIso(row.updated_at),
+      generatedAt: toIso(row.generated_at),
     })),
   }
 }
@@ -139,6 +254,14 @@ function buildSummaryQuery(policy: DerivativeProfilePolicyInput): SQL {
       )
       group by d.image_asset_id
       having count(distinct d.variant) = 3
+    ),
+    verified_base as (
+      select id
+      from image_assets
+      where media_type = 'IMAGE'
+        and original_exists_in_storage = true
+        and original_storage_key is not null
+        and btrim(original_storage_key) <> ''
     )
     select
       count(*) filter (where a.media_type = 'IMAGE')::bigint as total_image_assets,
@@ -154,6 +277,10 @@ function buildSummaryQuery(policy: DerivativeProfilePolicyInput): SQL {
             or coalesce(a.original_exists_in_storage, false) = false
           )
       )::bigint as assets_missing_original_or_r2_mapping,
+      (select count(*)::bigint from verified_base) as verified_assets_with_original,
+      (select count(*)::bigint from verified_base vb where exists (
+        select 1 from all_variants_ready avr where avr.image_asset_id = vb.id
+      )) as assets_with_all_current_profiles_ready,
       count(*) filter (
         where a.media_type = 'IMAGE'
           and a.original_exists_in_storage = true
@@ -182,6 +309,16 @@ function buildSummaryQuery(policy: DerivativeProfilePolicyInput): SQL {
   `
 }
 
+function variantPolicyMatchSql(variantRef: SQL, policy: DerivativeProfilePolicyInput): SQL {
+  return sql`
+    (
+      (${variantRef} = 'THUMB' and d.is_watermarked = true and d.watermark_profile = ${policy.thumbProfile})
+      or (${variantRef} = 'CARD' and d.is_watermarked = true and d.watermark_profile = ${policy.cardProfile})
+      or (${variantRef} = 'DETAIL' and d.is_watermarked = true and d.watermark_profile = ${policy.detailProfile})
+    )
+  `
+}
+
 function buildVariantCountsQuery(policy: DerivativeProfilePolicyInput): SQL {
   return sql`
     with image_assets_base as (
@@ -205,6 +342,14 @@ function buildVariantCountsQuery(policy: DerivativeProfilePolicyInput): SQL {
             or (v.variant = 'DETAIL' and d.is_watermarked = true and d.watermark_profile = ${policy.detailProfile})
           )
       )::bigint as ready_count,
+      count(*) filter (
+        where d.generation_status = 'READY'
+          and (
+            (v.variant = 'THUMB' and (d.is_watermarked is distinct from true or d.watermark_profile is distinct from ${policy.thumbProfile}))
+            or (v.variant = 'CARD' and (d.is_watermarked is distinct from true or d.watermark_profile is distinct from ${policy.cardProfile}))
+            or (v.variant = 'DETAIL' and (d.is_watermarked is distinct from true or d.watermark_profile is distinct from ${policy.detailProfile}))
+          )
+      )::bigint as ready_stale_profile_count,
       count(*) filter (where d.generation_status = 'FAILED')::bigint as failed_count,
       count(*) filter (
         where d.image_asset_id is null
@@ -243,7 +388,33 @@ function buildLatestFailedRowsQuery(limit: number): SQL {
   `
 }
 
-function toInt(value: number | string | undefined) {
+function buildRecentDerivativeUpdatesQuery(policy: DerivativeProfilePolicyInput, limit: number): SQL {
+  return sql`
+    select
+      a.id as asset_id,
+      a.fotokey,
+      a.legacy_image_code,
+      lower(d.variant) as variant,
+      d.generation_status,
+      d.watermark_profile,
+      d.is_watermarked,
+      d.width,
+      d.height,
+      d.size_bytes,
+      (${variantPolicyMatchSql(sql`d.variant`, policy)}) as profile_matches_policy,
+      d.updated_at,
+      d.generated_at
+    from image_derivatives d
+    join image_assets a on a.id = d.image_asset_id
+    where a.media_type = 'IMAGE'
+      and a.original_exists_in_storage = true
+      and d.updated_at is not null
+    order by d.updated_at desc
+    limit ${limit}
+  `
+}
+
+function toInt(value: number | string | undefined | null) {
   if (value === undefined || value === null) return 0
   if (typeof value === "number") return value
   const parsed = Number(value)

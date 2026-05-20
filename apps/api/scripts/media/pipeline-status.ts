@@ -14,8 +14,12 @@ import {
 
 interface CliOptions {
   detailWatermarkProfile: string
+  recentLimit: number
+  showFailed: boolean
   failedLimit: number
 }
+
+const VARIANT_ORDER = ["thumb", "card", "detail"] as const
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -36,14 +40,19 @@ async function main() {
       cardProfile: CARD_LIGHT_PREVIEW_PROFILE,
       detailProfile: options.detailWatermarkProfile,
     }
-    const status = await getMediaPipelineStatus(db, policy, options.failedLimit)
+    const status = await getMediaPipelineStatus(db, policy, {
+      failedSampleLimit: options.showFailed ? options.failedLimit : 0,
+      recentActivityLimit: options.recentLimit,
+    })
 
     console.log("Media pipeline status")
     console.log(
-      `Derivative profiles: thumb=${status.derivativeProfiles.thumbProfile}, card=${status.derivativeProfiles.cardProfile}, detail=${status.derivativeProfiles.detailProfile}`,
+      `Profiles: thumb=${status.derivativeProfiles.thumbProfile} | card=${status.derivativeProfiles.cardProfile} | detail=${status.derivativeProfiles.detailProfile}`,
     )
-    console.log(`Detail watermark profile (legacy field): ${status.watermarkProfile}`)
     console.log(`Generated at: ${status.generatedAt}`)
+    console.log(formatMigrationBar(status.migrationPercentComplete))
+
+    console.log("\nInventory")
     console.table({
       totalImageAssets: status.totalImageAssets,
       assetsWithOriginalStorageKey: status.assetsWithOriginalStorageKey,
@@ -51,42 +60,81 @@ async function main() {
       assetsWithR2ExistsFalse: status.assetsWithR2ExistsFalse,
       assetsWithR2ExistsNull: status.assetsWithR2ExistsNull,
       assetsMissingOriginalOrR2Mapping: status.assetsMissingOriginalOrR2Mapping,
+    })
+
+    console.log("\nProtected-preview migration (verified originals in R2)")
+    console.table({
+      verifiedAssetsWithOriginal: status.verifiedAssetsWithOriginal,
+      assetsWithAllCurrentProfilesReady: status.assetsWithAllCurrentProfilesReady,
+      verifiedAssetsRemainingMigration: status.verifiedAssetsRemainingMigration,
+      migrationPercentComplete: `${status.migrationPercentComplete}%`,
       assetsReadyForPublicListing: status.assetsReadyForPublicListing,
       assetsCurrentlyVisibleInPublicApi: status.assetsCurrentlyVisibleInPublicApi,
     })
 
-    const variantTable = Object.entries(status.derivativeByVariant).map(([variant, counts]) => ({
-      variant,
-      ready: counts.ready,
-      failed: counts.failed,
-      missing: counts.missing,
-    }))
-    console.table(variantTable)
+    console.log("\nDerivative readiness (current policy)")
+    console.table(
+      VARIANT_ORDER.map((variant) => ({
+        variant,
+        ready: status.derivativeByVariant[variant]?.ready ?? 0,
+        failed: status.derivativeByVariant[variant]?.failed ?? 0,
+        missing: status.derivativeByVariant[variant]?.missing ?? 0,
+      })),
+    )
 
-    if (status.latestFailedDerivatives.length > 0) {
-      console.log("Latest failed derivative rows")
+    console.log("\nMigration breakdown by variant")
+    console.table(
+      status.migrationByVariant.map((row) => ({
+        variant: row.variant,
+        readyCurrentProfile: row.readyCurrentProfile,
+        readyStaleProfile: row.readyStaleProfile,
+        failed: row.failed,
+        missingOrNotReady: row.missingOrNotReady,
+      })),
+    )
+
+    const recentPolicyOk = status.recentDerivativeUpdates.filter((row) => row.profileMatchesPolicy).length
+    const recentPolicyMismatch = status.recentDerivativeUpdates.length - recentPolicyOk
+    console.log(
+      `\nLatest derivative updates (last ${status.recentDerivativeUpdates.length} by updated_at; policyOk=${recentPolicyOk}, mismatch=${recentPolicyMismatch})`,
+    )
+    if (status.recentDerivativeUpdates.length > 0) {
       console.table(
-        status.latestFailedDerivatives.map((row) => ({
-          assetId: row.assetId,
-          legacyImageCode: row.legacyImageCode,
+        status.recentDerivativeUpdates.map((row) => ({
+          asset: row.fotokey ?? row.legacyImageCode ?? row.assetId.slice(0, 8),
           variant: row.variant,
-          generationStatus: row.generationStatus,
-          watermarkProfile: row.watermarkProfile,
-          updatedAt: row.updatedAt,
-          storageKeyMasked: row.storageKeyMasked,
-          hasErrorData: row.hasErrorData,
+          status: row.generationStatus,
+          profile: row.watermarkProfile ?? "-",
+          policyOk: row.profileMatchesPolicy ? "yes" : "no",
+          watermarked: row.isWatermarked ? "yes" : "no",
+          sizeKb: row.sizeBytes ? Math.round(row.sizeBytes / 1024) : "-",
+          dimensions: row.width && row.height ? `${row.width}x${row.height}` : "-",
+          updatedAt: formatTimestamp(row.updatedAt),
+          generatedAt: formatTimestamp(row.generatedAt),
         })),
       )
     } else {
-      console.log("No failed derivative rows found.")
+      console.log("No recent derivative updates found.")
     }
 
-    console.log("Suggested next commands")
-    console.log("- pnpm --dir apps/api legacy:import -- --only assets --skip-r2-check --limit 10000 --batch-size 1000")
-    console.log("- pnpm --dir apps/api media:verify-r2-originals -- --limit 10000 --batch-size 500 --concurrency 20")
-    console.log("- pnpm --dir apps/api media:generate-derivatives -- --scope all-verified --dry-run --limit 200")
-    console.log("- pnpm --dir apps/api media:generate-derivatives -- --scope all-verified --limit 200 --batch-size 50 --concurrency 4")
-    console.log("- pnpm --dir apps/api media:pipeline-status")
+    if (options.showFailed && status.latestFailedDerivatives.length > 0) {
+      console.log(`\nLatest failed derivative rows (sample ${status.latestFailedDerivatives.length})`)
+      console.table(
+        status.latestFailedDerivatives.map((row) => ({
+          asset: row.legacyImageCode ?? row.assetId.slice(0, 8),
+          variant: row.variant,
+          status: row.generationStatus,
+          profile: row.watermarkProfile ?? "-",
+          updatedAt: formatTimestamp(row.updatedAt),
+          storageKeyMasked: row.storageKeyMasked,
+        })),
+      )
+    }
+
+    console.log("\nSuggested next commands")
+    console.log("- pnpm --dir apps/api media:pipeline-status -- --recent-limit 40")
+    console.log("- pnpm --dir apps/api media:generate-derivatives -- --scope all-verified --variants thumb,card,detail --dry-run --limit 200")
+    console.log("- pnpm --dir apps/api run typesense:index-public-assets  # after backfill completes")
   } finally {
     await close()
   }
@@ -94,7 +142,9 @@ async function main() {
 
 function parseArgs(args: string[]): CliOptions {
   const options: CliOptions = {
-    detailWatermarkProfile: DETAIL_WATERMARKED_PROFILE,
+    detailWatermarkProfile: DETAIL_PREVIEW_PROFILE,
+    recentLimit: 25,
+    showFailed: false,
     failedLimit: 20,
   }
 
@@ -109,6 +159,8 @@ function parseArgs(args: string[]): CliOptions {
 
     if (arg === "--watermark-profile" || arg === "--detail-watermark-profile")
       options.detailWatermarkProfile = next().trim()
+    else if (arg === "--recent-limit") options.recentLimit = parsePositiveInteger(next(), "recent-limit")
+    else if (arg === "--show-failed") options.showFailed = true
     else if (arg === "--failed-limit") options.failedLimit = parsePositiveInteger(next(), "failed-limit")
     else if (arg === "--help" || arg === "-h") {
       printHelp()
@@ -126,9 +178,16 @@ function printHelp() {
   console.log(`
 Usage:
   pnpm --dir apps/api media:pipeline-status
-  pnpm --dir apps/api media:pipeline-status -- --detail-watermark-profile fotocorp-preview-v4-dense-dark-lowquality --failed-limit 30
+  pnpm --dir apps/api media:pipeline-status -- --recent-limit 40
+  pnpm --dir apps/api media:pipeline-status -- --show-failed --failed-limit 30
 
-Thumb/card/detail READY counts assume protected profiles (${THUMB_LIGHT_PREVIEW_PROFILE}, ${CARD_LIGHT_PREVIEW_PROFILE}, ${DETAIL_PREVIEW_PROFILE}).
+Options:
+  --recent-limit <n>     Recent derivative updates (default 25)
+  --show-failed          Include latest failed derivative sample table
+  --failed-limit <n>     Failed sample size when --show-failed (default 20)
+  --detail-watermark-profile <profile>  Override detail profile for counts
+
+Protected profiles: ${THUMB_LIGHT_PREVIEW_PROFILE}, ${CARD_LIGHT_PREVIEW_PROFILE}, ${DETAIL_PREVIEW_PROFILE}
 `)
 }
 
@@ -136,6 +195,21 @@ function parsePositiveInteger(value: string, name: string) {
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`--${name} must be a positive integer.`)
   return parsed
+}
+
+function formatTimestamp(value: string | null) {
+  if (!value) return "-"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toISOString().replace("T", " ").slice(0, 19)
+}
+
+function formatMigrationBar(percent: number) {
+  const width = 30
+  const clamped = Math.max(0, Math.min(100, percent))
+  const filled = Math.round((clamped / 100) * width)
+  const bar = `${"█".repeat(filled)}${"░".repeat(width - filled)}`
+  return `Migration [${bar}] ${clamped.toFixed(2)}%`
 }
 
 function loadLocalEnv() {
