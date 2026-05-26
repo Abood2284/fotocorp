@@ -5,10 +5,13 @@ import { methodNotAllowed } from "../../../lib/route-errors"
 import { internalAuthMiddleware } from "../../../middleware/internalAuth"
 import { addFotoboxService, listFotoboxService, removeFotoboxService } from "./service"
 import { addFotoboxBodySchema, fotoboxAssetParamSchema, fotoboxListQuerySchema, removeFotoboxBodySchema } from "./validators"
+import { boardRoutes } from "./boards/route"
 
 export const fotoboxRoutes = new Hono<{ Bindings: Env }>()
 
 fotoboxRoutes.use("/api/v1/internal/fotobox/*", internalAuthMiddleware)
+
+fotoboxRoutes.route("", boardRoutes)
 
 fotoboxRoutes.get(
   "/api/v1/internal/fotobox/items",

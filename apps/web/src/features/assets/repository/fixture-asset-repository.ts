@@ -1,7 +1,7 @@
 import { FIXTURE_ASSETS } from "@/lib/fixtures/assets"
 import { collectTopKeywords, filterAssets, sortAssets } from "@/features/assets/filter-utils"
 import type { AssetRepository, AssetSearchParams, AssetSearchResult } from "@/features/assets/repository/types"
-import { ADMIN_ASSET_RECORDS, INGESTION_RUNS } from "@/lib/fixtures/admin"
+import { ADMIN_ASSET_RECORDS } from "@/lib/fixtures/admin"
 
 export function createFixtureAssetRepository(): AssetRepository {
   return {
@@ -51,9 +51,6 @@ export function createFixtureAssetRepository(): AssetRepository {
     },
     async getAdminAssetById(id: string) {
       return ADMIN_ASSET_RECORDS.find((item) => item.asset.id === id) ?? null
-    },
-    async listIngestionRuns() {
-      return INGESTION_RUNS
     },
   }
 }

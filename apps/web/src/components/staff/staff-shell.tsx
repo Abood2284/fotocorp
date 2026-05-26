@@ -1,8 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { Camera, ChevronUp, LayoutDashboard, LogOut } from "lucide-react"
+import { ChevronUp, ChevronLeft, ChevronRight, LayoutDashboard, LogOut } from "lucide-react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
 import { staffNavItemsForRole } from "@/lib/staff/staff-navigation"
@@ -25,7 +26,7 @@ export function StaffShell({ children, staff }: StaffShellProps) {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar navItems={navItems} staff={staff} />
-      <main className="flex-1 overflow-y-auto bg-muted/30 p-6">{children}</main>
+      <main className="flex-1 overflow-y-auto bg-staff-50 p-6 lg:p-8">{children}</main>
     </div>
   )
 }
@@ -38,17 +39,30 @@ function Sidebar({
   staff: StaffShellStaff
 }) {
   const pathname = usePathname()
+  const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <aside className="flex w-36 shrink-0 flex-col border-r border-border bg-card">
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border px-2">
-        <Camera className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
-        <span className="fc-brand min-w-0 truncate text-xs font-semibold leading-none">
-          foto<span className="text-accent">corp</span>
-        </span>
+    <aside className={cn("flex shrink-0 flex-col border-r border-staff-200 bg-staff-100 text-staff-950 transition-all duration-300", collapsed ? "w-[72px]" : "w-64")}>
+      <div className={cn("flex h-14 shrink-0 items-center border-b border-staff-200 px-4", collapsed ? "justify-center" : "justify-between")}>
+        <Link
+          href="/staff/dashboard"
+          className={cn("flex items-center overflow-hidden transition-all duration-300", collapsed ? "w-0 opacity-0 hidden" : "w-auto opacity-100")}
+        >
+          <Image
+            src="/images/fotocorp-logo.svg"
+            alt="Fotocorp"
+            width={1400}
+            height={425}
+            className="h-6 w-auto"
+            priority
+          />
+        </Link>
+        <button onClick={() => setCollapsed(!collapsed)} className="flex h-8 w-8 items-center justify-center rounded-md text-staff-500 hover:bg-staff-200 hover:text-staff-950 transition-colors">
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        </button>
       </div>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-1.5" aria-label="Staff navigation">
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Staff navigation">
         {navItems.map(({ label, href, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(`${href}/`)
           return (
@@ -57,25 +71,26 @@ function Sidebar({
               href={href}
               title={label}
               className={cn(
-                "flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[0.65rem] font-medium leading-tight transition-colors",
+                "flex items-center rounded-md text-sm font-medium transition-all duration-200",
+                collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
                 isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  ? "bg-staff-200 text-staff-950"
+                  : "text-staff-600 hover:bg-staff-200/50 hover:text-staff-950"
               )}
             >
-              <Icon className="h-3 w-3 shrink-0" aria-hidden />
-              <span className="min-w-0 truncate">{label}</span>
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+              {!collapsed && <span className="min-w-0 truncate">{label}</span>}
             </Link>
           )
         })}
       </nav>
 
-      <StaffProfileMenu staff={staff} />
+      <StaffProfileMenu staff={staff} collapsed={collapsed} />
     </aside>
   )
 }
 
-function StaffProfileMenu({ staff }: { staff: StaffShellStaff }) {
+function StaffProfileMenu({ staff, collapsed }: { staff: StaffShellStaff, collapsed: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -106,33 +121,36 @@ function StaffProfileMenu({ staff }: { staff: StaffShellStaff }) {
   const displayLabel = staff.displayName.trim() || staff.username
 
   return (
-    <div className="relative shrink-0 border-t border-border p-1.5" ref={rootRef}>
+    <div className="relative shrink-0 border-t border-staff-200 p-3" ref={rootRef}>
       {open ? (
         <div
           role="menu"
-          className="absolute bottom-full left-1.5 right-1.5 z-50 mb-1 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
+          className={cn(
+            "absolute bottom-full z-50 mb-2 overflow-hidden rounded-lg border border-staff-200 bg-white py-1 shadow-lg shadow-black/5",
+            collapsed ? "left-14 w-56" : "left-3 right-3"
+          )}
         >
-          <div className="border-b border-border px-3 py-2.5">
-            <p className="truncate text-xs font-medium text-foreground">{displayLabel}</p>
-            <p className="truncate text-[0.65rem] text-muted-foreground">{staff.username}</p>
-            <p className="mt-1 text-[0.65rem] text-muted-foreground">{formatStaffRole(staff.role)}</p>
+          <div className="border-b border-staff-100 px-4 py-3">
+            <p className="truncate text-sm font-medium text-staff-950">{displayLabel}</p>
+            <p className="truncate text-xs text-staff-500">{staff.username}</p>
+            <p className="mt-1 text-xs text-staff-500">{formatStaffRole(staff.role)}</p>
           </div>
           <Link
             href="/staff/dashboard"
             role="menuitem"
-            className="flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted"
+            className="flex items-center gap-3 px-4 py-2 text-sm text-staff-700 transition-colors hover:bg-staff-50 hover:text-staff-950"
             onClick={() => setOpen(false)}
           >
-            <LayoutDashboard className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <LayoutDashboard className="h-4 w-4 shrink-0 text-staff-500" aria-hidden />
             Dashboard
           </Link>
           <button
             type="button"
             role="menuitem"
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-muted"
+            className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-staff-700 transition-colors hover:bg-staff-50 hover:text-staff-950"
             onClick={() => void handleSignOut()}
           >
-            <LogOut className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <LogOut className="h-4 w-4 shrink-0 text-staff-500" aria-hidden />
             Sign out
           </button>
         </div>
@@ -144,22 +162,27 @@ function StaffProfileMenu({ staff }: { staff: StaffShellStaff }) {
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "flex w-full items-center gap-1.5 rounded-md px-1.5 py-1.5 text-left transition-colors",
-          "hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          open && "bg-muted",
+          "flex w-full items-center rounded-md transition-colors",
+          "hover:bg-staff-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+          open && "bg-staff-200",
+          collapsed ? "justify-center p-2" : "gap-3 px-2 py-2"
         )}
       >
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[0.6rem] font-semibold text-primary-foreground">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-sm">
           {staff.userInitial}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[0.65rem] font-medium leading-tight text-foreground">{displayLabel}</span>
-          <span className="block truncate text-[0.6rem] leading-tight text-muted-foreground">{formatStaffRole(staff.role)}</span>
-        </span>
-        <ChevronUp
-          className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
-          aria-hidden
-        />
+        {!collapsed && (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-staff-950">{displayLabel}</span>
+              <span className="block truncate text-xs text-staff-500">{formatStaffRole(staff.role)}</span>
+            </span>
+            <ChevronUp
+              className={cn("h-4 w-4 shrink-0 text-staff-500 transition-transform duration-200", open && "rotate-180")}
+              aria-hidden
+            />
+          </>
+        )}
       </button>
     </div>
   )

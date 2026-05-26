@@ -8,10 +8,11 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const limit = Number(url.searchParams.get("limit") ?? 24)
   const cursor = url.searchParams.get("cursor") ?? undefined
+  const boardId = url.searchParams.get("boardId") ?? undefined
 
   try {
     return Response.json(
-      await listFotoboxItems({ authUserId: appUser.authUserId, limit, cursor }),
+      await listFotoboxItems({ authUserId: appUser.authUserId, limit, cursor, boardId }),
       jsonHeaders(),
     )
   } catch {
@@ -23,8 +24,8 @@ export async function POST(request: Request) {
   const appUser = await getRequestAppUser()
   if (!appUser) return authRequired()
 
-  const body = await request.json().catch(() => null) as { assetId?: string } | null
-  if (!body?.assetId) {
+  const body = await request.json().catch(() => null) as { assetId?: string; boardId?: string } | null
+  if (!body?.assetId || !body?.boardId) {
     return Response.json(
       { ok: false, error: { code: "ASSET_NOT_FOUND" } },
       { status: 400, headers: jsonHeaders().headers },
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
 
   try {
     return Response.json(
-      await addFotoboxItem({ authUserId: appUser.authUserId, assetId: body.assetId }),
+      await addFotoboxItem({ authUserId: appUser.authUserId, assetId: body.assetId, boardId: body.boardId }),
       jsonHeaders(),
     )
   } catch {

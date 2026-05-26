@@ -16,7 +16,7 @@ import {
 import { AppError } from "../../../lib/errors"
 import { json } from "../../../lib/http"
 import { parsePreviewTtl } from "../../../lib/assets/public-assets"
-import { listInternalAdminUsers, updateInternalAdminUserSubscription } from "../../../lib/users/internal-admin-users"
+import { listInternalAdminUsers, updateInternalAdminUserSubscription, updateInternalAdminUserSubscriptionDetail, getInternalAdminUser, updateInternalAdminUserRole, updateInternalAdminUserStatus } from "../../../lib/users/internal-admin-users"
 import {
   getMediaPipelineStatus,
   type DerivativeProfilePolicyInput,
@@ -81,6 +81,10 @@ export async function adminStatsService(env: Env) { return json(await getInterna
 export async function adminFiltersService(env: Env) { return json(await getInternalAdminFilters(db(env))) }
 export async function adminUsersService(env: Env, request: Request) { return json(await listInternalAdminUsers(db(env), request)) }
 export async function adminUserSubscriptionService(env: Env, authUserId: string, isSubscriber: boolean, actor: AdminActor) { return json(await updateInternalAdminUserSubscription(db(env), authUserId, isSubscriber, actor)) }
+export async function adminUserDetailService(env: Env, authUserId: string) { return json(await getInternalAdminUser(db(env), authUserId)) }
+export async function adminUserRoleService(env: Env, authUserId: string, role: "USER" | "PHOTOGRAPHER" | "ADMIN" | "SUPER_ADMIN", actor: AdminActor) { return json(await updateInternalAdminUserRole(db(env), authUserId, role, actor)) }
+export async function adminUserStatusService(env: Env, authUserId: string, status: "ACTIVE" | "SUSPENDED", actor: AdminActor) { return json(await updateInternalAdminUserStatus(db(env), authUserId, status, actor)) }
+export async function adminUserSubscriptionDetailService(env: Env, authUserId: string, payload: { subscriptionPlanId?: string | null; subscriptionEndsAt?: string | null; downloadQuotaLimit?: number | null }, actor: AdminActor) { return json(await updateInternalAdminUserSubscriptionDetail(db(env), authUserId, payload, actor)) }
 const DEFAULT_DERIVATIVE_PROFILE_POLICY: DerivativeProfilePolicyInput = {
   thumbProfile: THUMB_LIGHT_PREVIEW_PROFILE,
   cardProfile: CARD_LIGHT_PREVIEW_PROFILE,

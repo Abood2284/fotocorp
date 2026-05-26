@@ -2,12 +2,15 @@ import "server-only"
 
 import {
   getAdminCatalogAsset,
+  getAdminUser,
   fetchAdminAssetOriginal,
   fetchAdminAssetPreview,
   getAdminCatalogFilters,
   getAdminCatalogStats,
   listAdminUsers,
   listAdminCatalogAssets,
+  updateAdminUserRole,
+  updateAdminUserStatus,
   updateAdminUserSubscription,
   updateAdminAsset,
   updateAdminAssetPublishState,
@@ -26,4 +29,7 @@ export const updateAdminAssetState = updateAdminAssetPublishState
 export const updateAdminAssetEditorialBulk = updateAdminAssetBulk
 export const updateAdminAssetStateBulk = updateAdminAssetPublishStateBulk
 export const listInternalAdminUsers = listAdminUsers
+export const getInternalAdminUser = getAdminUser
+export const updateInternalAdminUserRole = updateAdminUserRole
+export const updateInternalAdminUserStatus = updateAdminUserStatus
 export const updateInternalAdminUserSubscription = updateAdminUserSubscription

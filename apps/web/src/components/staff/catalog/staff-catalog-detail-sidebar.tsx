@@ -1,22 +1,23 @@
 "use client"
 
-import { ExternalLink, X, Loader2 } from "lucide-react"
+import { ExternalLink, X, Loader2, ZoomIn } from "lucide-react"
 import { useEffect, useState, useTransition } from "react"
 
 import { fetchAdminAssetAction, updateAdminAssetEditorialAction, updateAdminAssetStateAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
 import type { AdminCatalogAssetItem, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
 import { PreviewImage } from "@/components/assets/preview-image"
 
-interface StaffCatalogDetailDrawerProps {
+interface StaffCatalogDetailSidebarProps {
   assetId: string
   onClose: () => void
   onUpdate: () => void
   filters: AdminCatalogFilters
 }
 
-export function StaffCatalogDetailDrawer({ assetId, onClose, onUpdate, filters }: StaffCatalogDetailDrawerProps) {
+export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters }: StaffCatalogDetailSidebarProps) {
   const [asset, setAsset] = useState<AdminCatalogAssetItem | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isZoomed, setIsZoomed] = useState(false)
   const [isSaving, startTransition] = useTransition()
 
   const [title, setTitle] = useState("")
@@ -79,8 +80,20 @@ export function StaffCatalogDetailDrawer({ assetId, onClose, onUpdate, filters }
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l border-border bg-card p-6 shadow-2xl overflow-y-auto sm:max-w-lg">
+      {isZoomed && asset?.previewReady && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm" onClick={() => setIsZoomed(false)}>
+          <button className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors" onClick={() => setIsZoomed(false)}>
+            <X size={32} />
+          </button>
+          <img 
+            src={`/staff/catalog/${asset.id}/preview-image?variant=detail`} 
+            alt="Zoomed" 
+            className="max-h-full max-w-full object-contain rounded-md"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
+      <div className="sticky top-0 h-screen w-full overflow-y-auto border-l border-border bg-card p-5">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold tracking-tight">Edit Asset</h3>
           <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted text-muted-foreground transition-colors">
@@ -97,12 +110,19 @@ export function StaffCatalogDetailDrawer({ assetId, onClose, onUpdate, filters }
         ) : (
           <div className="space-y-6">
             {asset.previewReady ? (
-              <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg border border-border bg-muted">
+              <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg border border-border bg-muted group">
                 <PreviewImage
                   src={`/staff/catalog/${asset.id}/preview-image?variant=detail`}
                   alt={asset.headline || "Preview"}
                   className="h-full w-full object-contain"
                 />
+                <button 
+                  onClick={() => setIsZoomed(true)}
+                  className="absolute top-2 right-2 rounded-md bg-black/50 p-1.5 text-white opacity-0 transition-all hover:bg-black/70 group-hover:opacity-100 backdrop-blur-sm"
+                  title="Zoom image"
+                >
+                  <ZoomIn size={18} />
+                </button>
               </div>
             ) : (
               <div className="flex aspect-[3/2] w-full items-center justify-center rounded-lg border border-border bg-muted">
@@ -110,18 +130,7 @@ export function StaffCatalogDetailDrawer({ assetId, onClose, onUpdate, filters }
               </div>
             )}
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <p className="font-mono text-xs text-muted-foreground">ID: {asset.legacyImageCode || asset.id}</p>
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${asset.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-slate-100 text-slate-800 border-slate-200'}`}>
-                    {asset.status}
-                  </span>
-                  <span className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${asset.visibility === 'PUBLIC' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-amber-100 text-amber-800 border-amber-200'}`}>
-                    {asset.visibility}
-                  </span>
-                </div>
-              </div>
+            <div className="flex items-center justify-end">
               <a 
                 href={`/assets/${asset.id}`} 
                 target="_blank" 
@@ -134,7 +143,7 @@ export function StaffCatalogDetailDrawer({ assetId, onClose, onUpdate, filters }
 
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-foreground">Headline / Title</label>
+                <label className="text-xs font-medium text-foreground">Who is in picture?</label>
                 <input 
                   type="text" 
                   value={title} 

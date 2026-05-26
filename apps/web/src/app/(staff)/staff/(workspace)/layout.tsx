@@ -1,4 +1,5 @@
 import { StaffShell } from "@/components/staff/staff-shell"
+import { StaffProviders } from "@/components/staff/staff-providers"
 import { assertStaffRouteAccess, requireStaff } from "@/lib/staff-session"
 
 export default async function StaffWorkspaceLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +16,7 @@ export default async function StaffWorkspaceLayout({ children }: { children: Rea
         userInitial: initial,
       }}
     >
-      {children}
+      <StaffProviders>{children}</StaffProviders>
     </StaffShell>
   )
 }

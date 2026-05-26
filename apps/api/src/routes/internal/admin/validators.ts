@@ -31,6 +31,20 @@ export const adminUserSubscriptionSchema = z.object({
   isSubscriber: z.boolean(),
 })
 
+export const adminUserRoleSchema = z.object({
+  role: z.enum(["USER", "PHOTOGRAPHER", "ADMIN", "SUPER_ADMIN"]),
+})
+
+export const adminUserStatusSchema = z.object({
+  status: z.enum(["ACTIVE", "SUSPENDED"]),
+})
+
+export const adminUserSubscriptionDetailSchema = z.object({
+  subscriptionPlanId: z.string().trim().max(255).nullable().optional(),
+  subscriptionEndsAt: z.string().trim().nullable().optional(),
+  downloadQuotaLimit: z.number().int().min(0).nullable().optional(),
+})
+
 export const adminBulkEditorialSchema = z.object({
   assetIds: z.array(z.uuid()).min(1).max(500),
   categoryId: z.uuid().nullable().optional(),

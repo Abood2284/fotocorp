@@ -16,6 +16,10 @@ import {
   adminStatsService,
   adminMediaPipelineStatusService,
   adminUserSubscriptionService,
+  adminUserDetailService,
+  adminUserRoleService,
+  adminUserStatusService,
+  adminUserSubscriptionDetailService,
   adminUsersService,
   listAdminAssetsService,
   normalizeKeywords,
@@ -27,6 +31,9 @@ import {
   adminPreviewQuerySchema,
   adminPublishStateSchema,
   adminUserParamSchema,
+  adminUserRoleSchema,
+  adminUserStatusSchema,
+  adminUserSubscriptionDetailSchema,
   adminUserSubscriptionSchema,
   adminBulkEditorialSchema,
   adminBulkPublishStateSchema,
@@ -172,3 +179,53 @@ internalAdminRoutes.patch(
 );
 
 internalAdminRoutes.all("/api/v1/internal/admin/users/:authUserId/subscription", () => methodNotAllowed());
+
+internalAdminRoutes.get(
+  "/api/v1/internal/admin/users/:authUserId",
+  zValidator("param", adminUserParamSchema),
+  async (c) => {
+    const params = c.req.valid("param");
+    return await adminUserDetailService(c.env, params.authUserId);
+  },
+);
+
+internalAdminRoutes.all("/api/v1/internal/admin/users/:authUserId", () => methodNotAllowed());
+
+internalAdminRoutes.patch(
+  "/api/v1/internal/admin/users/:authUserId/role",
+  zValidator("param", adminUserParamSchema),
+  zValidator("json", adminUserRoleSchema),
+  async (c) => {
+    const params = c.req.valid("param");
+    const body = c.req.valid("json");
+    return await adminUserRoleService(c.env, params.authUserId, body.role, actorFromRequest(c.req.raw));
+  },
+);
+
+internalAdminRoutes.all("/api/v1/internal/admin/users/:authUserId/role", () => methodNotAllowed());
+
+internalAdminRoutes.patch(
+  "/api/v1/internal/admin/users/:authUserId/status",
+  zValidator("param", adminUserParamSchema),
+  zValidator("json", adminUserStatusSchema),
+  async (c) => {
+    const params = c.req.valid("param");
+    const body = c.req.valid("json");
+    return await adminUserStatusService(c.env, params.authUserId, body.status, actorFromRequest(c.req.raw));
+  },
+);
+
+internalAdminRoutes.all("/api/v1/internal/admin/users/:authUserId/status", () => methodNotAllowed());
+
+internalAdminRoutes.patch(
+  "/api/v1/internal/admin/users/:authUserId/subscription-detail",
+  zValidator("param", adminUserParamSchema),
+  zValidator("json", adminUserSubscriptionDetailSchema),
+  async (c) => {
+    const params = c.req.valid("param");
+    const body = c.req.valid("json");
+    return await adminUserSubscriptionDetailService(c.env, params.authUserId, body, actorFromRequest(c.req.raw));
+  },
+);
+
+internalAdminRoutes.all("/api/v1/internal/admin/users/:authUserId/subscription-detail", () => methodNotAllowed());

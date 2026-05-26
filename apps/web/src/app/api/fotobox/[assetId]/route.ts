@@ -5,7 +5,7 @@ interface FotoboxItemRouteContext {
   params: Promise<{ assetId: string }>
 }
 
-export async function DELETE(_request: Request, context: FotoboxItemRouteContext) {
+export async function DELETE(request: Request, context: FotoboxItemRouteContext) {
   const authUser = await getCurrentAuthUser()
   if (!authUser) {
     return Response.json(
@@ -16,10 +16,12 @@ export async function DELETE(_request: Request, context: FotoboxItemRouteContext
 
   const appUser = await getOrCreateAppUser(authUser)
   const { assetId } = await context.params
+  const url = new URL(request.url)
+  const boardId = url.searchParams.get("boardId") ?? undefined
 
   try {
     return Response.json(
-      await removeFotoboxItem({ authUserId: appUser.authUserId, assetId }),
+      await removeFotoboxItem({ authUserId: appUser.authUserId, assetId, boardId }),
       jsonHeaders(),
     )
   } catch {

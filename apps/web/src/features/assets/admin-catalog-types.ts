@@ -84,6 +84,26 @@ export interface AdminCatalogFilters {
   contributors: Array<{ id: string; displayName: string; assetCount: number }>
 }
 
+export interface FotocorpProfile {
+  firstName: string | null
+  lastName: string | null
+  username: string | null
+  companyType: string | null
+  companyName: string | null
+  jobTitle: string | null
+  customJobTitle: string | null
+  companyEmail: string | null
+  companyEmailDomain: string | null
+  emailValidationDecision: string | null
+  phoneCountryCode: string | null
+  phoneNumber: string | null
+  interestedAssetTypes: string[] | null
+  imageQuantityRange: string | null
+  imageQualityPreference: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 export interface AdminCatalogUserItem {
   id: string
   authUserId: string
@@ -100,10 +120,12 @@ export interface AdminCatalogUserItem {
   downloadQuotaUsed: number
   createdAt: string | null
   updatedAt: string | null
+  profile: FotocorpProfile | null
 }
 
 export interface AdminCatalogUsersResponse {
   items: AdminCatalogUserItem[]
+  nextCursor: string | null
 }
 
 export interface AdminCatalogUserResponse {

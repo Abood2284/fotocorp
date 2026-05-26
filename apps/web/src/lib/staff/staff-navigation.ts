@@ -55,21 +55,9 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     roles: ["SUPER_ADMIN"],
   },
   {
-    label: "Ingestion",
-    href: "/staff/ingestion",
-    icon: ArrowRight,
-    roles: ["SUPER_ADMIN"],
-  },
-  {
     label: "Pipeline",
     href: "/staff/media-pipeline",
     icon: Gauge,
-    roles: ["SUPER_ADMIN"],
-  },
-  {
-    label: "Storage",
-    href: "/staff/storage",
-    icon: Database,
     roles: ["SUPER_ADMIN"],
   },
   {

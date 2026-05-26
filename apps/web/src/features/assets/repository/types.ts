@@ -1,6 +1,6 @@
 import type { AssetListItem } from "@/types"
 import type { AssetFilterQuery } from "@/features/assets/filter-utils"
-import type { AdminAssetRecord, IngestionRun } from "@/lib/fixtures/admin"
+import type { AdminAssetRecord } from "@/lib/fixtures/admin"
 
 export type AssetSearchParams = AssetFilterQuery
 
@@ -17,5 +17,4 @@ export interface AssetRepository {
   getRelatedAssets(params: { assetId: string; limit?: number }): Promise<AssetListItem[]>
   listAdminAssets(): Promise<AdminAssetRecord[]>
   getAdminAssetById(id: string): Promise<AdminAssetRecord | null>
-  listIngestionRuns(): Promise<IngestionRun[]>
 }

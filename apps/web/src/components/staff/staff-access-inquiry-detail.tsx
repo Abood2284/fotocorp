@@ -12,6 +12,7 @@ import {
   StaffApiError,
 } from "@/lib/api/staff-api"
 import { Button } from "@/components/ui/button"
+import { ConfirmDialog } from "@/components/staff/shared/confirm-dialog"
 import {
   formatAssetInterestType,
   formatEntitlementStatus,
@@ -34,6 +35,12 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const [adjustEntitlementId, setAdjustEntitlementId] = useState<string | null>(null)
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    title: string
+    description: string
+    variant: "default" | "destructive"
+    action: () => void
+  } | null>(null)
 
   const refetchDetail = useCallback(async () => {
     const next = await getStaffAccessInquiryDetail(inquiryId)
@@ -79,19 +86,25 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
   async function handleSuspend(entitlementId: string) {
     setNotice("")
     setError("")
-    if (!globalThis.confirm("Suspend this entitlement? The customer will no longer be able to use it for downloads.")) return
-    setSaving(true)
-    try {
-      await postStaffSubscriberEntitlementSuspend(entitlementId)
-      setNotice("Entitlement suspended.")
-      setAdjustEntitlementId(null)
-      await refetchDetail()
-    } catch (caught) {
-      if (caught instanceof StaffApiError) setError(caught.message)
-      else setError("Suspend failed.")
-    } finally {
-      setSaving(false)
-    }
+    setPendingConfirm({
+      title: "Suspend entitlement",
+      description: "Suspend this entitlement? The customer will no longer be able to use it for downloads.",
+      variant: "destructive",
+      action: async () => {
+        setSaving(true)
+        try {
+          await postStaffSubscriberEntitlementSuspend(entitlementId)
+          setNotice("Entitlement suspended.")
+          setAdjustEntitlementId(null)
+          await refetchDetail()
+        } catch (caught) {
+          if (caught instanceof StaffApiError) setError(caught.message)
+          else setError("Suspend failed.")
+        } finally {
+          setSaving(false)
+        }
+      },
+    })
   }
 
   async function handleSaveEntitlement(entitlementId: string, status: string, form: FormData) {
@@ -131,6 +144,19 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
 
   return (
     <div className="space-y-8">
+      <ConfirmDialog
+        open={!!pendingConfirm}
+        title={pendingConfirm?.title ?? ""}
+        description={pendingConfirm?.description ?? ""}
+        variant={pendingConfirm?.variant ?? "default"}
+        loading={saving}
+        onConfirm={() => {
+          pendingConfirm?.action()
+          setPendingConfirm(null)
+        }}
+        onCancel={() => setPendingConfirm(null)}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <Link href="/staff/access-inquiries" className="text-sm text-muted-foreground hover:text-foreground">

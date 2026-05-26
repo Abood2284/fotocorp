@@ -59,14 +59,15 @@ export async function generateMetadata({ params }: AssetDetailPageProps) {
     }
   }
 
-  const title = getAssetTitle(asset)
+  const primaryTitle = getAssetPrimaryTitle(asset)
   const preview = asset.previews.detail ?? asset.previews.card ?? asset.previews.thumb
+  const pageTitle = primaryTitle ?? asset.fotokey ?? "Fotocorp"
   return {
-    title: `${title} — Fotocorp`,
-    description: asset.caption ?? `Watermarked Fotocorp preview for ${title}.`,
+    title: `${pageTitle} — Fotocorp`,
+    description: asset.caption ?? (primaryTitle ? `Watermarked Fotocorp preview for ${primaryTitle}.` : "Watermarked Fotocorp preview."),
     openGraph: {
-      title: `${title} — Fotocorp`,
-      description: asset.caption ?? `Watermarked Fotocorp preview for ${title}.`,
+      title: `${pageTitle} — Fotocorp`,
+      description: asset.caption ?? (primaryTitle ? `Watermarked Fotocorp preview for ${primaryTitle}.` : "Watermarked Fotocorp preview."),
       images: preview?.url ? [{ url: preview.url, alt: getAssetAlt(asset) }] : [],
     },
   }
@@ -82,7 +83,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
   const accessState = await resolveAssetDetailAccessState()
 
   const preview = asset.previews.detail ?? asset.previews.card ?? asset.previews.thumb
-  const title = getAssetTitle(asset)
+  const primaryTitle = getAssetPrimaryTitle(asset)
   const caption = formatCaptionWithPhotoCredit(asset.caption, asset.contributor?.displayName)
   const keywords = splitKeywords(asset.keywords)
   const whoIsInPictureNames = parseWhoIsInPicture(asset.whoIsInPicture)
@@ -148,16 +149,20 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
         <div className="grid gap-7 lg:grid-cols-[minmax(0,1.62fr)_minmax(340px,0.58fr)] lg:items-stretch">
           <section className="min-w-0 space-y-5 lg:flex lg:min-h-0 lg:flex-col lg:gap-5">
-            <header className="shrink-0 space-y-3">
-              <h1 className="max-w-5xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl lg:text-[2.45rem] lg:leading-[1.08]">
-                {title}
-              </h1>
-              {caption && caption !== title && (
-                <p className="max-w-5xl text-sm leading-6 text-muted-foreground sm:text-base">
-                  {caption}
-                </p>
-              )}
-            </header>
+            {(primaryTitle || caption) && (
+              <header className="shrink-0 space-y-3">
+                {primaryTitle && (
+                  <h1 className="max-w-5xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl lg:text-[2.45rem] lg:leading-[1.08]">
+                    {primaryTitle}
+                  </h1>
+                )}
+                {caption && (
+                  <p className="max-w-5xl text-sm leading-6 text-muted-foreground sm:text-base">
+                    {caption}
+                  </p>
+                )}
+              </header>
+            )}
 
             <figure className="overflow-hidden bg-background lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
               {preview ? (
@@ -244,8 +249,8 @@ function formatCaptionWithPhotoCredit(caption: string | null | undefined, photog
   return `${trimmed} (Photo by ${photographerName} / Fotocorp)`
 }
 
-function getAssetTitle(asset: PublicAsset) {
-  return asset.headline || asset.caption || asset.category?.name || asset.event?.name || "Fotocorp archive image"
+function getAssetPrimaryTitle(asset: PublicAsset) {
+  return asset.event?.name?.trim() || null
 }
 
 function getAssetAlt(asset: PublicAsset) {

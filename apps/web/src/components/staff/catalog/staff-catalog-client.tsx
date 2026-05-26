@@ -1,15 +1,16 @@
 "use client"
 
-import { AlertTriangle, SquareCheck, ChevronLeft, ChevronRight, Pencil, ImageOff, Square, X, Filter, Search, Ellipsis, FileImage } from "lucide-react"
-import { useState, useTransition } from "react"
+import { SquareCheck, ChevronLeft, ChevronRight, ImageOff, Square, X, Filter, Search, Ellipsis, FileImage } from "lucide-react"
+import { useState, useTransition, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 import type { AdminCatalogAssetItem, AdminCatalogAssetsResponse, AdminCatalogFilters, AdminCatalogStats } from "@/features/assets/admin-catalog-types"
 import { updateAdminAssetStateBulkAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
-import { EmptyState } from "@/components/shared/empty-state"
 import { PreviewImage } from "@/components/assets/preview-image"
-import { StaffCatalogDetailDrawer } from "./staff-catalog-detail-drawer"
+import { StaffCatalogDetailSidebar } from "./staff-catalog-detail-sidebar"
+import { ConfirmDialog } from "@/components/staff/shared/confirm-dialog"
+import { cn } from "@/lib/utils"
 
 interface StaffCatalogClientProps {
   initialResponse: AdminCatalogAssetsResponse
@@ -24,6 +25,12 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
   
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [inspectAssetId, setInspectAssetId] = useState<string | null>(null)
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    title: string
+    description: string
+    variant: "default" | "destructive"
+    action: () => void
+  } | null>(null)
   
   const queryParams = new URLSearchParams(initialQuery)
   const previousQuery = new URLSearchParams(queryParams)
@@ -53,22 +60,62 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
   }
 
   const handleBulkArchive = async () => {
-    if (!selectedIds.size || !confirm("Are you sure you want to archive these assets?")) return
-    try {
-      await updateAdminAssetStateBulkAction({
-        assetIds: Array.from(selectedIds),
-        status: "REJECTED",
-        visibility: "PRIVATE"
-      })
-      setSelectedIds(new Set())
-      refreshData()
-    } catch (e) {
-      alert("Failed to archive some assets")
-    }
+    if (!selectedIds.size) return
+    setPendingConfirm({
+      title: "Archive assets",
+      description: `Are you sure you want to archive ${selectedIds.size} assets?`,
+      variant: "destructive",
+      action: async () => {
+        try {
+          await updateAdminAssetStateBulkAction({
+            assetIds: Array.from(selectedIds),
+            status: "REJECTED",
+            visibility: "PRIVATE"
+          })
+          setSelectedIds(new Set())
+          refreshData()
+        } catch (e) {
+          alert("Failed to archive some assets")
+        }
+      },
+    })
   }
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!inspectAssetId) return
+      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA" || document.activeElement?.tagName === "SELECT") {
+        return
+      }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault()
+        const currentIndex = initialResponse.items.findIndex(a => a.id === inspectAssetId)
+        if (currentIndex === -1) return
+        if (e.key === "ArrowDown" && currentIndex < initialResponse.items.length - 1) {
+          setInspectAssetId(initialResponse.items[currentIndex + 1].id)
+        } else if (e.key === "ArrowUp" && currentIndex > 0) {
+          setInspectAssetId(initialResponse.items[currentIndex - 1].id)
+        }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [inspectAssetId, initialResponse.items])
 
   return (
     <div className="space-y-5 relative">
+      <ConfirmDialog
+        open={!!pendingConfirm}
+        title={pendingConfirm?.title ?? ""}
+        description={pendingConfirm?.description ?? ""}
+        variant={pendingConfirm?.variant ?? "default"}
+        onConfirm={() => {
+          pendingConfirm?.action()
+          setPendingConfirm(null)
+        }}
+        onCancel={() => setPendingConfirm(null)}
+      />
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">Catalog</h2>
@@ -78,33 +125,28 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total assets" value={stats.totalAssets.toLocaleString()} />
-        <StatCard label="Approved public" value={stats.approvedPublicAssets.toLocaleString()} />
-        <StatCard label="Ready previews" value={stats.readyCardPreviewCount.toLocaleString()} />
-        <StatCard label="Missing R2" value={stats.missingR2Count.toLocaleString()} />
-      </div>
+      <div className="flex w-full items-start gap-4">
+        <div className={cn("space-y-5 transition-all duration-300", inspectAssetId ? "w-[60%]" : "w-full")}>
+          {/* Bulk actions bar */}
+          {selectedIds.size > 0 && (
+            <div className="sticky top-16 z-30 flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 shadow-sm backdrop-blur">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-primary">{selectedIds.size} selected</span>
+                <button onClick={() => setSelectedIds(new Set())} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={handleBulkArchive} className="rounded border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted text-rose-600">
+                  Bulk Archive
+                </button>
+              </div>
+            </div>
+          )}
 
-      {/* Bulk actions bar */}
-      {selectedIds.size > 0 && (
-        <div className="sticky top-16 z-30 flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 shadow-sm backdrop-blur">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-primary">{selectedIds.size} selected</span>
-            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleBulkArchive} className="rounded border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted text-rose-600">
-              Bulk Archive
-            </button>
-          </div>
-        </div>
-      )}
+          {/* Filter Chips */}
+          <ActiveFilterChips query={queryParams} />
 
-      {/* Filter Chips */}
-      <ActiveFilterChips query={queryParams} />
-
-      {/* Main Grid */}
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          {/* Main Grid */}
+          <div className="overflow-x-auto rounded-lg border border-border bg-card">
         <table className="w-full min-w-[1200px] text-sm">
           <thead className="bg-muted/60">
             <tr>
@@ -133,7 +175,6 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                   options={[{value:"",label:"All"}, {value:"PUBLIC",label:"PUBLIC"}, {value:"PRIVATE",label:"PRIVATE"}, {value:"UNLISTED",label:"UNLISTED"}]} 
                 />
               }>Visibility</Th>
-              <Th>Preview State</Th>
               <Th filterControl={
                 <HeaderSelectFilter 
                   query={queryParams} 
@@ -160,27 +201,30 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                   ]} 
                 />
               }>Updated</Th>
-              <th className="px-3 py-2 text-right">Action</th>
             </tr>
           </thead>
           <tbody>
             {initialResponse.items.length === 0 ? (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-muted-foreground">
+                <td colSpan={8} className="p-8 text-center text-muted-foreground">
                   No assets found matching filters.
                 </td>
               </tr>
             ) : (
               initialResponse.items.map(asset => (
-                <tr key={asset.id} className={`border-t border-border align-middle transition-colors hover:bg-muted/30 ${selectedIds.has(asset.id) ? 'bg-primary/5' : ''}`}>
-                  <td className="px-3 py-2">
+                <tr 
+                  key={asset.id} 
+                  onClick={() => setInspectAssetId(prev => prev === asset.id ? null : asset.id)}
+                  className={`border-t border-border align-middle transition-colors hover:bg-muted/30 cursor-pointer ${selectedIds.has(asset.id) || inspectAssetId === asset.id ? 'bg-primary/5' : ''}`}
+                >
+                  <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                     <button onClick={() => toggleSelection(asset.id)} className="text-muted-foreground hover:text-foreground">
                       {selectedIds.has(asset.id) ? <SquareCheck size={16} /> : <Square size={16} />}
                     </button>
                   </td>
                   <td className="px-3 py-2">
                     {bestPreviewVariant(asset) ? (
-                      <div className="h-12 w-20 overflow-hidden rounded border border-border bg-muted cursor-pointer" onClick={() => setInspectAssetId(asset.id)}>
+                      <div className="h-12 w-20 overflow-hidden rounded border border-border bg-muted">
                         <PreviewImage
                           src={`/staff/catalog/${asset.id}/preview-image?variant=${bestPreviewVariant(asset)}`}
                           alt={asset.headline || asset.caption || "Preview"}
@@ -201,25 +245,9 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                   </td>
                   <td className="px-3 py-2"><StatusBadge tone="neutral">{asset.status}</StatusBadge></td>
                   <td className="px-3 py-2"><StatusBadge tone={asset.visibility === "PUBLIC" ? "ok" : "warn"}>{asset.visibility}</StatusBadge></td>
-                  <td className="px-3 py-2">
-                    {asset.previewReady 
-                      ? <StatusBadge tone="ok">Ready</StatusBadge> 
-                      : (asset.previewState === "PARTIAL" 
-                        ? <StatusBadge tone="warn">Partial</StatusBadge> 
-                        : <StatusBadge tone="neutral">Missing</StatusBadge>)}
-                  </td>
                   <td className="px-3 py-2 max-w-[150px] truncate" title={asset.category?.name || ""}>{asset.category?.name ?? "—"}</td>
                   <td className="px-3 py-2 max-w-[150px] truncate" title={asset.event?.name || ""}>{asset.event?.name ?? "—"}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{toDate(asset.updatedAt ?? asset.createdAt)}</td>
-                  <td className="px-3 py-2 text-right">
-                    <button 
-                      onClick={() => setInspectAssetId(asset.id)}
-                      className="inline-flex items-center justify-center rounded border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
-                    >
-                      <Pencil className="mr-1.5" size={14} />
-                      Edit
-                    </button>
-                  </td>
                 </tr>
               ))
             )}
@@ -227,38 +255,33 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
         </table>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <Link href={`/staff/catalog?${previousQuery.toString()}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <ChevronLeft size={14} />
-          Reset cursor
-        </Link>
-        {initialResponse.nextCursor ? (
-          <Link href={`/staff/catalog?${nextQuery.toString()}`} className="inline-flex items-center gap-1 rounded border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
-            Load more
-            <ChevronRight size={14} />
-          </Link>
-        ) : (
-          <span className="text-xs text-muted-foreground">End of results</span>
+          <div className="flex items-center justify-between gap-3">
+            <Link href={`/staff/catalog?${previousQuery.toString()}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              <ChevronLeft size={14} />
+              Reset cursor
+            </Link>
+            {initialResponse.nextCursor ? (
+              <Link href={`/staff/catalog?${nextQuery.toString()}`} className="inline-flex items-center gap-1 rounded border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+                Load more
+                <ChevronRight size={14} />
+              </Link>
+            ) : (
+              <span className="text-xs text-muted-foreground">End of results</span>
+            )}
+          </div>
+        </div>
+
+        {inspectAssetId && (
+          <div className="w-[40%] shrink-0">
+            <StaffCatalogDetailSidebar
+              assetId={inspectAssetId}
+              onClose={() => setInspectAssetId(null)}
+              onUpdate={refreshData}
+              filters={filters}
+            />
+          </div>
         )}
       </div>
-
-      {inspectAssetId && (
-        <StaffCatalogDetailDrawer
-          assetId={inspectAssetId}
-          onClose={() => setInspectAssetId(null)}
-          onUpdate={refreshData}
-          filters={filters}
-        />
-      )}
-    </div>
-  )
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2.5">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
     </div>
   )
 }

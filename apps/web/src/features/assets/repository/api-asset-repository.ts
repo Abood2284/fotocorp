@@ -1,6 +1,6 @@
 import { collectTopKeywords, filterAssets, sortAssets } from "@/features/assets/filter-utils"
 import type { AssetRepository, AssetSearchParams, AssetSearchResult } from "@/features/assets/repository/types"
-import type { AdminAssetRecord, AdminAssetStatus, IngestionRun } from "@/lib/fixtures/admin"
+import type { AdminAssetRecord, AdminAssetStatus } from "@/lib/fixtures/admin"
 import type { AssetListItem } from "@/types"
 
 interface CreateApiAssetRepositoryOptions {
@@ -44,16 +44,6 @@ interface ApiAdminAssetDetail extends ApiAssetDetail {
   metadata?: Record<string, string | number | boolean | null>
 }
 
-interface ApiIngestionRun {
-  id?: string
-  source?: string
-  status?: "completed" | "running" | "failed"
-  startedAt?: string
-  completedAt?: string | null
-  discoveredCount?: number
-  importedCount?: number
-  failedCount?: number
-}
 
 export function createApiAssetRepository({
   baseUrl,
@@ -163,25 +153,6 @@ export function createApiAssetRepository({
     }
   }
 
-  function mapRunSummary(run: ApiIngestionRun): IngestionRun | null {
-    if (!run.id || !run.source || !run.status || !run.startedAt) return null
-    const discoveredCount = isPositiveNumber(run.discoveredCount) ? run.discoveredCount : 0
-    const successCount = isPositiveNumber(run.importedCount) ? run.importedCount : 0
-    const failureCount = isPositiveNumber(run.failedCount) ? run.failedCount : 0
-    const pendingCount = Math.max(discoveredCount - successCount - failureCount, 0)
-
-    return {
-      id: run.id,
-      source: run.source,
-      status: run.status,
-      startedAt: run.startedAt,
-      endedAt: run.completedAt ?? undefined,
-      successCount,
-      failureCount,
-      pendingCount,
-      errors: [],
-    }
-  }
 
   async function listApiAssets(): Promise<AssetListItem[]> {
     const response = await getJsonOrThrow<ApiListResponse<ApiAssetListItem>>("/assets")
@@ -309,22 +280,6 @@ export function createApiAssetRepository({
       return withFallback({
         primary: getPrimary,
         fallback: () => fallbackRepository.getAdminAssetById(id),
-      })
-    },
-    async listIngestionRuns() {
-      const getPrimary = async () => {
-        const response = await getJsonOrThrow<ApiListResponse<ApiIngestionRun>>("/staff/ingestion/runs")
-        const items = response.items ?? []
-        return items
-          .map((run) => mapRunSummary(run))
-          .filter((run): run is IngestionRun => run !== null)
-      }
-
-      if (!fallbackRepository) return getPrimary()
-
-      return withFallback({
-        primary: getPrimary,
-        fallback: () => fallbackRepository.listIngestionRuns(),
       })
     },
   }

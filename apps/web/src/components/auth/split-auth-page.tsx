@@ -9,6 +9,7 @@ import { authClient } from "@/lib/auth-client"
 import { resolveAuthRedirectFromSearchParams } from "@/lib/auth-redirect"
 import { validateBusinessEmail } from "@/lib/api/auth-api"
 import { isValidUsername, normalizeUsername } from "@/lib/username"
+import { migrateAnonBoardsToServer } from "@/lib/storage/fotobox-anon-store"
 
 type AuthTab = "sign-in" | "register"
 type EmailValidationStatus = "idle" | "checking" | "allowed" | "blocked" | "error"
@@ -290,6 +291,7 @@ export function SplitAuthPage() {
           applySignInServerError({ error: response.error, setErrors, setNotice, tab: "sign-in" })
           return
         }
+        await migrateAnonBoardsToServer()
       } catch (error) {
         applySignInServerError({ error, setErrors, setNotice, tab: "sign-in" })
         return
@@ -393,6 +395,7 @@ export function SplitAuthPage() {
           applyRegisterServerError({ error: response.error, setErrors, setNotice, tab: "register" })
           return
         }
+        await migrateAnonBoardsToServer()
       } catch (error) {
         applyRegisterServerError({ error, setErrors, setNotice, tab: "register" })
         return

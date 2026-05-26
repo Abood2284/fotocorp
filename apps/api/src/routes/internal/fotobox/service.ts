@@ -6,9 +6,9 @@ import { createPreviewUrl } from "../../../lib/media/preview-token"
 import { CARD_LIGHT_PREVIEW_PROFILE, THUMB_LIGHT_PREVIEW_PROFILE } from "../../../lib/media/watermark"
 import { parsePreviewTtl } from "../../../lib/assets/public-assets"
 
-interface ListFotoboxInput { authUserId: string; limit?: string; cursor?: string }
-interface AddFotoboxInput { authUserId: string; assetId: string }
-interface RemoveFotoboxInput { authUserId: string }
+interface ListFotoboxInput { authUserId: string; limit?: string; cursor?: string; boardId?: string }
+interface AddFotoboxInput { authUserId: string; assetId: string; boardId: string }
+interface RemoveFotoboxInput { authUserId: string; boardId?: string }
 interface ProfileRow { id: string; status: string }
 interface FotoboxRow { asset_id: string; saved_at: Date | string; who_is_in_picture: string | null; headline: string | null; caption: string | null; fotokey: string | null; category_name: string | null; event_name: string | null; card_width: number | null; card_height: number | null; thumb_width: number | null; thumb_height: number | null }
 interface CursorPayload { at: string; id: string }
@@ -19,7 +19,8 @@ export async function listFotoboxService(env: Env, input: ListFotoboxInput): Pro
   await requireActiveProfile(db, authUserId)
   const limit = parseLimit(input.limit ?? null, 24, 48)
   const cursor = parseCursor(input.cursor ?? null)
-  const rows = await listFotoboxRows(db, authUserId, limit + 1, cursor)
+  const boardId = input.boardId ?? undefined
+  const rows = await listFotoboxRows(db, authUserId, limit + 1, cursor, boardId)
   const pageRows = rows.slice(0, limit)
   return safeJson({
     ok: true,
@@ -32,27 +33,33 @@ export async function addFotoboxService(env: Env, input: AddFotoboxInput): Promi
   const db = dbFor(env)
   const profile = await requireActiveProfile(db, input.authUserId)
   await assertSaveableAsset(db, input.assetId)
+  await assertBoardOwnership(db, input.boardId, input.authUserId)
   const inserted = await executeRows<{ created_at: Date | string }>(db, sql`
-    insert into asset_fotobox_items (auth_user_id, app_user_profile_id, asset_id)
-    values (${input.authUserId}, ${profile.id}, ${input.assetId}::uuid)
-    on conflict (auth_user_id, asset_id) do nothing
+    insert into asset_fotobox_items (auth_user_id, app_user_profile_id, board_id, asset_id)
+    values (${input.authUserId}, ${profile.id}, ${input.boardId}::uuid, ${input.assetId}::uuid)
+    on conflict (board_id, asset_id) do nothing
     returning created_at
   `)
-  const createdAt = inserted[0]?.created_at ?? await findSavedAt(db, input.authUserId, input.assetId)
+  const createdAt = inserted[0]?.created_at ?? await findSavedAt(db, input.authUserId, input.assetId, input.boardId)
   return safeJson({ ok: true, alreadySaved: inserted.length === 0, item: { assetId: input.assetId, createdAt: toIso(createdAt) } })
 }
 
 export async function removeFotoboxService(env: Env, assetId: string, input: RemoveFotoboxInput): Promise<Response> {
   const db = dbFor(env)
   await requireActiveProfile(db, input.authUserId)
-  await db.execute(sql`delete from asset_fotobox_items where auth_user_id = ${input.authUserId} and asset_id = ${assetId}::uuid`)
+  if (input.boardId) {
+    await db.execute(sql`delete from asset_fotobox_items where auth_user_id = ${input.authUserId} and asset_id = ${assetId}::uuid and board_id = ${input.boardId}::uuid`)
+  } else {
+    await db.execute(sql`delete from asset_fotobox_items where auth_user_id = ${input.authUserId} and asset_id = ${assetId}::uuid`)
+  }
   return safeJson({ ok: true })
 }
 
 async function requireActiveProfile(db: DrizzleClient, authUserId: string): Promise<ProfileRow> { const rows = await executeRows<ProfileRow>(db, sql`select id, status from app_user_profiles where auth_user_id = ${authUserId} limit 1`); const profile = rows[0]; if (!profile) throw new AppError(404, "PROFILE_NOT_FOUND", "Profile was not found."); if (profile.status !== "ACTIVE") throw new AppError(403, "PROFILE_NOT_ACTIVE", "Profile is not active."); return profile }
 async function assertSaveableAsset(db: DrizzleClient, assetId: string): Promise<void> { const rows = await executeRows<{ id: string }>(db, sql`select id from image_assets where id = ${assetId}::uuid and status = 'ACTIVE' and visibility = 'PUBLIC' and media_type = 'IMAGE' and original_exists_in_storage = true limit 1`); if (!rows[0]) throw new AppError(404, "ASSET_NOT_SAVEABLE", "Asset is not available for Fotobox.") }
-async function findSavedAt(db: DrizzleClient, authUserId: string, assetId: string) { const rows = await executeRows<{ created_at: Date | string }>(db, sql`select created_at from asset_fotobox_items where auth_user_id = ${authUserId} and asset_id = ${assetId}::uuid limit 1`); return rows[0]?.created_at ?? new Date() }
-async function listFotoboxRows(db: DrizzleClient, authUserId: string, limit: number, cursor: CursorPayload | null): Promise<FotoboxRow[]> { const cursorWhere = cursor ? sql`and (fi.created_at, fi.asset_id) < (${cursor.at}::timestamptz, ${cursor.id}::uuid)` : sql``; return executeRows<FotoboxRow>(db, sql`select a.id as asset_id,fi.created_at as saved_at,a.who_is_in_picture,a.headline,a.caption,a.fotokey,c.name as category_name,e.name as event_name,card.width as card_width,card.height as card_height,thumb.width as thumb_width,thumb.height as thumb_height from asset_fotobox_items fi join image_assets a on a.id = fi.asset_id join image_derivatives card on card.image_asset_id = a.id and card.variant = 'CARD' and card.generation_status = 'READY' and card.is_watermarked = true and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE} left join image_derivatives thumb on thumb.image_asset_id = a.id and thumb.variant = 'THUMB' and thumb.generation_status = 'READY' and thumb.is_watermarked = true and thumb.watermark_profile = ${THUMB_LIGHT_PREVIEW_PROFILE} left join asset_categories c on c.id = a.category_id left join photo_events e on e.id = a.event_id where fi.auth_user_id = ${authUserId} and a.status = 'ACTIVE' and a.visibility = 'PUBLIC' and a.media_type = 'IMAGE' and a.original_exists_in_storage = true ${cursorWhere} order by fi.created_at desc, fi.asset_id desc limit ${limit}`) }
+async function assertBoardOwnership(db: DrizzleClient, boardId: string, authUserId: string): Promise<void> { const rows = await executeRows<{ id: string }>(db, sql`select id from fotobox_boards where id = ${boardId}::uuid and auth_user_id = ${authUserId} limit 1`); if (!rows[0]) throw new AppError(404, "BOARD_NOT_FOUND", "Board not found or does not belong to this user.") }
+async function findSavedAt(db: DrizzleClient, authUserId: string, assetId: string, boardId: string) { const rows = await executeRows<{ created_at: Date | string }>(db, sql`select created_at from asset_fotobox_items where auth_user_id = ${authUserId} and asset_id = ${assetId}::uuid and board_id = ${boardId}::uuid limit 1`); return rows[0]?.created_at ?? new Date() }
+async function listFotoboxRows(db: DrizzleClient, authUserId: string, limit: number, cursor: CursorPayload | null, boardId?: string): Promise<FotoboxRow[]> { const boardFilter = boardId ? sql`and fi.board_id = ${boardId}::uuid` : sql``; const cursorWhere = cursor ? sql`and (fi.created_at, fi.asset_id) < (${cursor.at}::timestamptz, ${cursor.id}::uuid)` : sql``; return executeRows<FotoboxRow>(db, sql`select a.id as asset_id,fi.created_at as saved_at,a.who_is_in_picture,a.headline,a.caption,a.fotokey,c.name as category_name,e.name as event_name,card.width as card_width,card.height as card_height,thumb.width as thumb_width,thumb.height as thumb_height from asset_fotobox_items fi join image_assets a on a.id = fi.asset_id join image_derivatives card on card.image_asset_id = a.id and card.variant = 'CARD' and card.generation_status = 'READY' and card.is_watermarked = true and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE} left join image_derivatives thumb on thumb.image_asset_id = a.id and thumb.variant = 'THUMB' and thumb.generation_status = 'READY' and thumb.is_watermarked = true and thumb.watermark_profile = ${THUMB_LIGHT_PREVIEW_PROFILE} left join asset_categories c on c.id = a.category_id left join photo_events e on e.id = a.event_id where fi.auth_user_id = ${authUserId} ${boardFilter} and a.status = 'ACTIVE' and a.visibility = 'PUBLIC' and a.media_type = 'IMAGE' and a.original_exists_in_storage = true ${cursorWhere} order by fi.created_at desc, fi.asset_id desc limit ${limit}`) }
 async function toFotoboxItem(row: FotoboxRow, env: Env) { return { assetId: row.asset_id, savedAt: toIso(row.saved_at), headline: row.headline, whoIsInPicture: row.who_is_in_picture, caption: row.caption, fotokey: row.fotokey, category: row.category_name, event: row.event_name, previewUrl: await previewUrl(row.asset_id, row.card_width, row.card_height, "card", env), thumbUrl: await previewUrl(row.asset_id, row.thumb_width, row.thumb_height, "thumb", env) } }
 async function previewUrl(assetId: string, width: number | null, height: number | null, variant: "thumb" | "card", env: Env) { if (!width || !height) return null; return { url: await createPreviewUrl(assetId, variant, env.MEDIA_PREVIEW_TOKEN_SECRET, parsePreviewTtl(env.MEDIA_PREVIEW_TOKEN_TTL_SECONDS)), width, height } }
 function dbFor(env: Env) { if (!env.DATABASE_URL) throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured."); return createHttpDb(env.DATABASE_URL) }

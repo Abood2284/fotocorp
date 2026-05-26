@@ -12,6 +12,15 @@ export const internalApiRoutes = {
   fotoboxItem: (assetId: string) =>
     `/api/v1/internal/fotobox/items/${encodeURIComponent(assetId)}`,
 
+  fotoboxBoards: () => "/api/v1/internal/fotobox/items/boards",
+
+  fotoboxBoard: (boardId: string) =>
+    `/api/v1/internal/fotobox/items/boards/${encodeURIComponent(boardId)}`,
+
+  fotoboxMigrateAnon: () => "/api/v1/internal/fotobox/items/migrate-anon",
+
+  fotoboxAssetBoardIds: () => "/api/v1/internal/fotobox/items/asset-board-ids",
+
   downloadHistory: () => "/api/v1/internal/downloads/history",
 
   adminAssets: () => "/api/v1/internal/admin/assets",
@@ -34,6 +43,18 @@ export const internalApiRoutes = {
   adminFilters: () => "/api/v1/internal/admin/filters",
 
   adminUsers: () => "/api/v1/internal/admin/users",
+
+  adminUser: (authUserId: string) =>
+    `/api/v1/internal/admin/users/${encodeURIComponent(authUserId)}`,
+
+  adminUserRole: (authUserId: string) =>
+    `/api/v1/internal/admin/users/${encodeURIComponent(authUserId)}/role`,
+
+  adminUserStatus: (authUserId: string) =>
+    `/api/v1/internal/admin/users/${encodeURIComponent(authUserId)}/status`,
+
+  adminUserSubscriptionDetail: (authUserId: string) =>
+    `/api/v1/internal/admin/users/${encodeURIComponent(authUserId)}/subscription-detail`,
 
   adminUserSubscription: (authUserId: string) =>
     `/api/v1/internal/admin/users/${encodeURIComponent(authUserId)}/subscription`,

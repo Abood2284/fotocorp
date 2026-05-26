@@ -99,6 +99,42 @@
 
 
 @theme inline {
+  --color-jumbo-50: #fafafa;
+  --color-jumbo-100: #f4f4f5;
+  --color-jumbo-200: #e5e4e7;
+  --color-jumbo-300: #d5d4d8;
+  --color-jumbo-400: #a4a1aa;
+  --color-jumbo-500: #74717b;
+  --color-jumbo-600: #55525b;
+  --color-jumbo-700: #413f46;
+  --color-jumbo-800: #28272a;
+  --color-jumbo-900: #19181b;
+  --color-jumbo-950: #0a090b;
+
+  --color-staff-50: #f4f6fa;
+  --color-staff-100: #e8ecf4;
+  --color-staff-200: #d4dae8;
+  --color-staff-300: #b8c2d6;
+  --color-staff-400: #8a96b0;
+  --color-staff-500: #647090;
+  --color-staff-600: #4a5673;
+  --color-staff-700: #353f58;
+  --color-staff-800: #222b3f;
+  --color-staff-900: #141c2e;
+  --color-staff-950: #0a1020;
+
+  --color-blue-50: #e8efff;
+  --color-blue-100: #d6e2ff;
+  --color-blue-200: #b5c8ff;
+  --color-blue-300: #88a3ff;
+  --color-blue-400: #5a73ff;
+  --color-blue-500: #3444ff;
+  --color-blue-600: #1212ff;
+  --color-blue-700: #0f0bfa;
+  --color-blue-800: #0a0ac9;
+  --color-blue-900: #13169c;
+  --color-blue-950: #0b0b5b;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 

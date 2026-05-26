@@ -27,6 +27,19 @@ export interface FotoboxItem {
   thumbUrl: AccountPreview | null
 }
 
+export interface FotoboxBoard {
+  id: string
+  name: string
+  itemCount: number
+  sortOrder: number
+  createdAt: string
+}
+
+export interface FotoboxBoardsResponse {
+  ok: true
+  boards: FotoboxBoard[]
+}
+
 export interface FotoboxResponse {
   ok: true
   items: FotoboxItem[]
@@ -57,9 +70,11 @@ export async function listFotoboxItems(input: {
   authUserId: string
   limit?: number
   cursor?: string
+  boardId?: string
 }): Promise<FotoboxResponse> {
   const params = new URLSearchParams({ authUserId: input.authUserId, limit: String(input.limit ?? 24) })
   if (input.cursor) params.set("cursor", input.cursor)
+  if (input.boardId) params.set("boardId", input.boardId)
 
   const body = await accountJson<FotoboxResponse>({
     path: withQuery(internalApiRoutes.fotoboxItems(), params),
@@ -70,7 +85,7 @@ export async function listFotoboxItems(input: {
   }
 }
 
-export async function addFotoboxItem(input: { authUserId: string; assetId: string }) {
+export async function addFotoboxItem(input: { authUserId: string; assetId: string; boardId: string }) {
   return accountJson({
     path: internalApiRoutes.fotoboxItems(),
     method: "POST",
@@ -78,11 +93,54 @@ export async function addFotoboxItem(input: { authUserId: string; assetId: strin
   })
 }
 
-export async function removeFotoboxItem(input: { authUserId: string; assetId: string }) {
+export async function removeFotoboxItem(input: { authUserId: string; assetId: string; boardId?: string }) {
   return accountJson({
     path: internalApiRoutes.fotoboxItem(input.assetId),
     method: "DELETE",
+    body: { authUserId: input.authUserId, boardId: input.boardId },
+  })
+}
+
+export async function listFotoboxBoards(authUserId: string): Promise<FotoboxBoardsResponse> {
+  const params = new URLSearchParams({ authUserId })
+  return accountJson<FotoboxBoardsResponse>({
+    path: withQuery(internalApiRoutes.fotoboxBoards(), params),
+  })
+}
+
+export async function createFotoboxBoard(input: { authUserId: string; name: string }) {
+  return accountJson({
+    path: internalApiRoutes.fotoboxBoards(),
+    method: "POST",
+    body: input,
+  })
+}
+
+export async function renameFotoboxBoard(input: { authUserId: string; boardId: string; name: string }) {
+  return accountJson({
+    path: internalApiRoutes.fotoboxBoard(input.boardId),
+    method: "PATCH",
+    body: { authUserId: input.authUserId, name: input.name },
+  })
+}
+
+export async function deleteFotoboxBoard(input: { authUserId: string; boardId: string }) {
+  return accountJson({
+    path: internalApiRoutes.fotoboxBoard(input.boardId),
+    method: "DELETE",
     body: { authUserId: input.authUserId },
+  })
+}
+
+export async function migrateAnonBoards(input: {
+  authUserId: string
+  appUserProfileId: string
+  boards: Array<{ name: string; items: string[] }>
+}) {
+  return accountJson({
+    path: internalApiRoutes.fotoboxMigrateAnon(),
+    method: "POST",
+    body: input,
   })
 }
 
@@ -109,7 +167,7 @@ export async function listDownloadHistory(input: {
 
 async function accountJson<T = unknown>(input: {
   path: string
-  method?: "GET" | "POST" | "DELETE"
+  method?: "GET" | "POST" | "PATCH" | "DELETE"
   body?: unknown
 }): Promise<T> {
   try {

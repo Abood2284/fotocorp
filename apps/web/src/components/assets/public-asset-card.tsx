@@ -26,7 +26,8 @@ export function PublicAssetCard({
   priority = false,
 }: PublicAssetCardProps) {
   const preview = asset.previews.card ?? asset.previews.thumb
-  const title = getAssetAlt(asset)
+  const eventTitle = getAssetEventTitle(asset)
+  const imageAlt = getAssetImageAlt(asset)
   const href = `/assets/${asset.id}`
   const isJustifiedGrid = variant === "grid" && gridLayout === "justified"
   const gridFrameStyle =
@@ -60,7 +61,7 @@ export function PublicAssetCard({
         {preview ? (
           <PreviewImage
             src={preview.url}
-            alt={title}
+            alt={imageAlt}
             className={cn(
               "block w-full transition-transform duration-700 ease-out group-hover:scale-[1.025] group-focus-within:scale-[1.025]",
               variant === "grid" && isJustifiedGrid && "h-full object-cover",
@@ -77,20 +78,22 @@ export function PublicAssetCard({
 
         <Link
           href={href}
-          aria-label={`View ${title}`}
+          aria-label={eventTitle ? `View ${eventTitle}` : "View image"}
           className="absolute inset-0 z-10 rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
         />
 
         {variant === "grid" && (
           <>
             <div className="public-grid-card-overlay pointer-events-none absolute inset-0 z-20 bg-gradient-to-b from-black/75 via-black/15 to-black/70 opacity-0 transition-opacity duration-200" />
-            <div className="public-grid-card-overlay pointer-events-none absolute bottom-3 left-3 z-30 max-w-[calc(100%-5rem)] opacity-0 transition-opacity duration-200">
-              <p className="line-clamp-2 text-xl font-bold leading-tight tracking-normal text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]">
-                {title}
-              </p>
-            </div>
+            {eventTitle && (
+              <div className="public-grid-card-overlay pointer-events-none absolute bottom-3 left-3 z-30 max-w-[calc(100%-5rem)] opacity-0 transition-opacity duration-200">
+                <p className="line-clamp-2 text-xl font-bold leading-tight tracking-normal text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]">
+                  {eventTitle}
+                </p>
+              </div>
+            )}
             <div className="public-grid-card-overlay absolute right-3 top-3 z-30 opacity-0 transition-opacity duration-200">
-              <PublicAssetSaveButton assetId={asset.id} stub compact compactLabel="Save as" />
+              <PublicAssetSaveButton assetId={asset.id} compact compactLabel="Save as" assetTitle={eventTitle ?? undefined} />
             </div>
           </>
         )}
@@ -102,9 +105,9 @@ export function PublicAssetCard({
             href={href}
             className="line-clamp-2 text-sm font-medium leading-5 text-foreground hover:underline"
           >
-            {title}
+            {eventTitle ?? asset.caption}
           </Link>
-          {asset.caption && (
+          {asset.caption && eventTitle && (
             <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">{asset.caption}</p>
           )}
         </div>
@@ -122,13 +125,11 @@ export function PublicAssetCard({
             href={href}
             className="line-clamp-3 text-xl font-medium leading-tight tracking-normal text-foreground hover:underline"
           >
-            {title}
+            {eventTitle ?? asset.caption}
           </Link>
           <div className="space-y-1 text-sm leading-5 text-muted-foreground">
-            {(asset.caption || asset.event?.name) && (
-              <p className="line-clamp-2">
-                {asset.event?.name ? `People: ${asset.event.name}` : asset.caption}
-              </p>
+            {asset.caption && eventTitle && (
+              <p className="line-clamp-2">{asset.caption}</p>
             )}
             {asset.contributor?.displayName && (
               <p>
@@ -145,8 +146,15 @@ export function PublicAssetCard({
   )
 }
 
-function getAssetAlt(asset: PublicAsset) {
-  return asset.headline || asset.caption || "Fotocorp archive image"
+function getAssetEventTitle(asset: PublicAsset) {
+  return asset.event?.name?.trim() || null
+}
+
+function getAssetImageAlt(asset: PublicAsset) {
+  const caption = asset.caption?.trim()
+  const headline = asset.headline?.trim()
+  const eventTitle = getAssetEventTitle(asset)
+  return caption || headline || eventTitle || "Fotocorp archive image"
 }
 
 function getPreviewAspectRatio(

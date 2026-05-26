@@ -139,7 +139,7 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
 
         <div className="ml-auto flex shrink-0 items-center gap-4 sm:gap-6">
           <Link
-            href="/account/fotobox"
+            href="/fotobox"
             className="hidden items-center gap-2 fc-label text-[#6b7280] transition-colors hover:text-foreground lg:flex"
           >
             <Archive size={18} />
@@ -233,7 +233,7 @@ function HeaderStatic({ userProfile, staffBrief }: HeaderProps) {
 
         <div className="ml-auto flex shrink-0 items-center gap-4 sm:gap-6">
           <Link
-            href="/account/fotobox"
+            href="/fotobox"
             className="hidden items-center gap-2 fc-label text-[#6b7280] transition-colors hover:text-foreground lg:flex"
           >
             <Archive size={18} />
@@ -644,7 +644,7 @@ function MobileRoleLinks({
   const subscriber = isActiveSubscriber(userProfile)
   const accountLinks: HeaderLink[] = [
     { label: "My account", href: "/account" },
-    { label: "Fotobox", href: "/account/fotobox" },
+    { label: "Fotobox", href: "/fotobox" },
     subscriber ? { label: "Downloads", href: "/account/downloads" } : { label: "Subscription", href: "/account/subscription" },
   ]
 
@@ -818,7 +818,6 @@ function getStaffToolAccountLinks(): AccountLink[] {
     { label: "Contributor uploads", href: "/staff/contributor-uploads", icon: Inbox },
     { label: "Catalog", href: "/staff/catalog", icon: Image },
     { label: "Users", href: "/staff/users", icon: Users },
-    { label: "Storage", href: "/staff/storage", icon: HardDrive },
     { label: "Audit", href: "/staff/audit", icon: Shield },
   ]
 }

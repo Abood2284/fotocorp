@@ -139,6 +139,39 @@ export async function listAdminUsers(searchParams: URLSearchParams) {
   })
 }
 
+export async function getAdminUser(authUserId: string) {
+  return adminJson<AdminCatalogUserResponse>({
+    path: internalApiRoutes.adminUser(authUserId),
+  })
+}
+
+export async function updateAdminUserRole(authUserId: string, payload: { role: string }) {
+  return adminJson<AdminCatalogUserResponse>({
+    path: internalApiRoutes.adminUserRole(authUserId),
+    method: "PATCH",
+    body: payload,
+  })
+}
+
+export async function updateAdminUserStatus(authUserId: string, payload: { status: string }) {
+  return adminJson<AdminCatalogUserResponse>({
+    path: internalApiRoutes.adminUserStatus(authUserId),
+    method: "PATCH",
+    body: payload,
+  })
+}
+
+export async function updateAdminUserSubscriptionDetail(
+  authUserId: string,
+  payload: { subscriptionPlanId?: string | null; subscriptionEndsAt?: string | null; downloadQuotaLimit?: number | null },
+) {
+  return adminJson<AdminCatalogUserResponse>({
+    path: internalApiRoutes.adminUserSubscriptionDetail(authUserId),
+    method: "PATCH",
+    body: payload,
+  })
+}
+
 export async function updateAdminUserSubscription(authUserId: string, payload: { isSubscriber: boolean }) {
   return adminJson<AdminCatalogUserResponse>({
     path: internalApiRoutes.adminUserSubscription(authUserId),

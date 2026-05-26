@@ -6,4 +6,6 @@ export const ASSET_AUDIT_ACTION = {
 
 export const USER_AUDIT_ACTION = {
   subscriptionUpdated: "USER_SUBSCRIPTION_UPDATED",
+  roleUpdated: "USER_ROLE_UPDATED",
+  statusUpdated: "USER_STATUS_UPDATED",
 } as const
