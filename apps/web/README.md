@@ -66,12 +66,6 @@ npm run preview
 # or similar package manager command
 ```
 
-## Under-construction mode (pre-launch)
-
-On your production domain, set `SITE_UNDER_CONSTRUCTION=true` in Wrangler vars or the Cloudflare dashboard for the **web** Worker. All routes redirect to `/under-construction` except static assets and `/api/*`.
-
-To preview the real site before launch, set `SITE_UNDER_CONSTRUCTION_BYPASS_SECRET` to a long random value, deploy, then visit `https://your-domain/?preview=<secret>` once. That sets a 7-day cookie so your team can browse normally. Remove both vars (or set `SITE_UNDER_CONSTRUCTION=false`) when you are ready to go live.
-
 ## Deploy
 
 Deploy the application to Cloudflare:

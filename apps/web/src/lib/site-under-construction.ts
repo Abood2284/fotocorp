@@ -1,13 +1,31 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare"
+
 export const CONSTRUCTION_PAGE_PATH = "/under-construction"
 
 export const SITE_PREVIEW_COOKIE = "fc_site_preview"
 
+function getRuntimeEnvVar(name: string): string | undefined {
+  // In OpenNext production, Worker `vars` are available at runtime via `getCloudflareContext()`.
+  // Relying only on `process.env` can get values baked in at build-time.
+  try {
+    const { env } = getCloudflareContext()
+    const value = (env as Record<string, unknown>)[name]
+    if (typeof value === "string") return value
+    if (value == null) return undefined
+    return String(value)
+  } catch {
+    // Fallback for local dev and edge-cases where Cloudflare context is unavailable.
+    return process.env[name]
+  }
+}
+
 export function isSiteUnderConstruction(): boolean {
-  return process.env.SITE_UNDER_CONSTRUCTION === "true"
+  const value = getRuntimeEnvVar("SITE_UNDER_CONSTRUCTION")
+  return value?.toLowerCase() === "true"
 }
 
 export function getSiteUnderConstructionBypassSecret(): string | null {
-  const secret = process.env.SITE_UNDER_CONSTRUCTION_BYPASS_SECRET?.trim()
+  const secret = getRuntimeEnvVar("SITE_UNDER_CONSTRUCTION_BYPASS_SECRET")?.trim()
   return secret && secret.length > 0 ? secret : null
 }
 

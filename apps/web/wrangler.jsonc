@@ -9,6 +9,8 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "web",
+	"workers_dev": true,
+	"preview_urls": true,
 	"main": ".open-next/worker.js",
 	"compatibility_date": "2026-04-23",
 	"compatibility_flags": [
@@ -35,7 +37,14 @@
 	"observability": {
 		"enabled": true
 	},
-	"upload_source_maps": true
+	"upload_source_maps": true,
+	"routes": [
+		{
+			"pattern": "fotocorp.com",
+			"zone_name": "fotocorp.com",
+			"custom_domain": true
+		}
+  	],
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

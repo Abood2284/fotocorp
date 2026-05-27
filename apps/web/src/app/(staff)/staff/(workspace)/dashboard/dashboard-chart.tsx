@@ -44,7 +44,7 @@ export function DashboardChart({ total, approved }: { total: number; approved: n
               fontWeight: 500,
               color: "var(--color-staff-950)"
             }}
-            formatter={(value: number) => [value.toLocaleString(), "Assets"]}
+            formatter={(value) => [Number(value).toLocaleString(), "Assets"]}
           />
           <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={60}>
             {data.map((entry, index) => (

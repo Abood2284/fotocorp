@@ -1,6 +1,8 @@
 import { FIXTURE_ASSETS } from "@/lib/fixtures/assets"
 import type { AssetListItem } from "@/types"
 
+export type IngestionRunStatus = "running" | "completed" | "failed"
+
 export type AdminAssetStatus =
   | "mapped"
   | "missing-metadata"
