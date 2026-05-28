@@ -1,3 +1,4 @@
+// apps/web/src/lib/server/latency-proxy.ts
 import {
   createTimingTracker,
   formatServerTiming,
@@ -13,6 +14,7 @@ interface TracedProxyOptions {
   request: Request
   route: string
   upstreamUrl: string
+  upstreamFetch?: typeof fetch
   cacheMode?: string
   accept?: string
   upstreamRevalidateSeconds?: number
@@ -42,7 +44,7 @@ export async function tracedUpstreamProxy(options: TracedProxyOptions): Promise<
   }
 
   try {
-    upstream = await fetch(options.upstreamUrl, upstreamFetchInit)
+    upstream = await (options.upstreamFetch ?? fetch)(options.upstreamUrl, upstreamFetchInit)
     tracker.mark("upstream_fetch")
   } catch (error) {
     fetchError = serializeFetchError(error)

@@ -12,6 +12,8 @@ Update this file after every meaningful implementation change.
 
 ## Completed
 
+- **Web public API proxy service binding:** `apps/web/src/app/api/public/[...path]/route.ts` now uses the production Cloudflare `FOTOCORP_API` service binding for public BFF upstream calls while preserving local `buildApiAssetUrl()` + normal HTTP fetch behavior. `tracedUpstreamProxy()` accepts an optional upstream fetch implementation and still defaults to global `fetch`. No API Worker route aliases were added; `/api/public/assets` continues to proxy the real `/api/v1/assets` route.
+
 - **Typesense incremental sync wiring restored:** Reconnected jobs post-publish callback (`notifyTypesenseSyncAsset` + `FOTOCORP_API_BASE_URL`/`INTERNAL_API_SECRET` in jobs env), registered internal search-typesense routes in `honoApp.ts`, and restored in-process hooks for staff catalog/events, contributor events, and publish CLI scripts.
 
 - **Typesense search filter + UX fixes:** API `buildFilterBy()` now UUID-detects on both `eventId`/`event` and `categoryId`/`category` so deep links and Typesense-mode URLs filter on `event_id`/`category_id` instead of misrouting UUIDs to `event_title`/`category_name`. Web `searchAssets()` passes `eventId`/`categoryId` when values are UUIDs. Search bar submit with non-empty text clears event/category/city/date scope filters for global archive search; browser URLs keep stable `eventId`/`categoryId` param names. Expanded [`docs/db-revamp/typesense-cloudflare-access-runbook.md`](../docs/db-revamp/typesense-cloudflare-access-runbook.md) with three-layer architecture diagram and full field inventory reference.

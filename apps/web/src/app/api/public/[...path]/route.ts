@@ -1,3 +1,5 @@
+// apps/web/src/app/api/public/[...path]/route.ts
+import { getCloudflareContext } from "@opennextjs/cloudflare"
 import type { NextRequest } from "next/server"
 import { buildApiAssetUrl } from "@/lib/api/fotocorp-api"
 import { tracedUpstreamProxy } from "@/lib/server/latency-proxy"
@@ -13,6 +15,22 @@ const PUBLIC_UPSTREAM_BY_BFF_PATH: Record<string, string> = {
   "assets/filters": "/api/v1/assets/filters",
   "search/assets": "/api/v1/search/assets",
   "events/latest": "/api/v1/public/events/latest",
+}
+
+type CloudflareServiceBinding = {
+  fetch: typeof fetch
+}
+
+function getProductionApiServiceBinding(): CloudflareServiceBinding | null {
+  if (process.env.NODE_ENV !== "production") return null
+
+  try {
+    const { env } = getCloudflareContext()
+    const binding = (env as { FOTOCORP_API?: CloudflareServiceBinding }).FOTOCORP_API
+    return binding?.fetch ? binding : null
+  } catch {
+    return null
+  }
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -32,7 +50,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   const query = request.nextUrl.search
-  const upstreamUrl = buildApiAssetUrl(`${upstreamBase}${query}`)
+  const upstreamPath = `${upstreamBase}${query}`
+  const apiServiceBinding = getProductionApiServiceBinding()
+  const upstreamUrl = apiServiceBinding ? `https://fotocorp-api${upstreamPath}` : buildApiAssetUrl(upstreamPath)
+  const upstreamFetch = apiServiceBinding ? apiServiceBinding.fetch.bind(apiServiceBinding) : undefined
 
   const isAssetList = bffPath === "assets"
   const isAssetFilters = bffPath === "assets/filters"
@@ -41,6 +62,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     request,
     route: `/api/public/${bffPath}`,
     upstreamUrl,
+    upstreamFetch,
     cacheMode: isAssetList ? "revalidate-30" : isAssetFilters ? "revalidate-300" : "no-store",
     upstreamRevalidateSeconds: isAssetList ? 30 : isAssetFilters ? 300 : undefined,
     passthroughCacheControl: isAssetList || isAssetFilters,

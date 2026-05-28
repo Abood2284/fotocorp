@@ -9,8 +9,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "web",
-	"workers_dev": true,
-	"preview_urls": true,
 	"main": ".open-next/worker.js",
 	"compatibility_date": "2026-04-23",
 	"compatibility_flags": [
@@ -32,7 +30,11 @@
 			// see https://opennext.js.org/cloudflare/caching
 			"binding": "WORKER_SELF_REFERENCE",
 			"service": "web"
-		}
+		},
+		{
+			"binding": "FOTOCORP_API",
+			"service": "fotocorp-api"
+		},
 	],
 	"observability": {
 		"enabled": true
@@ -41,6 +43,11 @@
 	"routes": [
 		{
 			"pattern": "fotocorp.com",
+			"zone_name": "fotocorp.com",
+			"custom_domain": true
+		},
+		{
+			"pattern": "www.fotocorp.com",
 			"zone_name": "fotocorp.com",
 			"custom_domain": true
 		}
