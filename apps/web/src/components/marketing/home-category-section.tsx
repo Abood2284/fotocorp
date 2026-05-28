@@ -239,35 +239,35 @@ export function HomeCategorySection() {
   return (
     <section className="w-full bg-background pt-4 pb-10">
       <div className="mx-auto flex w-full flex-col items-center">
-        <div className="flex w-full flex-wrap justify-center gap-x-12 gap-y-4 pb-0 text-base font-medium text-foreground sm:gap-x-16 sm:text-[17px]">
+        <div className="flex w-full flex-wrap justify-center gap-x-12 gap-y-4 pb-0 text-xs font-bold uppercase tracking-wider text-foreground sm:gap-x-16 font-sans">
           <button
             onClick={() => handleTabClick("Editorial")}
-            className={`pb-1 transition-all ${
+            className={`pb-1.5 transition-all cursor-pointer ${
               activeTab === "Editorial"
-                ? "border-b-[3px] border-accent font-semibold text-foreground"
-                : "border-b-[3px] border-transparent text-muted-foreground hover:text-foreground"
+                ? "border-b-2 border-black text-black font-bold"
+                : "border-b-2 border-transparent text-muted-foreground hover:text-black"
             }`}
           >
             Editorial
           </button>
           <button
             disabled
-            className="cursor-not-allowed border-b-[3px] border-transparent pb-1 text-muted-foreground opacity-50"
+            className="cursor-not-allowed border-b-2 border-transparent pb-1.5 text-muted-foreground/50"
           >
             Video
           </button>
           <button
             disabled
-            className="cursor-not-allowed border-b-[3px] border-transparent pb-1 text-muted-foreground opacity-50"
+            className="cursor-not-allowed border-b-2 border-transparent pb-1.5 text-muted-foreground/50"
           >
             Caricature
           </button>
           <button
             onClick={() => handleTabClick("Creative")}
-            className={`pb-1 transition-all ${
+            className={`pb-1.5 transition-all cursor-pointer ${
               activeTab === "Creative"
-                ? "border-b-[3px] border-accent font-semibold text-foreground"
-                : "border-b-[3px] border-transparent text-muted-foreground hover:text-foreground"
+                ? "border-b-2 border-black text-black font-bold"
+                : "border-b-2 border-transparent text-muted-foreground hover:text-black"
             }`}
           >
             Creative
@@ -275,13 +275,15 @@ export function HomeCategorySection() {
         </div>
 
         {activeTab === "Editorial" && (
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-sm font-medium">
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2 font-sans text-xs font-bold uppercase tracking-wider">
             {(["Latest", "News", "Sports", "Entertainment", "Retro"] as EditorialSubcategory[]).map((sub) => (
               <button
                 key={sub}
                 onClick={() => setEditorialSub(sub)}
-                className={`rounded px-5 py-1.5 transition-colors ${
-                  editorialSub === sub ? "bg-[#555] text-background hover:bg-[#444]" : "text-foreground hover:bg-black/5"
+                className={`px-4 py-2 transition-colors cursor-pointer rounded-none border ${
+                  editorialSub === sub
+                    ? "bg-black text-white border-black"
+                    : "bg-transparent text-foreground border-border hover:bg-black/5 hover:border-black"
                 }`}
               >
                 {sub}
@@ -334,32 +336,32 @@ export function HomeCategorySection() {
                 {CREATIVE_CARDS.map((card) => (
                   <div
                     key={card.id}
-                    className="relative h-[250px] w-[90vw] max-w-[1300px] shrink-0 snap-center overflow-hidden rounded-2xl bg-muted shadow-sm sm:h-[300px] lg:h-[380px]"
+                    className="relative h-[250px] w-[90vw] max-w-[1300px] shrink-0 snap-center overflow-hidden rounded-none border border-border bg-muted sm:h-[300px] lg:h-[380px]"
                   >
                     <img src={card.image} alt={card.title} className="h-full w-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40" />
+                    <div className="absolute inset-0 bg-black/45" />
                     <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white">
                       {card.brand && (
-                        <div className="mb-1 text-sm font-semibold tracking-wider text-white sm:text-base">
+                        <div className="mb-1.5 font-sans text-xs font-bold uppercase tracking-wider text-white">
                           {card.brand}
                         </div>
                       )}
-                      <h3 className="mb-2 text-3xl font-semibold tracking-tight text-white drop-shadow-md sm:text-4xl lg:text-5xl">
+                      <h3 className="mb-2 font-heading text-3xl font-normal text-white sm:text-4xl lg:text-5xl">
                         {card.title}
                       </h3>
                       {card.subtitle && (
-                        <p className="mb-3 text-xl font-medium text-white drop-shadow-sm sm:text-2xl">
+                        <p className="mb-3 font-body font-normal text-white text-xl sm:text-2xl">
                           {card.subtitle}
                         </p>
                       )}
                       {card.description && (
-                        <p className="mb-6 max-w-2xl text-sm text-white drop-shadow-sm sm:text-base lg:text-lg">
+                        <p className="mb-6 max-w-2xl font-body font-normal text-white text-sm sm:text-base lg:text-lg">
                           {card.description}
                         </p>
                       )}
                       <Link
                         href={card.link}
-                        className="rounded bg-primary px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 sm:text-base"
+                        className="bg-white text-black border border-white font-sans uppercase text-xs tracking-wider font-bold px-6 py-3 rounded-none transition-colors hover:bg-transparent hover:text-white"
                       >
                         {card.buttonText}
                       </Link>
@@ -370,17 +372,17 @@ export function HomeCategorySection() {
 
               <button
                 onClick={scrollLeft}
-                className="absolute left-2 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/50 p-2 text-white opacity-0 backdrop-blur transition-opacity hover:bg-black/70 group-hover:opacity-100 sm:left-4 sm:block"
+                className="absolute left-2 top-1/2 hidden -translate-y-1/2 rounded-none bg-black/75 p-2.5 text-white opacity-0 transition-opacity hover:bg-black group-hover:opacity-100 sm:left-4 sm:block cursor-pointer"
                 aria-label="Scroll left"
               >
-                <ChevronLeft size={24} />
+                <ChevronLeft size={20} />
               </button>
               <button
                 onClick={scrollRight}
-                className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/50 p-2 text-white opacity-0 backdrop-blur transition-opacity hover:bg-black/70 group-hover:opacity-100 sm:right-4 sm:block"
+                className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-none bg-black/75 p-2.5 text-white opacity-0 transition-opacity hover:bg-black group-hover:opacity-100 sm:right-4 sm:block cursor-pointer"
                 aria-label="Scroll right"
               >
-                <ChevronRight size={24} />
+                <ChevronRight size={20} />
               </button>
             </div>
 
@@ -442,7 +444,7 @@ function LatestEventsPanel({
             type="button"
             onClick={onLoadMore}
             disabled={loadingMore}
-            className="rounded bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-wait disabled:opacity-70"
+            className="button-outline-square w-full max-w-xs text-xs uppercase tracking-wider cursor-pointer disabled:cursor-wait disabled:opacity-70"
           >
             {loadingMore ? "Loading more events..." : "Load more events"}
           </button>
@@ -502,7 +504,7 @@ function SectionSkeleton({ tall = false }: { tall?: boolean }) {
   return (
     <div className="grid grid-cols-2 gap-2 px-4 sm:grid-cols-3 sm:px-6 lg:grid-cols-5 lg:px-8">
       {Array.from({ length: tall ? 5 : 10 }).map((_, index) => (
-        <div key={index} className={`${heightClass} animate-pulse rounded-sm bg-muted`} />
+        <div key={index} className={`${heightClass} animate-pulse rounded-none bg-muted`} />
       ))}
     </div>
   )

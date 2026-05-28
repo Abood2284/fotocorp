@@ -4,15 +4,15 @@ import { PreviewImage } from "@/components/assets/preview-image"
 import type { PublicHomepageEvent } from "@/features/assets/types"
 
 const FALLBACK_GRADIENTS = [
-  "linear-gradient(150deg,#1a2540 0%,#263460 55%,#3a5a8c 100%)",
-  "linear-gradient(145deg,#4A2710 0%,#8C5020 50%,#C88E48 100%)",
-  "linear-gradient(140deg,#1B3C22 0%,#2D6E44 50%,#5CAC78 100%)",
-  "linear-gradient(150deg,#152744 0%,#1E497C 50%,#3A7CC0 100%)",
-  "linear-gradient(145deg,#6C0C1A 0%,#B41A2C 50%,#E4445C 100%)",
-  "linear-gradient(150deg,#181818 0%,#3a3a3a 50%,#686868 100%)",
-  "linear-gradient(145deg,#9a6108 0%,#c07c0a 50%,#e8b84a 100%)",
-  "linear-gradient(140deg,#0C3C3E 0%,#186E7A 50%,#2AAEC0 100%)",
-  "linear-gradient(155deg,#5A0E6E 0%,#9E1E98 50%,#DC5EC8 100%)",
+  "linear-gradient(150deg,#111111 0%,#2a2a2a 50%,#555555 100%)",
+  "linear-gradient(145deg,#1c1c1c 0%,#333333 50%,#666666 100%)",
+  "linear-gradient(140deg,#0f0f0f 0%,#262626 50%,#525252 100%)",
+  "linear-gradient(150deg,#1f1f1f 0%,#3d3d3d 50%,#7a7a7a 100%)",
+  "linear-gradient(145deg,#121212 0%,#2c2c2c 50%,#5a5a5a 100%)",
+  "linear-gradient(150deg,#222222 0%,#444444 50%,#888888 100%)",
+  "linear-gradient(145deg,#181818 0%,#363636 50%,#737373 100%)",
+  "linear-gradient(140deg,#1d1d1d 0%,#3a3a3a 50%,#777777 100%)",
+  "linear-gradient(155deg,#151515 0%,#313131 50%,#6e6e6e 100%)",
 ]
 
 const STRIP_SLOT_COUNT = 9
@@ -48,7 +48,7 @@ export function HeroBackdropStrip({ events }: HeroBackdropStripProps) {
                 <PreviewImage
                   src={event.previewUrl}
                   alt=""
-                  className="h-full w-full min-w-28 object-cover sm:min-w-32 md:min-w-36 lg:min-w-40"
+                  className="h-full w-full min-w-28 object-cover grayscale saturate-0 sm:min-w-32 md:min-w-36 lg:min-w-40"
                   loading={i < 3 ? "eager" : "lazy"}
                 />
               ) : (
@@ -62,8 +62,8 @@ export function HeroBackdropStrip({ events }: HeroBackdropStripProps) {
         </div>
       </div>
 
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_52%_68%_at_50%_48%,#faf8f5_0%,rgba(250,248,245,0.72)_38%,rgba(250,248,245,0.32)_64%,transparent_94%)]" />
-      <div className="absolute inset-0 bg-linear-to-b from-surface-warm/75 via-transparent to-surface-warm/75" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_52%_68%_at_50%_48%,#ffffff_0%,rgba(255,255,255,0.72)_38%,rgba(255,255,255,0.32)_64%,transparent_94%)]" />
+      <div className="absolute inset-0 bg-linear-to-b from-white/75 via-transparent to-white/75" />
     </div>
   )
 }

@@ -114,7 +114,7 @@ export function AssetDetailActions({
   }
 
   return (
-    <section className="relative space-y-6 rounded-2xl bg-surface-warm/30 p-5 sm:p-6">
+    <section className="relative space-y-6 rounded-none border border-border bg-white p-5 sm:p-6 shadow-none">
       <iframe
         ref={downloadFrameRef}
         title="Download"
@@ -130,7 +130,7 @@ export function AssetDetailActions({
         <ImageUsageHelp />
       </div>
 
-      <fieldset className="overflow-hidden rounded-md border border-border bg-background">
+      <fieldset className="overflow-hidden rounded-none border border-border bg-background">
         {sizeOptions.map((option, index) => {
           const selected = option.id === selectedOption?.id
           const isSelectable = option.selectable !== false
@@ -164,11 +164,11 @@ export function AssetDetailActions({
                   ) : null}
                 </span>
               </label>
-              {option.dimensions || option.description ? (
+              {selected && (option.dimensions || option.description) ? (
                 <div
                   className={cn(
                     "border-t border-border/80 bg-muted/30 px-4 py-2.5 pl-11 text-xs leading-relaxed text-muted-foreground",
-                    selected && isSelectable && "bg-muted/40",
+                    isSelectable && "bg-muted/40",
                   )}
                 >
                   {option.dimensions ? (
@@ -187,15 +187,15 @@ export function AssetDetailActions({
       <div className="space-y-2">
         {accessState === "profile-unavailable" ? (
           <div className="space-y-3">
-            <div className="rounded-xl border border-border bg-muted/35 p-4 text-sm leading-6 text-foreground">
+            <div className="rounded-none border border-border bg-muted/35 p-4 text-sm leading-6 text-foreground">
               <p>
                 Your account session is active, but profile access could not be loaded. Refresh or sign in again.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button type="button" variant="outline" className="h-10" onClick={() => window.location.reload()}>
+                <Button type="button" variant="outline" className="h-10 rounded-none cursor-pointer" onClick={() => window.location.reload()}>
                   Refresh
                 </Button>
-                <Button asChild variant="outline" className="h-10">
+                <Button asChild variant="outline" className="h-10 rounded-none cursor-pointer">
                   <Link href={`/sign-in?callbackUrl=${encodeURIComponent(assetHref)}`}>
                     Sign in again
                   </Link>
@@ -204,32 +204,33 @@ export function AssetDetailActions({
             </div>
             <Button
               type="button"
-              variant="accentSoft"
-              size="lg"
-              className="w-full justify-center"
+              disabled={selectedOption?.downloadAvailable === false}
+              className="w-full flex items-center justify-center gap-2 rounded-none font-sans font-bold uppercase text-xs tracking-wider h-12 bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-100 disabled:text-neutral-400 disabled:border disabled:border-border disabled:cursor-not-allowed border-0 cursor-pointer"
               onClick={handleDownloadClick}
             >
               <Download size={16} />
-              Download now
+              {selectedOption?.downloadAvailable === false ? "Download unavailable for this size" : "Download now"}
             </Button>
           </div>
         ) : (
           <Button
             type="button"
-            variant="accentSoft"
-            size="lg"
-            disabled={downloadBusy || (accessState === "subscriber" && selectedOption?.downloadAvailable === false)}
-            className="w-full justify-center"
+            disabled={downloadBusy || selectedOption?.downloadAvailable === false}
+            className="w-full flex items-center justify-center gap-2 rounded-none font-sans font-bold uppercase text-xs tracking-wider h-12 bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-100 disabled:text-neutral-400 disabled:border disabled:border-border disabled:cursor-not-allowed border-0 cursor-pointer"
             onClick={handleDownloadClick}
             aria-label={`Download ${selectedOption?.label ?? "selected"} size`}
           >
             <Download size={16} />
-            {downloadBusy ? "Starting download..." : "Download now"}
+            {downloadBusy
+              ? "Starting download..."
+              : selectedOption?.downloadAvailable === false
+                ? "Download unavailable for this size"
+                : "Download now"}
           </Button>
         )}
 
         {downloadError ? (
-          <div className="rounded-xl border border-destructive/25 bg-destructive/10 p-3 text-sm leading-6 text-foreground">
+          <div className="rounded-none border border-destructive/25 bg-destructive/10 p-3 text-sm leading-6 text-foreground">
             {downloadError}
           </div>
         ) : null}
@@ -286,12 +287,12 @@ export function AssetDetailActions({
           <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Keywords
           </h3>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 font-sans">
             {keywords.map((keyword) => (
               <Link
                 key={keyword}
                 href={`/search?q=${encodeURIComponent(keyword)}`}
-                className="rounded bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="rounded-none border border-border bg-muted/30 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 {keyword}
               </Link>
@@ -311,7 +312,7 @@ function ImageUsageHelp() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
         aria-expanded={open}
         aria-label="How you can use this image"
       >
@@ -320,7 +321,7 @@ function ImageUsageHelp() {
       {open ? (
         <div
           role="dialog"
-          className="absolute right-0 top-full z-30 mt-2 w-[min(100vw-2.5rem,22rem)] rounded-lg border border-border bg-background p-4 text-xs leading-relaxed text-muted-foreground shadow-lg sm:w-80"
+          className="absolute right-0 top-full z-30 mt-2 w-[min(100vw-2.5rem,22rem)] rounded-none border border-border-strong bg-background p-4 text-xs leading-relaxed text-muted-foreground shadow-sm sm:w-80"
         >
           <p className="font-semibold text-foreground">Common uses include:</p>
           <p className="mt-1.5">

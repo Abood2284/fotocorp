@@ -32,7 +32,7 @@ import {
 
 /** Matches homepage hero (`--surface-warm` / #faf8f5) */
 const HEADER_SHELL_CLASS =
-  "relative z-50 w-full bg-[#faf8f5] text-foreground"
+  "relative z-50 w-full bg-white text-foreground"
 
 export type HeaderUserProfile = {
   email: string
@@ -166,7 +166,7 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
       <div
         id="mobile-nav-panel"
         className={cn(
-          "overflow-hidden border-t border-[#ede9e0] bg-[#faf8f5] transition-all duration-200 lg:hidden",
+          "overflow-hidden border-t border-[#ede9e0] bg-white transition-all duration-200 lg:hidden",
           mobileOpen
             ? "max-h-[calc(100vh-4rem)] overflow-y-auto opacity-100"
             : "pointer-events-none max-h-0 opacity-0",

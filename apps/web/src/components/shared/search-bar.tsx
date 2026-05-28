@@ -85,8 +85,8 @@ export function SearchBar({
       {showTypeSelect && (
         <div
           className={cn(
-            "relative z-50 flex shrink-0 items-center",
-            isCompact ? "py-1.5 pl-2" : "py-2 pl-2",
+            "relative z-50 flex shrink-0 items-center px-2",
+            isCompact ? "py-1.5" : "py-2",
             isSharp && "border-r border-border",
           )}
           ref={dropdownRef}
@@ -95,9 +95,9 @@ export function SearchBar({
             type="button"
             onClick={() => setIsTypeSelectOpen(!isTypeSelectOpen)}
             className={cn(
-              "flex items-center font-medium text-foreground outline-none transition-colors",
+              "flex items-center font-medium text-foreground outline-none transition-colors cursor-pointer",
               isSharp
-                ? "rounded-sm border border-border bg-muted/50 hover:bg-muted"
+                ? "rounded-none border border-border bg-muted/50 hover:bg-muted"
                 : "rounded-full bg-[#E5E7EB] hover:bg-[#D1D5DB]",
               isCompact
                 ? "gap-1.5 px-3 py-1.5 text-sm"
@@ -118,7 +118,7 @@ export function SearchBar({
               role="listbox"
               className={cn(
                 "absolute left-2 z-50 w-40 overflow-hidden bg-background p-2 shadow-lg border border-border",
-                isSharp ? "rounded-sm" : "rounded-xl border-border/40",
+                isSharp ? "rounded-none" : "rounded-xl border-border/40",
                 typeSelectMenuPlacement === "above"
                   ? "bottom-[calc(100%+8px)]"
                   : "top-[calc(100%+8px)]",
@@ -127,8 +127,8 @@ export function SearchBar({
               <button
                 type="button"
                 className={cn(
-                  "flex w-full items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted",
-                  isSharp ? "rounded-sm" : "rounded-lg",
+                  "flex w-full items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted cursor-pointer",
+                  isSharp ? "rounded-none" : "rounded-lg",
                 )}
                 onClick={() => {
                   setSelectedType("photos")
@@ -141,8 +141,8 @@ export function SearchBar({
               <button
                 type="button"
                 className={cn(
-                  "flex w-full items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted",
-                  isSharp ? "rounded-sm" : "rounded-lg",
+                  "flex w-full items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted cursor-pointer",
+                  isSharp ? "rounded-none" : "rounded-lg",
                 )}
                 onClick={() => {
                   setSelectedType("videos")

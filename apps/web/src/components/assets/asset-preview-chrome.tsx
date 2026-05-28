@@ -31,7 +31,48 @@ export function AssetPreviewChrome({
   const peopleLabel = whoIsInPicture?.trim()
 
   return (
-    <div className="flex h-full w-full max-w-full flex-col gap-3 bg-background lg:gap-4">
+    <div className="flex h-full w-full max-w-full flex-col gap-4 bg-background">
+      <div
+        className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border pb-3 px-1 sm:px-0"
+        aria-label="Image actions"
+      >
+        {peopleLabel ? (
+          <div className="flex min-w-0 flex-1 items-start gap-2.5">
+            <span
+              className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-none bg-foreground/5 border border-border text-foreground/70"
+              aria-hidden
+            >
+              <CircleHelp size={15} />
+            </span>
+            <div className="min-w-0">
+              <p className="font-sans text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Who is in picture
+              </p>
+              <p className="mt-0.5 font-sans text-sm font-medium leading-snug text-foreground">{peopleLabel}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="min-w-0 flex-1" />
+        )}
+
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3 font-sans">
+          <span className="rounded-none border border-border bg-muted/30 px-2.5 py-1.5 font-mono text-xs font-medium text-foreground/80">
+            {fotokey ?? "Unavailable"}
+          </span>
+          <span className="hidden h-6 w-px bg-border/80 sm:block" aria-hidden />
+          <FotoboxSaveButton
+            assetId={assetId}
+            stub
+            variant="ghost"
+            className="m-0 shrink-0"
+            buttonClassName="h-9 gap-1.5 rounded-none border border-black bg-black px-4 text-xs font-bold uppercase tracking-wider text-white shadow-none hover:bg-neutral-800 cursor-pointer"
+            icon={<Plus strokeWidth={2.5} size={14} />}
+            text="Save"
+            hoverLabel="Save as"
+          />
+        </div>
+      </div>
+
       <div
         className="flex min-h-[55vh] w-full max-h-[78vh] flex-1 items-center justify-center bg-background sm:min-h-[58vh] lg:min-h-0 lg:max-h-none"
       >
@@ -46,46 +87,6 @@ export function AssetPreviewChrome({
           )}
           loading={loading}
         />
-      </div>
-      <div
-        className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1 sm:px-0"
-        aria-label="Image actions"
-      >
-        {peopleLabel ? (
-          <div className="flex min-w-0 flex-1 items-start gap-2.5">
-            <span
-              className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-foreground/8 text-foreground/70"
-              aria-hidden
-            >
-              <CircleHelp size={16} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Who is in picture
-              </p>
-              <p className="mt-0.5 text-sm font-medium leading-snug text-foreground">{peopleLabel}</p>
-            </div>
-          </div>
-        ) : (
-          <div className="min-w-0 flex-1" />
-        )}
-
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
-          <span className="rounded-md bg-foreground/6 px-2.5 py-1.5 font-mono text-xs font-medium text-foreground/85">
-            {fotokey ?? "Unavailable"}
-          </span>
-          <span className="hidden h-6 w-px bg-border/80 sm:block" aria-hidden />
-          <FotoboxSaveButton
-            assetId={assetId}
-            stub
-            variant="ghost"
-            className="m-0 shrink-0"
-            buttonClassName="h-9 gap-1.5 rounded-md border-0 bg-neutral-800 px-4 text-sm font-medium text-white shadow-sm hover:bg-neutral-900 hover:text-white"
-            icon={<Plus  strokeWidth={2.5} size={16} />}
-            text="Save"
-            hoverLabel="Save as"
-          />
-        </div>
       </div>
       {peopleLabel ? (
         <span className="sr-only">Who is in this picture: {peopleLabel}</span>

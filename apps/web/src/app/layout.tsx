@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import { AppProviders } from "@/components/providers/app-providers"
-import { monumentGrotesk, playfairDisplay } from "@/lib/font"
+import { monumentGrotesk, playfairDisplay, lora } from "@/lib/font"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${monumentGrotesk.variable} ${playfairDisplay.variable}`}
+      className={`${monumentGrotesk.variable} ${playfairDisplay.variable} ${lora.variable}`}
     >
       <head>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />

@@ -27,24 +27,23 @@ const SIZE_OPTIONS: AssetSizeOption[] = [
     label: "Low",
     dimensions: "1200 px max edge • 72 dpi",
     description: "Best for web and screen preview",
-    selectable: false,
+    selectable: true,
     downloadAvailable: false,
-    disabledReason: "Coming soon",
   },
   {
     id: "medium",
     label: "Medium",
     dimensions: "2400 px max edge • 300 dpi",
     description: "Best for editorial and digital publishing",
-    selectable: false,
+    selectable: true,
     downloadAvailable: false,
-    disabledReason: "Coming soon",
   },
   {
     id: "large",
     label: "High",
     dimensions: "Maximum available resolution • 300 dpi",
     description: "Best for print and archive delivery",
+    selectable: true,
     downloadAvailable: true,
   },
 ]
@@ -115,7 +114,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             </span>
             <button
               type="submit"
-              className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+              className="button-primary-square inline-flex h-9 items-center justify-center px-5 text-xs font-bold uppercase tracking-wider cursor-pointer"
             >
               Search
             </button>
@@ -152,12 +151,12 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             {(primaryTitle || caption) && (
               <header className="shrink-0 space-y-3">
                 {primaryTitle && (
-                  <h1 className="max-w-5xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl lg:text-[2.45rem] lg:leading-[1.08]">
+                  <h1 className="fc-heading-1 max-w-5xl font-normal tracking-tight text-foreground sm:text-3xl lg:text-[2.45rem] lg:leading-[1.08]">
                     {primaryTitle}
                   </h1>
                 )}
                 {caption && (
-                  <p className="max-w-5xl text-sm leading-6 text-muted-foreground sm:text-base">
+                  <p className="fc-body-serif-md max-w-5xl text-muted-foreground">
                     {caption}
                   </p>
                 )}
@@ -232,7 +231,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               <PublicAssetGrid assets={relatedAssets} limit={12} />
             </div>
           ) : (
-            <div className="mt-6 rounded-xl bg-muted/20 p-8 text-center text-sm text-muted-foreground">
+            <div className="mt-6 rounded-none border border-border bg-muted/20 p-8 text-center text-sm text-muted-foreground">
               Related previews are not available right now. Use archive search to keep browsing.
             </div>
           )}
