@@ -121,6 +121,7 @@ export function SearchExperience({
   const nextCursor = displayResult.nextCursor
   const hasMore = displayResult.hasMore ?? Boolean(nextCursor)
   const viewMode = initialParams.view ?? "grid"
+  const resultEvent = deriveSelectedEventFromItems(initialParams.eventId, items)
   const eventFilterCount = filters.events.find((item) => item.id === initialParams.eventId)?.assetCount
   const totalCount = displayResult.totalCount ?? eventFilterCount ?? items.length
   const isPagePagination = paginationMode === "page"
@@ -161,13 +162,19 @@ export function SearchExperience({
   }, [searchCacheKey])
 
   const categoryName = filters.categories.find((item) => item.id === initialParams.categoryId)?.name
-  const eventName = selectedEvent?.name
+  const eventName = resultEvent?.name
+    ?? selectedEvent?.name
     ?? filters.events.find((item) => item.id === initialParams.eventId)?.name
     ?? undefined
   const cityName = filters.cities?.find((item) => item.id === initialParams.city)?.name ?? initialParams.city
   const activeEventCount = initialParams.eventId ? 1 : filtersLoading ? 0 : filters.events.length
   const topCategories = filters.categories.slice(0, 5)
-  const eventChipLabel = eventName ?? (initialParams.eventId && (filtersLoading || isFetching) ? "Loading event…" : undefined)
+  const eventChipLabel = eventName
+    ?? (initialParams.eventId
+      ? filtersLoading || isFetching
+        ? "Loading event…"
+        : "Selected event"
+      : undefined)
   const effectiveHasLoadError = hasLoadError || Boolean(searchError)
 
   const filterChips = useMemo(() => {
@@ -905,6 +912,22 @@ function buildSearchQueryParams(
     page: paginationMode === "page" ? params.page ?? 1 : undefined,
     view: params.view ?? "grid",
     paginationMode: paginationMode ?? "cursor",
+  }
+}
+
+function deriveSelectedEventFromItems(
+  eventId: string | undefined,
+  items: PublicAsset[],
+): SearchSelectedEvent | null {
+  if (!eventId) return null
+
+  const event = items.find((item) => item.event?.id === eventId)?.event
+  if (!event) return null
+
+  return {
+    id: event.id,
+    name: event.name,
+    eventDate: event.eventDate,
   }
 }
 

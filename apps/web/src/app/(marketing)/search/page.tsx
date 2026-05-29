@@ -1,5 +1,6 @@
 import { SearchExperience } from "@/components/search/search-experience"
 import { SearchFiltersProvider } from "@/components/search/search-filters-context"
+import { searchPublicAssets } from "@/lib/api/fotocorp-api"
 import type { PublicAssetListResponse, PublicAssetSort } from "@/features/assets/types"
 import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 
@@ -50,7 +51,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     view,
   }
 
-  const initialResult: PublicAssetListResponse = { items: [], nextCursor: null }
+  const { result: initialResult, hasLoadError } = await loadInitialSearchResult(initialParams)
 
   const selectedEvent = deriveSelectedEvent(initialParams.eventId, initialResult.items)
 
@@ -61,10 +62,48 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         initialParams={initialParams}
         initialResult={initialResult}
         selectedEvent={selectedEvent}
+        hasLoadError={hasLoadError}
         paginationMode="page"
       />
     </SearchFiltersProvider>
   )
+}
+
+async function loadInitialSearchResult(
+  params: {
+    q?: string
+    categoryId?: string
+    eventId?: string
+    city?: string
+    contributorId?: string
+    year?: number
+    month?: number
+    sort: PublicAssetSort
+    page?: number
+  },
+): Promise<{ result: PublicAssetListResponse; hasLoadError: boolean }> {
+  try {
+    return {
+      result: await searchPublicAssets({
+        q: params.q,
+        categoryId: params.categoryId,
+        eventId: params.eventId,
+        city: params.city,
+        contributorId: params.contributorId,
+        year: params.year,
+        month: params.month,
+        sort: params.sort,
+        page: params.page,
+        limit: 50,
+      }),
+      hasLoadError: false,
+    }
+  } catch {
+    return {
+      result: { items: [], nextCursor: null },
+      hasLoadError: true,
+    }
+  }
 }
 
 function deriveSelectedEvent(

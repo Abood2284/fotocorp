@@ -49,12 +49,13 @@ export function hasFotocorpApiBaseUrl() {
 }
 
 export function buildApiAssetUrl(path: string) {
+  if (/^https?:\/\//i.test(path)) return path
+
   const apiBaseUrl = getPublicApiBaseUrl()
   if (!apiBaseUrl) {
     throw new FotocorpApiError("Fotocorp API base URL is not configured.", 500, "API_BASE_URL_MISSING")
   }
 
-  if (/^https?:\/\//i.test(path)) return path
   const normalizedPath = path.startsWith("/") ? path : `/${path}`
   return `${apiBaseUrl}${normalizedPath}`
 }
