@@ -3,6 +3,7 @@
 
 import Link from "next/link"
 
+import { useQueryClient } from "@tanstack/react-query"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { Suspense } from "react"
@@ -10,6 +11,7 @@ import { Suspense } from "react"
 import { FotocorpLogoLink } from "@/components/layout/fotocorp-logo-link"
 import { buttonVariants } from "@/components/ui/button"
 import { authClient } from "@/lib/auth-client"
+import { SHARED_AUTH_SESSION_QUERY_KEY, useSharedAuthSession } from "@/lib/use-shared-auth-session"
 import { cn } from "@/lib/utils"
 import {
   Archive,
@@ -429,7 +431,8 @@ function AccountMenu({
   staffBrief?: StaffBrief | null
 }) {
   const router = useRouter()
-  const { data: session, isPending } = authClient.useSession()
+  const queryClient = useQueryClient()
+  const { data: session, isPending } = useSharedAuthSession()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const user = session?.user
@@ -455,6 +458,7 @@ function AccountMenu({
 
   async function handleSignOut() {
     await authClient.signOut()
+    queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, null)
     setOpen(false)
     router.push("/sign-in")
     router.refresh()
@@ -676,11 +680,13 @@ function MobileAccountMenu({
   staffBrief?: StaffBrief | null
 }) {
   const router = useRouter()
-  const { data: session, isPending } = authClient.useSession()
+  const queryClient = useQueryClient()
+  const { data: session, isPending } = useSharedAuthSession()
   const user = session?.user
 
   async function handleSignOut() {
     await authClient.signOut()
+    queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, null)
     router.push("/sign-in")
     router.refresh()
   }

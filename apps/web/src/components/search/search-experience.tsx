@@ -1,10 +1,12 @@
 "use client"
 
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { useRouter } from "next/navigation"
 import type React from "react"
 import { useEffect, useMemo, useState, useTransition } from "react"
 
 import type {
+  PublicAsset,
   PublicAssetFiltersResponse,
   PublicAssetListResponse,
   PublicAssetSort,
@@ -19,6 +21,7 @@ import {
 import { useSearchFilters } from "@/components/search/search-filters-context"
 import { Button } from "@/components/ui/button"
 import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
+import { searchPublicAssets } from "@/lib/api/fotocorp-api"
 import { cn, formatInteger } from "@/lib/utils"
 import {  Calendars, ChevronDown, ChevronLeft, ChevronRight, Images, Rows, SlidersHorizontal, X, Grid3x3, SearchIcon, ListFilterIcon  } from "lucide-react"
 
@@ -77,16 +80,49 @@ export function SearchExperience({
   paginationMode = "cursor",
 }: SearchExperienceProps) {
   const router = useRouter()
-  const { filters, isLoading: filtersLoading } = useSearchFilters()
+  const { filters, isLoading: filtersLoading, mergeFilters } = useSearchFilters()
   const [isPending, startTransition] = useTransition()
   const [showFilters, setShowFilters] = useState(false)
   const [queryDraft, setQueryDraft] = useState(initialParams.q ?? "")
-  const items = initialResult.items
-  const nextCursor = initialResult.nextCursor
-  const hasMore = initialResult.hasMore ?? Boolean(nextCursor)
+  const searchQueryParams = useMemo(
+    () => buildSearchQueryParams(initialParams, paginationMode),
+    [initialParams, paginationMode],
+  )
+  const searchCacheKey = useMemo(
+    () => `fotocorp:search:v2:${JSON.stringify(searchQueryParams)}`,
+    [searchQueryParams],
+  )
+  const {
+    data: displayResult = initialResult,
+    error: searchError,
+    isFetching,
+  } = useQuery({
+    queryKey: ["public-search-assets", searchQueryParams],
+    queryFn: () => searchPublicAssets({
+      q: searchQueryParams.q,
+      categoryId: searchQueryParams.categoryId,
+      eventId: searchQueryParams.eventId,
+      city: searchQueryParams.city,
+      contributorId: searchQueryParams.contributorId,
+      year: searchQueryParams.year,
+      month: searchQueryParams.month,
+      cursor: searchQueryParams.cursor,
+      sort: searchQueryParams.sort,
+      page: searchQueryParams.page,
+      limit: PAGE_SIZE,
+    }),
+    initialData: initialResult.items.length > 0 ? initialResult : undefined,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+  })
+  const items = displayResult.items
+  const nextCursor = displayResult.nextCursor
+  const hasMore = displayResult.hasMore ?? Boolean(nextCursor)
   const viewMode = initialParams.view ?? "grid"
   const eventFilterCount = filters.events.find((item) => item.id === initialParams.eventId)?.assetCount
-  const totalCount = initialResult.totalCount ?? eventFilterCount ?? items.length
+  const totalCount = displayResult.totalCount ?? eventFilterCount ?? items.length
   const isPagePagination = paginationMode === "page"
 
   const [history, setHistory] = useState<(string | undefined)[]>([undefined])
@@ -100,6 +136,30 @@ export function SearchExperience({
     setQueryDraft(initialParams.q ?? "")
   }, [initialParams.q])
 
+  useEffect(() => {
+    if (displayResult.filters) mergeFilters(displayResult.filters)
+  }, [displayResult.filters, mergeFilters])
+
+  useEffect(() => {
+    const scrollKey = buildSearchScrollKey(searchCacheKey)
+    const raw = window.sessionStorage.getItem(scrollKey)
+    if (!raw) return
+    const y = Number(raw)
+    if (!Number.isFinite(y) || y <= 0) return
+    requestAnimationFrame(() => window.scrollTo({ top: y }))
+  }, [searchCacheKey])
+
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      const link = (event.target as Element | null)?.closest?.("a[href^='/assets/']")
+      if (!link) return
+      window.sessionStorage.setItem(buildSearchScrollKey(searchCacheKey), String(window.scrollY))
+    }
+
+    document.addEventListener("click", handleClick, { capture: true })
+    return () => document.removeEventListener("click", handleClick, { capture: true })
+  }, [searchCacheKey])
+
   const categoryName = filters.categories.find((item) => item.id === initialParams.categoryId)?.name
   const eventName = selectedEvent?.name
     ?? filters.events.find((item) => item.id === initialParams.eventId)?.name
@@ -107,7 +167,8 @@ export function SearchExperience({
   const cityName = filters.cities?.find((item) => item.id === initialParams.city)?.name ?? initialParams.city
   const activeEventCount = initialParams.eventId ? 1 : filtersLoading ? 0 : filters.events.length
   const topCategories = filters.categories.slice(0, 5)
-  const eventChipLabel = eventName ?? (initialParams.eventId && filtersLoading ? "Loading event…" : undefined)
+  const eventChipLabel = eventName ?? (initialParams.eventId && (filtersLoading || isFetching) ? "Loading event…" : undefined)
+  const effectiveHasLoadError = hasLoadError || Boolean(searchError)
 
   const filterChips = useMemo(() => {
     const chips: Array<{ key: string; label: string; remove: () => void }> = []
@@ -228,10 +289,10 @@ export function SearchExperience({
 
   const currentIndex = history.indexOf(initialParams.cursor)
   const displayPage = isPagePagination
-    ? (initialResult.page ?? initialParams.page ?? 1)
+    ? (displayResult.page ?? initialParams.page ?? 1)
     : currentIndex !== -1 ? currentIndex + 1 : (initialParams.cursor ? 2 : 1)
-  const exactTotalCount = initialResult.totalCount ?? eventFilterCount
-  const totalPages = initialResult.totalPages ?? (exactTotalCount !== undefined
+  const exactTotalCount = displayResult.totalCount ?? eventFilterCount
+  const totalPages = displayResult.totalPages ?? (exactTotalCount !== undefined
     ? Math.max(1, Math.ceil(exactTotalCount / PAGE_SIZE))
     : Math.max(displayPage, hasMore ? displayPage + 1 : displayPage))
   const currentPage = Math.min(displayPage, totalPages)
@@ -279,7 +340,7 @@ export function SearchExperience({
                 <X size={24} />
               </button>
             )}
-            <Button type="submit" className="m-3 h-12 rounded-none px-5" disabled={isPending} aria-busy={isPending}>
+            <Button type="submit" className="m-3 h-12 rounded-none px-5" disabled={isPending} aria-busy={isPending || isFetching}>
               {isPending ? "Searching…" : "Search"}
             </Button>
           </div>
@@ -358,7 +419,7 @@ export function SearchExperience({
           )}
 
           <main className="relative min-w-0">
-            {isPending && (
+            {(isPending || (isFetching && items.length > 0)) && (
               <div
                 className="pointer-events-none absolute inset-0 z-10 bg-background/35"
                 aria-hidden="true"
@@ -367,7 +428,12 @@ export function SearchExperience({
             {items.length > 0 ? (
               <>
                 {viewMode === "grid" ? (
-                  <PublicAssetGrid assets={items} limit={items.length} priorityCount={8} />
+                  <PublicAssetGrid
+                    assets={items}
+                    limit={items.length}
+                    priorityCount={8}
+                    detailHrefForAsset={(asset) => buildSearchAssetHref(asset, initialParams)}
+                  />
                 ) : (
                   <div className="grid grid-cols-1 border-l border-t border-border bg-background sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                     {items.map((asset, index) => (
@@ -376,6 +442,7 @@ export function SearchExperience({
                         asset={asset}
                         variant="card"
                         priority={index < 8}
+                        detailHref={buildSearchAssetHref(asset, initialParams)}
                       />
                     ))}
                   </div>
@@ -391,12 +458,14 @@ export function SearchExperience({
                   onNext={goToNext}
                 />
               </>
+            ) : isFetching ? (
+              <SearchGridSkeleton />
             ) : (
               <div className="border border-border bg-background py-16">
                 <EmptyState
                   icon={Images}
                   title="No matching images found."
-                  description={hasLoadError
+                  description={effectiveHasLoadError
                     ? "Search is temporarily unavailable. Try again in a moment."
                     : hasActiveFilters ? "Try a broader search or remove a few filters." : "Try a different search term."}
                   action={{ label: "View latest", href: "/search" }}
@@ -406,6 +475,16 @@ export function SearchExperience({
           </main>
         </div>
       </section>
+    </div>
+  )
+}
+
+function SearchGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 border-l border-t border-border bg-background sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+      {Array.from({ length: 15 }).map((_, index) => (
+        <div key={index} className="aspect-[4/5] animate-pulse border-b border-r border-border bg-muted" />
+      ))}
     </div>
   )
 }
@@ -789,4 +868,46 @@ function formatShortDate(value: string | null | undefined) {
 function yearOptions() {
   const current = new Date().getFullYear()
   return Array.from({ length: 12 }, (_, index) => current - index)
+}
+
+function buildSearchAssetHref(asset: PublicAsset, params: SearchExperienceProps["initialParams"]) {
+  const searchParams = new URLSearchParams()
+  if (params.q) searchParams.set("q", params.q)
+  if (params.categoryId) searchParams.set("categoryId", params.categoryId)
+  if (params.eventId) searchParams.set("eventId", params.eventId)
+  if (params.city) searchParams.set("city", params.city)
+  if (params.contributorId) searchParams.set("contributorId", params.contributorId)
+  if (params.year) searchParams.set("year", String(params.year))
+  if (params.month) searchParams.set("month", String(params.month))
+  if (params.sort && params.sort !== "newest") searchParams.set("sort", params.sort)
+  if (params.page && params.page > 1) searchParams.set("page", String(params.page))
+  if (params.cursor) searchParams.set("cursor", params.cursor)
+  if (params.view === "card") searchParams.set("view", "card")
+
+  const query = searchParams.toString()
+  return query ? `/assets/${asset.id}?${query}` : `/assets/${asset.id}`
+}
+
+function buildSearchQueryParams(
+  params: SearchExperienceProps["initialParams"],
+  paginationMode: SearchExperienceProps["paginationMode"],
+) {
+  return {
+    q: params.q,
+    categoryId: params.categoryId,
+    eventId: params.eventId,
+    city: params.city,
+    contributorId: params.contributorId,
+    year: params.year,
+    month: params.month,
+    sort: params.sort,
+    cursor: paginationMode === "cursor" ? params.cursor : undefined,
+    page: paginationMode === "page" ? params.page ?? 1 : undefined,
+    view: params.view ?? "grid",
+    paginationMode: paginationMode ?? "cursor",
+  }
+}
+
+function buildSearchScrollKey(searchCacheKey: string) {
+  return `${searchCacheKey}:scrollY`
 }

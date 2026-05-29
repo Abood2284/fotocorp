@@ -7,6 +7,7 @@ import {
   getPublicHomepageFeed,
   parseLatestEventsQuery,
 } from "../../lib/assets/public-homepage"
+import { listPublicCreativeFeaturedAssets, parsePreviewTtl } from "../../lib/assets/public-assets"
 import { AppError } from "../../lib/errors"
 import {
   createTimingTracker,
@@ -22,6 +23,9 @@ export const publicHomepageRoutes = new Hono<{ Bindings: Env; Variables: AppRequ
 
 export const PUBLIC_HOMEPAGE_FEED_CACHE_CONTROL =
   "public, max-age=60, s-maxage=300, stale-while-revalidate=3600"
+
+export const PUBLIC_CREATIVE_FEATURED_CACHE_CONTROL =
+  "public, max-age=86400, s-maxage=2592000, stale-while-revalidate=604800"
 
 publicHomepageRoutes.get("/api/v1/public/homepage", async (c) => {
   const startedAt = Date.now()
@@ -79,6 +83,7 @@ publicHomepageRoutes.get("/api/v1/public/events/latest", async (c) => {
     windowDays: searchParams.get("windowDays"),
     limit: searchParams.get("limit"),
     cursor: searchParams.get("cursor"),
+    section: searchParams.get("section"),
   }
 
   try {
@@ -164,5 +169,62 @@ publicHomepageRoutes.get("/api/v1/public/events/latest", async (c) => {
   }
 })
 
+publicHomepageRoutes.get("/api/v1/public/creative/featured", async (c) => {
+  const startedAt = Date.now()
+  const route = "/api/v1/public/creative/featured"
+
+  try {
+    if (!c.env.DATABASE_URL) {
+      throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
+    }
+
+    const cdn = parsePublicPreviewCdnConfig(c.env)
+    const response = await listPublicCreativeFeaturedAssets(
+      createHttpDb(c.env.DATABASE_URL),
+      { limit: c.req.query("limit") },
+      c.env.MEDIA_PREVIEW_TOKEN_SECRET,
+      parsePreviewTtl(c.env.MEDIA_PREVIEW_TOKEN_TTL_SECONDS),
+      cdn,
+    )
+    const durationMs = Date.now() - startedAt
+
+    console.info(
+      JSON.stringify({
+        event: "public_creative_featured_request",
+        route,
+        durationMs,
+        status: "ok",
+        itemCount: response.items.length,
+        cacheControl: PUBLIC_CREATIVE_FEATURED_CACHE_CONTROL,
+      }),
+    )
+
+    return json(response, 200, {
+      headers: {
+        "Cache-Control": PUBLIC_CREATIVE_FEATURED_CACHE_CONTROL,
+        "X-Content-Type-Options": "nosniff",
+      },
+    })
+  } catch (error) {
+    const durationMs = Date.now() - startedAt
+    const serialized = error instanceof Error
+      ? { name: error.name, message: error.message }
+      : { name: "UnknownError", message: String(error) }
+
+    console.error(
+      JSON.stringify({
+        event: "public_creative_featured_request",
+        route,
+        durationMs,
+        status: "error",
+        error: serialized,
+      }),
+    )
+
+    throw error
+  }
+})
+
 publicHomepageRoutes.all("/api/v1/public/homepage", () => methodNotAllowed())
 publicHomepageRoutes.all("/api/v1/public/events/latest", () => methodNotAllowed())
+publicHomepageRoutes.all("/api/v1/public/creative/featured", () => methodNotAllowed())

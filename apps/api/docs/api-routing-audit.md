@@ -5,6 +5,16 @@
 - [DB revamp docs (README)](../../docs/db-revamp/README.md) — catalog/photographer DB revamp entry point, runbooks, and historical PR reports under `reports/`.
 - [Media pipeline operations (temporary)](../../docs/db-revamp/media-pipeline-operations.md) — one-time derivative migration status and generation commands.
 - [Typesense public search API report](../../docs/db-revamp/reports/typesense-public-search-api-report.md) — parallel public search route, BFF path, Typesense env, request mapping, and production access caveat.
+- [Public route cache audit](../../docs/db-revamp/reports/public-route-cache-audit.md) — public route caller inventory, cache behavior, search back-navigation behavior, and verification commands.
+
+## Incremental update (2026-05-29)
+
+- `GET /api/v1/search/assets` remains owned by `apps/api/src/routes/public/catalog-routes.ts` and now returns `Cache-Control: public, max-age=30, s-maxage=120, stale-while-revalidate=300` for anonymous public Typesense results.
+- `GET /api/v1/assets/:assetId` remains owned by `apps/api/src/routes/public/catalog-routes.ts` and now returns `Cache-Control: public, max-age=300, s-maxage=2592000, stale-while-revalidate=604800` for public metadata.
+- Web BFF `GET`/`HEAD` `/api/public/events/latest`, `/api/public/search/assets`, and `/api/public/assets/:assetId` remain owned by `apps/web/src/app/api/public/[...path]/route.ts`; these public paths explicitly preserve/set public cache headers instead of falling back to `private, no-store`.
+- `GET /api/v1/public/events/latest` now accepts `section=latest|news|sports|entertainment|retro` while staying projection-backed by `public_event_feed_items`.
+- `GET /api/v1/public/creative/featured` is owned by `apps/api/src/routes/public/homepage-routes.ts`; it reads current-month rows from `public_creative_featured_items` and returns public featured assets with `Cache-Control: public, max-age=86400, s-maxage=2592000, stale-while-revalidate=604800`. Populate with `pnpm --dir apps/api creative:refresh-featured -- --period YYYY-MM --limit 50`.
+- Public marketing layout no longer probes `/api/v1/staff/auth/me`; staff auth remains required under `/staff/*`.
 
 ## Incremental update (2026-05-20)
 
@@ -78,8 +88,8 @@ This makes route behavior hard to reason about and slows root-cause analysis whe
 | `GET` | `/api/v1/assets/collections` | `publicAssetCollectionsRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed collections. PR-16I: same resolved category for grouping/preview pick. |
 | `GET` | `/api/v1/assets/:id` | `publicAssetDetailRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public asset detail. PR-16I: same `fotokey` + category rules as list. |
 | `GET` | `/api/v1/search/assets` | `searchTypesensePublicAssets` | `apps/api/src/routes/public/catalog-routes.ts` + `apps/api/src/lib/search/typesense-public-assets.ts` | Parallel Typesense-backed public search/facet/count endpoint. Searches `event_title`, `caption`, `who_is_in_picture`, `people`, `keywords`, `category_name`, and `fotokey`; does not search `title`. Supports page pagination and category/event/city name filters for the feature-flagged `/search` cutover. Does not replace `/api/v1/assets` or `/api/v1/assets/filters`. |
-| `GET` | `/api/v1/public/homepage` | `getPublicHomepageFeed` | `apps/api/src/routes/public/homepage-routes.ts` | Lightweight homepage feed: first-page latest-events preview only, ordered by `created_at`; no newest/editorial asset slices. |
-| `GET` | `/api/v1/public/events/latest` | `listPublicLatestEvents` | `apps/api/src/routes/public/homepage-routes.ts` | Cursor-paginated Latest Events from `public_event_feed_items` projection (`windowDays`, `limit`, optional cursor). Card `previewUrl` uses `PUBLIC_PREVIEW_CDN_BASE_URL` + derivative `storage_key` when configured; otherwise stable `/api/media/assets/:id/preview/card` fallback. |
+| `GET` | `/api/v1/public/homepage` | `getPublicHomepageFeed` | `apps/api/src/routes/public/homepage-routes.ts` | Lightweight homepage feed: first-page latest-events preview only, ordered by `event_date`; no newest/editorial asset slices. |
+| `GET` | `/api/v1/public/events/latest` | `listPublicLatestEvents` | `apps/api/src/routes/public/homepage-routes.ts` | Cursor-paginated Latest Events from `public_event_feed_items` projection (`windowDays`, `limit`, optional cursor), filtered and ordered by `event_date desc, event_id desc`. Card `previewUrl` uses `PUBLIC_PREVIEW_CDN_BASE_URL` + derivative `storage_key` when configured; otherwise stable `/api/media/assets/:id/preview/card` fallback. |
 
 ### Public Media Routes
 

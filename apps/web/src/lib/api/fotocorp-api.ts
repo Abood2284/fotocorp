@@ -9,6 +9,7 @@ import type {
   PublicHomepageFeed,
   PublicHomepageFeedResult,
   PublicLatestEventsResponse,
+  PublicLatestEventsSection,
 } from "@/features/assets/types"
 import {
   createTimingTracker,
@@ -91,7 +92,10 @@ export async function listPublicAssets(params: PublicAssetListParams = {}): Prom
 
 export async function searchAssets(params: PublicAssetListParams = {}): Promise<PublicAssetListResponse> {
   if (!isTypesenseSearchEnabled()) return listPublicAssets(params)
+  return searchPublicAssets(params)
+}
 
+export async function searchPublicAssets(params: PublicAssetListParams = {}): Promise<PublicAssetListResponse> {
   const searchParams = new URLSearchParams()
   appendParam(searchParams, "q", params.q)
   appendTypesenseScopeParam(searchParams, "categoryId", "category", params.categoryId, params.category)
@@ -108,7 +112,7 @@ export async function searchAssets(params: PublicAssetListParams = {}): Promise<
   const response = await getJson<TypesenseSearchResponse>(
     `${resolveSearchAssetsPath()}${query ? `?${query}` : ""}`,
     {
-      cachePolicy: "default",
+      cachePolicy: "public-search-short",
       traceRoute: "/api/public/search/assets",
       layer: typeof window === "undefined" ? "web" : "browser",
     },
@@ -125,7 +129,9 @@ export function isTypesenseSearchEnabled() {
 }
 
 export async function getPublicAsset(assetId: string): Promise<PublicAssetDetailResponse> {
-  const response = await getJson<PublicAssetDetailResponse>(`/api/v1/assets/${encodeURIComponent(assetId)}`)
+  const response = await getJson<PublicAssetDetailResponse>(`/api/v1/assets/${encodeURIComponent(assetId)}`, {
+    cachePolicy: "public-detail",
+  })
 
   return {
     asset: normalizeAssetPreviewUrls(response.asset),
@@ -211,21 +217,59 @@ export async function fetchPublicLatestEvents(params: {
   windowDays?: number
   limit?: number
   cursor?: string | null
+  section?: PublicLatestEventsSection
 } = {}): Promise<PublicLatestEventsResponse> {
   const searchParams = new URLSearchParams()
   appendParam(searchParams, "windowDays", params.windowDays)
   appendParam(searchParams, "limit", params.limit)
   appendParam(searchParams, "cursor", params.cursor ?? undefined)
+  appendParam(searchParams, "section", params.section)
   const query = searchParams.toString()
   const path = `${resolveLatestEventsPath()}${query ? `?${query}` : ""}`
 
   return getJson<PublicLatestEventsResponse>(path, {
+    cachePolicy: "public-short",
     traceRoute: "/api/public/events/latest",
-    layer: "browser",
+    layer: typeof window === "undefined" ? "web" : "browser",
   })
 }
 
-type PublicJsonCachePolicy = "default" | "public-short" | "public-filters-long"
+export async function fetchCreativeFeaturedAssets(params: {
+  limit?: number
+} = {}): Promise<PublicAssetListResponse> {
+  const searchParams = new URLSearchParams()
+  appendParam(searchParams, "limit", params.limit)
+  const query = searchParams.toString()
+  const response = await getJson<PublicAssetListResponse & { assets?: PublicAsset[] }>(
+    `/api/public/creative/featured${query ? `?${query}` : ""}`,
+    {
+      cachePolicy: "public-creative-long",
+      traceRoute: "/api/public/creative/featured",
+      layer: typeof window === "undefined" ? "web" : "browser",
+    },
+  )
+
+  const responseItems = Array.isArray(response.items)
+    ? response.items
+    : Array.isArray(response.assets)
+      ? response.assets
+      : []
+
+  return {
+    ...response,
+    items: responseItems.map(normalizeAssetPreviewUrls),
+    nextCursor: response.nextCursor ?? null,
+    hasMore: response.hasMore === true,
+  }
+}
+
+type PublicJsonCachePolicy =
+  | "default"
+  | "public-short"
+  | "public-search-short"
+  | "public-detail"
+  | "public-filters-long"
+  | "public-creative-long"
 
 async function getJson<T>(
   path: string,
@@ -244,8 +288,12 @@ async function getJson<T>(
   const tracker = createTimingTracker()
 
   const revalidateSeconds = typeof window === "undefined"
-    ? options.cachePolicy === "public-short"
+    ? options.cachePolicy === "public-short" || options.cachePolicy === "public-search-short"
       ? 30
+      : options.cachePolicy === "public-detail"
+        ? 300
+      : options.cachePolicy === "public-creative-long"
+        ? 86_400
       : options.cachePolicy === "public-filters-long"
         ? 300
         : null

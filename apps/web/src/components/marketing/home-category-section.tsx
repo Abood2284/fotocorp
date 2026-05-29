@@ -1,34 +1,30 @@
 "use client"
 
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
-import type { RefObject } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 
 import { PublicEventsGrid } from "@/components/assets/public-events-grid"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
-import { fetchPublicLatestEvents, listPublicAssets } from "@/lib/api/fotocorp-api"
-import type { PublicAsset, PublicEvent, PublicHomepageEvent } from "@/features/assets/types"
+import { fetchCreativeFeaturedAssets, fetchPublicLatestEvents } from "@/lib/api/fotocorp-api"
+import type { PublicEvent, PublicHomepageEvent, PublicLatestEventsResponse, PublicLatestEventsSection } from "@/features/assets/types"
 
 type TabType = "Editorial" | "Video" | "Caricature" | "Creative"
 type EditorialSubcategory = "Latest" | "News" | "Sports" | "Entertainment" | "Retro"
-type LoadState = "idle" | "loading" | "ready" | "error"
+type LoadState = "loading" | "ready" | "error"
 
-interface AssetSectionState {
-  items: PublicAsset[]
-  state: LoadState
-}
-
-const ASSET_SECTION_UNAVAILABLE_COPY = "This section is temporarily unavailable."
 const LATEST_EVENTS_LIMIT = 15
-const ASSET_SECTION_LIMIT = 15
-const NEWEST_ASSETS_LIMIT = 50
+const CREATIVE_ASSETS_LIMIT = 50
+const RECENT_EVENTS_WINDOW_DAYS = 30
+const WIDE_EVENTS_WINDOW_DAYS = 365
 
-const EDITORIAL_SECTIONS: Record<Exclude<EditorialSubcategory, "Latest">, { title: string; query: string }> = {
-  News: { title: "News", query: "News" },
-  Sports: { title: "Sports", query: "Sports" },
-  Entertainment: { title: "Entertainment", query: "Entertainment" },
-  Retro: { title: "Retro", query: "Retro" },
+const EDITORIAL_SECTIONS: Record<EditorialSubcategory, PublicLatestEventsSection> = {
+  Latest: "latest",
+  News: "news",
+  Sports: "sports",
+  Entertainment: "entertainment",
+  Retro: "retro",
 }
 
 const CREATIVE_CARDS = [
@@ -80,114 +76,61 @@ function mapHomepageEventToPublicEvent(event: PublicHomepageEvent): PublicEvent 
   }
 }
 
-function useLazyAssetSection(options: {
-  enabled: boolean
-  query?: string
-  limit: number
-}): [RefObject<HTMLDivElement | null>, AssetSectionState] {
-  const ref = useRef<HTMLDivElement>(null)
-  const [nearViewport, setNearViewport] = useState(false)
-  const [section, setSection] = useState<AssetSectionState>({ items: [], state: "idle" })
+async function fetchHomepageEventsSection(section: PublicLatestEventsSection): Promise<{
+  response: PublicLatestEventsResponse
+  windowDays: number
+}> {
+  const recent = await fetchPublicLatestEvents({
+    windowDays: RECENT_EVENTS_WINDOW_DAYS,
+    limit: LATEST_EVENTS_LIMIT,
+    section,
+  })
 
-  useEffect(() => {
-    if (!options.enabled || nearViewport) return
-    const element = ref.current
-    if (!element) return
+  if (section === "latest" || recent.items.length > 0) {
+    return { response: recent, windowDays: RECENT_EVENTS_WINDOW_DAYS }
+  }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setNearViewport(true)
-          observer.disconnect()
-        }
-      },
-      { rootMargin: "600px 0px" },
-    )
+  const wider = await fetchPublicLatestEvents({
+    windowDays: WIDE_EVENTS_WINDOW_DAYS,
+    limit: LATEST_EVENTS_LIMIT,
+    section,
+  })
 
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [nearViewport, options.enabled])
-
-  useEffect(() => {
-    if (!options.enabled || !nearViewport || section.state !== "idle") return
-    let cancelled = false
-    setSection((current) => ({ ...current, state: "loading" }))
-
-    listPublicAssets({
-      q: options.query,
-      limit: options.limit,
-      sort: "newest",
-    })
-      .then((response) => {
-        if (!cancelled) setSection({ items: response.items, state: "ready" })
-      })
-      .catch(() => {
-        if (!cancelled) setSection({ items: [], state: "error" })
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [nearViewport, options.enabled, options.limit, options.query, section.state])
-
-  return [ref, section]
+  return { response: wider, windowDays: WIDE_EVENTS_WINDOW_DAYS }
 }
 
 export function HomeCategorySection() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState<TabType>("Editorial")
   const [editorialSub, setEditorialSub] = useState<EditorialSubcategory>("Latest")
-  const [latestEvents, setLatestEvents] = useState<PublicHomepageEvent[]>([])
-  const [latestEventsState, setLatestEventsState] = useState<LoadState>("loading")
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [hasMoreEvents, setHasMoreEvents] = useState(false)
+  const selectedSection = EDITORIAL_SECTIONS[editorialSub]
+  const [eventPageItems, setEventPageItems] = useState<PublicHomepageEvent[]>([])
+  const [eventPageCursor, setEventPageCursor] = useState<string | null>(null)
+  const [hasMoreEventPages, setHasMoreEventPages] = useState(false)
   const [loadingMoreEvents, setLoadingMoreEvents] = useState(false)
-
-  const [newsRef, news] = useLazyAssetSection({
-    enabled: activeTab === "Editorial" && (editorialSub === "Latest" || editorialSub === "News"),
-    query: EDITORIAL_SECTIONS.News.query,
-    limit: ASSET_SECTION_LIMIT,
+  const eventQuery = useQuery({
+    queryKey: ["homepage-events", selectedSection, RECENT_EVENTS_WINDOW_DAYS, LATEST_EVENTS_LIMIT],
+    queryFn: () => fetchHomepageEventsSection(selectedSection),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   })
-  const [sportsRef, sports] = useLazyAssetSection({
-    enabled: activeTab === "Editorial" && (editorialSub === "Latest" || editorialSub === "Sports"),
-    query: EDITORIAL_SECTIONS.Sports.query,
-    limit: ASSET_SECTION_LIMIT,
-  })
-  const [entertainmentRef, entertainment] = useLazyAssetSection({
-    enabled: activeTab === "Editorial" && (editorialSub === "Latest" || editorialSub === "Entertainment"),
-    query: EDITORIAL_SECTIONS.Entertainment.query,
-    limit: ASSET_SECTION_LIMIT,
-  })
-  const [retroRef, retro] = useLazyAssetSection({
-    enabled: activeTab === "Editorial" && (editorialSub === "Latest" || editorialSub === "Retro"),
-    query: EDITORIAL_SECTIONS.Retro.query,
-    limit: ASSET_SECTION_LIMIT,
-  })
-  const [newestRef, newest] = useLazyAssetSection({
+  const creativeQuery = useQuery({
+    queryKey: ["homepage-creative-featured", CREATIVE_ASSETS_LIMIT],
+    queryFn: () => fetchCreativeFeaturedAssets({ limit: CREATIVE_ASSETS_LIMIT }),
     enabled: activeTab === "Creative",
-    limit: NEWEST_ASSETS_LIMIT,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
   })
+  const baseEventData = eventQuery.data
 
   useEffect(() => {
-    let cancelled = false
-    setLatestEventsState("loading")
-
-    fetchPublicLatestEvents({ windowDays: 30, limit: LATEST_EVENTS_LIMIT })
-      .then((response) => {
-        if (cancelled) return
-        setLatestEvents(response.items)
-        setNextCursor(response.nextCursor)
-        setHasMoreEvents(response.hasMore)
-        setLatestEventsState("ready")
-      })
-      .catch(() => {
-        if (!cancelled) setLatestEventsState("error")
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    setEventPageItems([])
+    setEventPageCursor(baseEventData?.response.nextCursor ?? null)
+    setHasMoreEventPages(baseEventData?.response.hasMore ?? false)
+  }, [baseEventData?.response.hasMore, baseEventData?.response.nextCursor, selectedSection])
 
   useEffect(() => {
     if (activeTab === "Creative" && scrollContainerRef.current) {
@@ -202,24 +145,25 @@ export function HomeCategorySection() {
   }, [activeTab])
 
   const loadMoreEvents = useCallback(async () => {
-    if (!nextCursor || loadingMoreEvents) return
+    if (!eventPageCursor || loadingMoreEvents || !baseEventData) return
     setLoadingMoreEvents(true)
 
     try {
       const response = await fetchPublicLatestEvents({
-        windowDays: 30,
+        windowDays: baseEventData.windowDays,
         limit: LATEST_EVENTS_LIMIT,
-        cursor: nextCursor,
+        cursor: eventPageCursor,
+        section: selectedSection,
       })
-      setLatestEvents((current) => [...current, ...response.items])
-      setNextCursor(response.nextCursor)
-      setHasMoreEvents(response.hasMore)
+      setEventPageItems((current) => [...current, ...response.items])
+      setEventPageCursor(response.nextCursor)
+      setHasMoreEventPages(response.hasMore)
     } catch {
-      setLatestEventsState("error")
+      setHasMoreEventPages(false)
     } finally {
       setLoadingMoreEvents(false)
     }
-  }, [loadingMoreEvents, nextCursor])
+  }, [baseEventData, eventPageCursor, loadingMoreEvents, selectedSection])
 
   const scrollLeft = () => {
     scrollContainerRef.current?.scrollBy({ left: -window.innerWidth * 0.8, behavior: "smooth" })
@@ -234,7 +178,13 @@ export function HomeCategorySection() {
     setActiveTab(tab)
   }
 
-  const latestEventItems = latestEvents.map(mapHomepageEventToPublicEvent)
+  const latestEventItems = useMemo(
+    () => [
+      ...(baseEventData?.response.items ?? []),
+      ...eventPageItems,
+    ].map(mapHomepageEventToPublicEvent),
+    [baseEventData?.response.items, eventPageItems],
+  )
 
   return (
     <section className="w-full bg-background pt-4 pb-10">
@@ -296,33 +246,19 @@ export function HomeCategorySection() {
       <div className="mt-6 w-full">
         {activeTab === "Editorial" && (
           <div className="flex w-full flex-col gap-12 pb-8">
-            {editorialSub === "Latest" ? (
-              <>
-                <LatestEventsPanel
-                  events={latestEventItems}
-                  hasMore={hasMoreEvents}
-                  loadingMore={loadingMoreEvents}
-                  onLoadMore={loadMoreEvents}
-                  state={latestEventsState}
-                />
-
-                <div className="mt-6 flex flex-col gap-12">
-                  <AssetSection refObject={newsRef} title="News" section={news} />
-                  <AssetSection refObject={sportsRef} title="Sports" section={sports} />
-                  <AssetSection refObject={entertainmentRef} title="Entertainment" section={entertainment} />
-                  <AssetSection refObject={retroRef} title="Retro" section={retro} />
-                </div>
-              </>
-            ) : (
-              <div className="mt-2 w-full px-4 sm:px-6 lg:px-8">
-                {editorialSub === "News" && <AssetGridOnly refObject={newsRef} section={news} />}
-                {editorialSub === "Sports" && <AssetGridOnly refObject={sportsRef} section={sports} />}
-                {editorialSub === "Entertainment" && (
-                  <AssetGridOnly refObject={entertainmentRef} section={entertainment} />
-                )}
-                {editorialSub === "Retro" && <AssetGridOnly refObject={retroRef} section={retro} />}
-              </div>
-            )}
+            <LatestEventsPanel
+              events={latestEventItems}
+              hasMore={hasMoreEventPages}
+              loadingMore={loadingMoreEvents}
+              onLoadMore={loadMoreEvents}
+              onShowCreative={() => setActiveTab("Creative")}
+              onShowLatest={() => {
+                setActiveTab("Editorial")
+                setEditorialSub("Latest")
+              }}
+              state={eventQuery.isError ? "error" : eventQuery.isFetching && !baseEventData ? "loading" : "ready"}
+              sectionLabel={editorialSub}
+            />
           </div>
         )}
 
@@ -386,13 +322,26 @@ export function HomeCategorySection() {
               </button>
             </div>
 
-            <div ref={newestRef} className="mt-1 w-full">
-              {newest.state === "error" ? (
-                <SectionUnavailable />
-              ) : newest.state !== "ready" ? (
+            <div className="mt-1 w-full">
+              {creativeQuery.isError ? (
+                <CreativeEmptyState
+                  error
+                  onShowLatest={() => {
+                    setActiveTab("Editorial")
+                    setEditorialSub("Latest")
+                  }}
+                />
+              ) : creativeQuery.isFetching && !creativeQuery.data ? (
                 <SectionSkeleton />
+              ) : (creativeQuery.data?.items.length ?? 0) === 0 ? (
+                <CreativeEmptyState
+                  onShowLatest={() => {
+                    setActiveTab("Editorial")
+                    setEditorialSub("Latest")
+                  }}
+                />
               ) : (
-                <PublicAssetGrid assets={newest.items} dense />
+                <PublicAssetGrid assets={creativeQuery.data?.items ?? []} dense />
               )}
             </div>
           </div>
@@ -407,13 +356,19 @@ function LatestEventsPanel({
   hasMore,
   loadingMore,
   onLoadMore,
+  onShowCreative,
+  onShowLatest,
   state,
+  sectionLabel,
 }: {
   events: PublicEvent[]
   hasMore: boolean
   loadingMore: boolean
   onLoadMore: () => void
+  onShowCreative: () => void
+  onShowLatest: () => void
   state: LoadState
+  sectionLabel: EditorialSubcategory
 }) {
   if (state === "error") {
     return (
@@ -429,9 +384,11 @@ function LatestEventsPanel({
 
   if (events.length === 0) {
     return (
-      <div className="w-full px-4 py-12 text-center text-sm text-muted-foreground sm:px-6 lg:px-8">
-        No public events added in the last 30 days.
-      </div>
+      <EditorialEmptyState
+        sectionLabel={sectionLabel}
+        onShowCreative={onShowCreative}
+        onShowLatest={onShowLatest}
+      />
     )
   }
 
@@ -454,48 +411,82 @@ function LatestEventsPanel({
   )
 }
 
-function AssetSection({
-  refObject,
-  section,
-  title,
+function EditorialEmptyState({
+  onShowCreative,
+  onShowLatest,
+  sectionLabel,
 }: {
-  refObject: RefObject<HTMLDivElement | null>
-  section: AssetSectionState
-  title: string
+  onShowCreative: () => void
+  onShowLatest: () => void
+  sectionLabel: EditorialSubcategory
 }) {
+  const isLatest = sectionLabel === "Latest"
+  const browseHref = isLatest ? "/search?sort=newest" : `/search?q=${encodeURIComponent(sectionLabel)}`
+  const title = isLatest
+    ? "No recent Editorial events yet."
+    : `No recent ${sectionLabel} events yet.`
+  const description = isLatest
+    ? "View the latest image coverage or explore Creative picks."
+    : `Browse all ${sectionLabel} images or view latest Editorial coverage.`
+
   return (
-    <div ref={refObject} className="w-full px-4 sm:px-6 lg:px-8">
-      <div className="mb-4">
-        <h2 className="fc-heading-2 text-foreground">{title}</h2>
+    <div className="mx-auto flex max-w-xl flex-col items-center px-4 py-12 text-center sm:px-6 lg:px-8">
+      <h3 className="font-heading text-2xl font-normal text-foreground">{title}</h3>
+      <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
+        <Link href={browseHref} className="button-outline-square px-5 py-3 text-xs uppercase tracking-wider">
+          {isLatest ? "Search Images" : `Browse all ${sectionLabel} images`}
+        </Link>
+        {!isLatest && (
+          <button
+            type="button"
+            onClick={onShowLatest}
+            className="button-outline-square px-5 py-3 text-xs uppercase tracking-wider"
+          >
+            View Latest Editorial
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onShowCreative}
+          className="button-outline-square px-5 py-3 text-xs uppercase tracking-wider"
+        >
+          Explore Creative Picks
+        </button>
       </div>
-      <AssetSectionBody section={section} />
     </div>
   )
 }
 
-function AssetGridOnly({
-  refObject,
-  section,
+function CreativeEmptyState({
+  error = false,
+  onShowLatest,
 }: {
-  refObject: RefObject<HTMLDivElement | null>
-  section: AssetSectionState
+  error?: boolean
+  onShowLatest: () => void
 }) {
   return (
-    <div ref={refObject}>
-      <AssetSectionBody section={section} />
+    <div className="mx-auto flex max-w-xl flex-col items-center px-4 py-12 text-center sm:px-6 lg:px-8">
+      <h3 className="font-heading text-2xl font-normal text-foreground">
+        {error ? "Creative picks are temporarily unavailable." : "Creative picks are being prepared."}
+      </h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Browse latest editorial coverage or check back soon.
+      </p>
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
+        <button
+          type="button"
+          onClick={onShowLatest}
+          className="button-outline-square px-5 py-3 text-xs uppercase tracking-wider"
+        >
+          View Latest Editorial
+        </button>
+        <Link href="/search" className="button-outline-square px-5 py-3 text-xs uppercase tracking-wider">
+          Search Images
+        </Link>
+      </div>
     </div>
   )
-}
-
-function AssetSectionBody({ section }: { section: AssetSectionState }) {
-  if (section.state === "error") return <SectionUnavailable />
-  if (section.state !== "ready") return <SectionSkeleton />
-
-  return <PublicAssetGrid assets={section.items} limit={section.items.length} />
-}
-
-function SectionUnavailable() {
-  return <div className="py-12 text-center text-sm text-muted-foreground">{ASSET_SECTION_UNAVAILABLE_COPY}</div>
 }
 
 function SectionSkeleton({ tall = false }: { tall?: boolean }) {

@@ -70,6 +70,7 @@ interface AssetRow {
   event_name: string | null;
   event_date: Date | string | null;
   event_location: string | null;
+  event_asset_count?: number | string | null;
   contributor_id: string | null;
   contributor_display_name: string | null;
   thumb_width: number | null;
@@ -133,7 +134,7 @@ interface AssetDto {
   mediaType: string;
   source: string;
   category: { id: string; name: string } | null;
-  event: { id: string; name: string | null; eventDate: string | null; location: string | null } | null;
+  event: { id: string; name: string | null; eventDate: string | null; location: string | null; assetCount?: number } | null;
   contributor: { id: string; displayName: string } | null;
   previews: {
     thumb: PreviewDto | null;
@@ -160,6 +161,40 @@ export async function listPublicAssets(
     : null;
 
   return { items, nextCursor, hasMore };
+}
+
+export async function listPublicCreativeFeaturedAssets(
+  db: DrizzleClient,
+  input: { limit?: string | null },
+  secret: string | undefined,
+  ttlSeconds: number,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
+) {
+  const limit = input.limit ? Math.min(parseLimit(input.limit), 50) : 50;
+  const periodKey = currentPeriodKey();
+  const rows = await executeRows<AssetRow>(db, sql`
+    ${selectAssetSql(undefined)}
+    ${fromAssetSql()}
+    join public_creative_featured_items featured
+      on featured.asset_id = a.id
+      and featured.period_key = ${periodKey}
+      and featured.status = 'ACTIVE'
+    where ${publicAssetPredicate("a")}
+      and card.id is not null
+    order by featured.rank asc, featured.asset_id asc
+    limit ${limit}
+  `);
+  const items = await Promise.all(rows.map((row) => toAssetDto(row, secret, ttlSeconds, false, cdn)));
+
+  return {
+    items,
+    nextCursor: null,
+    hasMore: false,
+  };
+}
+
+function currentPeriodKey(date = new Date()): string {
+  return date.toISOString().slice(0, 7);
 }
 
 export async function getPublicAssetDetail(
@@ -486,6 +521,7 @@ function selectAssetSql(q: string | undefined): SQL {
       e.name as event_name,
       e.event_date,
       e.location as event_location,
+      (select count(*)::int from image_assets a3 where a3.event_id = e.id and ${publicAssetPredicate("a3")}) as event_asset_count,
       p.id as contributor_id,
       p.display_name as contributor_display_name,
       thumb.width as thumb_width,
@@ -585,7 +621,17 @@ async function toAssetDto(
     source: row.source,
     category: resolvePublicCategory(row),
     event: row.event_id
-      ? { id: row.event_id, name: row.event_name, eventDate: toIso(row.event_date), location: row.event_location }
+      ? {
+          id: row.event_id,
+          name: row.event_name,
+          eventDate: toIso(row.event_date),
+          location: row.event_location,
+          assetCount: typeof row.event_asset_count === "number"
+            ? row.event_asset_count
+            : typeof row.event_asset_count === "string"
+              ? parseInt(row.event_asset_count, 10)
+              : undefined,
+        }
       : null,
     contributor: row.contributor_id && row.contributor_display_name
       ? { id: row.contributor_id, displayName: row.contributor_display_name }

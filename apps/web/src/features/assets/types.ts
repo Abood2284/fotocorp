@@ -16,6 +16,7 @@ export interface PublicAssetEvent {
   name: string | null
   eventDate: string | null
   location: string | null
+  assetCount?: number
 }
 
 export interface PublicAssetContributor {
@@ -118,6 +119,8 @@ export interface PublicHomepageEvent {
   slug?: string | null
   eventDate?: string | null
   createdAt: string
+  location?: string | null
+  categoryName?: string | null
   assetCount: number
   previewUrl: string
   previewWidth?: number | null
@@ -181,3 +184,5 @@ export interface PublicAssetListParams {
   limit?: number
   sort?: PublicAssetSort
 }
+
+export type PublicLatestEventsSection = "latest" | "news" | "sports" | "entertainment" | "retro"

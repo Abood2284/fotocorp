@@ -6,6 +6,9 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	"placement": {
+		"mode": "smart"
+	},
 	"limits": {
 		"cpu_ms": 30000
 	},

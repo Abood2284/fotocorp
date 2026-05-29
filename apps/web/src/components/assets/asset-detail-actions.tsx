@@ -1,11 +1,11 @@
 "use client"
 
-import { Download, CircleHelp } from "lucide-react"
+import { Download, CircleHelp, ChevronDown, ChevronUp } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useMemo, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import type { PublicAsset } from "@/features/assets/types"
 import { messageForSubscriberDownloadErrorCode } from "@/lib/download-error-messages"
 import { cn } from "@/lib/utils"
 
@@ -36,6 +36,8 @@ interface AssetDetailActionsProps {
   metadataRows: AssetMetadataRow[]
   whoIsInPictureNames?: string[]
   keywords: string[]
+  eventAssets?: PublicAsset[]
+  totalEventAssets?: number
 }
 
 interface AssetMetadataRow {
@@ -53,11 +55,14 @@ export function AssetDetailActions({
   metadataRows,
   whoIsInPictureNames = [],
   keywords,
+  eventAssets = [],
+  totalEventAssets = 0,
 }: AssetDetailActionsProps) {
-  const router = useRouter()
   const [selectedSize, setSelectedSize] = useState<AssetSizeOption["id"]>("large")
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [keywordsOpen, setKeywordsOpen] = useState(false)
   const downloadFrameRef = useRef<HTMLIFrameElement>(null)
 
   const selectedOption = useMemo(
@@ -70,13 +75,12 @@ export function AssetDetailActions({
   )
 
   const canDownload =
-    accessState === "subscriber" && selectedOption?.downloadAvailable !== false
+    selectedOption?.downloadAvailable !== false
 
   async function handleDownloadClick(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
 
     if (!canDownload) {
-      router.push("/request-access")
       return
     }
 
@@ -236,67 +240,139 @@ export function AssetDetailActions({
         ) : null}
       </div>
 
+      {/* More from this event contact sheet */}
+      {eventAssets.length > 0 && (
+        <div className="border-t border-border/60 pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              More from this event
+            </h3>
+            {totalEventAssets > 0 && (
+              <a
+                href="#event-gallery-section"
+                className="text-[10px] font-bold uppercase tracking-wider text-primary hover:underline underline-offset-2"
+              >
+                View all {totalEventAssets}
+              </a>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2 max-h-[min(40vh,420px)] overflow-y-auto pr-1">
+            {eventAssets.map((otherAsset) => {
+              const isActive = otherAsset.id === assetId
+              const otherPreview = otherAsset.previews.thumb ?? otherAsset.previews.card
+              return (
+                <Link
+                  key={otherAsset.id}
+                  href={`/assets/${otherAsset.id}`}
+                  scroll={false}
+                  className={cn(
+                    "relative aspect-[4/3] w-full overflow-hidden bg-muted border transition-all cursor-pointer rounded-none",
+                    isActive ? "border-black border-2" : "border-transparent border"
+                  )}
+                >
+                  {otherPreview?.url ? (
+                    <img
+                      src={otherPreview.url}
+                      alt={otherAsset.fotokey ?? ""}
+                      className="h-full w-full object-cover transition-opacity duration-200 hover:opacity-90"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-muted" />
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {(restrictions || whoIsInPictureNames.length > 0 || metadataRows.length > 0) && (
         <div className="space-y-3 border-t border-border pt-5">
-          <h3 className="text-xs font-medium text-foreground">Details</h3>
-          {restrictions ? (
-            <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs leading-relaxed">
-              <p className="text-muted-foreground">Restrictions:</p>
-              <p className="text-foreground">{restrictions}</p>
-            </div>
-          ) : null}
-          {whoIsInPictureNames.length > 0 ? (
-            <dl className="space-y-2 text-xs leading-relaxed">
-              <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
-                <dt className="text-muted-foreground">Who is in picture:</dt>
-                <dd className="text-foreground">
-                  <p className="flex flex-wrap items-center gap-x-1 gap-y-1">
-                    {whoIsInPictureNames.map((name, index) => (
-                      <span key={name} className="inline-flex items-center">
-                        {index > 0 ? <span className="mr-1 text-muted-foreground">,</span> : null}
-                        <Link
-                          href={`/search?q=${encodeURIComponent(name)}`}
-                          className="text-primary underline underline-offset-4 hover:text-primary-hover"
-                        >
-                          {name}
-                        </Link>
-                      </span>
-                    ))}
-                  </p>
-                </dd>
+          <button
+            type="button"
+            onClick={() => setDetailsOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between text-left lg:pointer-events-none cursor-pointer"
+            aria-expanded={detailsOpen}
+          >
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">Details</h3>
+            <span className="text-muted-foreground lg:hidden">
+              {detailsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </span>
+          </button>
+
+          <div className={cn("space-y-3 lg:block", detailsOpen ? "block" : "hidden")}>
+            {restrictions ? (
+              <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs leading-relaxed">
+                <p className="text-muted-foreground">Restrictions:</p>
+                <p className="text-foreground">{restrictions}</p>
               </div>
-            </dl>
-          ) : null}
-          {metadataRows.length > 0 ? (
-            <dl className="space-y-2 text-xs leading-relaxed">
-              {metadataRows.map((row) => (
-                <div key={row.label} className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
-                  <dt className="text-muted-foreground">{row.label}</dt>
-                  <dd className="text-foreground" title={row.value}>
-                    {row.value}
+            ) : null}
+            {whoIsInPictureNames.length > 0 ? (
+              <dl className="space-y-2 text-xs leading-relaxed">
+                <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
+                  <dt className="text-muted-foreground">Who is in picture:</dt>
+                  <dd className="text-foreground">
+                    <p className="flex flex-wrap items-center gap-x-1 gap-y-1">
+                      {whoIsInPictureNames.map((name, index) => (
+                        <span key={name} className="inline-flex items-center">
+                          {index > 0 ? <span className="mr-1 text-muted-foreground">,</span> : null}
+                          <Link
+                            href={`/search?q=${encodeURIComponent(name)}`}
+                            className="text-primary underline underline-offset-4 hover:text-primary-hover"
+                          >
+                            {name}
+                          </Link>
+                        </span>
+                      ))}
+                    </p>
                   </dd>
                 </div>
-              ))}
-            </dl>
-          ) : null}
+              </dl>
+            ) : null}
+            {metadataRows.length > 0 ? (
+              <dl className="space-y-2 text-xs leading-relaxed">
+                {metadataRows.map((row) => (
+                  <div key={row.label} className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
+                    <dt className="text-muted-foreground">{row.label}</dt>
+                    <dd className="text-foreground" title={row.value}>
+                      {row.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+          </div>
         </div>
       )}
 
       {keywords.length > 0 ? (
         <div className="border-t border-border/60 pt-4">
-          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Keywords
-          </h3>
-          <div className="flex flex-wrap gap-1.5 font-sans">
-            {keywords.map((keyword) => (
-              <Link
-                key={keyword}
-                href={`/search?q=${encodeURIComponent(keyword)}`}
-                className="rounded-none border border-border bg-muted/30 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                {keyword}
-              </Link>
-            ))}
+          <button
+            type="button"
+            onClick={() => setKeywordsOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between text-left lg:pointer-events-none cursor-pointer"
+            aria-expanded={keywordsOpen}
+          >
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+              Keywords
+            </h3>
+            <span className="text-muted-foreground lg:hidden">
+              {keywordsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </span>
+          </button>
+
+          <div className={cn("mt-3 lg:block", keywordsOpen ? "block" : "hidden")}>
+            <div className="flex flex-wrap gap-1.5 font-sans">
+              {keywords.map((keyword) => (
+                <Link
+                  key={keyword}
+                  href={`/search?q=${encodeURIComponent(keyword)}`}
+                  className="rounded-none border border-border bg-muted/30 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {keyword}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       ) : null}

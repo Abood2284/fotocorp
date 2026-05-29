@@ -16,6 +16,7 @@ import {
 import { AppError } from "../../../lib/errors"
 import { json } from "../../../lib/http"
 import { parsePreviewTtl } from "../../../lib/assets/public-assets"
+import { invalidatePublicAssetCache } from "../../../lib/cache/public-cache-invalidation"
 import { listInternalAdminUsers, updateInternalAdminUserSubscription, updateInternalAdminUserSubscriptionDetail, getInternalAdminUser, updateInternalAdminUserRole, updateInternalAdminUserStatus } from "../../../lib/users/internal-admin-users"
 import {
   getMediaPipelineStatus,
@@ -59,7 +60,13 @@ export async function adminAssetPreviewService(env: Env, assetId: string, varian
   return new Response(object.object.body, { status: 200, headers })
 }
 export async function adminAssetUpdateService(env: Env, assetId: string, payload: { caption: string | null; headline: string | null; description: string | null; keywords: string[] | null; categoryId: string | null; eventId: string | null; contributorId: string | null }, actor: AdminActor) {
-  return json(await updateInternalAdminAssetEditorial(db(env), env, assetId, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env)))
+  const result = await updateInternalAdminAssetEditorial(db(env), env, assetId, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env))
+  await invalidatePublicAssetCache(env, {
+    assetId,
+    eventId: result.asset.event?.id ?? payload.eventId,
+    includeEventFeeds: true,
+  })
+  return json(result)
 }
 export async function adminAssetPublishStateService(env: Env, assetId: string, payload: { status: "APPROVED" | "REVIEW" | "REJECTED"; visibility: "PUBLIC" | "PRIVATE" }, actor: AdminActor) {
   if (payload.status === "APPROVED" && payload.visibility === "PUBLIC") {
@@ -69,7 +76,13 @@ export async function adminAssetPublishStateService(env: Env, assetId: string, p
       return Response.json({ error: { code: "PREVIEW_NOT_READY", message: "This asset cannot be published until all required preview derivatives are ready.", details: { missingVariants: check.missingVariants } } }, { status: 409 })
     }
   }
-  return json(await updateInternalAdminAssetPublish(db(env), env, assetId, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env)))
+  const result = await updateInternalAdminAssetPublish(db(env), env, assetId, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env))
+  await invalidatePublicAssetCache(env, {
+    assetId,
+    eventId: result.asset.event?.id ?? null,
+    includeEventFeeds: payload.status === "APPROVED" && payload.visibility === "PUBLIC",
+  })
+  return json(result)
 }
 export async function adminAssetUpdateBulkService(env: Env, payload: { assetIds: string[], categoryId?: string | null, eventId?: string | null }, actor: AdminActor) {
   return json(await updateInternalAdminAssetEditorialBulk(db(env), env, payload.assetIds, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env)))

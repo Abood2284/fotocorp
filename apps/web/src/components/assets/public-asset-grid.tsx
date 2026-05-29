@@ -60,6 +60,7 @@ export interface PublicAssetGridProps {
   className?: string
   emptyTitle?: string
   emptyDescription?: string
+  detailHrefForAsset?: (asset: PublicAsset) => string
 }
 
 /**
@@ -73,6 +74,7 @@ export function PublicAssetGrid({
   className,
   emptyTitle = "Previews are being prepared",
   emptyDescription = "The public archive will appear here as soon as watermarked previews are ready.",
+  detailHrefForAsset,
 }: PublicAssetGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
@@ -176,6 +178,7 @@ export function PublicAssetGrid({
                     variant="grid"
                     gridLayout="justified"
                     priority={priorityIds.has(tile.id)}
+                    detailHref={detailHrefForAsset?.(asset)}
                     className={cn("h-full w-full", dense && "!rounded-none")}
                   />
                 </div>

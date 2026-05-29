@@ -1,6 +1,7 @@
 "use client"
 
-import { CircleHelp, Plus } from "lucide-react"
+import { CircleHelp, Plus, ChevronLeft, ChevronRight } from "lucide-react"
+import Link from "next/link"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { FotoboxSaveButton } from "@/components/assets/fotobox-save-button"
 import { cn } from "@/lib/utils"
@@ -15,6 +16,11 @@ interface AssetPreviewChromeProps {
   whoIsInPicture: string | null
   fotokey: string | null
   assetId: string
+  // Pagination details
+  currentPhotoNumber?: number
+  totalPhotos?: number
+  prevAssetId?: string | null
+  nextAssetId?: string | null
 }
 
 export function AssetPreviewChrome({
@@ -27,8 +33,13 @@ export function AssetPreviewChrome({
   whoIsInPicture,
   fotokey,
   assetId,
+  currentPhotoNumber,
+  totalPhotos,
+  prevAssetId,
+  nextAssetId,
 }: AssetPreviewChromeProps) {
   const peopleLabel = whoIsInPicture?.trim()
+  const showPagination = currentPhotoNumber !== undefined && totalPhotos !== undefined && totalPhotos > 1
 
   return (
     <div className="flex h-full w-full max-w-full flex-col gap-4 bg-background">
@@ -74,7 +85,7 @@ export function AssetPreviewChrome({
       </div>
 
       <div
-        className="flex min-h-[55vh] w-full max-h-[78vh] flex-1 items-center justify-center bg-background sm:min-h-[58vh] lg:min-h-0 lg:max-h-none"
+        className="relative flex min-h-[50vh] w-full max-h-[68vh] flex-1 items-center justify-center bg-background sm:min-h-[55vh] lg:min-h-0 lg:max-h-none"
       >
         <PreviewImage
           src={src}
@@ -87,6 +98,45 @@ export function AssetPreviewChrome({
           )}
           loading={loading}
         />
+
+        {/* Count Badge Overlay */}
+        {showPagination && (
+          <div className="absolute top-4 left-4 z-20 bg-black/75 px-2.5 py-1 font-sans text-[10px] font-bold uppercase tracking-wider text-white">
+            Photo {currentPhotoNumber} of {totalPhotos}
+          </div>
+        )}
+
+        {/* Navigation Arrows Overlay */}
+        {prevAssetId && (
+          <Link
+            href={`/assets/${prevAssetId}`}
+            scroll={false}
+            className="absolute left-4 top-1/2 z-20 -translate-y-1/2 bg-black/75 p-2.5 text-white hover:bg-black transition-colors rounded-none cursor-pointer"
+            aria-label="Previous image"
+          >
+            <ChevronLeft size={20} />
+          </Link>
+        )}
+        {nextAssetId && (
+          <Link
+            href={`/assets/${nextAssetId}`}
+            scroll={false}
+            className="absolute right-4 top-1/2 z-20 -translate-y-1/2 bg-black/75 p-2.5 text-white hover:bg-black transition-colors rounded-none cursor-pointer"
+            aria-label="Next image"
+          >
+            <ChevronRight size={20} />
+          </Link>
+        )}
+
+        {/* View Gallery Link Overlay */}
+        {showPagination && (
+          <a
+            href="#event-gallery-section"
+            className="absolute bottom-4 right-4 z-20 bg-black/75 px-3 py-1.5 font-sans text-[10px] font-bold uppercase tracking-wider text-white hover:bg-black transition-colors rounded-none cursor-pointer"
+          >
+            View Gallery
+          </a>
+        )}
       </div>
       {peopleLabel ? (
         <span className="sr-only">Who is in this picture: {peopleLabel}</span>

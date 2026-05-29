@@ -1,7 +1,13 @@
 "use client"
 
-import { PreviewImage } from "@/components/assets/preview-image"
-import type { PublicHomepageEvent } from "@/features/assets/types"
+import { useState } from "react"
+
+export interface HeroBackdropItem {
+  id: string
+  title: string
+  href: string
+  imageUrl: string | null
+}
 
 const FALLBACK_GRADIENTS = [
   "linear-gradient(150deg,#111111 0%,#2a2a2a 50%,#555555 100%)",
@@ -18,11 +24,14 @@ const FALLBACK_GRADIENTS = [
 const STRIP_SLOT_COUNT = 9
 
 interface HeroBackdropStripProps {
-  events: PublicHomepageEvent[]
+  items: HeroBackdropItem[]
 }
 
-export function HeroBackdropStrip({ events }: HeroBackdropStripProps) {
-  const slots = Array.from({ length: STRIP_SLOT_COUNT }, (_, i) => events[i])
+export function HeroBackdropStrip({ items }: HeroBackdropStripProps) {
+  const slots =
+    items.length > 0
+      ? Array.from({ length: STRIP_SLOT_COUNT }, (_, i) => items[i % items.length])
+      : Array.from({ length: STRIP_SLOT_COUNT }, () => null)
 
   return (
     <div
@@ -39,31 +48,66 @@ export function HeroBackdropStrip({ events }: HeroBackdropStripProps) {
         }}
       >
         <div className="flex h-full min-h-52 w-max max-w-none shrink-0 items-stretch gap-0.5 py-3 sm:min-h-56 sm:py-4 md:min-h-0 md:py-5">
-          {slots.map((event, i) => (
+          {slots.map((item, i) => (
             <div
-              key={i}
+              key={`${item?.id ?? "fallback"}-${i}`}
               className="relative aspect-[3/4] h-full w-auto shrink-0 overflow-hidden bg-muted"
             >
-              {event?.previewUrl ? (
-                <PreviewImage
-                  src={event.previewUrl}
+              {item?.imageUrl ? (
+                <HeroImage
+                  src={item.imageUrl}
                   alt=""
-                  className="h-full w-full min-w-28 object-cover grayscale saturate-0 sm:min-w-32 md:min-w-36 lg:min-w-40"
                   loading={i < 3 ? "eager" : "lazy"}
+                  fallbackIndex={i}
                 />
               ) : (
-                <div
-                  className="h-full min-w-28 sm:min-w-32 md:min-w-36 lg:min-w-40"
-                  style={{ background: FALLBACK_GRADIENTS[i % FALLBACK_GRADIENTS.length] }}
-                />
+                <HeroFallback index={i} />
               )}
             </div>
           ))}
         </div>
       </div>
 
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_52%_68%_at_50%_48%,#ffffff_0%,rgba(255,255,255,0.72)_38%,rgba(255,255,255,0.32)_64%,transparent_94%)]" />
-      <div className="absolute inset-0 bg-linear-to-b from-white/75 via-transparent to-white/75" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_52%_68%_at_50%_48%,rgba(255,255,255,0.86)_0%,rgba(255,255,255,0.54)_38%,rgba(255,255,255,0.18)_64%,transparent_94%)]" />
+      <div className="absolute inset-0 bg-linear-to-b from-white/50 via-transparent to-white/50" />
     </div>
+  )
+}
+
+function HeroImage({
+  alt,
+  fallbackIndex,
+  loading,
+  src,
+}: {
+  alt: string
+  fallbackIndex: number
+  loading: "eager" | "lazy"
+  src: string
+}) {
+  const [failed, setFailed] = useState(false)
+
+  if (failed) return <HeroFallback index={fallbackIndex} />
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      className="h-full w-full min-w-28 object-cover saturate-[0.75] contrast-[0.95] sm:min-w-32 md:min-w-36 lg:min-w-40"
+      loading={loading}
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
+function HeroFallback({ index }: { index: number }) {
+  return (
+    <div
+      className="h-full min-w-28 sm:min-w-32 md:min-w-36 lg:min-w-40"
+      style={{ background: FALLBACK_GRADIENTS[index % FALLBACK_GRADIENTS.length] }}
+    />
   )
 }

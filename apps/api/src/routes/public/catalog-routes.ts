@@ -20,6 +20,12 @@ export const publicCatalogRoutes = new Hono<{ Bindings: Env }>();
 export const PUBLIC_CATALOG_LIST_CACHE_CONTROL =
   "public, max-age=30, s-maxage=120, stale-while-revalidate=300";
 
+export const PUBLIC_TYPESENSE_SEARCH_CACHE_CONTROL =
+  "public, max-age=30, s-maxage=120, stale-while-revalidate=300";
+
+export const PUBLIC_ASSET_DETAIL_CACHE_CONTROL =
+  "public, max-age=300, s-maxage=2592000, stale-while-revalidate=604800";
+
 export const PUBLIC_CATALOG_FILTERS_CACHE_CONTROL =
   "public, max-age=300, s-maxage=900, stale-while-revalidate=1800";
 
@@ -94,7 +100,7 @@ publicCatalogRoutes.get("/api/v1/search/assets", async (c) => {
 
     return json(response, 200, {
       headers: {
-        "Cache-Control": "no-store",
+        "Cache-Control": PUBLIC_TYPESENSE_SEARCH_CACHE_CONTROL,
         "X-Content-Type-Options": "nosniff",
       },
     });
@@ -213,6 +219,13 @@ publicCatalogRoutes.get("/api/v1/assets/:assetId", async (c) => {
       ttl(c.env),
       cdn,
     ),
+    200,
+    {
+      headers: {
+        "Cache-Control": PUBLIC_ASSET_DETAIL_CACHE_CONTROL,
+        "X-Content-Type-Options": "nosniff",
+      },
+    },
   );
 });
 

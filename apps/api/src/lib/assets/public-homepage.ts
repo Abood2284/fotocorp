@@ -13,6 +13,8 @@ export interface PublicHomepageEventDto {
   eventDate: string | null
   createdAt: string
   assetCount: number
+  location: string | null
+  categoryName: string | null
   previewUrl: string
   previewWidth: number | null
   previewHeight: number | null
@@ -38,16 +40,20 @@ export interface PublicLatestEventsQueryInput {
   windowDays?: string | null
   limit?: string | null
   cursor?: string | null
+  section?: string | null
 }
 
 interface PublicLatestEventsQuery {
   windowDays: number
   limit: number
   cursor: LatestEventsCursor | null
+  section: PublicLatestEventsSection
 }
 
+export type PublicLatestEventsSection = "latest" | "news" | "sports" | "entertainment" | "retro"
+
 interface LatestEventsCursor {
-  createdAt: string
+  eventDate: string
   id: string
 }
 
@@ -57,6 +63,8 @@ interface HomepageEventRow {
   event_date: Date | string | null
   created_at: Date | string
   asset_count: number | string
+  event_location: string | null
+  category_name: string | null
   preview_asset_id: string | null
   preview_width: number | null
   preview_height: number | null
@@ -98,6 +106,7 @@ export interface PublicLatestEventsDbTrace {
   windowDays: number
   limit: number
   hasCursor: boolean
+  section: PublicLatestEventsSection
 }
 
 export async function fetchPublicLatestEventsRows(
@@ -119,6 +128,7 @@ export async function fetchPublicLatestEventsRows(
       windowDays: query.windowDays,
       limit: query.limit,
       hasCursor: Boolean(query.cursor),
+      section: query.section,
     },
   }
 }
@@ -143,7 +153,7 @@ export function buildLatestEventsResponse(
   const hasMore = rows.length > query.limit
   const nextCursor = hasMore && lastReturnedRow
     ? encodeLatestEventsCursor({
-        createdAt: toIso(lastReturnedRow.created_at) ?? new Date(0).toISOString(),
+        eventDate: toIso(lastReturnedRow.event_date) ?? new Date(0).toISOString(),
         id: lastReturnedRow.event_id,
       })
     : null
@@ -172,6 +182,8 @@ function mapEventRow(row: HomepageEventRow, cdn: PublicPreviewCdnConfig): Public
     eventDate: toIso(row.event_date),
     createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     assetCount: Number(row.asset_count),
+    location: row.event_location,
+    categoryName: row.category_name,
     previewUrl,
     previewWidth: row.preview_width,
     previewHeight: row.preview_height,
@@ -182,13 +194,14 @@ function buildLatestEventsSql(query: PublicLatestEventsQuery): SQL {
   const pageSize = query.limit + 1
   const cursorWhere = query.cursor
     ? sql`and (
-        f.created_at < ${query.cursor.createdAt}::timestamptz
+        f.event_date < ${query.cursor.eventDate}::timestamptz
         or (
-          f.created_at = ${query.cursor.createdAt}::timestamptz
+          f.event_date = ${query.cursor.eventDate}::timestamptz
           and f.event_id < ${query.cursor.id}::uuid
         )
       )`
     : sql``
+  const sectionWhere = latestEventsSectionWhere(query.section)
 
   return sql`
     select
@@ -197,20 +210,26 @@ function buildLatestEventsSql(query: PublicLatestEventsQuery): SQL {
       f.event_date,
       f.created_at,
       f.asset_count,
+      e.location as event_location,
+      c.name as category_name,
       f.preview_asset_id,
       f.preview_width,
       f.preview_height,
       f.preview_url,
       card.storage_key as preview_storage_key
     from public_event_feed_items f
+    left join photo_events e on e.id = f.event_id
+    left join asset_categories c on c.id = e.category_id
     left join image_derivatives card
       on card.image_asset_id = f.preview_asset_id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
     where f.is_public = true
-      and f.created_at >= (current_timestamp - (${query.windowDays}::int * interval '1 day'))
+      and f.event_date is not null
+      and f.event_date >= (current_timestamp - (${query.windowDays}::int * interval '1 day'))
+      ${sectionWhere}
       ${cursorWhere}
-    order by f.created_at desc, f.event_id desc
+    order by f.event_date desc, f.event_id desc
     limit ${pageSize}
   `
 }
@@ -220,7 +239,33 @@ export function parseLatestEventsQuery(input: PublicLatestEventsQueryInput): Pub
     windowDays: parseWindowDays(input.windowDays ?? null),
     limit: parseLimit(input.limit ?? null),
     cursor: parseCursor(input.cursor ?? null),
+    section: parseSection(input.section ?? null),
   }
+}
+
+function parseSection(value: string | null): PublicLatestEventsSection {
+  const normalized = value?.trim().toLowerCase()
+  if (!normalized || normalized === "latest") return "latest"
+  if (
+    normalized === "news" ||
+    normalized === "sports" ||
+    normalized === "entertainment" ||
+    normalized === "retro"
+  ) {
+    return normalized
+  }
+  throw new AppError(400, "INVALID_SECTION", "section must be latest, news, sports, entertainment, or retro.")
+}
+
+function latestEventsSectionWhere(section: PublicLatestEventsSection): SQL {
+  if (section === "latest") return sql``
+  if (section === "retro") {
+    return sql`and (
+      lower(coalesce(c.name, '')) = 'retro'
+      or lower(coalesce(c.name, '')) like '%archive%'
+    )`
+  }
+  return sql`and lower(coalesce(c.name, '')) = ${section}`
 }
 
 function parseWindowDays(value: string | null): number {
@@ -251,9 +296,9 @@ function parseCursor(value: string | null): LatestEventsCursor | null {
       .replaceAll("_", "/")
       .padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=")
     const parsed = JSON.parse(atob(padded)) as Partial<LatestEventsCursor>
-    if (!parsed.createdAt || !parsed.id || !isUuid(parsed.id)) throw new Error("invalid cursor")
-    if (!toIso(parsed.createdAt)) throw new Error("invalid cursor")
-    return { createdAt: parsed.createdAt, id: parsed.id }
+    if (!parsed.eventDate || !parsed.id || !isUuid(parsed.id)) throw new Error("invalid cursor")
+    if (!toIso(parsed.eventDate)) throw new Error("invalid cursor")
+    return { eventDate: parsed.eventDate, id: parsed.id }
   } catch {
     throw new AppError(400, "INVALID_CURSOR", "Cursor is invalid.")
   }

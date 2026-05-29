@@ -1,9 +1,5 @@
-// apps/web/src/app/(marketing)/search/page.tsx
-import { Suspense } from "react"
 import { SearchExperience } from "@/components/search/search-experience"
-import { SearchFiltersLoader } from "@/components/search/search-filters-loader"
 import { SearchFiltersProvider } from "@/components/search/search-filters-context"
-import { isTypesenseSearchEnabled, searchAssets } from "@/lib/api/fotocorp-api"
 import type { PublicAssetListResponse, PublicAssetSort } from "@/features/assets/types"
 import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 
@@ -38,10 +34,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const sort = parseSort(params.sort, q)
   const year = parseOptionalNumber(params.year)
   const month = parseOptionalNumber(params.month)
-  const cursor = normalized(params.cursor)
   const page = parseOptionalNumber(params.page) ?? 1
   const view: "grid" | "card" = params.view === "card" ? "card" : "grid"
-  const useTypesense = isTypesenseSearchEnabled()
   const initialParams = {
     q,
     categoryId: normalized(params.categoryId ?? params.category),
@@ -51,43 +45,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     year,
     month,
     sort,
-    cursor: useTypesense ? undefined : cursor,
-    page: useTypesense ? page : undefined,
+    cursor: undefined,
+    page,
     view,
   }
 
-  const pageStartedAt = Date.now()
-  let assetsFetchMs = 0
-
-  let initialResult: PublicAssetListResponse = { items: [], nextCursor: null }
-  let hasLoadError = false
-
-  try {
-    const startedAt = Date.now()
-    initialResult = await searchAssets({ ...initialParams, limit: 50 })
-    assetsFetchMs = Date.now() - startedAt
-  } catch {
-    assetsFetchMs = Date.now() - pageStartedAt
-    hasLoadError = true
-  }
+  const initialResult: PublicAssetListResponse = { items: [], nextCursor: null }
 
   const selectedEvent = deriveSelectedEvent(initialParams.eventId, initialResult.items)
-  const totalMs = Date.now() - pageStartedAt
-
-  console.info(
-    JSON.stringify({
-      route: "/search",
-      backend: initialResult.timing?.backend ?? "postgres",
-      eventId: initialParams.eventId ?? null,
-      city: initialParams.city ?? null,
-      timings: {
-        assets_fetch: assetsFetchMs,
-        upstream_took: initialResult.timing?.tookMs,
-        render_prepare: Math.max(0, totalMs - assetsFetchMs),
-        total: totalMs,
-      },
-    }),
-  )
 
   return (
     <SearchFiltersProvider initialFilters={initialResult.filters}>
@@ -96,14 +61,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         initialParams={initialParams}
         initialResult={initialResult}
         selectedEvent={selectedEvent}
-        hasLoadError={hasLoadError}
-        paginationMode={useTypesense ? "page" : "cursor"}
+        paginationMode="page"
       />
-      {!useTypesense && (
-        <Suspense fallback={null}>
-          <SearchFiltersLoader />
-        </Suspense>
-      )}
     </SearchFiltersProvider>
   )
 }

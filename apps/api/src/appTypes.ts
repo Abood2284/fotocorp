@@ -13,6 +13,12 @@ export interface Env {
   PUBLIC_PREVIEW_CDN_BASE_URL?: string;
   /** Optional CDN path version segment for deterministic preview URLs when storage_key is unavailable. Defaults to v1. */
   PUBLIC_PREVIEW_CDN_VERSION?: string;
+  /** Public web origin used to build targeted Cloudflare cache purge URLs, for example https://www.fotocorp.com. */
+  PUBLIC_WEB_ORIGIN?: string;
+  /** Optional Cloudflare zone id for targeted public cache purge after staff metadata edits. */
+  CLOUDFLARE_CACHE_PURGE_ZONE_ID?: string;
+  /** Optional Cloudflare API token with cache purge permission. */
+  CLOUDFLARE_CACHE_PURGE_API_TOKEN?: string;
   TYPESENSE_HOST?: string;
   TYPESENSE_API_KEY?: string;
   TYPESENSE_COLLECTION_ALIAS?: string;

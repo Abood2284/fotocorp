@@ -19,6 +19,8 @@ interface TracedProxyOptions {
   accept?: string
   upstreamRevalidateSeconds?: number
   passthroughCacheControl?: boolean
+  responseCacheControl?: string
+  responseBody?: boolean
 }
 
 export async function tracedUpstreamProxy(options: TracedProxyOptions): Promise<Response> {
@@ -98,6 +100,11 @@ export async function tracedUpstreamProxy(options: TracedProxyOptions): Promise<
   const bodyText = await upstream.text()
   tracker.mark("json_parse")
 
+  const responseCacheControl = options.responseCacheControl
+    ?? (options.passthroughCacheControl
+      ? (upstream.headers.get("cache-control") ?? "private, no-store")
+      : "private, no-store")
+
   const responseHeaders = buildProxyResponseHeaders({
     requestId,
     serverTiming: formatServerTiming(
@@ -107,9 +114,7 @@ export async function tracedUpstreamProxy(options: TracedProxyOptions): Promise<
       },
       tracker.total(),
     ),
-    cacheControl: options.passthroughCacheControl
-      ? (upstream.headers.get("cache-control") ?? "private, no-store")
-      : "private, no-store",
+    cacheControl: responseCacheControl,
     contentType: upstream.headers.get("content-type") ?? "application/json",
     upstreamRequestId: upstream.headers.get(FOTOCORP_REQUEST_ID_HEADER),
   })
@@ -146,7 +151,7 @@ export async function tracedUpstreamProxy(options: TracedProxyOptions): Promise<
       : {}),
   })
 
-  return new Response(bodyText, {
+  return new Response(options.responseBody === false ? null : bodyText, {
     status: upstream.status,
     headers: responseHeaders,
   })
