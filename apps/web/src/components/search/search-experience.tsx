@@ -154,8 +154,8 @@ export function SearchExperience({
   const {
     data: filterSnapshot,
   } = useQuery({
-    queryKey: ["public-search-filters"],
-    queryFn: () => getPublicAssetFilters(),
+    queryKey: ["public-search-filters", { includeCounts: false }],
+    queryFn: () => getPublicAssetFilters({ includeCounts: false }),
     staleTime: 5 * 60_000,
     gcTime: 10 * 60_000,
     refetchOnWindowFocus: false,
@@ -262,10 +262,6 @@ export function SearchExperience({
   useEffect(() => {
     setQueryDraft(initialParams.q ?? "")
   }, [initialParams.q])
-
-  useEffect(() => {
-    if (displayResult?.filters) mergeFilters(displayResult.filters)
-  }, [displayResult?.filters, mergeFilters])
 
   useEffect(() => {
     if (filterSnapshot) mergeFilters(filterSnapshot)
@@ -580,7 +576,6 @@ export function SearchExperience({
               <FilterPanel
                 categories={filters.categories}
                 events={filters.events}
-                cities={filters.cities ?? []}
                 params={initialParams}
                 disabled={isPending}
                 onUpdate={updateParams}
@@ -691,7 +686,6 @@ function SearchGridSkeleton() {
 function FilterPanel({
   categories,
   events,
-  cities,
   params,
   disabled,
   onUpdate,
@@ -699,7 +693,6 @@ function FilterPanel({
 }: {
   categories: PublicAssetFiltersResponse["categories"]
   events: PublicAssetFiltersResponse["events"]
-  cities: NonNullable<PublicAssetFiltersResponse["cities"]>
   params: SearchExperienceProps["initialParams"]
   disabled?: boolean
   onUpdate: (next: Partial<SearchExperienceProps["initialParams"]>, forceSort?: boolean) => void
@@ -772,6 +765,7 @@ function FilterPanel({
       <FilterList
         title="Categories"
         emptyLabel="No categories available"
+        showCounts={false}
         items={categories.map((category) => ({ id: category.id, label: category.name, count: category.assetCount }))}
         activeId={params.categoryId}
         onSelect={(id) => onUpdate({ categoryId: id === params.categoryId ? undefined : id })}
@@ -780,6 +774,7 @@ function FilterPanel({
       <FilterList
         title="Events"
         emptyLabel="No events available"
+        showCounts={false}
         items={events.slice(0, 24).map((event) => ({
           id: event.id,
           label: event.name ?? "Untitled event",
@@ -788,18 +783,6 @@ function FilterPanel({
         }))}
         activeId={params.eventId}
         onSelect={(id) => onUpdate({ eventId: id === params.eventId ? undefined : id })}
-      />
-
-      <FilterList
-        title="Cities"
-        emptyLabel="No cities available"
-        items={cities.slice(0, 24).map((city) => ({
-          id: city.id,
-          label: city.name,
-          count: city.assetCount,
-        }))}
-        activeId={params.city}
-        onSelect={(id) => onUpdate({ city: id === params.city ? undefined : id })}
       />
     </aside>
   )
@@ -810,12 +793,14 @@ function FilterList({
   items,
   activeId,
   emptyLabel,
+  showCounts = true,
   onSelect,
 }: {
   title: string
   items: Array<{ id: string; label: string; count: number; meta?: string | null }>
   activeId?: string
   emptyLabel: string
+  showCounts?: boolean
   onSelect: (id: string) => void
 }) {
   return (
@@ -837,7 +822,9 @@ function FilterList({
                 <span className="block truncate font-medium">{item.label}</span>
                 {item.meta && <span className="block text-xs text-muted-foreground">{item.meta}</span>}
               </span>
-              <span className="shrink-0 text-xs text-muted-foreground">{formatInteger(item.count)}</span>
+              {showCounts && (
+                <span className="shrink-0 text-xs text-muted-foreground">{formatInteger(item.count)}</span>
+              )}
             </button>
           ))}
         </div>

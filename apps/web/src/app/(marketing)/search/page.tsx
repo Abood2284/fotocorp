@@ -1,4 +1,7 @@
+import { Suspense } from "react"
+
 import { SearchExperience } from "@/components/search/search-experience"
+import { SearchFiltersLoader } from "@/components/search/search-filters-loader"
 import { SearchFiltersProvider } from "@/components/search/search-filters-context"
 import { isTypesenseSearchEnabled, searchPublicAssets, searchPublicEvents } from "@/lib/api/fotocorp-api"
 import type { PublicAssetListResponse, PublicAssetSort, PublicSearchEventsResponse } from "@/features/assets/types"
@@ -56,7 +59,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   const typesenseSearchEnabled = isTypesenseSearchEnabled()
   const isEventsMode = mode === "events" && typesenseSearchEnabled
-  const [{ result: initialResult, hasLoadError }, initialEventResult, initialImageCount, initialEventCount] = await Promise.all([
+  const [
+    { result: initialResult, hasLoadError },
+    initialEventResult,
+    initialImageCount,
+    initialEventCount,
+  ] = await Promise.all([
     isEventsMode
       ? Promise.resolve({ result: emptySearchResult(), hasLoadError: false })
       : loadInitialSearchResult(initialParams),
@@ -68,7 +76,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const selectedEvent = deriveSelectedEvent(initialParams.eventId, initialResult.items)
 
   return (
-    <SearchFiltersProvider initialFilters={initialResult.filters}>
+    <SearchFiltersProvider>
       <SearchExperience
         key={JSON.stringify(initialParams)}
         initialParams={initialParams}
@@ -81,6 +89,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         paginationMode="page"
         typesenseSearchEnabled={typesenseSearchEnabled}
       />
+      <Suspense fallback={null}>
+        <SearchFiltersLoader includeCounts={false} />
+      </Suspense>
     </SearchFiltersProvider>
   )
 }

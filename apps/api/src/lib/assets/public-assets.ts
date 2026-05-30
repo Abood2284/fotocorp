@@ -301,7 +301,15 @@ export async function getPublicAssetDetail(
   return { asset: await toAssetDto(row, secret, ttlSeconds, true, cdn) };
 }
 
-export async function getPublicAssetFilters(db: DrizzleClient) {
+interface PublicAssetFiltersOptions {
+  includeCounts?: boolean;
+}
+
+export async function getPublicAssetFilters(db: DrizzleClient, options: PublicAssetFiltersOptions = {}) {
+  if (options.includeCounts === false) {
+    return getPublicAssetFiltersWithoutCounts(db);
+  }
+
   const categoriesSql = sql`
     select c.id, c.name, count(*)::int as asset_count
     from image_assets a
@@ -352,6 +360,38 @@ export async function getPublicAssetFilters(db: DrizzleClient) {
       name: row.name,
       eventDate: toIso(row.event_date),
       assetCount: Number(row.asset_count),
+    })),
+  };
+}
+
+async function getPublicAssetFiltersWithoutCounts(db: DrizzleClient) {
+  const [categories, events] = await Promise.all([
+    executeRows<{ id: string; name: string | null }>(db, sql`
+      select id, name
+      from asset_categories
+      order by name asc
+      limit 100
+    `),
+    executeRows<{ id: string; name: string | null; event_date: Date | null }>(db, sql`
+      select id, name, event_date
+      from photo_events
+      where status = 'ACTIVE'
+      order by event_date desc nulls last, id desc
+      limit 100
+    `),
+  ]);
+
+  return {
+    categories: categories.map((row) => ({
+      id: row.id,
+      name: row.name ?? "Untitled category",
+      assetCount: 0,
+    })),
+    events: events.map((row) => ({
+      id: row.id,
+      name: row.name,
+      eventDate: toIso(row.event_date),
+      assetCount: 0,
     })),
   };
 }

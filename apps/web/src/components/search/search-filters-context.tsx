@@ -5,6 +5,11 @@ import type { PublicAssetFiltersResponse } from "@/features/assets/types"
 
 const EMPTY_FILTERS: PublicAssetFiltersResponse = { categories: [], events: [], cities: [], sources: [] }
 
+export function hasPopulatedAssetFilters(filters: PublicAssetFiltersResponse | undefined) {
+  if (!filters) return false
+  return filters.categories.length > 0 || filters.events.length > 0
+}
+
 interface SearchFiltersContextValue {
   filters: PublicAssetFiltersResponse
   isLoading: boolean
@@ -22,7 +27,7 @@ export function SearchFiltersProvider({
 }) {
   const [state, setState] = useState({
     filters: initialFilters ?? EMPTY_FILTERS,
-    isLoading: !initialFilters,
+    isLoading: !hasPopulatedAssetFilters(initialFilters),
   })
 
   const mergeFilters = useCallback((filters: PublicAssetFiltersResponse) => {

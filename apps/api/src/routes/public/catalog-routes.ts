@@ -313,7 +313,8 @@ publicCatalogRoutes.get("/api/v1/search/events", async (c) => {
 publicCatalogRoutes.all("/api/v1/search/events", () => methodNotAllowed());
 
 publicCatalogRoutes.get("/api/v1/assets/filters", async (c) => {
-  return json(await getPublicAssetFilters(db(c.env)), 200, {
+  const includeCounts = c.req.query("includeCounts") !== "false";
+  return json(await getPublicAssetFilters(db(c.env), { includeCounts }), 200, {
     headers: { "Cache-Control": PUBLIC_CATALOG_FILTERS_CACHE_CONTROL },
   });
 });

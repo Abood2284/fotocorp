@@ -198,9 +198,14 @@ export async function getPublicAsset(assetId: string): Promise<PublicAssetDetail
 }
 
 export async function getPublicAssetFilters(
-  options: { cachePolicy?: PublicJsonCachePolicy } = {},
+  options: { cachePolicy?: PublicJsonCachePolicy; includeCounts?: boolean } = {},
 ): Promise<PublicAssetFiltersResponse> {
-  return getJson<PublicAssetFiltersResponse>(resolveFiltersPath(), {
+  const searchParams = new URLSearchParams()
+  if (options.includeCounts === false) searchParams.set("includeCounts", "false")
+  const query = searchParams.toString()
+  const path = `${resolveFiltersPath()}${query ? `?${query}` : ""}`
+
+  return getJson<PublicAssetFiltersResponse>(path, {
     cachePolicy: options.cachePolicy ?? "public-filters-long",
   })
 }
