@@ -35,7 +35,7 @@ export function SearchEventResultsGrid({ events }: SearchEventResultsGridProps) 
           {event.matchingAssetCount > 0 && (
             <div className="absolute right-3 top-3 flex items-center gap-1.5 rounded-sm bg-black/50 px-2 py-1 text-[13px] font-medium text-white backdrop-blur-md">
               <ImageIcon strokeWidth={2} size={16} />
-              <span>{formatInteger(event.matchingAssetCount)} matching images</span>
+              <span>{formatInteger(event.matchingAssetCount)} images</span>
             </div>
           )}
 

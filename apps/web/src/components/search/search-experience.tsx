@@ -46,10 +46,12 @@ interface SearchExperienceProps {
   }
   initialEventResult?: PublicSearchEventsResponse | null
   initialImageCount?: number
+  initialEventCount?: number
   initialResult: PublicAssetListResponse
   selectedEvent?: SearchSelectedEvent | null
   hasLoadError?: boolean
   paginationMode?: "cursor" | "page"
+  typesenseSearchEnabled?: boolean
 }
 
 type SearchViewMode = "grid" | "card"
@@ -84,9 +86,11 @@ export function SearchExperience({
   initialResult,
   initialEventResult = null,
   initialImageCount,
+  initialEventCount,
   selectedEvent = null,
   hasLoadError = false,
   paginationMode = "cursor",
+  typesenseSearchEnabled: typesenseSearchEnabledProp,
 }: SearchExperienceProps) {
   const router = useRouter()
   const { filters, isLoading: filtersLoading, mergeFilters } = useSearchFilters()
@@ -94,7 +98,11 @@ export function SearchExperience({
   const [showFilters, setShowFilters] = useState(false)
   const [queryDraft, setQueryDraft] = useState(initialParams.q ?? "")
   const resultMode = initialParams.mode ?? "images"
-  const typesenseSearchEnabled = isTypesenseSearchEnabled()
+  const typesenseSearchEnabled = resolveTypesenseSearchEnabled({
+    serverFlag: typesenseSearchEnabledProp,
+    initialEventCount,
+    initialEventResult,
+  })
   const searchQueryParams = useMemo(
     () => buildSearchQueryParams(initialParams, paginationMode),
     [initialParams, paginationMode],
@@ -239,7 +247,7 @@ export function SearchExperience({
     ? 1
     : resultMode === "events"
       ? (displayEventResult?.foundEvents ?? 0)
-      : (eventCountSnapshot?.foundEvents ?? 0)
+      : (eventCountSnapshot?.foundEvents ?? initialEventCount ?? 0)
   const isPagePagination = paginationMode === "page"
   const isEventsMode = resultMode === "events"
   const activePageSize = isEventsMode ? EVENT_PAGE_SIZE : PAGE_SIZE
@@ -655,7 +663,7 @@ export function SearchExperience({
               <div className="border border-border bg-background py-16">
                 <EmptyState
                   icon={Images}
-                  title="No matching images found."
+                  title="No images found."
                   description={effectiveHasLoadError
                     ? "Search is temporarily unavailable. Try again in a moment."
                     : hasActiveFilters ? "Try a broader search or remove a few filters." : "Try a different search term."}
@@ -1158,4 +1166,18 @@ function deriveSelectedEventFromItems(
 
 function buildSearchScrollKey(searchCacheKey: string) {
   return `${searchCacheKey}:scrollY`
+}
+
+function resolveTypesenseSearchEnabled({
+  serverFlag,
+  initialEventCount,
+  initialEventResult,
+}: {
+  serverFlag?: boolean
+  initialEventCount?: number
+  initialEventResult?: PublicSearchEventsResponse | null
+}) {
+  if (serverFlag !== undefined) return serverFlag
+  if (initialEventCount !== undefined || initialEventResult != null) return true
+  return isTypesenseSearchEnabled()
 }

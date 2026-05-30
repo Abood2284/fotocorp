@@ -54,13 +54,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     mode,
   }
 
-  const isEventsMode = mode === "events" && isTypesenseSearchEnabled()
-  const [{ result: initialResult, hasLoadError }, initialEventResult, initialImageCount] = await Promise.all([
+  const typesenseSearchEnabled = isTypesenseSearchEnabled()
+  const isEventsMode = mode === "events" && typesenseSearchEnabled
+  const [{ result: initialResult, hasLoadError }, initialEventResult, initialImageCount, initialEventCount] = await Promise.all([
     isEventsMode
       ? Promise.resolve({ result: emptySearchResult(), hasLoadError: false })
       : loadInitialSearchResult(initialParams),
     isEventsMode ? loadInitialEventSearchResult(initialParams) : Promise.resolve(null),
     isEventsMode ? loadInitialImageCount(initialParams) : Promise.resolve(undefined),
+    !isEventsMode && typesenseSearchEnabled ? loadInitialEventCount(initialParams) : Promise.resolve(undefined),
   ])
 
   const selectedEvent = deriveSelectedEvent(initialParams.eventId, initialResult.items)
@@ -73,9 +75,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         initialResult={initialResult}
         initialEventResult={initialEventResult}
         initialImageCount={initialImageCount}
+        initialEventCount={initialEventCount}
         selectedEvent={selectedEvent}
         hasLoadError={hasLoadError}
         paginationMode="page"
+        typesenseSearchEnabled={typesenseSearchEnabled}
       />
     </SearchFiltersProvider>
   )
@@ -150,6 +154,37 @@ async function loadInitialImageCount(
       includeFacets: false,
     })
     return result.totalCount
+  } catch {
+    return undefined
+  }
+}
+
+async function loadInitialEventCount(
+  params: {
+    q?: string
+    categoryId?: string
+    eventId?: string
+    city?: string
+    contributorId?: string
+    year?: number
+    month?: number
+    sort: PublicAssetSort
+  },
+): Promise<number | undefined> {
+  try {
+    const result = await searchPublicEvents({
+      q: params.q,
+      categoryId: params.categoryId,
+      eventId: params.eventId,
+      city: params.city,
+      contributorId: params.contributorId,
+      year: params.year,
+      month: params.month,
+      sort: params.sort,
+      page: 1,
+      limit: 1,
+    })
+    return result.foundEvents
   } catch {
     return undefined
   }
