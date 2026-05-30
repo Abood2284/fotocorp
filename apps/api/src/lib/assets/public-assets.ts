@@ -233,16 +233,21 @@ export async function listPublicRoyaltyFreeFeaturedAssets(
 
   const queryStartedAt = Date.now();
   const rows = await executeRows<AssetRow>(db, sql`
+    with featured as materialized (
+      select
+        asset_id,
+        rank
+      from public_royalty_free_featured_items
+      where period_key = ${periodKey}
+        and status = 'ACTIVE'
+      order by rank asc, asset_id asc
+      limit ${limit}
+    )
     ${selectAssetSql(undefined)}
-    ${fromAssetSql()}
-    join public_creative_featured_items featured
-      on featured.asset_id = a.id
-      and featured.period_key = ${periodKey}
-      and featured.status = 'ACTIVE'
+    ${fromRoyaltyFreeFeaturedAssetSql()}
     where ${publicAssetPredicate("a")}
       and card.id is not null
-    order by featured.rank asc, featured.asset_id asc
-    limit ${limit}
+    order by f.rank asc, f.asset_id asc
   `);
   const query = Date.now() - queryStartedAt;
 
@@ -269,7 +274,7 @@ export async function listPublicRoyaltyFreeFeaturedAssets(
   };
 }
 
-/** @deprecated Use {@link listPublicRoyaltyFreeFeaturedAssets} — table name unchanged. */
+/** @deprecated Use {@link listPublicRoyaltyFreeFeaturedAssets}. */
 export const listPublicCreativeFeaturedAssets = listPublicRoyaltyFreeFeaturedAssets;
 
 function currentPeriodKey(date = new Date()): string {
@@ -612,6 +617,36 @@ function selectAssetSql(q: string | undefined): SQL {
       detail.width as detail_width,
       detail.height as detail_height,
       detail.storage_key as detail_storage_key
+  `;
+}
+
+function fromRoyaltyFreeFeaturedAssetSql(): SQL {
+  return sql`
+    from featured f
+    join image_assets a
+      on a.id = f.asset_id
+    join image_derivatives card
+      on card.image_asset_id = a.id
+      and card.variant = 'CARD'
+      and card.generation_status = 'READY'
+      and card.is_watermarked = true
+      and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
+    left join image_derivatives thumb
+      on thumb.image_asset_id = a.id
+      and thumb.variant = 'THUMB'
+      and thumb.generation_status = 'READY'
+      and thumb.is_watermarked = true
+      and thumb.watermark_profile = ${THUMB_LIGHT_PREVIEW_PROFILE}
+    left join image_derivatives detail
+      on detail.image_asset_id = a.id
+      and detail.variant = 'DETAIL'
+      and detail.generation_status = 'READY'
+      and detail.is_watermarked = true
+      and detail.watermark_profile = ${DETAIL_PREVIEW_PROFILE}
+    left join asset_categories ac on ac.id = a.category_id
+    left join photo_events e on e.id = a.event_id
+    left join asset_categories ec on ec.id = e.category_id
+    left join contributors p on p.id = a.contributor_id
   `;
 }
 

@@ -293,24 +293,31 @@ export function HomeCategorySection() {
                     key={card.id}
                     className="relative h-[250px] w-[90vw] max-w-[1300px] shrink-0 snap-center overflow-hidden rounded-none border border-border bg-muted sm:h-[300px] lg:h-[380px]"
                   >
-                    <img src={card.image} alt={card.title} className="h-full w-full object-cover" />
-                    <div className="absolute inset-0 bg-black/45" />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white">
+                    <img
+                      src={card.image}
+                      alt={card.title}
+                      className="h-full w-full object-cover brightness-[0.82] saturate-[0.92]"
+                    />
+                    <div
+                      className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/50 to-black/75"
+                      aria-hidden
+                    />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-white [text-shadow:0_1px_14px_rgba(0,0,0,0.75)]">
                       {card.brand && (
-                        <div className="mb-1.5 font-sans text-xs font-bold uppercase tracking-wider text-white">
+                        <div className="mb-1.5 font-sans text-xs font-bold uppercase tracking-wider !text-white">
                           {card.brand}
                         </div>
                       )}
-                      <h3 className="mb-2 font-heading text-3xl font-normal text-white sm:text-4xl lg:text-5xl">
+                      <h3 className="mb-2 font-heading text-3xl font-normal !text-white sm:text-4xl lg:text-5xl">
                         {card.title}
                       </h3>
                       {card.subtitle && (
-                        <p className="mb-3 font-body font-normal text-white text-xl sm:text-2xl">
+                        <p className="mb-3 font-body text-xl font-normal !text-white sm:text-2xl">
                           {card.subtitle}
                         </p>
                       )}
                       {card.description && (
-                        <p className="mb-6 max-w-2xl font-body font-normal text-white text-sm sm:text-base lg:text-lg">
+                        <p className="mb-6 max-w-2xl font-body text-sm font-normal !text-white sm:text-base lg:text-lg">
                           {card.description}
                         </p>
                       )}
@@ -351,7 +358,7 @@ export function HomeCategorySection() {
                   }}
                 />
               ) : royaltyFreeQuery.isFetching && !royaltyFreeQuery.data ? (
-                <SectionSkeleton />
+                <SectionSkeleton featuredGrid />
               ) : (royaltyFreeQuery.data?.items.length ?? 0) === 0 ? (
                 <RoyaltyFreeEmptyState
                   onShowLatest={() => {
@@ -360,7 +367,11 @@ export function HomeCategorySection() {
                   }}
                 />
               ) : (
-                <PublicAssetGrid assets={royaltyFreeQuery.data?.items ?? []} dense />
+                <PublicAssetGrid
+                  assets={royaltyFreeQuery.data?.items ?? []}
+                  featured
+                  className="px-4 sm:px-6 lg:px-8"
+                />
               )}
             </div>
           </div>
@@ -508,7 +519,30 @@ function RoyaltyFreeEmptyState({
   )
 }
 
-function SectionSkeleton({ tall = false }: { tall?: boolean }) {
+function SectionSkeleton({
+  tall = false,
+  featuredGrid = false,
+}: {
+  tall?: boolean
+  featuredGrid?: boolean
+}) {
+  if (featuredGrid) {
+    return (
+      <div className="w-full animate-pulse px-4 sm:px-6 lg:px-8" aria-hidden>
+        {[0, 1, 2].map((rowIndex) => (
+          <div
+            key={rowIndex}
+            className="mb-2 flex h-[220px] w-full gap-2 sm:h-[280px] sm:gap-3"
+          >
+            {Array.from({ length: 4 }).map((_, tileIndex) => (
+              <div key={tileIndex} className="h-full flex-1 rounded-none bg-muted" />
+            ))}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   const heightClass = tall ? "h-[300px] sm:h-[400px] lg:h-[500px]" : "h-56"
 
   return (
