@@ -1,6 +1,11 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
-import { buildLatestEventsResponse, parseLatestEventsQuery } from "../src/lib/assets/public-homepage"
+import {
+  buildEventCategoryBrowseResponse,
+  buildLatestEventsResponse,
+  parseEventCategoryBrowseQuery,
+  parseLatestEventsQuery,
+} from "../src/lib/assets/public-homepage"
 import {
   buildPublicPreviewCdnUrl,
   resolvePublicStablePreviewUrl,
@@ -176,5 +181,42 @@ describe("buildLatestEventsResponse", () => {
     assert.equal(decoded.eventDate, "2026-05-20T00:00:00.000Z")
     assert.equal(decoded.createdAt, undefined)
     assert.equal(decoded.id, "22222222-2222-4222-8222-222222222222")
+  })
+})
+
+describe("buildEventCategoryBrowseResponse", () => {
+  it("defaults to 25, rejects latest, and omits total counts", () => {
+    const query = parseEventCategoryBrowseQuery({ section: "news", limit: null, cursor: null })
+    const response = buildEventCategoryBrowseResponse(
+      [
+        {
+          event_id: "22222222-2222-4222-8222-222222222222",
+          title: "Archive news event",
+          event_date: "2026-01-01T00:00:00.000Z",
+          created_at: "2026-05-01T12:00:00.000Z",
+          asset_count: 2,
+          event_location: null,
+          category_name: "News",
+          preview_asset_id: SAMPLE_ASSET_ID,
+          preview_width: 612,
+          preview_height: 408,
+          preview_url: `/api/media/assets/${SAMPLE_ASSET_ID}/preview/card`,
+          preview_storage_key: "previews/v1/card/news.webp",
+        },
+      ],
+      query,
+      { baseUrl: null, version: null },
+    )
+
+    assert.equal(query.limit, 25)
+    assert.equal(response.section, "news")
+    assert.equal(response.limit, 25)
+    assert.equal(response.items.length, 1)
+    assert.equal(Object.hasOwn(response, "total"), false)
+    assert.equal(Object.hasOwn(response, "totalCount"), false)
+    assert.throws(
+      () => parseEventCategoryBrowseQuery({ section: "latest", limit: "25", cursor: null }),
+      /section must be news, sports, entertainment, or retro/,
+    )
   })
 })

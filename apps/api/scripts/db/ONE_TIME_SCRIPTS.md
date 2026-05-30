@@ -17,6 +17,26 @@ Do not add long-lived business logic here — use Drizzle migrations or permanen
 | Script | npm command | Purpose | Delete after |
 | --- | --- | --- | --- |
 | `backfill-legacy-fotokeys.ts` | `pnpm --dir apps/api db:backfill:legacy-fotokeys` | Copy `legacy_image_code` → `fotokey` (+ `fotokey_date`, `fotokey_sequence`, `fotokey_assigned_at`) for `FC…` codes; sync `fotokey_daily_counters` | Backfill + `db:validate:fotokey-publish` pass on **every** env you care about |
+| `backfill-photo-events-category-id.ts` | `pnpm --dir apps/api db:backfill:photo-events-category-id` | Set `photo_events.category_id` from dominant public `image_assets.category_id` | Backfill verified on **every** env you care about; re-run investigation browse counts |
+
+### `backfill-photo-events-category-id.ts` — how to run
+
+**Requires:** `DATABASE_URL` in `apps/api/.dev.vars` pointing at the intended Neon branch.
+
+```bash
+# 1) Preview counts (no writes)
+pnpm --dir apps/api db:backfill:photo-events-category-id -- --dry-run
+
+# 2) Apply
+pnpm --dir apps/api db:backfill:photo-events-category-id
+```
+
+**Behavior**
+
+- Considers only `image_assets` with `event_id`, `category_id`, `status = 'ACTIVE'`, `visibility = 'PUBLIC'`.
+- Picks dominant category per event by asset count, then lowest `asset_categories.legacy_category_code`.
+- Updates only rows where `photo_events.category_id IS NULL`.
+- Does not touch `public_event_feed_items`, Latest, browse routes, or schema.
 
 ### `backfill-legacy-fotokeys.ts` — how to run
 

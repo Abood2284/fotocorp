@@ -23,8 +23,12 @@ export interface Env {
   TYPESENSE_API_KEY?: string;
   TYPESENSE_COLLECTION_ALIAS?: string;
   TYPESENSE_SEARCH_TIMEOUT_MS?: string;
+  /** Optional higher timeout budget for grouped event search (defaults to 8000ms). */
+  TYPESENSE_EVENT_SEARCH_TIMEOUT_MS?: string;
   TYPESENSE_CF_ACCESS_CLIENT_ID?: string;
   TYPESENSE_CF_ACCESS_CLIENT_SECRET?: string;
+  /** Diagnostic-only flag for homepage and public catalog latency investigation logs. */
+  HOMEPAGE_DEBUG_LATENCY?: string;
   INTERNAL_API_SECRET?: string;
   LEGACY_FIXTURE_ROUTES_ENABLED?: string;
   /**

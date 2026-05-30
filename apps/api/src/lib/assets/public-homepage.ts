@@ -5,6 +5,7 @@ import {
   type PublicPreviewCdnConfig,
   resolvePublicStablePreviewUrl,
 } from "../media/public-preview-cdn-url"
+import { joinPublicCardDerivative, publicAssetPredicate } from "./public-catalog-sql"
 
 export interface PublicHomepageEventDto {
   id: string
@@ -25,6 +26,11 @@ export interface PublicLatestEventsResponseDto {
   nextCursor: string | null
   hasMore: boolean
   generatedAt: string
+}
+
+export interface PublicEventCategoryBrowseResponseDto extends PublicLatestEventsResponseDto {
+  section: PublicEventBrowseSection
+  limit: number
 }
 
 export interface PublicHomepageFeedDto {
@@ -51,6 +57,7 @@ interface PublicLatestEventsQuery {
 }
 
 export type PublicLatestEventsSection = "latest" | "news" | "sports" | "entertainment" | "retro"
+export type PublicEventBrowseSection = Exclude<PublicLatestEventsSection, "latest">
 
 interface LatestEventsCursor {
   eventDate: string
@@ -74,8 +81,10 @@ interface HomepageEventRow {
 
 const DEFAULT_WINDOW_DAYS = 30
 const DEFAULT_EVENT_LIMIT = 15
+const DEFAULT_BROWSE_LIMIT = 25
 const MAX_EVENT_LIMIT = 50
 const MAX_WINDOW_DAYS = 365
+const NULL_EVENT_DATE_CURSOR = new Date(0).toISOString()
 
 export async function getPublicHomepageFeed(
   db: DrizzleClient,
@@ -166,6 +175,87 @@ export function buildLatestEventsResponse(
   }
 }
 
+export interface PublicEventCategoryBrowseQueryInput {
+  limit?: string | null
+  cursor?: string | null
+  section?: string | null
+}
+
+export interface PublicEventCategoryBrowseQuery {
+  limit: number
+  cursor: LatestEventsCursor | null
+  section: PublicEventBrowseSection
+}
+
+export interface PublicEventCategoryBrowseDbTrace {
+  dbMs: number
+  rowCount: number
+  queryName: "public_event_category_browse"
+  projection: false
+  sourceTable: "photo_events"
+  limit: number
+  hasCursor: boolean
+  section: PublicEventBrowseSection
+}
+
+export function parseEventCategoryBrowseQuery(
+  input: PublicEventCategoryBrowseQueryInput,
+): PublicEventCategoryBrowseQuery {
+  return {
+    limit: parseLimit(input.limit ?? null, DEFAULT_BROWSE_LIMIT),
+    cursor: parseCursor(input.cursor ?? null),
+    section: parseBrowseSection(input.section ?? null),
+  }
+}
+
+export async function fetchPublicEventCategoryBrowseRows(
+  db: DrizzleClient,
+  query: PublicEventCategoryBrowseQuery,
+): Promise<{ rows: HomepageEventRow[]; dbTrace: PublicEventCategoryBrowseDbTrace }> {
+  const dbStartedAt = Date.now()
+  const rows = await executeRows<HomepageEventRow>(db, buildEventCategoryBrowseSql(query))
+  const dbMs = Date.now() - dbStartedAt
+
+  return {
+    rows,
+    dbTrace: {
+      dbMs,
+      rowCount: rows.length,
+      queryName: "public_event_category_browse",
+      projection: false,
+      sourceTable: "photo_events",
+      limit: query.limit,
+      hasCursor: Boolean(query.cursor),
+      section: query.section,
+    },
+  }
+}
+
+export function buildEventCategoryBrowseResponse(
+  rows: HomepageEventRow[],
+  query: PublicEventCategoryBrowseQuery,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
+): PublicEventCategoryBrowseResponseDto {
+  const pageRows = rows.slice(0, query.limit)
+  const lastReturnedRow = pageRows.at(-1)
+  const hasMore = rows.length > query.limit
+  const nextCursor = hasMore && lastReturnedRow
+    ? encodeLatestEventsCursor({
+        eventDate: toIso(lastReturnedRow.event_date) ?? NULL_EVENT_DATE_CURSOR,
+        id: lastReturnedRow.event_id,
+      })
+    : null
+
+  return {
+    section: query.section,
+    limit: query.limit,
+    items: pageRows.map((row) => mapEventRow(row, cdn)),
+    nextCursor,
+    hasMore,
+    generatedAt: new Date().toISOString(),
+  }
+}
+
 function mapEventRow(row: HomepageEventRow, cdn: PublicPreviewCdnConfig): PublicHomepageEventDto {
   const previewUrl = row.preview_asset_id
     ? resolvePublicStablePreviewUrl(cdn, {
@@ -190,19 +280,7 @@ function mapEventRow(row: HomepageEventRow, cdn: PublicPreviewCdnConfig): Public
   }
 }
 
-function buildLatestEventsSql(query: PublicLatestEventsQuery): SQL {
-  const pageSize = query.limit + 1
-  const cursorWhere = query.cursor
-    ? sql`and (
-        f.event_date < ${query.cursor.eventDate}::timestamptz
-        or (
-          f.event_date = ${query.cursor.eventDate}::timestamptz
-          and f.event_id < ${query.cursor.id}::uuid
-        )
-      )`
-    : sql``
-  const sectionWhere = latestEventsSectionWhere(query.section)
-
+function selectHomepageEventRowsSql(): SQL {
   return sql`
     select
       f.event_id,
@@ -224,6 +302,24 @@ function buildLatestEventsSql(query: PublicLatestEventsQuery): SQL {
       on card.image_asset_id = f.preview_asset_id
       and card.variant = 'CARD'
       and card.generation_status = 'READY'
+  `
+}
+
+function buildLatestEventsSql(query: PublicLatestEventsQuery): SQL {
+  const pageSize = query.limit + 1
+  const cursorWhere = query.cursor
+    ? sql`and (
+        f.event_date < ${query.cursor.eventDate}::timestamptz
+        or (
+          f.event_date = ${query.cursor.eventDate}::timestamptz
+          and f.event_id < ${query.cursor.id}::uuid
+        )
+      )`
+    : sql``
+  const sectionWhere = latestEventsSectionWhere(query.section)
+
+  return sql`
+    ${selectHomepageEventRowsSql()}
     where f.is_public = true
       and f.event_date is not null
       and f.event_date >= (current_timestamp - (${query.windowDays}::int * interval '1 day'))
@@ -234,10 +330,110 @@ function buildLatestEventsSql(query: PublicLatestEventsQuery): SQL {
   `
 }
 
+function buildEventCategoryBrowseSql(query: PublicEventCategoryBrowseQuery): SQL {
+  const pageSize = query.limit + 1
+  const cursorWhere = query.cursor ? browseCursorWhere(query.cursor) : sql``
+  const sectionWhere = browseSectionWhere(query.section)
+  const hasPublicPreview = sql`
+    exists (
+      select 1
+      from image_assets a
+      ${joinPublicCardDerivative("a", "browse_card_exists")}
+      where a.event_id = pe.id
+        and ${publicAssetPredicate("a")}
+    )
+  `
+
+  return sql`
+    with page_events as (
+      select
+        pe.id as event_id,
+        pe.name as title,
+        pe.event_date,
+        pe.created_at,
+        pe.location as event_location,
+        c.name as category_name
+      from photo_events pe
+      join asset_categories c on c.id = pe.category_id
+      where pe.status = 'ACTIVE'
+        and pe.category_id is not null
+        ${sectionWhere}
+        and ${hasPublicPreview}
+        ${cursorWhere}
+      order by pe.event_date desc nulls last, pe.id desc
+      limit ${pageSize}
+    ),
+    eligible_assets as (
+      select
+        a.id as asset_id,
+        a.event_id,
+        a.image_date,
+        a.created_at,
+        browse_card.width as preview_width,
+        browse_card.height as preview_height,
+        browse_card.storage_key as preview_storage_key
+      from image_assets a
+      ${joinPublicCardDerivative("a", "browse_card")}
+      where a.event_id in (select event_id from page_events)
+        and ${publicAssetPredicate("a")}
+    ),
+    event_counts as (
+      select event_id, count(*)::int as asset_count
+      from eligible_assets
+      group by event_id
+    ),
+    event_previews as (
+      select distinct on (event_id)
+        event_id,
+        asset_id as preview_asset_id,
+        preview_width,
+        preview_height,
+        preview_storage_key
+      from eligible_assets
+      order by event_id, coalesce(image_date, created_at) desc, asset_id desc
+    )
+    select
+      pe.event_id,
+      pe.title,
+      pe.event_date,
+      pe.created_at,
+      coalesce(ec.asset_count, 0) as asset_count,
+      pe.event_location,
+      pe.category_name,
+      ep.preview_asset_id,
+      ep.preview_width,
+      ep.preview_height,
+      '' as preview_url,
+      ep.preview_storage_key
+    from page_events pe
+    left join event_counts ec on ec.event_id = pe.event_id
+    left join event_previews ep on ep.event_id = pe.event_id
+    order by pe.event_date desc nulls last, pe.event_id desc
+  `
+}
+
+function browseSectionWhere(section: PublicEventBrowseSection): SQL {
+  return sql`and lower(c.name) = ${section}`
+}
+
+function browseCursorWhere(cursor: LatestEventsCursor): SQL {
+  if (cursor.eventDate === NULL_EVENT_DATE_CURSOR) {
+    return sql`and pe.event_date is null and pe.id < ${cursor.id}::uuid`
+  }
+
+  return sql`and (
+    pe.event_date < ${cursor.eventDate}::timestamptz
+    or (
+      pe.event_date = ${cursor.eventDate}::timestamptz
+      and pe.id < ${cursor.id}::uuid
+    )
+  )`
+}
+
 export function parseLatestEventsQuery(input: PublicLatestEventsQueryInput): PublicLatestEventsQuery {
   return {
     windowDays: parseWindowDays(input.windowDays ?? null),
-    limit: parseLimit(input.limit ?? null),
+    limit: parseLimit(input.limit ?? null, DEFAULT_EVENT_LIMIT),
     cursor: parseCursor(input.cursor ?? null),
     section: parseSection(input.section ?? null),
   }
@@ -255,6 +451,19 @@ function parseSection(value: string | null): PublicLatestEventsSection {
     return normalized
   }
   throw new AppError(400, "INVALID_SECTION", "section must be latest, news, sports, entertainment, or retro.")
+}
+
+function parseBrowseSection(value: string | null): PublicEventBrowseSection {
+  const normalized = value?.trim().toLowerCase()
+  if (
+    normalized === "news" ||
+    normalized === "sports" ||
+    normalized === "entertainment" ||
+    normalized === "retro"
+  ) {
+    return normalized
+  }
+  throw new AppError(400, "INVALID_SECTION", "section must be news, sports, entertainment, or retro.")
 }
 
 function latestEventsSectionWhere(section: PublicLatestEventsSection): SQL {
@@ -277,8 +486,8 @@ function parseWindowDays(value: string | null): number {
   return parsed
 }
 
-function parseLimit(value: string | null): number {
-  if (!value) return DEFAULT_EVENT_LIMIT
+function parseLimit(value: string | null, defaultLimit: number): number {
+  if (!value) return defaultLimit
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_EVENT_LIMIT) {
     throw new AppError(400, "INVALID_LIMIT", `limit must be an integer between 1 and ${MAX_EVENT_LIMIT}.`)

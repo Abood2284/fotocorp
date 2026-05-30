@@ -1,23 +1,29 @@
 "use client"
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 
 import { PublicEventsGrid } from "@/components/assets/public-events-grid"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
-import { fetchCreativeFeaturedAssets, fetchPublicLatestEvents } from "@/lib/api/fotocorp-api"
-import type { PublicEvent, PublicHomepageEvent, PublicLatestEventsResponse, PublicLatestEventsSection } from "@/features/assets/types"
+import { fetchRoyaltyFreeFeaturedAssets, fetchPublicEventCategoryBrowse, fetchPublicLatestEvents } from "@/lib/api/fotocorp-api"
+import type {
+  PublicEvent,
+  PublicEventBrowseSection,
+  PublicHomepageEvent,
+  PublicLatestEventsResponse,
+  PublicLatestEventsSection,
+} from "@/features/assets/types"
 
 type TabType = "Editorial" | "Video" | "Caricature" | "Creative"
 type EditorialSubcategory = "Latest" | "News" | "Sports" | "Entertainment" | "Retro"
 type LoadState = "loading" | "ready" | "error"
 
 const LATEST_EVENTS_LIMIT = 15
+const CATEGORY_BROWSE_EVENTS_LIMIT = 25
 const CREATIVE_ASSETS_LIMIT = 50
 const RECENT_EVENTS_WINDOW_DAYS = 30
-const WIDE_EVENTS_WINDOW_DAYS = 365
 
 const EDITORIAL_SECTIONS: Record<EditorialSubcategory, PublicLatestEventsSection> = {
   Latest: "latest",
@@ -78,25 +84,22 @@ function mapHomepageEventToPublicEvent(event: PublicHomepageEvent): PublicEvent 
 
 async function fetchHomepageEventsSection(section: PublicLatestEventsSection): Promise<{
   response: PublicLatestEventsResponse
-  windowDays: number
+  mode: "latest" | "category-browse"
 }> {
-  const recent = await fetchPublicLatestEvents({
-    windowDays: RECENT_EVENTS_WINDOW_DAYS,
-    limit: LATEST_EVENTS_LIMIT,
-    section,
-  })
-
-  if (section === "latest" || recent.items.length > 0) {
-    return { response: recent, windowDays: RECENT_EVENTS_WINDOW_DAYS }
+  if (section === "latest") {
+    const response = await fetchPublicLatestEvents({
+      windowDays: RECENT_EVENTS_WINDOW_DAYS,
+      limit: LATEST_EVENTS_LIMIT,
+      section,
+    })
+    return { response, mode: "latest" }
   }
 
-  const wider = await fetchPublicLatestEvents({
-    windowDays: WIDE_EVENTS_WINDOW_DAYS,
-    limit: LATEST_EVENTS_LIMIT,
-    section,
+  const response = await fetchPublicEventCategoryBrowse({
+    limit: CATEGORY_BROWSE_EVENTS_LIMIT,
+    section: section as PublicEventBrowseSection,
   })
-
-  return { response: wider, windowDays: WIDE_EVENTS_WINDOW_DAYS }
+  return { response, mode: "category-browse" }
 }
 
 export function HomeCategorySection() {
@@ -109,22 +112,32 @@ export function HomeCategorySection() {
   const [hasMoreEventPages, setHasMoreEventPages] = useState(false)
   const [loadingMoreEvents, setLoadingMoreEvents] = useState(false)
   const eventQuery = useQuery({
-    queryKey: ["homepage-events", selectedSection, RECENT_EVENTS_WINDOW_DAYS, LATEST_EVENTS_LIMIT],
+    queryKey: [
+      "homepage-events",
+      selectedSection,
+      selectedSection === "latest" ? RECENT_EVENTS_WINDOW_DAYS : "archive",
+      selectedSection === "latest" ? LATEST_EVENTS_LIMIT : CATEGORY_BROWSE_EVENTS_LIMIT,
+    ],
     queryFn: () => fetchHomepageEventsSection(selectedSection),
-    staleTime: 60_000,
+    staleTime: selectedSection === "latest" ? 60_000 : 86_400_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
-    placeholderData: keepPreviousData,
   })
-  const creativeQuery = useQuery({
-    queryKey: ["homepage-creative-featured", CREATIVE_ASSETS_LIMIT],
-    queryFn: () => fetchCreativeFeaturedAssets({ limit: CREATIVE_ASSETS_LIMIT }),
+  const royaltyFreeQuery = useQuery({
+    queryKey: ["homepage-royalty-free-featured", CREATIVE_ASSETS_LIMIT],
+    queryFn: () => fetchRoyaltyFreeFeaturedAssets({ limit: CREATIVE_ASSETS_LIMIT }),
     enabled: activeTab === "Creative",
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   })
   const baseEventData = eventQuery.data
+
+  useEffect(() => {
+    setEventPageItems([])
+    setEventPageCursor(null)
+    setHasMoreEventPages(false)
+  }, [selectedSection])
 
   useEffect(() => {
     setEventPageItems([])
@@ -149,12 +162,18 @@ export function HomeCategorySection() {
     setLoadingMoreEvents(true)
 
     try {
-      const response = await fetchPublicLatestEvents({
-        windowDays: baseEventData.windowDays,
-        limit: LATEST_EVENTS_LIMIT,
-        cursor: eventPageCursor,
-        section: selectedSection,
-      })
+      const response = baseEventData.mode === "latest"
+        ? await fetchPublicLatestEvents({
+            windowDays: RECENT_EVENTS_WINDOW_DAYS,
+            limit: LATEST_EVENTS_LIMIT,
+            cursor: eventPageCursor,
+            section: selectedSection,
+          })
+        : await fetchPublicEventCategoryBrowse({
+            limit: CATEGORY_BROWSE_EVENTS_LIMIT,
+            cursor: eventPageCursor,
+            section: selectedSection as PublicEventBrowseSection,
+          })
       setEventPageItems((current) => [...current, ...response.items])
       setEventPageCursor(response.nextCursor)
       setHasMoreEventPages(response.hasMore)
@@ -220,7 +239,7 @@ export function HomeCategorySection() {
                 : "border-b-2 border-transparent text-muted-foreground hover:text-black"
             }`}
           >
-            Creative
+            Royalty Free
           </button>
         </div>
 
@@ -323,25 +342,25 @@ export function HomeCategorySection() {
             </div>
 
             <div className="mt-1 w-full">
-              {creativeQuery.isError ? (
-                <CreativeEmptyState
+              {royaltyFreeQuery.isError ? (
+                <RoyaltyFreeEmptyState
                   error
                   onShowLatest={() => {
                     setActiveTab("Editorial")
                     setEditorialSub("Latest")
                   }}
                 />
-              ) : creativeQuery.isFetching && !creativeQuery.data ? (
+              ) : royaltyFreeQuery.isFetching && !royaltyFreeQuery.data ? (
                 <SectionSkeleton />
-              ) : (creativeQuery.data?.items.length ?? 0) === 0 ? (
-                <CreativeEmptyState
+              ) : (royaltyFreeQuery.data?.items.length ?? 0) === 0 ? (
+                <RoyaltyFreeEmptyState
                   onShowLatest={() => {
                     setActiveTab("Editorial")
                     setEditorialSub("Latest")
                   }}
                 />
               ) : (
-                <PublicAssetGrid assets={creativeQuery.data?.items ?? []} dense />
+                <PublicAssetGrid assets={royaltyFreeQuery.data?.items ?? []} dense />
               )}
             </div>
           </div>
@@ -424,9 +443,9 @@ function EditorialEmptyState({
   const browseHref = isLatest ? "/search?sort=newest" : `/search?q=${encodeURIComponent(sectionLabel)}`
   const title = isLatest
     ? "No recent Editorial events yet."
-    : `No recent ${sectionLabel} events yet.`
+    : `No ${sectionLabel} events found.`
   const description = isLatest
-    ? "View the latest image coverage or explore Creative picks."
+    ? "View the latest image coverage or explore royalty-free picks."
     : `Browse all ${sectionLabel} images or view latest Editorial coverage.`
 
   return (
@@ -451,14 +470,14 @@ function EditorialEmptyState({
           onClick={onShowCreative}
           className="button-outline-square px-5 py-3 text-xs uppercase tracking-wider"
         >
-          Explore Creative Picks
+          Explore Royalty-Free Picks
         </button>
       </div>
     </div>
   )
 }
 
-function CreativeEmptyState({
+function RoyaltyFreeEmptyState({
   error = false,
   onShowLatest,
 }: {
@@ -468,7 +487,7 @@ function CreativeEmptyState({
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center px-4 py-12 text-center sm:px-6 lg:px-8">
       <h3 className="font-heading text-2xl font-normal text-foreground">
-        {error ? "Creative picks are temporarily unavailable." : "Creative picks are being prepared."}
+        {error ? "Royalty-free picks are temporarily unavailable." : "Royalty-free picks are being prepared."}
       </h3>
       <p className="mt-2 text-sm text-muted-foreground">
         Browse latest editorial coverage or check back soon.

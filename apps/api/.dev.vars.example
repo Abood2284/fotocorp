@@ -24,6 +24,8 @@ TYPESENSE_HOST=http://127.0.0.1:8108
 TYPESENSE_API_KEY=change-me
 TYPESENSE_COLLECTION_ALIAS=public_assets_current
 TYPESENSE_SEARCH_TIMEOUT_MS=1500
+# Grouped event search uses a higher default timeout (8000ms) unless overridden here.
+TYPESENSE_EVENT_SEARCH_TIMEOUT_MS=8000
 # Optional for production Typesense behind Cloudflare Tunnel + Access service auth.
 # Store real values as Worker secrets, not browser env vars or committed files.
 TYPESENSE_CF_ACCESS_CLIENT_ID=

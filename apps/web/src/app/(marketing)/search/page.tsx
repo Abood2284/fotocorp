@@ -1,7 +1,7 @@
 import { SearchExperience } from "@/components/search/search-experience"
 import { SearchFiltersProvider } from "@/components/search/search-filters-context"
-import { searchPublicAssets } from "@/lib/api/fotocorp-api"
-import type { PublicAssetListResponse, PublicAssetSort } from "@/features/assets/types"
+import { isTypesenseSearchEnabled, searchPublicAssets, searchPublicEvents } from "@/lib/api/fotocorp-api"
+import type { PublicAssetListResponse, PublicAssetSort, PublicSearchEventsResponse } from "@/features/assets/types"
 import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 
 interface SearchPageProps {
@@ -19,6 +19,7 @@ interface SearchPageProps {
     cursor?: string
     page?: string
     view?: string
+    mode?: string
   }>
 }
 
@@ -37,6 +38,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const month = parseOptionalNumber(params.month)
   const page = parseOptionalNumber(params.page) ?? 1
   const view: "grid" | "card" = params.view === "card" ? "card" : "grid"
+  const mode: "images" | "events" = params.mode === "events" ? "events" : "images"
   const initialParams = {
     q,
     categoryId: normalized(params.categoryId ?? params.category),
@@ -49,9 +51,17 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     cursor: undefined,
     page,
     view,
+    mode,
   }
 
-  const { result: initialResult, hasLoadError } = await loadInitialSearchResult(initialParams)
+  const isEventsMode = mode === "events" && isTypesenseSearchEnabled()
+  const [{ result: initialResult, hasLoadError }, initialEventResult, initialImageCount] = await Promise.all([
+    isEventsMode
+      ? Promise.resolve({ result: emptySearchResult(), hasLoadError: false })
+      : loadInitialSearchResult(initialParams),
+    isEventsMode ? loadInitialEventSearchResult(initialParams) : Promise.resolve(null),
+    isEventsMode ? loadInitialImageCount(initialParams) : Promise.resolve(undefined),
+  ])
 
   const selectedEvent = deriveSelectedEvent(initialParams.eventId, initialResult.items)
 
@@ -61,6 +71,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         key={JSON.stringify(initialParams)}
         initialParams={initialParams}
         initialResult={initialResult}
+        initialEventResult={initialEventResult}
+        initialImageCount={initialImageCount}
         selectedEvent={selectedEvent}
         hasLoadError={hasLoadError}
         paginationMode="page"
@@ -95,6 +107,7 @@ async function loadInitialSearchResult(
         sort: params.sort,
         page: params.page,
         limit: 50,
+        includeFacets: false,
       }),
       hasLoadError: false,
     }
@@ -103,6 +116,73 @@ async function loadInitialSearchResult(
       result: { items: [], nextCursor: null },
       hasLoadError: true,
     }
+  }
+}
+
+function emptySearchResult(): PublicAssetListResponse {
+  return { items: [], nextCursor: null }
+}
+
+async function loadInitialImageCount(
+  params: {
+    q?: string
+    categoryId?: string
+    eventId?: string
+    city?: string
+    contributorId?: string
+    year?: number
+    month?: number
+    sort: PublicAssetSort
+  },
+): Promise<number | undefined> {
+  try {
+    const result = await searchPublicAssets({
+      q: params.q,
+      categoryId: params.categoryId,
+      eventId: params.eventId,
+      city: params.city,
+      contributorId: params.contributorId,
+      year: params.year,
+      month: params.month,
+      sort: params.sort,
+      page: 1,
+      limit: 1,
+      includeFacets: false,
+    })
+    return result.totalCount
+  } catch {
+    return undefined
+  }
+}
+
+async function loadInitialEventSearchResult(
+  params: {
+    q?: string
+    categoryId?: string
+    eventId?: string
+    city?: string
+    contributorId?: string
+    year?: number
+    month?: number
+    sort: PublicAssetSort
+    page?: number
+  },
+): Promise<PublicSearchEventsResponse | null> {
+  try {
+    return await searchPublicEvents({
+      q: params.q,
+      categoryId: params.categoryId,
+      eventId: params.eventId,
+      city: params.city,
+      contributorId: params.contributorId,
+      year: params.year,
+      month: params.month,
+      sort: params.sort,
+      page: params.page,
+      limit: 25,
+    })
+  } catch {
+    return null
   }
 }
 

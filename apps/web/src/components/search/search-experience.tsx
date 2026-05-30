@@ -10,6 +10,7 @@ import type {
   PublicAssetFiltersResponse,
   PublicAssetListResponse,
   PublicAssetSort,
+  PublicSearchEventsResponse,
 } from "@/features/assets/types"
 import { PublicAssetCard } from "@/components/assets/public-asset-card"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
@@ -18,12 +19,13 @@ import {
   SearchCategoryTabsSkeleton,
   SearchFilterPanelSkeleton,
 } from "@/components/search/search-filter-skeletons"
+import { SearchEventResultsGrid } from "@/components/search/search-event-results-grid"
 import { useSearchFilters } from "@/components/search/search-filters-context"
 import { Button } from "@/components/ui/button"
 import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
-import { searchPublicAssets } from "@/lib/api/fotocorp-api"
+import { getPublicAssetFilters, isTypesenseSearchEnabled, searchPublicAssets, searchPublicEvents } from "@/lib/api/fotocorp-api"
 import { cn, formatInteger } from "@/lib/utils"
-import {  Calendars, ChevronDown, ChevronLeft, ChevronRight, Images, Rows, SlidersHorizontal, X, Grid3x3, SearchIcon, ListFilterIcon  } from "lucide-react"
+import { Calendars, ChevronDown, ChevronLeft, ChevronRight, Images, SlidersHorizontal, X, SearchIcon, ListFilterIcon } from "lucide-react"
 
 export type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 
@@ -40,7 +42,10 @@ interface SearchExperienceProps {
     cursor?: string
     page?: number
     view?: SearchViewMode
+    mode?: SearchResultMode
   }
+  initialEventResult?: PublicSearchEventsResponse | null
+  initialImageCount?: number
   initialResult: PublicAssetListResponse
   selectedEvent?: SearchSelectedEvent | null
   hasLoadError?: boolean
@@ -48,6 +53,7 @@ interface SearchExperienceProps {
 }
 
 type SearchViewMode = "grid" | "card"
+type SearchResultMode = "images" | "events"
 
 const SORT_OPTIONS: Array<{ label: string; value: PublicAssetSort }> = [
   { label: "Best match", value: "relevance" },
@@ -71,10 +77,13 @@ const MONTH_OPTIONS = [
 ]
 
 const PAGE_SIZE = 50
+const EVENT_PAGE_SIZE = 25
 
 export function SearchExperience({
   initialParams,
   initialResult,
+  initialEventResult = null,
+  initialImageCount,
   selectedEvent = null,
   hasLoadError = false,
   paginationMode = "cursor",
@@ -84,9 +93,24 @@ export function SearchExperience({
   const [isPending, startTransition] = useTransition()
   const [showFilters, setShowFilters] = useState(false)
   const [queryDraft, setQueryDraft] = useState(initialParams.q ?? "")
+  const resultMode = initialParams.mode ?? "images"
+  const typesenseSearchEnabled = isTypesenseSearchEnabled()
   const searchQueryParams = useMemo(
     () => buildSearchQueryParams(initialParams, paginationMode),
     [initialParams, paginationMode],
+  )
+  const searchScopeQueryParams = useMemo(
+    () => buildSearchScopeQueryParams(initialParams),
+    [
+      initialParams.q,
+      initialParams.categoryId,
+      initialParams.eventId,
+      initialParams.city,
+      initialParams.contributorId,
+      initialParams.year,
+      initialParams.month,
+      initialParams.sort,
+    ],
   )
   const searchCacheKey = useMemo(
     () => `fotocorp:search:v2:${JSON.stringify(searchQueryParams)}`,
@@ -110,21 +134,115 @@ export function SearchExperience({
       sort: searchQueryParams.sort,
       page: searchQueryParams.page,
       limit: PAGE_SIZE,
+      includeFacets: false,
     }),
     initialData: initialResult.items.length > 0 ? initialResult : undefined,
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
+    enabled: resultMode === "images",
   })
-  const items = displayResult.items
-  const nextCursor = displayResult.nextCursor
-  const hasMore = displayResult.hasMore ?? Boolean(nextCursor)
+  const {
+    data: filterSnapshot,
+  } = useQuery({
+    queryKey: ["public-search-filters"],
+    queryFn: () => getPublicAssetFilters(),
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    enabled: filtersLoading,
+  })
+  const eventSearchQueryParams = useMemo(
+    () => buildEventSearchQueryParams(initialParams, paginationMode),
+    [initialParams, paginationMode],
+  )
+  const {
+    data: imageCountSnapshot,
+  } = useQuery({
+    queryKey: ["public-search-images-count", searchScopeQueryParams],
+    queryFn: () => searchPublicAssets({
+      q: searchScopeQueryParams.q,
+      categoryId: searchScopeQueryParams.categoryId,
+      eventId: searchScopeQueryParams.eventId,
+      city: searchScopeQueryParams.city,
+      contributorId: searchScopeQueryParams.contributorId,
+      year: searchScopeQueryParams.year,
+      month: searchScopeQueryParams.month,
+      sort: searchScopeQueryParams.sort,
+      page: 1,
+      limit: 1,
+      includeFacets: false,
+    }),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+    enabled: typesenseSearchEnabled && resultMode === "events",
+  })
+  const {
+    data: eventCountSnapshot,
+  } = useQuery({
+    queryKey: ["public-search-events-count", searchScopeQueryParams],
+    queryFn: () => searchPublicEvents({
+      q: searchScopeQueryParams.q,
+      categoryId: searchScopeQueryParams.categoryId,
+      eventId: searchScopeQueryParams.eventId,
+      city: searchScopeQueryParams.city,
+      contributorId: searchScopeQueryParams.contributorId,
+      year: searchScopeQueryParams.year,
+      month: searchScopeQueryParams.month,
+      sort: searchScopeQueryParams.sort,
+      page: 1,
+      limit: 1,
+    }),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+    enabled: typesenseSearchEnabled && resultMode === "images",
+  })
+  const {
+    data: displayEventResult = initialEventResult ?? undefined,
+    error: eventSearchError,
+    isFetching: isEventFetching,
+  } = useQuery({
+    queryKey: ["public-search-events", eventSearchQueryParams],
+    queryFn: () => searchPublicEvents({
+      q: eventSearchQueryParams.q,
+      categoryId: eventSearchQueryParams.categoryId,
+      eventId: eventSearchQueryParams.eventId,
+      city: eventSearchQueryParams.city,
+      contributorId: eventSearchQueryParams.contributorId,
+      year: eventSearchQueryParams.year,
+      month: eventSearchQueryParams.month,
+      sort: eventSearchQueryParams.sort,
+      page: eventSearchQueryParams.page,
+      limit: EVENT_PAGE_SIZE,
+    }),
+    initialData: initialEventResult?.items.length ? initialEventResult : undefined,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+    enabled: typesenseSearchEnabled && resultMode === "events",
+  })
+  const items = displayResult?.items ?? initialResult.items
+  const nextCursor = displayResult?.nextCursor ?? initialResult.nextCursor
+  const hasMore = displayResult?.hasMore ?? initialResult.hasMore ?? Boolean(nextCursor)
   const viewMode = initialParams.view ?? "grid"
   const resultEvent = deriveSelectedEventFromItems(initialParams.eventId, items)
   const eventFilterCount = filters.events.find((item) => item.id === initialParams.eventId)?.assetCount
-  const totalCount = displayResult.totalCount ?? eventFilterCount ?? items.length
+  const totalCount = displayResult?.totalCount ?? initialResult.totalCount ?? eventFilterCount ?? items.length
+  const eventItems = displayEventResult?.items ?? []
+  const eventCount = initialParams.eventId
+    ? 1
+    : resultMode === "events"
+      ? (displayEventResult?.foundEvents ?? 0)
+      : (eventCountSnapshot?.foundEvents ?? 0)
   const isPagePagination = paginationMode === "page"
+  const isEventsMode = resultMode === "events"
+  const activePageSize = isEventsMode ? EVENT_PAGE_SIZE : PAGE_SIZE
 
   const [history, setHistory] = useState<(string | undefined)[]>([undefined])
   const baseParamsKey = JSON.stringify({ ...initialParams, cursor: undefined })
@@ -138,8 +256,12 @@ export function SearchExperience({
   }, [initialParams.q])
 
   useEffect(() => {
-    if (displayResult.filters) mergeFilters(displayResult.filters)
-  }, [displayResult.filters, mergeFilters])
+    if (displayResult?.filters) mergeFilters(displayResult.filters)
+  }, [displayResult?.filters, mergeFilters])
+
+  useEffect(() => {
+    if (filterSnapshot) mergeFilters(filterSnapshot)
+  }, [filterSnapshot, mergeFilters])
 
   useEffect(() => {
     const scrollKey = buildSearchScrollKey(searchCacheKey)
@@ -167,7 +289,8 @@ export function SearchExperience({
     ?? filters.events.find((item) => item.id === initialParams.eventId)?.name
     ?? undefined
   const cityName = filters.cities?.find((item) => item.id === initialParams.city)?.name ?? initialParams.city
-  const activeEventCount = initialParams.eventId ? 1 : filtersLoading ? 0 : filters.events.length
+  const activeEventCount = eventCount
+  const inactiveImageCount = imageCountSnapshot?.totalCount ?? initialImageCount ?? 0
   const topCategories = filters.categories.slice(0, 5)
   const eventChipLabel = eventName
     ?? (initialParams.eventId
@@ -175,7 +298,7 @@ export function SearchExperience({
         ? "Loading event…"
         : "Selected event"
       : undefined)
-  const effectiveHasLoadError = hasLoadError || Boolean(searchError)
+  const effectiveHasLoadError = hasLoadError || Boolean(searchError) || (isEventsMode && Boolean(eventSearchError))
 
   const filterChips = useMemo(() => {
     const chips: Array<{ key: string; label: string; remove: () => void }> = []
@@ -206,6 +329,7 @@ export function SearchExperience({
     if (!isPagePagination && merged.cursor) params.set("cursor", merged.cursor)
     if (isPagePagination && merged.page && merged.page > 1) params.set("page", String(merged.page))
     if (merged.view === "card") params.set("view", "card")
+    if (merged.mode === "events") params.set("mode", "events")
 
     const effectiveSort = forceSort
       ? merged.q
@@ -241,6 +365,7 @@ export function SearchExperience({
         : {}),
       cursor: undefined,
       page: undefined,
+      mode: "images",
     })
   }
 
@@ -257,7 +382,17 @@ export function SearchExperience({
       sort: "newest",
       cursor: undefined,
       page: undefined,
+      mode: "images",
     })
+  }
+
+  function setResultMode(mode: SearchResultMode) {
+    if (mode === resultMode) return
+    updateParams({
+      mode,
+      page: undefined,
+      cursor: undefined,
+    }, false)
   }
 
   function goToNext() {
@@ -296,23 +431,35 @@ export function SearchExperience({
 
   const currentIndex = history.indexOf(initialParams.cursor)
   const displayPage = isPagePagination
-    ? (displayResult.page ?? initialParams.page ?? 1)
+    ? (isEventsMode
+      ? (displayEventResult?.page ?? initialParams.page ?? 1)
+      : (displayResult?.page ?? initialParams.page ?? 1))
     : currentIndex !== -1 ? currentIndex + 1 : (initialParams.cursor ? 2 : 1)
-  const exactTotalCount = displayResult.totalCount ?? eventFilterCount
-  const totalPages = displayResult.totalPages ?? (exactTotalCount !== undefined
-    ? Math.max(1, Math.ceil(exactTotalCount / PAGE_SIZE))
-    : Math.max(displayPage, hasMore ? displayPage + 1 : displayPage))
+  const exactTotalCount = isEventsMode
+    ? displayEventResult?.foundEvents
+    : (displayResult?.totalCount ?? eventFilterCount)
+  const totalPages = isEventsMode
+    ? (displayEventResult?.totalPages ?? Math.max(1, Math.ceil((displayEventResult?.foundEvents ?? eventItems.length) / activePageSize)))
+    : (displayResult?.totalPages ?? (exactTotalCount !== undefined
+      ? Math.max(1, Math.ceil(exactTotalCount / PAGE_SIZE))
+      : Math.max(displayPage, hasMore ? displayPage + 1 : displayPage)))
   const currentPage = Math.min(displayPage, totalPages)
-  const displayCount = exactTotalCount
-    ?? Math.max(totalCount, (displayPage - 1) * PAGE_SIZE + items.length)
-  const resultTitle = buildResultTitle(
-    displayCount,
-    initialParams.q,
-    categoryName,
-    eventName,
-    exactTotalCount === undefined && hasMore,
-  )
+  const displayCount = isEventsMode
+    ? (displayEventResult?.foundEvents ?? eventItems.length)
+    : (exactTotalCount ?? Math.max(totalCount, (displayPage - 1) * PAGE_SIZE + items.length))
+  const resultTitle = isEventsMode
+    ? buildEventResultTitle(displayCount, initialParams.q, categoryName, eventName)
+    : buildResultTitle(
+      displayCount,
+      initialParams.q,
+      categoryName,
+      eventName,
+      exactTotalCount === undefined && hasMore,
+    )
   const hasActiveFilters = filterChips.length > 0 || initialParams.sort !== "newest"
+  const isResultsFetching = isEventsMode ? isEventFetching : isFetching
+  const hasEventResults = eventItems.length > 0
+  const hasImageResults = items.length > 0
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -392,7 +539,7 @@ export function SearchExperience({
       </section>
 
       <section className="bg-surface-warm px-3 py-6 sm:px-5 lg:px-6">
-        <div className="mb-6 grid gap-5 md:grid-cols-[1fr_auto_190px] md:items-end">
+        <div className="mb-6 grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
           <div>
             <h1 className="text-2xl font-medium tracking-normal text-foreground md:text-3xl">
               {resultTitle}
@@ -400,12 +547,21 @@ export function SearchExperience({
             <ActiveChips chips={filterChips} onClearAll={clearAll} className="mt-3" />
           </div>
 
-          <div className="flex items-end gap-8">
-            <ResultMetric active label="Images" value={displayCount} suffix={!exactTotalCount && hasMore ? "+" : undefined} />
-            <ResultMetric label="Events" value={activeEventCount} />
+          <div className="ml-auto flex items-end gap-8">
+            <ResultMetric
+              active={!isEventsMode}
+              label="Images"
+              value={isEventsMode ? inactiveImageCount : displayCount}
+              suffix={!isEventsMode && exactTotalCount === undefined && hasMore ? "+" : undefined}
+              onClick={() => setResultMode("images")}
+            />
+            <ResultMetric
+              active={isEventsMode}
+              label="Events"
+              value={activeEventCount}
+              onClick={typesenseSearchEnabled ? () => setResultMode("events") : undefined}
+            />
           </div>
-
-          <ViewToggle value={viewMode} onChange={(value) => updateParams({ view: value }, false)} />
         </div>
 
         <div className={cn("grid gap-5", showFilters && "lg:grid-cols-[300px_minmax(0,1fr)]")}>
@@ -426,13 +582,41 @@ export function SearchExperience({
           )}
 
           <main className="relative min-w-0">
-            {(isPending || (isFetching && items.length > 0)) && (
+            {(isPending || (isResultsFetching && (isEventsMode ? hasEventResults : hasImageResults))) && (
               <div
                 className="pointer-events-none absolute inset-0 z-10 bg-background/35"
                 aria-hidden="true"
               />
             )}
-            {items.length > 0 ? (
+            {isEventsMode ? (
+              hasEventResults ? (
+                <>
+                  <SearchEventResultsGrid events={eventItems} />
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    isFirstPage={currentPage === 1}
+                    hasNextPage={isPagePagination ? currentPage < totalPages : Boolean(displayEventResult?.hasMore)}
+                    disabled={isPending}
+                    onPrev={goToPrev}
+                    onNext={goToNext}
+                  />
+                </>
+              ) : isResultsFetching ? (
+                <SearchGridSkeleton />
+              ) : (
+                <div className="border border-border bg-background py-16">
+                  <EmptyState
+                    icon={Images}
+                    title="No matching events found."
+                    description={effectiveHasLoadError
+                      ? "Search is temporarily unavailable. Try again in a moment."
+                      : hasActiveFilters ? "Try a broader search or remove a few filters." : "Try a different search term."}
+                    action={{ label: "View latest", href: "/search" }}
+                  />
+                </div>
+              )
+            ) : hasImageResults ? (
               <>
                 {viewMode === "grid" ? (
                   <PublicAssetGrid
@@ -465,7 +649,7 @@ export function SearchExperience({
                   onNext={goToNext}
                 />
               </>
-            ) : isFetching ? (
+            ) : isResultsFetching ? (
               <SearchGridSkeleton />
             ) : (
               <div className="border border-border bg-background py-16">
@@ -490,7 +674,7 @@ function SearchGridSkeleton() {
   return (
     <div className="grid grid-cols-2 border-l border-t border-border bg-background sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
       {Array.from({ length: 15 }).map((_, index) => (
-        <div key={index} className="aspect-[4/5] animate-pulse border-b border-r border-border bg-muted" />
+        <div key={index} className="aspect-4/5 animate-pulse border-b border-r border-border bg-muted" />
       ))}
     </div>
   )
@@ -684,46 +868,43 @@ function ResultMetric({
   label,
   value,
   suffix,
+  onClick,
 }: {
   active?: boolean
   label: string
   value: number
   suffix?: string
+  onClick?: () => void
 }) {
-  return (
-    <div className={cn("border-b-4 pb-1", active ? "border-accent" : "border-transparent")}>
+  const content = (
+    <>
       <span className="text-2xl font-medium text-foreground">{formatInteger(value)}{suffix}</span>
       <span className="ml-2 text-2xl font-medium text-foreground">{label}</span>
-    </div>
+    </>
   )
-}
 
-function ViewToggle({
-  value,
-  onChange,
-}: {
-  value: SearchViewMode
-  onChange: (value: SearchViewMode) => void
-}) {
+  if (!onClick) {
+    return (
+      <div className={cn("border-b-4 pb-1", active ? "border-accent" : "border-transparent")}>
+        {content}
+      </div>
+    )
+  }
+
   return (
-    <div className="ml-auto inline-flex h-12 overflow-hidden border border-border-strong bg-muted">
-      <button
-        type="button"
-        onClick={() => onChange("grid")}
-        className={cn("flex w-14 items-center justify-center border-r border-border-strong transition-colors", value === "grid" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
-        aria-label="Grid view"
-      >
-        <Grid3x3 className="h-6 w-6" />
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("card")}
-        className={cn("flex w-14 items-center justify-center transition-colors", value === "card" ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
-        aria-label="Card view"
-      >
-        <Rows className="h-6 w-6" />
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "-mx-2 cursor-pointer rounded-sm border-b-4 px-2 pb-1 text-left transition-colors",
+        active
+          ? "border-accent text-foreground hover:bg-muted/50"
+          : "border-transparent text-muted-foreground hover:border-border-strong hover:bg-muted/70 hover:text-foreground",
+      )}
+      aria-pressed={active}
+    >
+      {content}
+    </button>
   )
 }
 
@@ -865,6 +1046,19 @@ function buildResultTitle(
   return `${total} latest editorial photos and high-res pictures`
 }
 
+function buildEventResultTitle(
+  totalCount: number,
+  query?: string,
+  categoryName?: string,
+  eventName?: string,
+) {
+  const total = formatInteger(totalCount)
+  if (query) return `${total} events matching "${query}"`
+  if (eventName) return `${total} events for ${eventName}`
+  if (categoryName) return `${total} ${categoryName} events`
+  return `${total} matching events`
+}
+
 function formatShortDate(value: string | null | undefined) {
   if (!value) return null
   const date = new Date(value)
@@ -893,6 +1087,37 @@ function buildSearchAssetHref(asset: PublicAsset, params: SearchExperienceProps[
 
   const query = searchParams.toString()
   return query ? `/assets/${asset.id}?${query}` : `/assets/${asset.id}`
+}
+
+function buildSearchScopeQueryParams(params: SearchExperienceProps["initialParams"]) {
+  return {
+    q: params.q,
+    categoryId: params.categoryId,
+    eventId: params.eventId,
+    city: params.city,
+    contributorId: params.contributorId,
+    year: params.year,
+    month: params.month,
+    sort: params.sort,
+  }
+}
+
+function buildEventSearchQueryParams(
+  params: SearchExperienceProps["initialParams"],
+  paginationMode: SearchExperienceProps["paginationMode"],
+) {
+  return {
+    q: params.q,
+    categoryId: params.categoryId,
+    eventId: params.eventId,
+    city: params.city,
+    contributorId: params.contributorId,
+    year: params.year,
+    month: params.month,
+    sort: params.sort,
+    page: paginationMode === "page" ? params.page ?? 1 : 1,
+    mode: params.mode ?? "events",
+  }
 }
 
 function buildSearchQueryParams(

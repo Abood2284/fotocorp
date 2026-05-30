@@ -26,6 +26,8 @@ interface PublicAssetQuery {
   sort: SortMode;
 }
 
+type PublicAssetsDebugLog = (payload: Record<string, unknown>) => void;
+
 export interface PublicAssetListQueryInput {
   q?: string | null;
   categoryId?: string | null;
@@ -149,29 +151,87 @@ export async function listPublicAssets(
   secret: string | undefined,
   ttlSeconds: number,
   cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
+  debugLog?: PublicAssetsDebugLog,
 ) {
+  const startedAt = Date.now();
+  const parseStartedAt = Date.now();
   const query = parseListQuery(input);
-  const rows = await executeRows<AssetRow>(db, buildListSql(query));
+  debugLog?.({
+    step: "request_parse_done",
+    durationMs: Date.now() - parseStartedAt,
+    limit: query.limit,
+    sort: query.sort,
+    hasQuery: Boolean(query.q),
+    hasCursor: Boolean(query.cursor),
+    hasCategoryId: Boolean(query.categoryId),
+    hasEventId: Boolean(query.eventId),
+    hasContributorId: Boolean(query.contributorId),
+  });
+  const sqlStartedAt = Date.now();
+  const querySql = buildListSql(query);
+  debugLog?.({
+    step: "main_db_query_start",
+    limit: query.limit + 1,
+    sort: query.sort,
+  });
+  const rows = await executeRows<AssetRow>(db, querySql);
+  debugLog?.({
+    step: "main_db_query_done",
+    durationMs: Date.now() - sqlStartedAt,
+    rowCount: rows.length,
+  });
+  const paginationStartedAt = Date.now();
   const hasMore = rows.length > query.limit;
   const pageRows = rows.slice(0, query.limit);
+  debugLog?.({
+    step: "pagination_slice_done",
+    durationMs: Date.now() - paginationStartedAt,
+    rowCount: pageRows.length,
+    hasMore,
+  });
+  const mappingStartedAt = Date.now();
   const items = await Promise.all(pageRows.map((row) => toAssetDto(row, secret, ttlSeconds, false, cdn)));
+  debugLog?.({
+    step: "result_mapping_done",
+    durationMs: Date.now() - mappingStartedAt,
+    rowCount: items.length,
+  });
+  const cursorStartedAt = Date.now();
   const lastReturnedRow = pageRows.at(-1);
   const nextCursor = hasMore && lastReturnedRow
     ? encodeCursor(toCursor(lastReturnedRow, query.sort))
     : null;
+  debugLog?.({
+    step: "response_build_done",
+    durationMs: Date.now() - cursorStartedAt,
+    totalDurationMs: Date.now() - startedAt,
+    rowCount: items.length,
+    hasMore,
+    responseBytes: JSON.stringify({ items, nextCursor, hasMore }).length,
+  });
 
   return { items, nextCursor, hasMore };
 }
 
-export async function listPublicCreativeFeaturedAssets(
+export interface PublicRoyaltyFreeFeaturedTimings {
+  query: number;
+  previewResolve: number;
+  responseBuild: number;
+  total: number;
+}
+
+export async function listPublicRoyaltyFreeFeaturedAssets(
   db: DrizzleClient,
   input: { limit?: string | null },
   secret: string | undefined,
   ttlSeconds: number,
   cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ) {
+  const totalStartedAt = Date.now();
   const limit = input.limit ? Math.min(parseLimit(input.limit), 50) : 50;
   const periodKey = currentPeriodKey();
+
+  const queryStartedAt = Date.now();
   const rows = await executeRows<AssetRow>(db, sql`
     ${selectAssetSql(undefined)}
     ${fromAssetSql()}
@@ -184,14 +244,33 @@ export async function listPublicCreativeFeaturedAssets(
     order by featured.rank asc, featured.asset_id asc
     limit ${limit}
   `);
-  const items = await Promise.all(rows.map((row) => toAssetDto(row, secret, ttlSeconds, false, cdn)));
+  const query = Date.now() - queryStartedAt;
 
-  return {
+  const previewResolveStartedAt = Date.now();
+  const items = await Promise.all(rows.map((row) => toAssetDto(row, secret, ttlSeconds, false, cdn)));
+  const previewResolve = Date.now() - previewResolveStartedAt;
+
+  const responseBuildStartedAt = Date.now();
+  const response = {
     items,
     nextCursor: null,
     hasMore: false,
   };
+  const responseBuild = Date.now() - responseBuildStartedAt;
+
+  return {
+    response,
+    timings: {
+      query,
+      previewResolve,
+      responseBuild,
+      total: Date.now() - totalStartedAt,
+    },
+  };
 }
+
+/** @deprecated Use {@link listPublicRoyaltyFreeFeaturedAssets} — table name unchanged. */
+export const listPublicCreativeFeaturedAssets = listPublicRoyaltyFreeFeaturedAssets;
 
 function currentPeriodKey(date = new Date()): string {
   return date.toISOString().slice(0, 7);

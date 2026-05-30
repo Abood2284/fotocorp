@@ -57,6 +57,7 @@ Detailed PR write-ups live under [`reports/`](./reports/). They are kept for aud
 | [fotokey-publish-pipeline-report.md](./reports/fotokey-publish-pipeline-report.md) | PR-15.1 Fotokey + publish |
 | [pr-16i-asset-category-canonicalization-report.md](./reports/pr-16i-asset-category-canonicalization-report.md) | PR-16I public Fotokey + category model |
 | [pr-16e-jobs-docker-vps-deployment-report.md](./reports/pr-16e-jobs-docker-vps-deployment-report.md) | PR-16E jobs Docker + VPS |
+| [schema-legacy-duplication-audit-report.md](./reports/schema-legacy-duplication-audit-report.md) | Legacy vs clean schema audit, headline/log duplication, deprecation plan |
 
 > **Note:** `image-runtime-compatibility-spike-report.md` and `image-runtime-fallback-spike-report.md` are reserved names for future spikes if checked in; they are not present in the repo today.
 

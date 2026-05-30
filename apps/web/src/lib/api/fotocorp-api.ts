@@ -5,11 +5,16 @@ import type {
   PublicAssetFiltersResponse,
   PublicAssetListParams,
   PublicAssetListResponse,
+  PublicEventBrowseSection,
+  PublicEventCategoryBrowseResponse,
   PublicEventListResponse,
   PublicHomepageFeed,
   PublicHomepageFeedResult,
+  PublicHomepageHeroSetResponse,
   PublicLatestEventsResponse,
   PublicLatestEventsSection,
+  PublicSearchEventsResponse,
+  PublicSearchEventResult,
 } from "@/features/assets/types"
 import {
   createTimingTracker,
@@ -61,6 +66,7 @@ export function buildApiAssetUrl(path: string) {
 }
 
 export async function listPublicAssets(params: PublicAssetListParams = {}): Promise<PublicAssetListResponse> {
+  const startedAt = Date.now()
   const searchParams = new URLSearchParams()
   appendParam(searchParams, "q", params.q)
   appendParam(searchParams, "categoryId", params.categoryId)
@@ -73,22 +79,45 @@ export async function listPublicAssets(params: PublicAssetListParams = {}): Prom
   appendParam(searchParams, "sort", params.sort)
 
   const query = searchParams.toString()
+  logHomepageDebugStep({
+    event: "homepage_render_step",
+    step: "list_public_assets_request_start",
+    route: resolveAssetsPath(),
+    query,
+    cachePolicy: "public-short",
+  })
   const response = await getJson<PublicAssetListResponse & { assets?: PublicAsset[] }>(
     `${resolveAssetsPath()}${query ? `?${query}` : ""}`,
-    { cachePolicy: "public-short" },
+    {
+      cachePolicy: "public-short",
+      ...(isHomepageDebugLatencyEnabled()
+        ? { traceRoute: resolveAssetsPath(), layer: typeof window === "undefined" ? "web" as const : "browser" as const }
+        : {}),
+    },
   )
+  const normalizeStartedAt = Date.now()
   const responseItems = Array.isArray(response.items)
     ? response.items
     : Array.isArray(response.assets)
       ? response.assets
       : []
 
-  return {
+  const result = {
     items: responseItems.map(normalizeAssetPreviewUrls),
     nextCursor: response.nextCursor ?? null,
     hasMore: response.hasMore === true || Boolean(response.nextCursor),
     totalCount: typeof response.totalCount === "number" ? response.totalCount : undefined,
   }
+  logHomepageDebugStep({
+    event: "homepage_render_step",
+    step: "list_public_assets_request_done",
+    route: resolveAssetsPath(),
+    durationMs: Date.now() - startedAt,
+    normalizeMs: Date.now() - normalizeStartedAt,
+    rowCount: result.items.length,
+    hasMore: result.hasMore,
+  })
+  return result
 }
 
 export async function searchAssets(params: PublicAssetListParams = {}): Promise<PublicAssetListResponse> {
@@ -107,6 +136,7 @@ export async function searchPublicAssets(params: PublicAssetListParams = {}): Pr
   appendParam(searchParams, "page", params.page)
   appendParam(searchParams, "limit", params.limit)
   appendParam(searchParams, "sort", params.sort)
+  if (params.includeFacets === false) appendParam(searchParams, "includeFacets", "false")
 
   const query = searchParams.toString()
   const startedAt = Date.now()
@@ -123,6 +153,34 @@ export async function searchPublicAssets(params: PublicAssetListParams = {}): Pr
   logTypesenseSearchDebug(params, response, clientTtfbMs)
 
   return normalizeTypesenseSearchResponse(response)
+}
+
+export async function searchPublicEvents(params: PublicAssetListParams = {}): Promise<PublicSearchEventsResponse> {
+  const searchParams = new URLSearchParams()
+  appendParam(searchParams, "q", params.q)
+  appendTypesenseScopeParam(searchParams, "categoryId", "category", params.categoryId, params.category)
+  appendTypesenseScopeParam(searchParams, "eventId", "event", params.eventId, params.event)
+  appendParam(searchParams, "city", params.city)
+  appendParam(searchParams, "year", params.year)
+  appendParam(searchParams, "month", params.month)
+  appendParam(searchParams, "page", params.page)
+  appendParam(searchParams, "limit", params.limit ?? 25)
+  appendParam(searchParams, "sort", params.sort)
+
+  const query = searchParams.toString()
+  const response = await getJson<PublicSearchEventsResponse>(
+    `${resolveSearchEventsPath()}${query ? `?${query}` : ""}`,
+    {
+      cachePolicy: "public-search-short",
+      traceRoute: "/api/public/search/events",
+      layer: typeof window === "undefined" ? "web" : "browser",
+    },
+  )
+
+  return {
+    ...response,
+    items: response.items.map(normalizeSearchEventResult),
+  }
 }
 
 export function isTypesenseSearchEnabled() {
@@ -235,17 +293,73 @@ export async function fetchPublicLatestEvents(params: {
   })
 }
 
-export async function fetchCreativeFeaturedAssets(params: {
+export async function fetchPublicEventCategoryBrowse(params: {
+  limit?: number
+  cursor?: string | null
+  section: PublicEventBrowseSection
+}): Promise<PublicEventCategoryBrowseResponse> {
+  const searchParams = new URLSearchParams()
+  appendParam(searchParams, "limit", params.limit)
+  appendParam(searchParams, "cursor", params.cursor ?? undefined)
+  appendParam(searchParams, "section", params.section)
+  const query = searchParams.toString()
+  const path = `${resolveEventCategoryBrowsePath()}${query ? `?${query}` : ""}`
+
+  return getJson<PublicEventCategoryBrowseResponse>(path, {
+    cachePolicy: "public-category-browse-long",
+    traceRoute: "/api/public/events/browse",
+    layer: typeof window === "undefined" ? "web" : "browser",
+  })
+}
+
+export async function fetchPublicHomepageHeroSet(): Promise<PublicHomepageHeroSetResponse> {
+  const startedAt = Date.now()
+
+  try {
+    const response = await getJson<PublicHomepageHeroSetResponse>(resolveHomepageHeroSetPath(), {
+      cachePolicy: "public-hero-set",
+      traceRoute: "/api/public/homepage/hero-set",
+      layer: typeof window === "undefined" ? "web" : "browser",
+    })
+
+    if (process.env.NODE_ENV !== "production") {
+      console.info(JSON.stringify({
+        event: "homepage_hero_set_fetch",
+        status: "ok",
+        itemCount: response.items.length,
+        source: "hero_set_endpoint",
+        setKey: response.setKey,
+        durationMs: Date.now() - startedAt,
+      }))
+    }
+
+    return response
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.info(JSON.stringify({
+        event: "homepage_hero_set_fetch",
+        status: "error",
+        itemCount: 0,
+        source: "hero_set_endpoint",
+        errorMessage: error instanceof Error ? error.message : "hero_set_unavailable",
+        durationMs: Date.now() - startedAt,
+      }))
+    }
+    throw error
+  }
+}
+
+export async function fetchRoyaltyFreeFeaturedAssets(params: {
   limit?: number
 } = {}): Promise<PublicAssetListResponse> {
   const searchParams = new URLSearchParams()
   appendParam(searchParams, "limit", params.limit)
   const query = searchParams.toString()
   const response = await getJson<PublicAssetListResponse & { assets?: PublicAsset[] }>(
-    `/api/public/creative/featured${query ? `?${query}` : ""}`,
+    `/api/public/royalty-free/featured${query ? `?${query}` : ""}`,
     {
-      cachePolicy: "public-creative-long",
-      traceRoute: "/api/public/creative/featured",
+      cachePolicy: "public-royalty-free-long",
+      traceRoute: "/api/public/royalty-free/featured",
       layer: typeof window === "undefined" ? "web" : "browser",
     },
   )
@@ -270,7 +384,9 @@ type PublicJsonCachePolicy =
   | "public-search-short"
   | "public-detail"
   | "public-filters-long"
-  | "public-creative-long"
+  | "public-royalty-free-long"
+  | "public-hero-set"
+  | "public-category-browse-long"
 
 async function getJson<T>(
   path: string,
@@ -287,13 +403,26 @@ async function getJson<T>(
     : buildApiAssetUrl(path)
   const requestId = resolveRequestId()
   const tracker = createTimingTracker()
+  logHomepageDebugStep({
+    event: "homepage_render_step",
+    requestId,
+    step: "api_fetch_start",
+    route: options.traceRoute,
+    requestPath: requestUrl.startsWith("http")
+      ? new URL(requestUrl).pathname + new URL(requestUrl).search
+      : requestUrl,
+  })
 
   const revalidateSeconds = typeof window === "undefined"
     ? options.cachePolicy === "public-short" || options.cachePolicy === "public-search-short"
       ? 30
       : options.cachePolicy === "public-detail"
         ? 300
-      : options.cachePolicy === "public-creative-long"
+      : options.cachePolicy === "public-royalty-free-long"
+        ? 86_400
+      : options.cachePolicy === "public-hero-set"
+        ? 300
+      : options.cachePolicy === "public-category-browse-long"
         ? 86_400
       : options.cachePolicy === "public-filters-long"
         ? 300
@@ -306,14 +435,28 @@ async function getJson<T>(
     try {
       response = await fetch(requestUrl, {
         method: "GET",
-        ...(usePublicRevalidate ? { next: { revalidate: revalidateSeconds! } } : { cache: "no-store" as RequestCache }),
+        ...(usePublicRevalidate
+          ? { next: { revalidate: revalidateSeconds! } }
+          : options.cachePolicy === "public-category-browse-long"
+            ? {}
+            : { cache: "no-store" as RequestCache }),
         signal: controller.signal,
         headers: {
           Accept: "application/json",
           ...requestIdHeaders(requestId),
+          ...(isHomepageDebugLatencyEnabled() ? { "x-homepage-debug-latency": "true" } : {}),
         },
       })
       tracker.mark("upstream_fetch")
+      logHomepageDebugStep({
+        event: "homepage_render_step",
+        requestId,
+        step: "api_fetch_done",
+        route: options.traceRoute,
+        durationMs: tracker.elapsed("upstream_fetch"),
+        status: response.status,
+        cacheControl: response.headers.get("cache-control"),
+      })
     } catch (error) {
       if (options.traceRoute) {
         const serialized = serializeFetchError(error)
@@ -363,6 +506,14 @@ async function getJson<T>(
 
     const payload = (await response.json()) as T
     tracker.mark("json_parse")
+    logHomepageDebugStep({
+      event: "homepage_render_step",
+      requestId: response.headers.get(FOTOCORP_REQUEST_ID_HEADER) ?? requestId,
+      step: "api_json_parse_done",
+      route: options.traceRoute,
+      durationMs: tracker.elapsed("json_parse"),
+      totalMs: tracker.total(),
+    })
 
     if (options.traceRoute) {
       logLatencyTrace({
@@ -388,6 +539,15 @@ async function getJson<T>(
   }
 }
 
+function logHomepageDebugStep(payload: Record<string, unknown>) {
+  if (!isHomepageDebugLatencyEnabled()) return
+  console.info(JSON.stringify(payload))
+}
+
+function isHomepageDebugLatencyEnabled() {
+  return process.env.HOMEPAGE_DEBUG_LATENCY === "true"
+}
+
 function resolveAssetsPath() {
   return typeof window === "undefined" ? "/api/v1/assets" : "/api/public/assets"
 }
@@ -400,8 +560,22 @@ function resolveSearchAssetsPath() {
   return typeof window === "undefined" ? "/api/v1/search/assets" : "/api/public/search/assets"
 }
 
+function resolveSearchEventsPath() {
+  return typeof window === "undefined" ? "/api/v1/search/events" : "/api/public/search/events"
+}
+
 function resolveLatestEventsPath() {
   return typeof window === "undefined" ? "/api/v1/public/events/latest" : "/api/public/events/latest"
+}
+
+function resolveEventCategoryBrowsePath() {
+  return typeof window === "undefined" ? "/api/v1/public/events/browse" : "/api/public/events/browse"
+}
+
+function resolveHomepageHeroSetPath() {
+  return typeof window === "undefined"
+    ? "/api/v1/public/homepage/hero-set"
+    : "/api/public/homepage/hero-set"
 }
 
 async function readApiError(response: Response) {
@@ -435,6 +609,14 @@ function normalizePreview<T extends { url: string } | null>(preview: T): T {
   return {
     ...preview,
     url: buildApiAssetUrl(preview.url),
+  }
+}
+
+function normalizeSearchEventResult(item: PublicSearchEventResult): PublicSearchEventResult {
+  if (!item.previewUrl) return item
+  return {
+    ...item,
+    previewUrl: buildApiAssetUrl(item.previewUrl),
   }
 }
 

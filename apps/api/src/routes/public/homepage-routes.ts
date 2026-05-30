@@ -1,13 +1,20 @@
-import { Hono } from "hono"
+import { Hono, type Context } from "hono"
 import type { Env } from "../../appTypes"
 import { createHttpDb, type AppRequestVariables } from "../../db"
 import {
+  buildEventCategoryBrowseResponse,
   buildLatestEventsResponse,
+  fetchPublicEventCategoryBrowseRows,
   fetchPublicLatestEventsRows,
   getPublicHomepageFeed,
+  parseEventCategoryBrowseQuery,
   parseLatestEventsQuery,
 } from "../../lib/assets/public-homepage"
-import { listPublicCreativeFeaturedAssets, parsePreviewTtl } from "../../lib/assets/public-assets"
+import {
+  getPublicHomepageHeroSet,
+  PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL,
+} from "../../lib/assets/public-homepage-hero-set"
+import { listPublicRoyaltyFreeFeaturedAssets, parsePreviewTtl } from "../../lib/assets/public-assets"
 import { AppError } from "../../lib/errors"
 import {
   createTimingTracker,
@@ -24,8 +31,14 @@ export const publicHomepageRoutes = new Hono<{ Bindings: Env; Variables: AppRequ
 export const PUBLIC_HOMEPAGE_FEED_CACHE_CONTROL =
   "public, max-age=60, s-maxage=300, stale-while-revalidate=3600"
 
-export const PUBLIC_CREATIVE_FEATURED_CACHE_CONTROL =
+export const PUBLIC_ROYALTY_FREE_FEATURED_CACHE_CONTROL =
   "public, max-age=86400, s-maxage=2592000, stale-while-revalidate=604800"
+
+/** @deprecated Use {@link PUBLIC_ROYALTY_FREE_FEATURED_CACHE_CONTROL}. */
+export const PUBLIC_CREATIVE_FEATURED_CACHE_CONTROL = PUBLIC_ROYALTY_FREE_FEATURED_CACHE_CONTROL
+
+export const PUBLIC_EVENT_CATEGORY_BROWSE_CACHE_CONTROL =
+  "public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400"
 
 publicHomepageRoutes.get("/api/v1/public/homepage", async (c) => {
   const startedAt = Date.now()
@@ -169,9 +182,14 @@ publicHomepageRoutes.get("/api/v1/public/events/latest", async (c) => {
   }
 })
 
-publicHomepageRoutes.get("/api/v1/public/creative/featured", async (c) => {
+publicHomepageRoutes.get("/api/v1/public/events/browse", async (c) => {
   const startedAt = Date.now()
-  const route = "/api/v1/public/creative/featured"
+  const searchParams = new URL(c.req.url).searchParams
+  const input = {
+    limit: searchParams.get("limit"),
+    cursor: searchParams.get("cursor"),
+    section: searchParams.get("section"),
+  }
 
   try {
     if (!c.env.DATABASE_URL) {
@@ -179,29 +197,28 @@ publicHomepageRoutes.get("/api/v1/public/creative/featured", async (c) => {
     }
 
     const cdn = parsePublicPreviewCdnConfig(c.env)
-    const response = await listPublicCreativeFeaturedAssets(
-      createHttpDb(c.env.DATABASE_URL),
-      { limit: c.req.query("limit") },
-      c.env.MEDIA_PREVIEW_TOKEN_SECRET,
-      parsePreviewTtl(c.env.MEDIA_PREVIEW_TOKEN_TTL_SECONDS),
-      cdn,
-    )
+    const db = createHttpDb(c.env.DATABASE_URL)
+    const query = parseEventCategoryBrowseQuery(input)
+    const { rows } = await fetchPublicEventCategoryBrowseRows(db, query)
+    const response = buildEventCategoryBrowseResponse(rows, query, cdn)
     const durationMs = Date.now() - startedAt
 
     console.info(
       JSON.stringify({
-        event: "public_creative_featured_request",
-        route,
+        event: "public_event_category_browse",
+        section: query.section,
+        limit: query.limit,
+        hasCursor: Boolean(query.cursor),
+        rowCount: response.items.length,
+        hasMore: response.hasMore,
         durationMs,
-        status: "ok",
-        itemCount: response.items.length,
-        cacheControl: PUBLIC_CREATIVE_FEATURED_CACHE_CONTROL,
+        cacheMode: "category-browse-photo-events",
       }),
     )
 
     return json(response, 200, {
       headers: {
-        "Cache-Control": PUBLIC_CREATIVE_FEATURED_CACHE_CONTROL,
+        "Cache-Control": PUBLIC_EVENT_CATEGORY_BROWSE_CACHE_CONTROL,
         "X-Content-Type-Options": "nosniff",
       },
     })
@@ -213,7 +230,57 @@ publicHomepageRoutes.get("/api/v1/public/creative/featured", async (c) => {
 
     console.error(
       JSON.stringify({
-        event: "public_creative_featured_request",
+        event: "public_event_category_browse",
+        status: "error",
+        hasCursor: Boolean(input.cursor),
+        durationMs,
+        error: serialized,
+      }),
+    )
+
+    throw error
+  }
+})
+
+publicHomepageRoutes.get("/api/v1/public/homepage/hero-set", async (c) => {
+  const startedAt = Date.now()
+  const route = "/api/v1/public/homepage/hero-set"
+
+  try {
+    if (!c.env.DATABASE_URL) {
+      throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
+    }
+
+    const response = await getPublicHomepageHeroSet(createHttpDb(c.env.DATABASE_URL))
+    const durationMs = Date.now() - startedAt
+
+    console.info(
+      JSON.stringify({
+        event: "homepage_hero_set_request",
+        route,
+        durationMs,
+        status: "ok",
+        itemCount: response.items.length,
+        setKey: response.setKey,
+        cacheControl: PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL,
+      }),
+    )
+
+    return json(response, 200, {
+      headers: {
+        "Cache-Control": PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL,
+        "X-Content-Type-Options": "nosniff",
+      },
+    })
+  } catch (error) {
+    const durationMs = Date.now() - startedAt
+    const serialized = error instanceof Error
+      ? { name: error.name, message: error.message }
+      : { name: "UnknownError", message: String(error) }
+
+    console.error(
+      JSON.stringify({
+        event: "homepage_hero_set_request",
         route,
         durationMs,
         status: "error",
@@ -225,6 +292,83 @@ publicHomepageRoutes.get("/api/v1/public/creative/featured", async (c) => {
   }
 })
 
+async function handleRoyaltyFreeFeaturedRequest(
+  c: Context<{ Bindings: Env; Variables: AppRequestVariables }>,
+  options: { route: string; legacyRoute: boolean },
+) {
+  const startedAt = Date.now()
+  const { route, legacyRoute } = options
+
+  try {
+    if (!c.env.DATABASE_URL) {
+      throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
+    }
+
+    const cdn = parsePublicPreviewCdnConfig(c.env)
+    const { response, timings } = await listPublicRoyaltyFreeFeaturedAssets(
+      createHttpDb(c.env.DATABASE_URL),
+      { limit: c.req.query("limit") },
+      c.env.MEDIA_PREVIEW_TOKEN_SECRET,
+      parsePreviewTtl(c.env.MEDIA_PREVIEW_TOKEN_TTL_SECONDS),
+      cdn,
+    )
+    const durationMs = Date.now() - startedAt
+
+    console.info(
+      JSON.stringify({
+        event: "public_royalty_free_featured_request",
+        route,
+        legacyRoute,
+        durationMs,
+        status: "ok",
+        itemCount: response.items.length,
+        cacheControl: PUBLIC_ROYALTY_FREE_FEATURED_CACHE_CONTROL,
+        timings,
+      }),
+    )
+
+    return json(response, 200, {
+      headers: {
+        "Cache-Control": PUBLIC_ROYALTY_FREE_FEATURED_CACHE_CONTROL,
+        "X-Content-Type-Options": "nosniff",
+      },
+    })
+  } catch (error) {
+    const durationMs = Date.now() - startedAt
+    const serialized = error instanceof Error
+      ? { name: error.name, message: error.message }
+      : { name: "UnknownError", message: String(error) }
+
+    console.error(
+      JSON.stringify({
+        event: "public_royalty_free_featured_request",
+        route,
+        legacyRoute,
+        durationMs,
+        status: "error",
+        error: serialized,
+      }),
+    )
+
+    throw error
+  }
+}
+
+publicHomepageRoutes.get("/api/v1/public/royalty-free/featured", (c) =>
+  handleRoyaltyFreeFeaturedRequest(c, {
+    route: "/api/v1/public/royalty-free/featured",
+    legacyRoute: false,
+  }))
+
+publicHomepageRoutes.get("/api/v1/public/creative/featured", (c) =>
+  handleRoyaltyFreeFeaturedRequest(c, {
+    route: "/api/v1/public/creative/featured",
+    legacyRoute: true,
+  }))
+
 publicHomepageRoutes.all("/api/v1/public/homepage", () => methodNotAllowed())
+publicHomepageRoutes.all("/api/v1/public/homepage/hero-set", () => methodNotAllowed())
 publicHomepageRoutes.all("/api/v1/public/events/latest", () => methodNotAllowed())
+publicHomepageRoutes.all("/api/v1/public/events/browse", () => methodNotAllowed())
+publicHomepageRoutes.all("/api/v1/public/royalty-free/featured", () => methodNotAllowed())
 publicHomepageRoutes.all("/api/v1/public/creative/featured", () => methodNotAllowed())
