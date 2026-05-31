@@ -18,7 +18,7 @@ export const DEFAULT_JUSTIFIED_OPTIONS: JustifiedRowsOptions = {
   targetRowHeight: 200,
   minRowHeight: 140,
   maxRowHeight: 320,
-  justifyLastRow: true,
+  justifyLastRow: false,
   minTileWidth: 150,
 }
 
@@ -27,7 +27,7 @@ export const DENSE_JUSTIFIED_OPTIONS: JustifiedRowsOptions = {
   targetRowHeight: 140,
   minRowHeight: 110,
   maxRowHeight: 220,
-  justifyLastRow: true,
+  justifyLastRow: false,
   minTileWidth: 120,
 }
 
@@ -37,7 +37,7 @@ export const FEATURED_JUSTIFIED_OPTIONS: JustifiedRowsOptions = {
   targetRowHeight: 280,
   minRowHeight: 220,
   maxRowHeight: 400,
-  justifyLastRow: true,
+  justifyLastRow: false,
   minTileWidth: 300,
 }
 
@@ -182,24 +182,22 @@ export function PublicAssetGrid({
               marginBottom: gap,
             }}
           >
-            {row.items.map((tile, tileIndex) => {
+            {row.items.map((tile) => {
               const asset = assetById.get(tile.id)
               if (!asset) return null
-              const isLastTile = tileIndex === row.items.length - 1
 
               return (
                 <div
                   key={tile.id}
                   className={cn(
-                    "overflow-hidden",
+                    "shrink-0 overflow-hidden",
                     (dense || featured) && "!rounded-none",
-                    isLastTile ? "min-w-0 flex-1" : "shrink-0",
                   )}
-                  style={
-                    isLastTile
-                      ? { flexBasis: tile.width, height: row.height }
-                      : { width: tile.width, flex: `0 0 ${tile.width}px`, height: row.height }
-                  }
+                  style={{
+                    width: tile.width,
+                    flex: `0 0 ${tile.width}px`,
+                    height: row.height,
+                  }}
                 >
                   <PublicAssetCard
                     asset={asset}

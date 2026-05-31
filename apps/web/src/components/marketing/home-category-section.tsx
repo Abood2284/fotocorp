@@ -20,6 +20,10 @@ type TabType = "Editorial" | "Video" | "Caricature" | "Creative"
 type EditorialSubcategory = "Latest" | "News" | "Sports" | "Entertainment" | "Retro"
 type LoadState = "loading" | "ready" | "error"
 
+interface HomeCategorySectionProps {
+  initialTab?: "Editorial" | "Creative"
+}
+
 const LATEST_EVENTS_LIMIT = 15
 const CATEGORY_BROWSE_EVENTS_LIMIT = 25
 const CREATIVE_ASSETS_LIMIT = 50
@@ -102,9 +106,10 @@ async function fetchHomepageEventsSection(section: PublicLatestEventsSection): P
   return { response, mode: "category-browse" }
 }
 
-export function HomeCategorySection() {
+export function HomeCategorySection({ initialTab = "Editorial" }: HomeCategorySectionProps) {
+  const sectionRef = useRef<HTMLElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [activeTab, setActiveTab] = useState<TabType>("Editorial")
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab === "Creative" ? "Creative" : "Editorial")
   const [editorialSub, setEditorialSub] = useState<EditorialSubcategory>("Latest")
   const selectedSection = EDITORIAL_SECTIONS[editorialSub]
   const [eventPageItems, setEventPageItems] = useState<PublicHomepageEvent[]>([])
@@ -132,6 +137,14 @@ export function HomeCategorySection() {
     refetchOnWindowFocus: false,
   })
   const baseEventData = eventQuery.data
+
+  useEffect(() => {
+    if (initialTab !== "Creative") return
+    setActiveTab("Creative")
+    requestAnimationFrame(() => {
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+  }, [initialTab])
 
   useEffect(() => {
     setEventPageItems([])
@@ -206,7 +219,11 @@ export function HomeCategorySection() {
   )
 
   return (
-    <section className="w-full bg-background pt-4 pb-10">
+    <section
+      ref={sectionRef}
+      id="homepage-categories"
+      className="scroll-mt-16 w-full bg-background pt-4 pb-10"
+    >
       <div className="mx-auto flex w-full flex-col items-center">
         <div className="flex w-full flex-wrap justify-center gap-x-12 gap-y-4 pb-0 text-xs font-bold uppercase tracking-wider text-foreground sm:gap-x-16 font-sans">
           <button

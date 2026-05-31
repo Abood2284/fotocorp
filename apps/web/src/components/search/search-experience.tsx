@@ -451,15 +451,6 @@ export function SearchExperience({
   const displayCount = isEventsMode
     ? (displayEventResult?.foundEvents ?? eventItems.length)
     : (exactTotalCount ?? Math.max(totalCount, (displayPage - 1) * PAGE_SIZE + items.length))
-  const resultTitle = isEventsMode
-    ? buildEventResultTitle(displayCount, initialParams.q, categoryName, eventName)
-    : buildResultTitle(
-      displayCount,
-      initialParams.q,
-      categoryName,
-      eventName,
-      exactTotalCount === undefined && hasMore,
-    )
   const hasActiveFilters = filterChips.length > 0 || initialParams.sort !== "newest"
   const isResultsFetching = isEventsMode ? isEventFetching : isFetching
   const hasEventResults = eventItems.length > 0
@@ -543,13 +534,8 @@ export function SearchExperience({
       </section>
 
       <section className="bg-surface-warm px-3 py-6 sm:px-5 lg:px-6">
-        <div className="mb-6 grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
-          <div>
-            <h1 className="text-2xl font-medium tracking-normal text-foreground md:text-3xl">
-              {resultTitle}
-            </h1>
-            <ActiveChips chips={filterChips} onClearAll={clearAll} className="mt-3" />
-          </div>
+        <div className="mb-6 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <ActiveChips chips={filterChips} onClearAll={clearAll} />
 
           <div className="ml-auto flex items-end gap-8">
             <ResultMetric
@@ -1025,33 +1011,6 @@ function ActiveChips({
       </button>
     </div>
   )
-}
-
-function buildResultTitle(
-  totalCount: number,
-  query?: string,
-  categoryName?: string,
-  eventName?: string,
-  approximate = false,
-) {
-  const total = `${formatInteger(totalCount)}${approximate ? "+" : ""}`
-  if (query) return `${total} ${query} photos and high-res pictures`
-  if (eventName) return `${total} photos from ${eventName}`
-  if (categoryName) return `${total} ${categoryName} photos and high-res pictures`
-  return `${total} latest editorial photos and high-res pictures`
-}
-
-function buildEventResultTitle(
-  totalCount: number,
-  query?: string,
-  categoryName?: string,
-  eventName?: string,
-) {
-  const total = formatInteger(totalCount)
-  if (query) return `${total} events matching "${query}"`
-  if (eventName) return `${total} events for ${eventName}`
-  if (categoryName) return `${total} ${categoryName} events`
-  return `${total} matching events`
 }
 
 function formatShortDate(value: string | null | undefined) {

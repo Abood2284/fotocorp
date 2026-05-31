@@ -48,19 +48,24 @@ export function AssetPreviewChrome({
         aria-label="Image actions"
       >
         {peopleLabel ? (
-          <div className="flex min-w-0 flex-1 items-start gap-2.5">
-            <span
-              className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-none bg-foreground/5 border border-border text-foreground/70"
-              aria-hidden
-            >
-              <CircleHelp size={15} />
-            </span>
-            <div className="min-w-0">
-              <p className="font-sans text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Who is in picture
-              </p>
-              <p className="mt-0.5 font-sans text-sm font-medium leading-snug text-foreground">{peopleLabel}</p>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <div className="group relative shrink-0">
+              <span
+                className="inline-flex h-7 w-7 items-center justify-center rounded-none border border-border bg-foreground/5 text-foreground/70"
+                tabIndex={0}
+                aria-describedby="who-is-in-picture-tooltip"
+              >
+                <CircleHelp size={15} aria-hidden />
+              </span>
+              <span
+                id="who-is-in-picture-tooltip"
+                role="tooltip"
+                className="pointer-events-none absolute left-0 top-full z-30 mt-1.5 whitespace-nowrap rounded-none border border-border bg-foreground px-2.5 py-1.5 font-sans text-[10px] font-bold uppercase tracking-wider text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+              >
+                Who is in picture?
+              </span>
             </div>
+            <p className="min-w-0 font-sans text-sm font-medium leading-snug text-foreground">{peopleLabel}</p>
           </div>
         ) : (
           <div className="min-w-0 flex-1" />
@@ -78,8 +83,8 @@ export function AssetPreviewChrome({
             className="m-0 shrink-0"
             buttonClassName="h-9 gap-1.5 rounded-none border border-black bg-black px-4 text-xs font-bold uppercase tracking-wider text-white shadow-none hover:bg-neutral-800 cursor-pointer"
             icon={<Plus strokeWidth={2.5} size={14} />}
-            text="Save"
-            hoverLabel="Save as"
+            text="Fotobox"
+            hoverLabel="Add to Fotobox"
           />
         </div>
       </div>
@@ -128,15 +133,6 @@ export function AssetPreviewChrome({
           </Link>
         )}
 
-        {/* View Gallery Link Overlay */}
-        {showPagination && (
-          <a
-            href="#event-gallery-section"
-            className="absolute bottom-4 right-4 z-20 bg-black/75 px-3 py-1.5 font-sans text-[10px] font-bold uppercase tracking-wider text-white hover:bg-black transition-colors rounded-none cursor-pointer"
-          >
-            View Gallery
-          </a>
-        )}
       </div>
       {peopleLabel ? (
         <span className="sr-only">Who is in this picture: {peopleLabel}</span>

@@ -7,11 +7,18 @@ export const metadata = {
     "India's foremost news photo agency. Pan-India editorial, celebrity, sports, and archive images. Based in Mumbai.",
 }
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  const params = await searchParams
+  const initialTab = params.tab?.trim().toLowerCase() === "royalty-free" ? "Creative" : "Editorial"
+
   return (
     <>
       <HomeHeroBackdropLoader />
-      <HomeCategorySection />
+      <HomeCategorySection initialTab={initialTab} />
     </>
   )
 }

@@ -18,7 +18,7 @@ export function HomeHero({ items }: HomeHeroProps) {
           India&apos;s licensed news photography
         </h1>
         <p className="fc-body-serif-md mb-4 max-w-md text-center text-muted-foreground">
-          Editorial, sports, celebrity, and archive imagery for newsrooms and
+          Editorial, Caricatures, celebrity, and archive imagery for newsrooms and
           publishers.
         </p>
 
@@ -26,8 +26,6 @@ export function HomeHero({ items }: HomeHeroProps) {
           <SearchBar
             size="lg"
             variant="sharp"
-            showTypeSelect
-            typeSelectMenuPlacement="above"
             navigate
             placeholder="Search 1M+ licensed images…"
             className="border border-border bg-background shadow-[0_2px_12px_rgba(26,37,64,0.08)] focus-within:shadow-[0_4px_20px_rgba(26,37,64,0.11)] transition-shadow"

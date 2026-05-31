@@ -5,7 +5,7 @@ import Link from "next/link"
 
 import { useQueryClient } from "@tanstack/react-query"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Suspense, useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { FotocorpLogoLink } from "@/components/layout/fotocorp-logo-link"
 import { authClient } from "@/lib/auth-client"
@@ -72,23 +72,27 @@ interface ShellProps extends HeaderProps {
   pathname: string
   sortParam: string | null
   modeParam: string | null
+  tabParam: string | null
+  categoryIdParam: string | null
 }
 
-/** Primary nav — search-backed browse where noted. */
-const PRIMARY_NAV_LINKS: HeaderLink[] = [
-  { label: "Archive", href: "/search" },
-  { label: "Events", href: "/search?mode=events" },
-  { label: "Categories", href: "/search" },
-  { label: "About", href: "/about" },
-  { label: "Contact", href: "/contact" },
+/** Browse nav — title case, Getty-inspired hover panels. */
+const BROWSE_NAV_TRIGGER_CLASS =
+  "flex items-center gap-1 px-3 py-2 font-sans text-sm font-medium transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+
+const EDITORIAL_LINKS: HeaderLink[] = [
+  { label: "Entertainment", href: "/categories/entertainment" },
+  { label: "News", href: "/categories/news" },
+  { label: "Fashion", href: "/categories/fashion" },
+  { label: "Sports", href: "/categories/sports" },
+  { label: "Business", href: "/categories/business" },
+  { label: "Retro", href: "/categories/retro" },
+  { label: "Royalty Free", href: "/?tab=royalty-free" },
 ]
 
-const MOBILE_GROUPS: Array<{ title: string; links: HeaderLink[] }> = [
-  {
-    title: "Browse",
-    links: PRIMARY_NAV_LINKS,
-  },
-]
+type BrowseDropdownId = "editorial" | "video" | "caricature"
+
+const HOVER_CLOSE_DELAY_MS = 150
 
 export function Header({ userProfile, staffBrief }: HeaderProps) {
   return (
@@ -109,16 +113,38 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
       pathname={pathname}
       sortParam={searchParams.get("sort")}
       modeParam={searchParams.get("mode")}
+      tabParam={searchParams.get("tab")}
+      categoryIdParam={searchParams.get("categoryId") ?? searchParams.get("category")}
     />
   )
 }
 
 function HeaderStatic({ userProfile, staffBrief }: HeaderProps) {
-  return <HeaderShell userProfile={userProfile} staffBrief={staffBrief} pathname="/" sortParam={null} modeParam={null} />
+  return (
+    <HeaderShell
+      userProfile={userProfile}
+      staffBrief={staffBrief}
+      pathname="/"
+      sortParam={null}
+      modeParam={null}
+      tabParam={null}
+      categoryIdParam={null}
+    />
+  )
 }
 
-function HeaderShell({ userProfile, staffBrief, pathname, sortParam, modeParam }: ShellProps) {
+function HeaderShell({
+  userProfile,
+  staffBrief,
+  pathname,
+  sortParam,
+  modeParam,
+  tabParam,
+  categoryIdParam,
+}: ShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [openDropdown, setOpenDropdown] = useState<BrowseDropdownId | null>(null)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     setMobileOpen(false)
@@ -126,15 +152,47 @@ function HeaderShell({ userProfile, staffBrief, pathname, sortParam, modeParam }
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setMobileOpen(false)
+      if (event.key === "Escape") {
+        setMobileOpen(false)
+        setOpenDropdown(null)
+      }
     }
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    }
+  }, [])
+
+  function scheduleCloseDropdown() {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = setTimeout(() => setOpenDropdown(null), HOVER_CLOSE_DELAY_MS)
+  }
+
+  function cancelCloseDropdown() {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
+  }
+
+  function openBrowseDropdown(id: BrowseDropdownId) {
+    cancelCloseDropdown()
+    setOpenDropdown(id)
+  }
+
+  const editorialActive = isEditorialNavActive(pathname, categoryIdParam)
+  const royaltyFreeActive = isRoyaltyFreeNavActive(pathname, tabParam)
+
   return (
-    <header className={HEADER_SHELL_CLASS}>
+    <header
+      className={cn(HEADER_SHELL_CLASS, "relative")}
+      onMouseLeave={() => scheduleCloseDropdown()}
+    >
       <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:px-8">
         <FotocorpLogoLink className="pr-1" priority />
 
@@ -142,9 +200,35 @@ function HeaderShell({ userProfile, staffBrief, pathname, sortParam, modeParam }
           className="hidden min-w-0 flex-1 items-center lg:flex"
           aria-label="Primary navigation"
         >
-          {PRIMARY_NAV_LINKS.map((link) => (
-            <SectionNavLink key={`${link.label}-${link.href}`} link={link} pathname={pathname} sortParam={sortParam} modeParam={modeParam} />
-          ))}
+          <BrowseNavTrigger
+            label="Editorial"
+            active={editorialActive}
+            expanded={openDropdown === "editorial"}
+            onOpen={() => openBrowseDropdown("editorial")}
+            onCloseSchedule={scheduleCloseDropdown}
+            onCloseCancel={cancelCloseDropdown}
+          />
+          <BrowseNavTrigger
+            label="Video"
+            active={false}
+            expanded={openDropdown === "video"}
+            onOpen={() => openBrowseDropdown("video")}
+            onCloseSchedule={scheduleCloseDropdown}
+            onCloseCancel={cancelCloseDropdown}
+          />
+          <BrowseNavTrigger
+            label="Caricature"
+            active={false}
+            expanded={openDropdown === "caricature"}
+            onOpen={() => openBrowseDropdown("caricature")}
+            onCloseSchedule={scheduleCloseDropdown}
+            onCloseCancel={cancelCloseDropdown}
+          />
+          <BrowseNavLink
+            label="Royalty Free"
+            href="/?tab=royalty-free"
+            active={royaltyFreeActive}
+          />
           <RoleMainLinks
             userProfile={userProfile}
             staffBrief={staffBrief}
@@ -183,6 +267,47 @@ function HeaderShell({ userProfile, staffBrief, pathname, sortParam, modeParam }
         </div>
       </div>
 
+      {openDropdown === "editorial" && (
+        <BrowseDropdownPanel onMouseEnter={cancelCloseDropdown} onMouseLeave={scheduleCloseDropdown}>
+          <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+            <h2 className="font-heading text-lg font-normal text-foreground">Editorial</h2>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              Licensed news photography across entertainment, sports, fashion, and archive coverage.
+            </p>
+            <ul className="mt-4 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+              {EDITORIAL_LINKS.map((link) => (
+                <li key={link.href + link.label}>
+                  <Link
+                    href={link.href}
+                    className="block px-2 py-2 font-sans text-sm font-medium text-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </BrowseDropdownPanel>
+      )}
+
+      {openDropdown === "video" && (
+        <BrowseDropdownPanel onMouseEnter={cancelCloseDropdown} onMouseLeave={scheduleCloseDropdown}>
+          <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+            <h2 className="font-heading text-lg font-normal text-foreground">Video</h2>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">Video licensing is coming soon.</p>
+          </div>
+        </BrowseDropdownPanel>
+      )}
+
+      {openDropdown === "caricature" && (
+        <BrowseDropdownPanel onMouseEnter={cancelCloseDropdown} onMouseLeave={scheduleCloseDropdown}>
+          <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+            <h2 className="font-heading text-lg font-normal text-foreground">Caricature</h2>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">Caricature licensing is coming soon.</p>
+          </div>
+        </BrowseDropdownPanel>
+      )}
+
       {/* Mobile panel */}
       <div
         id="mobile-nav-panel"
@@ -197,15 +322,7 @@ function HeaderShell({ userProfile, staffBrief, pathname, sortParam, modeParam }
           className="mx-auto grid max-w-[1600px] gap-6 px-4 py-5 sm:px-6"
           aria-label="Mobile navigation"
         >
-          {MOBILE_GROUPS.map((group) => (
-            <MobileLinkGroup
-              key={group.title}
-              group={group}
-              pathname={pathname}
-              sortParam={sortParam}
-              modeParam={modeParam}
-            />
-          ))}
+          <MobileBrowseNav pathname={pathname} tabParam={tabParam} />
           <MobileRoleLinks
             userProfile={userProfile}
             staffBrief={staffBrief}
@@ -217,6 +334,127 @@ function HeaderShell({ userProfile, staffBrief, pathname, sortParam, modeParam }
         </nav>
       </div>
     </header>
+  )
+}
+
+function BrowseNavLink({ label, href, active }: { label: string; href: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        BROWSE_NAV_TRIGGER_CLASS,
+        active ? "text-foreground" : "text-muted-foreground",
+      )}
+    >
+      {label}
+    </Link>
+  )
+}
+
+function BrowseNavTrigger({
+  label,
+  active,
+  expanded,
+  onOpen,
+  onCloseSchedule,
+  onCloseCancel,
+}: {
+  label: string
+  active: boolean
+  expanded: boolean
+  onOpen: () => void
+  onCloseSchedule: () => void
+  onCloseCancel: () => void
+}) {
+  return (
+    <div
+      onMouseEnter={() => {
+        onCloseCancel()
+        onOpen()
+      }}
+      onMouseLeave={onCloseSchedule}
+    >
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-haspopup="true"
+        className={cn(
+          BROWSE_NAV_TRIGGER_CLASS,
+          active || expanded ? "text-foreground" : "text-muted-foreground",
+        )}
+      >
+        {label}
+        <ChevronDown
+          size={14}
+          className={cn("text-muted-foreground transition-transform", expanded && "rotate-180")}
+        />
+      </button>
+    </div>
+  )
+}
+
+function BrowseDropdownPanel({
+  children,
+  onMouseEnter,
+  onMouseLeave,
+}: {
+  children: ReactNode
+  onMouseEnter: () => void
+  onMouseLeave: () => void
+}) {
+  return (
+    <div
+      className="absolute left-0 right-0 top-full z-40 hidden border-t border-border bg-background lg:block"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      {children}
+    </div>
+  )
+}
+
+function MobileBrowseNav({ pathname, tabParam }: { pathname: string; tabParam: string | null }) {
+  const royaltyFreeActive = isRoyaltyFreeNavActive(pathname, tabParam)
+
+  return (
+    <section>
+      <h2 className="mb-2 font-sans text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Browse</h2>
+      <div className="grid gap-4">
+        <div>
+          <h3 className="mb-1 px-3 font-sans text-xs font-semibold uppercase tracking-wider text-foreground">Editorial</h3>
+          <div className="grid gap-1">
+            {EDITORIAL_LINKS.map((link) => (
+              <MobileNavLink
+                key={link.href + link.label}
+                link={link}
+                pathname={pathname}
+                sortParam={null}
+                modeParam={null}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-1">
+          <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
+            Video — Coming soon
+          </span>
+          <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
+            Caricature — Coming soon
+          </span>
+          <Link
+            href="/?tab=royalty-free"
+            aria-current={royaltyFreeActive ? "page" : undefined}
+            className={cn(
+              "border-l-2 px-3 py-2 font-sans text-xs font-medium transition-colors hover:bg-secondary hover:text-foreground",
+              royaltyFreeActive ? "border-foreground bg-secondary text-foreground" : "border-transparent text-muted-foreground",
+            )}
+          >
+            Royalty Free
+          </Link>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -734,6 +972,16 @@ function getRoleLinks(userProfile: HeaderUserProfile, staffBrief?: StaffBrief | 
 
 function isActiveSubscriber(userProfile: HeaderUserProfile) {
   return userProfile.isSubscriber && userProfile.subscriptionStatus === "ACTIVE"
+}
+
+function isEditorialNavActive(pathname: string, categoryIdParam: string | null) {
+  if (pathname === "/search" && categoryIdParam) return true
+  if (pathname.startsWith("/categories/")) return true
+  return false
+}
+
+function isRoyaltyFreeNavActive(pathname: string, tabParam: string | null) {
+  return pathname === "/" && tabParam?.toLowerCase() === "royalty-free"
 }
 
 function isActivePath(pathname: string, href: string, sortParam: string | null, modeParam: string | null) {

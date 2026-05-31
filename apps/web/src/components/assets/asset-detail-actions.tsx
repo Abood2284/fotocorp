@@ -244,7 +244,7 @@ export function AssetDetailActions({
       {eventAssets.length > 0 && (
         <div className="border-t border-border/60 pt-4">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
               More from this event
             </h3>
             {totalEventAssets > 0 && (

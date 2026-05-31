@@ -139,7 +139,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
   return (
     <div className="bg-background pb-20 lg:pb-0">
-      <div className="border-b border-border bg-surface-warm/70">
+      <div className="bg-surface-warm/70">
         <div className="mx-auto w-full max-w-[1600px] px-3 py-3 sm:px-5 lg:px-8">
           <form action="/search" className="flex min-h-12 items-center gap-3 rounded-none border border-border-strong bg-background px-4 shadow-sm">
             <Search className="shrink-0 text-foreground" aria-hidden size={20} />
@@ -164,8 +164,8 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[1600px] px-3 py-5 sm:px-5 lg:px-8 lg:py-7">
-        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+      <div className="mx-auto w-full max-w-[1600px] px-3 pt-3 pb-5 sm:px-5 lg:px-8 lg:pt-4 lg:pb-7">
+        <div className="mb-7 flex flex-wrap items-center gap-2 text-sm text-muted-foreground lg:mb-8">
           <Link href={backHref} className="inline-flex items-center gap-1 transition-colors hover:text-foreground">
             <ChevronLeft size={16} />
             Back to results
@@ -198,19 +198,12 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                   </h1>
                 )}
                 {totalEventAssets > 0 && asset.event?.id && (
-                  <div className="flex items-center gap-2 font-sans text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    <Link
-                      href={`/search?eventId=${encodeURIComponent(asset.event.id)}`}
-                      className="hover:text-black hover:underline underline-offset-2"
-                    >
-                      {totalEventAssets} {totalEventAssets === 1 ? "image" : "images"} from this event
-                    </Link>
-                    <span>·</span>
+                  <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     <a
                       href="#event-gallery-section"
                       className="hover:text-black hover:underline underline-offset-2"
                     >
-                      View event gallery
+                      {totalEventAssets} {totalEventAssets === 1 ? "image" : "images"} from this event
                     </a>
                   </div>
                 )}
