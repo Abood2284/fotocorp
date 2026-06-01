@@ -74,6 +74,7 @@ export default async function AdminAssetDetailPage({ params, searchParams }: Adm
   async function saveEditorial(formData: FormData) {
     "use server"
     await updateAdminAssetEditorial(id, {
+      whoIsInPicture: normalizeNullableText(formData.get("whoIsInPicture")),
       headline: normalizeNullableText(formData.get("headline")),
       caption: normalizeNullableText(formData.get("caption")),
       description: normalizeNullableText(formData.get("description")),
@@ -189,6 +190,7 @@ export default async function AdminAssetDetailPage({ params, searchParams }: Adm
               <Field label="Event" value={asset.event?.name ?? "—"} />
               <Field label="Photographer" value={asset.contributor?.displayName ?? "—"} />
               <Field label="Updated" value={toDate(asset.updatedAt ?? asset.createdAt)} />
+              <div className="sm:col-span-2"><p className="text-xs uppercase tracking-wide text-muted-foreground">Who is in picture</p><p className="mt-1 text-sm font-medium">{asset.whoIsInPicture ?? "—"}</p></div>
               <div className="sm:col-span-2"><p className="text-xs uppercase tracking-wide text-muted-foreground">Headline</p><p className="mt-1 text-sm font-medium">{asset.headline ?? "—"}</p></div>
               <div className="sm:col-span-2"><p className="text-xs uppercase tracking-wide text-muted-foreground">Caption</p><p className="mt-1 text-sm font-medium">{asset.caption ?? "—"}</p></div>
               <div className="sm:col-span-2"><p className="text-xs uppercase tracking-wide text-muted-foreground">Description</p><p className="mt-1 text-sm font-medium">{asset.description ?? "—"}</p></div>
@@ -223,6 +225,7 @@ export default async function AdminAssetDetailPage({ params, searchParams }: Adm
             <CardHeader><CardTitle className="text-base">Editorial details</CardTitle></CardHeader>
             <CardContent>
               <form action={saveEditorial} className="space-y-3">
+                <TextField name="whoIsInPicture" label="Who is in picture" defaultValue={asset.whoIsInPicture ?? ""} />
                 <TextField name="headline" label="Headline" defaultValue={asset.headline ?? ""} />
                 <TextAreaField name="caption" label="Caption" defaultValue={asset.caption ?? ""} rows={5} />
                 <TextAreaField name="description" label="Description" defaultValue={asset.description ?? ""} rows={4} />
