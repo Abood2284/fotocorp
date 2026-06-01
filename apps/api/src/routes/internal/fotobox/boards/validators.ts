@@ -1,21 +1,21 @@
 import { z } from "zod"
 
 export const listBoardsQuerySchema = z.object({
-  authUserId: z.string().trim().min(1),
+  userId: z.string().uuid(),
 })
 
 export const createBoardBodySchema = z.object({
-  authUserId: z.string().trim().min(1),
+  userId: z.string().uuid(),
   name: z.string().trim().min(1).max(100),
 })
 
 export const renameBoardBodySchema = z.object({
-  authUserId: z.string().trim().min(1),
+  userId: z.string().uuid(),
   name: z.string().trim().min(1).max(100),
 })
 
 export const deleteBoardBodySchema = z.object({
-  authUserId: z.string().trim().min(1),
+  userId: z.string().uuid(),
 })
 
 export const boardIdParamSchema = z.object({
@@ -23,8 +23,7 @@ export const boardIdParamSchema = z.object({
 })
 
 export const migrateAnonBodySchema = z.object({
-  authUserId: z.string().trim().min(1),
-  appUserProfileId: z.string().trim().min(1),
+  userId: z.string().uuid(),
   boards: z.array(
     z.object({
       name: z.string().trim().min(1).max(100),

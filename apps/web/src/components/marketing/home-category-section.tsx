@@ -7,8 +7,9 @@ import Link from "next/link"
 
 import { PublicEventsGrid } from "@/components/assets/public-events-grid"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
-import { fetchRoyaltyFreeFeaturedAssets, fetchPublicEventCategoryBrowse, fetchPublicLatestEvents } from "@/lib/api/fotocorp-api"
+import { fetchPublicEventCategoryBrowse, fetchPublicLatestEvents } from "@/lib/api/fotocorp-api"
 import type {
+  PublicAsset,
   PublicEvent,
   PublicEventBrowseSection,
   PublicHomepageEvent,
@@ -22,11 +23,11 @@ type LoadState = "loading" | "ready" | "error"
 
 interface HomeCategorySectionProps {
   initialTab?: "Editorial" | "Creative"
+  royaltyFreeAssets?: PublicAsset[]
 }
 
 const LATEST_EVENTS_LIMIT = 15
 const CATEGORY_BROWSE_EVENTS_LIMIT = 25
-const CREATIVE_ASSETS_LIMIT = 50
 const RECENT_EVENTS_WINDOW_DAYS = 30
 
 const EDITORIAL_SECTIONS: Record<EditorialSubcategory, PublicLatestEventsSection> = {
@@ -106,7 +107,10 @@ async function fetchHomepageEventsSection(section: PublicLatestEventsSection): P
   return { response, mode: "category-browse" }
 }
 
-export function HomeCategorySection({ initialTab = "Editorial" }: HomeCategorySectionProps) {
+export function HomeCategorySection({
+  initialTab = "Editorial",
+  royaltyFreeAssets = [],
+}: HomeCategorySectionProps) {
   const sectionRef = useRef<HTMLElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState<TabType>(initialTab === "Creative" ? "Creative" : "Editorial")
@@ -125,14 +129,6 @@ export function HomeCategorySection({ initialTab = "Editorial" }: HomeCategorySe
     ],
     queryFn: () => fetchHomepageEventsSection(selectedSection),
     staleTime: selectedSection === "latest" ? 60_000 : 86_400_000,
-    gcTime: 5 * 60_000,
-    refetchOnWindowFocus: false,
-  })
-  const royaltyFreeQuery = useQuery({
-    queryKey: ["homepage-royalty-free-featured", CREATIVE_ASSETS_LIMIT],
-    queryFn: () => fetchRoyaltyFreeFeaturedAssets({ limit: CREATIVE_ASSETS_LIMIT }),
-    enabled: activeTab === "Creative",
-    staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   })
@@ -366,17 +362,7 @@ export function HomeCategorySection({ initialTab = "Editorial" }: HomeCategorySe
             </div>
 
             <div className="mt-1 w-full">
-              {royaltyFreeQuery.isError ? (
-                <RoyaltyFreeEmptyState
-                  error
-                  onShowLatest={() => {
-                    setActiveTab("Editorial")
-                    setEditorialSub("Latest")
-                  }}
-                />
-              ) : royaltyFreeQuery.isFetching && !royaltyFreeQuery.data ? (
-                <SectionSkeleton featuredGrid />
-              ) : (royaltyFreeQuery.data?.items.length ?? 0) === 0 ? (
+              {royaltyFreeAssets.length === 0 ? (
                 <RoyaltyFreeEmptyState
                   onShowLatest={() => {
                     setActiveTab("Editorial")
@@ -385,7 +371,7 @@ export function HomeCategorySection({ initialTab = "Editorial" }: HomeCategorySe
                 />
               ) : (
                 <PublicAssetGrid
-                  assets={royaltyFreeQuery.data?.items ?? []}
+                  assets={royaltyFreeAssets}
                   featured
                   className="px-4 sm:px-6 lg:px-8"
                 />

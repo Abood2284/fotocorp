@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 
 export interface SharedAuthSession {
   user?: {
+    id?: string
     name?: string | null
     email?: string | null
   } | null

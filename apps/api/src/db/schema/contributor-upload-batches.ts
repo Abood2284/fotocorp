@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { contributorAccounts } from "./contributor-accounts";
 import { contributors } from "./contributors";
 import { photoEvents } from "./photo-events";
 
@@ -13,9 +12,6 @@ export const contributorUploadBatches = pgTable(
     contributorId: uuid("contributor_id")
       .notNull()
       .references(() => contributors.id, { onDelete: "restrict" }),
-    contributorAccountId: uuid("contributor_account_id")
-      .notNull()
-      .references(() => contributorAccounts.id, { onDelete: "restrict" }),
     eventId: uuid("event_id")
       .notNull()
       .references(() => photoEvents.id, { onDelete: "restrict" }),
@@ -37,7 +33,6 @@ export const contributorUploadBatches = pgTable(
       sql`${table.status} in ('OPEN', 'SUBMITTED', 'COMPLETED', 'FAILED', 'CANCELLED')`,
     ),
     index("contributor_upload_batches_contributor_id_idx").on(table.contributorId),
-    index("contributor_upload_batches_account_id_idx").on(table.contributorAccountId),
     index("contributor_upload_batches_event_id_idx").on(table.eventId),
     index("contributor_upload_batches_status_idx").on(table.status),
     index("contributor_upload_batches_created_at_idx").on(table.createdAt),

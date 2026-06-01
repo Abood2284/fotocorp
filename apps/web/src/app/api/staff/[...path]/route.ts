@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server"
-import { buildAuthProxyRequestHeaders, buildAuthProxyResponseHeaders } from "@/app/api/auth/[...all]/route"
+import { buildAuthProxyRequestHeaders, buildAuthProxyResponseHeaders } from "@/lib/api/bff-proxy-headers"
 
 function appendForwardedSetCookies(source: Headers, target: Headers) {
   target.delete("set-cookie")

@@ -12,6 +12,7 @@ import {
   listMissingContributorStagingS3ConfigKeys,
   verifyContributorStagingObjectExists,
 } from "../../../lib/r2-contributor-uploads";
+import { assertContributorHasPortalCredential } from "../../../lib/auth/contributor-portal-access";
 import { createContributorStagingPresignedPutUrl } from "../../../lib/r2-presigned-put";
 import type { ContributorSessionResult } from "../auth/service";
 import type {
@@ -24,7 +25,6 @@ import type {
 interface BatchRow {
   id: string;
   contributor_id: string;
-  contributor_account_id: string;
   event_id: string;
   status: string;
   asset_type: string;
@@ -91,14 +91,12 @@ export async function createPhotographerUploadBatch(
   if (event.status !== "ACTIVE") throw new AppError(400, "EVENT_NOT_ACTIVE", "Only ACTIVE events accept uploads.");
 
   const photographerId = session.contributor.id;
-  const accountId = session.account.id;
 
   const inserted = await executeRows<BatchRow>(
     db,
     sql`
       insert into contributor_upload_batches (
         contributor_id,
-        contributor_account_id,
         event_id,
         asset_type,
         common_title,
@@ -107,7 +105,6 @@ export async function createPhotographerUploadBatch(
       )
       values (
         ${photographerId}::uuid,
-        ${accountId}::uuid,
         ${body.eventId}::uuid,
         ${body.assetType},
         ${body.commonTitle ?? null},
@@ -117,7 +114,6 @@ export async function createPhotographerUploadBatch(
       returning
         id,
         contributor_id,
-        contributor_account_id,
         event_id,
         status,
         asset_type,
@@ -159,32 +155,13 @@ export async function staffDelegateCreatePhotographerUploadBatch(
   if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found.");
   if (event.status !== "ACTIVE") throw new AppError(400, "EVENT_NOT_ACTIVE", "Only ACTIVE events accept uploads.");
 
-  const accountRows = await executeRows<{ id: string }>(
-    db,
-    sql`
-      select id
-      from contributor_accounts
-      where contributor_id = ${body.targetContributorId}::uuid
-        and status = 'ACTIVE'
-      order by created_at asc
-      limit 1
-    `,
-  );
-  const accountId = accountRows[0]?.id;
-  if (!accountId) {
-    throw new AppError(
-      400,
-      "CONTRIBUTOR_ACCOUNT_REQUIRED",
-      "The selected photographer has no active portal account. They must sign in once before staff can upload on their behalf.",
-    );
-  }
+  await assertContributorHasPortalCredential(db, body.targetContributorId);
 
   const inserted = await executeRows<BatchRow>(
     db,
     sql`
       insert into contributor_upload_batches (
         contributor_id,
-        contributor_account_id,
         event_id,
         asset_type,
         common_title,
@@ -193,7 +170,6 @@ export async function staffDelegateCreatePhotographerUploadBatch(
       )
       values (
         ${body.targetContributorId}::uuid,
-        ${accountId}::uuid,
         ${body.eventId}::uuid,
         ${body.assetType},
         ${body.commonTitle ?? null},
@@ -203,7 +179,6 @@ export async function staffDelegateCreatePhotographerUploadBatch(
       returning
         id,
         contributor_id,
-        contributor_account_id,
         event_id,
         status,
         asset_type,
@@ -254,7 +229,6 @@ export async function listPhotographerUploadBatches(
       select
         b.id,
         b.contributor_id,
-        b.contributor_account_id,
         b.event_id,
         b.status,
         b.asset_type,
@@ -309,7 +283,6 @@ export async function getPhotographerUploadBatchDetail(db: DrizzleClient, sessio
       select
         b.id,
         b.contributor_id,
-        b.contributor_account_id,
         b.event_id,
         b.status,
         b.asset_type,
@@ -432,7 +405,6 @@ async function preparePhotographerUploadFilesCore(
   body: PrepareUploadFilesBody,
 ) {
   const photographerId = batch.contributor_id;
-  const accountId = batch.contributor_account_id;
 
   const items: Array<{
     itemId: string;
@@ -493,7 +465,6 @@ async function preparePhotographerUploadFilesCore(
         id,
         batch_id,
         contributor_id,
-        contributor_account_id,
         original_file_name,
         original_file_extension,
         mime_type,
@@ -505,7 +476,6 @@ async function preparePhotographerUploadFilesCore(
         ${itemId}::uuid,
         ${batch.id}::uuid,
         ${photographerId}::uuid,
-        ${accountId}::uuid,
         ${file.fileName},
         ${originalExt},
         ${file.mimeType},
@@ -798,7 +768,6 @@ async function submitPhotographerUploadBatchCore(db: DrizzleClient, batch: Batch
       select
         id,
         contributor_id,
-        contributor_account_id,
         event_id,
         status,
         asset_type,
@@ -834,7 +803,6 @@ async function requireOpenBatchForPhotographer(db: DrizzleClient, session: Contr
       select
         id,
         contributor_id,
-        contributor_account_id,
         event_id,
         status,
         asset_type,
@@ -866,7 +834,6 @@ async function requireOpenBatchById(db: DrizzleClient, batchId: string): Promise
       select
         id,
         contributor_id,
-        contributor_account_id,
         event_id,
         status,
         asset_type,

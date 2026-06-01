@@ -25,8 +25,8 @@ boardRoutes.get(
   "/api/v1/internal/fotobox/items/boards",
   zValidator("query", listBoardsQuerySchema),
   async (c) => {
-    const { authUserId } = c.req.valid("query")
-    return listBoardsService(c.env, authUserId)
+    const { userId } = c.req.valid("query")
+    return listBoardsService(c.env, userId)
   },
 )
 
@@ -34,8 +34,8 @@ boardRoutes.post(
   "/api/v1/internal/fotobox/items/boards",
   zValidator("json", createBoardBodySchema),
   async (c) => {
-    const { authUserId, name } = c.req.valid("json")
-    return createBoardService(c.env, authUserId, name)
+    const { userId, name } = c.req.valid("json")
+    return createBoardService(c.env, userId, name)
   },
 )
 
@@ -45,8 +45,8 @@ boardRoutes.patch(
   zValidator("json", renameBoardBodySchema),
   async (c) => {
     const { boardId } = c.req.valid("param")
-    const { authUserId, name } = c.req.valid("json")
-    return renameBoardService(c.env, boardId, authUserId, name)
+    const { userId, name } = c.req.valid("json")
+    return renameBoardService(c.env, boardId, userId, name)
   },
 )
 
@@ -56,8 +56,8 @@ boardRoutes.delete(
   zValidator("json", deleteBoardBodySchema),
   async (c) => {
     const { boardId } = c.req.valid("param")
-    const { authUserId } = c.req.valid("json")
-    return deleteBoardService(c.env, boardId, authUserId)
+    const { userId } = c.req.valid("json")
+    return deleteBoardService(c.env, boardId, userId)
   },
 )
 
@@ -72,9 +72,9 @@ boardRoutes.post(
 
 boardRoutes.get(
   "/api/v1/internal/fotobox/items/asset-board-ids",
-  zValidator("query", z.object({ authUserId: z.string().trim().min(1), assetId: z.uuid() })),
+  zValidator("query", z.object({ userId: z.string().trim().min(1), assetId: z.uuid() })),
   async (c) => {
-    const { authUserId, assetId } = c.req.valid("query")
-    return getAssetBoardIdsService(c.env, authUserId, assetId)
+    const { userId, assetId } = c.req.valid("query")
+    return getAssetBoardIdsService(c.env, userId, assetId)
   },
 )

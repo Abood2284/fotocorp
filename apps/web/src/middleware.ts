@@ -1,4 +1,4 @@
-import { hasBetterAuthSessionCookie } from "@/lib/edge-better-auth-session-presence"
+import { hasPlatformSessionCookie } from "@/lib/edge-platform-session-presence"
 import { NextRequest, NextResponse } from "next/server"
 
 function handleProtectedAccountRoutes(request: NextRequest): NextResponse | null {
@@ -6,7 +6,7 @@ function handleProtectedAccountRoutes(request: NextRequest): NextResponse | null
 
   if (!pathname.startsWith("/account")) return null
 
-  if (hasBetterAuthSessionCookie(request)) return NextResponse.next()
+  if (hasPlatformSessionCookie(request)) return NextResponse.next()
 
   const signInUrl = new URL("/sign-in", request.url)
   signInUrl.searchParams.set("callbackUrl", `${request.nextUrl.pathname}${request.nextUrl.search}`)
@@ -33,8 +33,8 @@ export function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
-// Photographer portal routes (`/contributor/*`) and staff routes (`/staff/*`) use separate cookies
-// (not Better Auth). Staff workspace routes require staff session in `app/(staff)/staff/(workspace)/layout.tsx`.
+// Photographer portal (`/contributor/*`) and staff (`/staff/*`) use separate cookies.
+// Staff workspace routes require staff session in `app/(staff)/staff/(workspace)/layout.tsx`.
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon\\.svg|images/).*)",

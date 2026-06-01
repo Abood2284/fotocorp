@@ -8,7 +8,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { FotocorpLogoLink } from "@/components/layout/fotocorp-logo-link"
-import { authClient } from "@/lib/auth-client"
 import { SHARED_AUTH_SESSION_QUERY_KEY, useSharedAuthSession } from "@/lib/use-shared-auth-session"
 import { cn } from "@/lib/utils"
 import {
@@ -544,7 +543,7 @@ function AccountMenu({
   }, [])
 
   async function handleSignOut() {
-    await authClient.signOut()
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
     queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, null)
     setOpen(false)
     router.push("/sign-in")
@@ -772,7 +771,7 @@ function MobileAccountMenu({
   const user = session?.user
 
   async function handleSignOut() {
-    await authClient.signOut()
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
     queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, null)
     router.push("/sign-in")
     router.refresh()

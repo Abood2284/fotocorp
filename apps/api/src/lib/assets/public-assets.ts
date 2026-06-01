@@ -12,6 +12,8 @@ import {
   THUMB_LIGHT_PREVIEW_PROFILE,
 } from "../media/watermark";
 
+export const PUBLIC_ROYALTY_FREE_CATEGORY_NAME = "Royalty Free";
+
 type SortMode = "newest" | "oldest" | "relevance";
 
 interface PublicAssetQuery {
@@ -229,25 +231,19 @@ export async function listPublicRoyaltyFreeFeaturedAssets(
 ) {
   const totalStartedAt = Date.now();
   const limit = input.limit ? Math.min(parseLimit(input.limit), 50) : 50;
-  const periodKey = currentPeriodKey();
 
   const queryStartedAt = Date.now();
   const rows = await executeRows<AssetRow>(db, sql`
-    with featured as materialized (
-      select
-        asset_id,
-        rank
-      from public_royalty_free_featured_items
-      where period_key = ${periodKey}
-        and status = 'ACTIVE'
-      order by rank asc, asset_id asc
-      limit ${limit}
-    )
     ${selectAssetSql(undefined)}
-    ${fromRoyaltyFreeFeaturedAssetSql()}
+    ${fromAssetSql()}
     where ${publicAssetPredicate("a")}
       and card.id is not null
-    order by f.rank asc, f.asset_id asc
+      and (
+        ac.name = ${PUBLIC_ROYALTY_FREE_CATEGORY_NAME}
+        or (a.category_id is null and ec.name = ${PUBLIC_ROYALTY_FREE_CATEGORY_NAME})
+      )
+    order by a.created_at desc, a.id asc
+    limit ${limit}
   `);
   const query = Date.now() - queryStartedAt;
 
@@ -276,10 +272,6 @@ export async function listPublicRoyaltyFreeFeaturedAssets(
 
 /** @deprecated Use {@link listPublicRoyaltyFreeFeaturedAssets}. */
 export const listPublicCreativeFeaturedAssets = listPublicRoyaltyFreeFeaturedAssets;
-
-function currentPeriodKey(date = new Date()): string {
-  return date.toISOString().slice(0, 7);
-}
 
 export async function getPublicAssetDetail(
   db: DrizzleClient,
@@ -657,36 +649,6 @@ function selectAssetSql(q: string | undefined): SQL {
       detail.width as detail_width,
       detail.height as detail_height,
       detail.storage_key as detail_storage_key
-  `;
-}
-
-function fromRoyaltyFreeFeaturedAssetSql(): SQL {
-  return sql`
-    from featured f
-    join image_assets a
-      on a.id = f.asset_id
-    join image_derivatives card
-      on card.image_asset_id = a.id
-      and card.variant = 'CARD'
-      and card.generation_status = 'READY'
-      and card.is_watermarked = true
-      and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
-    left join image_derivatives thumb
-      on thumb.image_asset_id = a.id
-      and thumb.variant = 'THUMB'
-      and thumb.generation_status = 'READY'
-      and thumb.is_watermarked = true
-      and thumb.watermark_profile = ${THUMB_LIGHT_PREVIEW_PROFILE}
-    left join image_derivatives detail
-      on detail.image_asset_id = a.id
-      and detail.variant = 'DETAIL'
-      and detail.generation_status = 'READY'
-      and detail.is_watermarked = true
-      and detail.watermark_profile = ${DETAIL_PREVIEW_PROFILE}
-    left join asset_categories ac on ac.id = a.category_id
-    left join photo_events e on e.id = a.event_id
-    left join asset_categories ec on ec.id = e.category_id
-    left join contributors p on p.id = a.contributor_id
   `;
 }
 

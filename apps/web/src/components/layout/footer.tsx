@@ -11,6 +11,7 @@ const BROWSE_LINKS: FooterLink[] = [
   { label: "Categories", href: "/categories" },
   { label: "Events", href: "/events" },
   { label: "Request access", href: "/request-access" },
+  { label: "Apply to contribute", href: "/apply-contributor" },
 ]
 
 const COMPANY_LINKS: FooterLink[] = [

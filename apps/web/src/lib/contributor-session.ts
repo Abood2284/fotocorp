@@ -3,6 +3,7 @@ import "server-only"
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 import { getContributorMe, type ContributorAuthResponse } from "@/lib/api/contributor-api"
+import { buildSignInHref } from "@/lib/auth-sign-in-gateway"
 
 export async function getContributorCookieHeader() {
   const cookieStore = await cookies()
@@ -22,7 +23,7 @@ export async function getOptionalContributorSession(): Promise<ContributorAuthRe
 
 export async function requireContributorPortalSession() {
   const session = await getOptionalContributorSession()
-  if (!session) redirect("/contributor/login")
+  if (!session) redirect(buildSignInHref({ persona: "contributor" }))
   return session
 }
 

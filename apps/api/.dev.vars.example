@@ -34,6 +34,14 @@ TYPESENSE_CF_ACCESS_CLIENT_SECRET=
 # Must match apps/web `.env.local` INTERNAL_API_SECRET. Web proxies /api/auth/* and internal routes here.
 INTERNAL_API_SECRET=replace-with-long-random-internal-secret
 
+# Transactional email for registration/access approval flow.
+# Store RESEND_API_KEY as a Cloudflare secret in deployed environments; do not commit real keys.
+EMAIL_PROVIDER=resend
+EMAIL_FROM_NAME=Fotocorp Subscriptions
+EMAIL_FROM_ADDRESS=subscription@fotocorp.com
+EMAIL_REPLY_TO=subscription@fotocorp.com
+RESEND_API_KEY=
+
 # Runtime media delivery uses Worker R2 bindings in wrangler.jsonc:
 # - MEDIA_PREVIEWS_BUCKET for watermarked derivatives
 # - MEDIA_ORIGINALS_BUCKET for canonical Fotokey originals (admin tunnel + subscriber download)
@@ -77,6 +85,13 @@ CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET=fotocorp-2026-contributor-uploads
 # STAFF_BOOTSTRAP_PASSWORD=
 # STAFF_BOOTSTRAP_DISPLAY_NAME=Super Admin
 # STAFF_BOOTSTRAP_ROLE=SUPER_ADMIN
+# Development: reset a platform USER password (P4 Better Auth hashes are not verifiable by P5 login)
+# PLATFORM_DEV_LOGIN_IDENTIFIER=abood
+# PLATFORM_DEV_PASSWORD=
+# PLATFORM_USER_DELETE_IDENTIFIER=john
+# pnpm --dir apps/api db:delete:platform-user
+# pnpm --dir apps/api db:sync:contributor-credentials-from-export
+# pnpm --dir apps/api db:sync:remaining-contributor-credentials
 # PHOTOGRAPHER_SMOKE_USERNAME=ph_000xxx
 # PHOTOGRAPHER_SMOKE_PASSWORD=
 # PHOTOGRAPHER_UPLOAD_SMOKE_REAL_R2=1

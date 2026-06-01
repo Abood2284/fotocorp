@@ -20,6 +20,12 @@
 			"0 3 * * *"
 		]
 	},
+	"vars": {
+		"EMAIL_PROVIDER": "resend",
+		"EMAIL_FROM_NAME": "Fotocorp Subscriptions",
+		"EMAIL_FROM_ADDRESS": "subscription@fotocorp.com",
+		"EMAIL_REPLY_TO": "subscription@fotocorp.com"
+	},	
 	"r2_buckets": [
 		{
 			"binding": "MEDIA_ORIGINALS_BUCKET",

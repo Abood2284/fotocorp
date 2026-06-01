@@ -5,7 +5,7 @@ import { useEffect, useState } from "react"
 import type React from "react"
 
 import { cn } from "@/lib/utils"
-import { authClient } from "@/lib/auth-client"
+import { useSharedAuthSession } from "@/lib/use-shared-auth-session"
 import { getAnonSavedAssetIds, getAnonBoards, removeFromAnonBoard } from "@/lib/storage/fotobox-anon-store"
 import { FotoboxBoardPicker } from "@/components/assets/fotobox-board-picker"
 
@@ -23,7 +23,7 @@ export function PublicAssetSaveButton({
   assetTitle,
 }: PublicAssetSaveButtonProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
-  const { data: session } = authClient.useSession()
+  const { data: session } = useSharedAuthSession()
   const isAuthenticated = !!session?.user
   const [hasSaved, setHasSaved] = useState(false)
   const [checking, setChecking] = useState(true)

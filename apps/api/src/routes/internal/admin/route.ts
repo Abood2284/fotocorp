@@ -14,6 +14,7 @@ import {
   adminAssetUpdateBulkService,
   adminFiltersService,
   adminStatsService,
+  adminDashboardSummaryService,
   adminMediaPipelineStatusService,
   adminUserSubscriptionService,
   adminUserDetailService,
@@ -129,6 +130,7 @@ internalAdminRoutes.patch(
       params.assetId,
       {
         caption: nullable(body.caption),
+        whoIsInPicture: nullable(body.whoIsInPicture),
         headline: nullable(body.headline),
         description: nullable(body.description),
         keywords: normalizeKeywords(body.keywords),
@@ -148,6 +150,12 @@ internalAdminRoutes.get("/api/v1/internal/admin/catalog/stats", async (c) => {
 });
 
 internalAdminRoutes.all("/api/v1/internal/admin/catalog/stats", () => methodNotAllowed());
+
+internalAdminRoutes.get("/api/v1/internal/admin/dashboard/summary", async (c) => {
+  return await adminDashboardSummaryService(c.env);
+});
+
+internalAdminRoutes.all("/api/v1/internal/admin/dashboard/summary", () => methodNotAllowed());
 
 internalAdminRoutes.get("/api/v1/internal/admin/media-pipeline/status", async (c) => {
   return await adminMediaPipelineStatusService(c.env);

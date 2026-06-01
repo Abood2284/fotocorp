@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+
+export const CONTRIBUTOR_SOURCES = ["LEGACY_IMPORT", "MANUAL", "APPLICATION"] as const;
 
 export const contributors = pgTable(
   "contributors",
@@ -19,15 +21,16 @@ export const contributors = pgTable(
     country: text("country"),
     postalCode: text("postal_code"),
     status: text("status").default("UNKNOWN").notNull(),
-    legacyStatus: text("legacy_status"),
     source: text("source").default("LEGACY_IMPORT").notNull(),
-    legacyPayload: jsonb("legacy_payload"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     check("contributors_status_check", sql`${table.status} in ('ACTIVE', 'INACTIVE', 'DELETED', 'UNKNOWN')`),
-    check("contributors_source_check", sql`${table.source} in ('LEGACY_IMPORT', 'MANUAL')`),
+    check(
+      "contributors_source_check",
+      sql`${table.source} in ('LEGACY_IMPORT', 'MANUAL', 'APPLICATION')`,
+    ),
     uniqueIndex("contributors_legacy_photographer_id_unique_idx")
       .on(table.legacyPhotographerId)
       .where(sql`${table.legacyPhotographerId} is not null`),

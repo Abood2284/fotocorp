@@ -4,7 +4,7 @@ import { ArrowLeft, Check, FolderPlus, Loader2, Search, X } from "lucide-react"
 import { useEffect, useRef, useState, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
-import { authClient } from "@/lib/auth-client"
+import { useSharedAuthSession } from "@/lib/use-shared-auth-session"
 import {
   createAnonBoard,
   addToAnonBoard,
@@ -32,7 +32,7 @@ export function FotoboxBoardPicker({
   onOpenChange,
   assetTitle,
 }: FotoboxBoardPickerProps) {
-  const { data: session } = authClient.useSession()
+  const { data: session } = useSharedAuthSession()
   const isAuthenticated = !!session?.user
   const [mounted, setMounted] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)

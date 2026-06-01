@@ -4,7 +4,7 @@ import {
   buildAuthProxyRequestHeaders,
   buildAuthProxyResponseHeaders,
   isUpstreamUnreachableFetchError,
-} from "../src/app/api/auth/[...all]/route"
+} from "../src/lib/api/bff-proxy-headers"
 
 describe("auth proxy headers", () => {
   it("does not forward body transport headers upstream", () => {

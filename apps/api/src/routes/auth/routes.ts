@@ -1,36 +1,19 @@
 import { Hono } from "hono";
 import type { Env } from "../../appTypes";
 import type { AppRequestVariables } from "../../db";
-import { getAuth } from "../../auth/auth";
-import { createTimingTracker, formatServerTiming, logLatencyTrace } from "../../lib/latency-trace";
+import { AppError } from "../../lib/errors";
+import { errorResponse } from "../../lib/http";
 
+/** Better Auth catch-all retired after P5 — platform auth lives under /api/v1/auth/*. */
 export const authRoutes = new Hono<{ Bindings: Env; Variables: AppRequestVariables }>();
 
-authRoutes.all("/api/auth/*", async (c) => {
-  const pathname = new URL(c.req.url).pathname;
-  const isGetSession = pathname.endsWith("/get-session");
-  if (!isGetSession) return getAuth(c.env).handler(c.req.raw);
-
-  const requestId = c.get("requestId");
-  const tracker = createTimingTracker();
-  const response = await getAuth(c.env).handler(c.req.raw);
-  tracker.mark("handler");
-  const durationMs = tracker.total();
-  const timings = { handler: tracker.elapsed("handler"), total: durationMs };
-
-  logLatencyTrace({
-    event: "latency_trace",
-    requestId,
-    layer: "api",
-    route: "/api/auth/get-session",
-    status: response.ok ? "ok" : "error",
-    statusCode: response.status,
-    durationMs,
-    timings,
-    cache: { mode: "auth", hit: false, cacheControl: response.headers.get("cache-control") },
-  });
-
-  const headers = new Headers(response.headers);
-  headers.set("Server-Timing", formatServerTiming(timings, durationMs));
-  return new Response(response.body, { status: response.status, headers });
+authRoutes.all("/api/auth/*", (c) => {
+  return errorResponse(
+    new AppError(
+      410,
+      "BETTER_AUTH_RETIRED",
+      "Better Auth is retired. Use /api/v1/auth/login, /api/v1/auth/logout, /api/v1/auth/sign-up, or the web BFF /api/auth/* platform routes.",
+    ),
+    { requestId: c.get("requestId") },
+  );
 });

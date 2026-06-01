@@ -5,6 +5,7 @@ import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import { ChevronUp, ChevronLeft, ChevronRight, LayoutDashboard, LogOut } from "lucide-react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import { buildSignInHref } from "@/lib/auth-sign-in-gateway"
 import { cn } from "@/lib/utils"
 import { staffNavItemsForRole } from "@/lib/staff/staff-navigation"
 
@@ -114,7 +115,7 @@ function StaffProfileMenu({ staff, collapsed }: { staff: StaffShellStaff, collap
   async function handleSignOut() {
     setOpen(false)
     await fetch("/api/staff/auth/logout", { method: "POST", credentials: "include" })
-    router.push("/staff/login")
+    router.push(buildSignInHref({ persona: "staff" }))
     router.refresh()
   }
 

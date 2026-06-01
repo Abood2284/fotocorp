@@ -3,7 +3,7 @@ import type { DrizzleClient } from "../../../db";
 import { AppError } from "../../../lib/errors";
 import { json } from "../../../lib/http";
 import { schedulePublicEventFeedSync } from "../../../lib/assets/public-event-feed-projection";
-import { listAssetCategoriesForContributor } from "../../contributor/catalog/service";
+import { listAssetCategoriesForContributor, assertContributorUploadCategoryExists } from "../../contributor/catalog/service";
 import type { PatchUploadAssetMetadataBody, PrepareUploadFilesBody } from "../../contributor/uploads/validators";
 import {
   staffDelegateCompletePhotographerUploadItem,
@@ -56,7 +56,7 @@ export async function listStaffUploadWizardAssetCategoriesService(db: DrizzleCli
 }
 
 export async function createStaffUploadWizardEventService(db: DrizzleClient, body: StaffUploadWizardEventBody): Promise<Response> {
-  await assertCategoryExists(db, body.categoryId);
+  await assertContributorUploadCategoryExists(db, body.categoryId);
   await assertContributorExists(db, body.targetContributorId);
 
   const eventDateSql = parseEventDateForSql(body.eventDate);
@@ -78,7 +78,6 @@ export async function createStaffUploadWizardEventService(db: DrizzleClient, bod
         status,
         source,
         created_by_contributor_id,
-        created_by_contributor_account_id,
         created_by_source
       )
       values (
@@ -95,7 +94,6 @@ export async function createStaffUploadWizardEventService(db: DrizzleClient, bod
         'ACTIVE',
         ${PHOTO_EVENT_SOURCE_FOTOCORP_PORTAL},
         ${body.targetContributorId}::uuid,
-        null::uuid,
         'ADMIN'
       )
       returning id
@@ -187,13 +185,6 @@ export async function patchStaffUploadWizardMetadataService(
   return json(await staffDelegatePatchPhotographerUploadAssetMetadata(db, batchId, imageAssetId, body));
 }
 
-async function assertCategoryExists(db: DrizzleClient, categoryId: string) {
-  const rows = await executeRows<{ id: string }>(
-    db,
-    sql`select id from asset_categories where id = ${categoryId}::uuid limit 1`,
-  );
-  if (!rows[0]) throw new AppError(400, "EVENT_CATEGORY_INVALID", "Category was not found.");
-}
 
 async function assertContributorExists(db: DrizzleClient, contributorId: string) {
   const rows = await executeRows<{ id: string }>(

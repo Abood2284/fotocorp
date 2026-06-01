@@ -72,20 +72,33 @@ async function staffJson<T>(
 
 export interface StaffAccessInquiryListItem {
   inquiryId: string
+  inquiryType: string
   status: string
-  authUserId: string
+  userId: string | null
+  contributorId: string | null
+  proposedUsername: string | null
   interestedAssetTypes: string[]
   imageQuantityRange: string | null
   imageQualityPreference: string | null
   createdAt: string
-  companyName: string
-  companyEmail: string
-  firstName: string
-  lastName: string
+  companyName: string | null
+  companyEmail: string | null
+  firstName: string | null
+  lastName: string | null
 }
 
-export async function getStaffAccessInquiries(options: { cookieHeader?: string } = {}) {
-  return staffJson<{ ok: true; items: StaffAccessInquiryListItem[] }>("/access-inquiries", {
+export async function getStaffAccessInquiries(
+  options: {
+    cookieHeader?: string
+    inquiryType?: "USER_ACCESS" | "CONTRIBUTOR_APPLICATION"
+    status?: string
+  } = {},
+) {
+  const params = new URLSearchParams()
+  if (options.inquiryType) params.set("type", options.inquiryType)
+  if (options.status) params.set("status", options.status)
+  const query = params.toString() ? `?${params.toString()}` : ""
+  return staffJson<{ ok: true; items: StaffAccessInquiryListItem[] }>(`/access-inquiries${query}`, {
     method: "GET",
     cookieHeader: options.cookieHeader,
   })
@@ -95,21 +108,63 @@ export async function getStaffAccessInquiryDetail(inquiryId: string, options: { 
   return staffJson<{
     ok: true
     inquiry: Record<string, unknown>
-    companyName: string
-    companyEmail: string
-    firstName: string
-    lastName: string
-    jobTitle: string
-    companyType: string
+    companyName: string | null
+    companyEmail: string | null
+    firstName: string | null
+    lastName: string | null
+    jobTitle: string | null
+    companyType: string | null
     subscriberAccess: { isSubscriber: boolean; subscriptionStatus: string }
+    contributorProfile: { id: string; displayName: string | null; status: string | null; email: string | null } | null
+    pendingClaims: Array<{ claimType: string; normalizedValue: string; status: string }>
     entitlements: Record<string, unknown>[]
   }>(`/access-inquiries/${encodeURIComponent(inquiryId)}`, { method: "GET", cookieHeader: options.cookieHeader })
+}
+
+export async function postStaffApproveContributorApplication(
+  inquiryId: string,
+  body: { username?: string },
+  options: { cookieHeader?: string } = {},
+) {
+  return staffJson<{
+    ok: true
+    contributorId: string
+    username: string
+    temporaryPassword: string
+    inquiryId: string
+  }>(`/access-inquiries/${encodeURIComponent(inquiryId)}/approve-contributor`, {
+    method: "POST",
+    body,
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function postStaffCloseAccessInquiry(
+  inquiryId: string,
+  body: { staffNotes?: string | null } = {},
+  options: { cookieHeader?: string } = {},
+) {
+  return staffJson<{ ok: true; inquiry: Record<string, unknown> }>(
+    `/access-inquiries/${encodeURIComponent(inquiryId)}/close`,
+    { method: "POST", body, cookieHeader: options.cookieHeader },
+  )
 }
 
 export async function postStaffAccessInquiryEntitlementDraft(inquiryId: string, options: { cookieHeader?: string } = {}) {
   return staffJson<{ ok: true; entitlements: Record<string, unknown>[] }>(
     `/access-inquiries/${encodeURIComponent(inquiryId)}/entitlement-draft`,
     { method: "POST", body: {}, cookieHeader: options.cookieHeader },
+  )
+}
+
+export async function postStaffAccessInquiryActivateAllEntitlements(
+  inquiryId: string,
+  body: { validUntil?: string | null } = {},
+  options: { cookieHeader?: string } = {},
+) {
+  return staffJson<{ ok: true; entitlements: Record<string, unknown>[] }>(
+    `/access-inquiries/${encodeURIComponent(inquiryId)}/activate-entitlements`,
+    { method: "POST", body, cookieHeader: options.cookieHeader },
   )
 }
 

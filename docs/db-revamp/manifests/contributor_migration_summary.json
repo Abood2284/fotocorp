@@ -1,0 +1,574 @@
+{
+  "generatedAt": "2026-05-31T19:41:11.577Z",
+  "assetOwnerRows": 96,
+  "canonicalContributorCount": 93,
+  "mergeIntoRowCount": 3,
+  "keepRowCount": 93,
+  "totalAssetCountListed": 729598,
+  "mergeReasonCounts": {
+    "MANUAL": 3,
+    "DISPLAY_NAME": 0,
+    "REAL_EMAIL": 0
+  },
+  "placeholderEmailRowCount": 28,
+  "canonicalContributors": [
+    {
+      "canonicalContributorId": "83513349-e466-4496-938f-3bddb9ef4215",
+      "displayName": "Ganesh Lad",
+      "totalAssets": 148464,
+      "sources": 2
+    },
+    {
+      "canonicalContributorId": "9e9c4214-1570-49f2-8d68-3bf50553e210",
+      "displayName": "Jafar Khan",
+      "totalAssets": 122508,
+      "sources": 2
+    },
+    {
+      "canonicalContributorId": "b5fe56f5-120d-4bd5-b599-fed081d38971",
+      "displayName": "Sunil Shirsekar",
+      "totalAssets": 94796,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "2a2b4407-fb23-42fb-b421-36b48fffbe04",
+      "displayName": "Sachin Kadvekar",
+      "totalAssets": 87969,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "c237b9ca-57b2-409a-aa94-4caf927c8823",
+      "displayName": "Stringer",
+      "totalAssets": 50669,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "df6e8b80-1db0-41fb-a15b-243f8314443a",
+      "displayName": "Pravin Utturkar",
+      "totalAssets": 27713,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "6c7fffba-7d67-4268-8ad9-f4da1958137f",
+      "displayName": "Sameer Joshi",
+      "totalAssets": 26434,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "53ff38ea-453d-40b5-86fd-59cf31b2e727",
+      "displayName": "Rajeev Tyagi",
+      "totalAssets": 26005,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "7d8144f4-0644-460b-a318-d0013024fb78",
+      "displayName": "Shaielesh Mule",
+      "totalAssets": 21462,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "310d27fc-f018-4acc-a4b2-6a62a4ca27ad",
+      "displayName": "Bhaskar  Mallick",
+      "totalAssets": 18511,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "b295e0ca-74bb-4f48-8463-bbfdccf609a7",
+      "displayName": "Pankaj Sharma",
+      "totalAssets": 13724,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "24d8b6f0-ca0b-44ce-b0ad-f31ca89661b8",
+      "displayName": "Santosh  Nagwekar",
+      "totalAssets": 11453,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "f5464dfb-6d92-4f83-b9dc-f4c493767d0b",
+      "displayName": "Ajinkya Sawant",
+      "totalAssets": 8753,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "5503918c-1656-4efe-8983-6f59311fa713",
+      "displayName": "Bilal Najar",
+      "totalAssets": 8493,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "3558786b-b2d3-416f-91db-afacb9430b5f",
+      "displayName": "Pramod Thakur",
+      "totalAssets": 4948,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "de3e4e5e-a7a0-42b5-bcc5-98cbf9d242cd",
+      "displayName": "Durga Prasad",
+      "totalAssets": 4452,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "041f3d28-2961-4356-9c76-489d31ecf76c",
+      "displayName": "Kedar Nene",
+      "totalAssets": 4181,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "ce06f5ee-8be6-485d-abe9-042bbb4b5023",
+      "displayName": "Nirav Trivedi",
+      "totalAssets": 4019,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "ce612c08-2c75-4364-b45b-9ed820d154e9",
+      "displayName": "Harshit P",
+      "totalAssets": 3713,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "335e1a9e-8682-4146-9ee7-da76aef3a163",
+      "displayName": "Dattaram Kaudare",
+      "totalAssets": 3526,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "6c6d6dc9-ff19-4a8b-b574-c646ee7b5098",
+      "displayName": "Karan Singh",
+      "totalAssets": 2906,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "e3267c93-4023-47c0-af19-261de1b82eed",
+      "displayName": "D Yadav",
+      "totalAssets": 2827,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "97fc1be3-bfc7-4b49-838e-a095350d9c21",
+      "displayName": "Ujjal Deb",
+      "totalAssets": 2677,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "333a62c2-168e-428d-9d44-016311573b95",
+      "displayName": "Ashish Raje",
+      "totalAssets": 2401,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "3c1a6207-bc9f-47fe-acd3-b04febcd8abf",
+      "displayName": "Tushar Mane",
+      "totalAssets": 2376,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "46a55533-0e7a-4127-a39e-538226d121bd",
+      "displayName": "Sandip Das",
+      "totalAssets": 2310,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "d66ad45d-3f8e-4153-b1eb-fb07ebb2aee8",
+      "displayName": "pratik koli",
+      "totalAssets": 2129,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "504a3c03-4413-424e-9b68-11d6eff78ee2",
+      "displayName": "D Soumik",
+      "totalAssets": 2052,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "a6b27a4b-c2d7-40d3-b43f-dadbe22b23b4",
+      "displayName": "Mohnish Dabhoya",
+      "totalAssets": 1659,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "1d3e6a44-ff6c-454f-aa49-7a9add0b7d99",
+      "displayName": "Zara zakir",
+      "totalAssets": 1496,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "e3f52ece-f543-4e1a-860e-f8118bcd11ad",
+      "displayName": "Rajesh Yadav",
+      "totalAssets": 1457,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "fba40d6a-7f27-4542-8952-ad1b89e75af8",
+      "displayName": "Kishor Kadam",
+      "totalAssets": 1219,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "d5f8ed82-f8e6-4174-a117-6b8b67fc017d",
+      "displayName": "Saurabh",
+      "totalAssets": 1187,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "cca60a52-501e-41f7-9c7d-066d7e755e9f",
+      "displayName": "T. Amrutraj",
+      "totalAssets": 1038,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "1515a0fc-5ad9-4807-a4d4-353e89b3e9b9",
+      "displayName": "Subhash Barolia",
+      "totalAssets": 937,
+      "sources": 2
+    },
+    {
+      "canonicalContributorId": "3f8a4696-a886-4f65-836e-88653ad3593a",
+      "displayName": "Mukund Singh",
+      "totalAssets": 852,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "5907d33e-360a-4f00-b74f-1e1d3e5bd8eb",
+      "displayName": "Money Sharma",
+      "totalAssets": 749,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "21da8232-f6b3-4297-a916-61eec02f4251",
+      "displayName": "Om Anandrao",
+      "totalAssets": 707,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "f72f8820-8e4b-4c2a-9a33-4dc0f16da158",
+      "displayName": "Apoorva  Salkade",
+      "totalAssets": 676,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "879b9915-ec7f-4275-99c5-321fc0eb3946",
+      "displayName": "Tejesh Kharat",
+      "totalAssets": 564,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "9f7ec6bb-6b14-43f5-be41-e3e3d71f1f19",
+      "displayName": "T Vishal",
+      "totalAssets": 523,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "14fe0562-04fe-4746-bbe3-14e76eea8bd9",
+      "displayName": "R Balaji",
+      "totalAssets": 453,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "70ab22ce-fb9b-427b-b067-004b6f933a82",
+      "displayName": "shailesh bhatnagar",
+      "totalAssets": 436,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "e0def906-7147-4f5c-9b30-f3132d757f05",
+      "displayName": "S Sen",
+      "totalAssets": 387,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "6d63f257-080d-4a6d-8ec2-1254860c22ed",
+      "displayName": "Arindam Dey",
+      "totalAssets": 385,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "82c7772f-d336-4c69-bdf5-3560d693786d",
+      "displayName": "Amlan",
+      "totalAssets": 376,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "2e7c2552-f97d-4a81-80e0-5c8958cd918e",
+      "displayName": "Anshuman Akash",
+      "totalAssets": 314,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "a6be08bd-164d-4a6b-a2f0-3f44e463ae63",
+      "displayName": "Vinod  Kumar",
+      "totalAssets": 304,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "f7dc5096-9db5-49da-aa36-d34c1fd2ebbe",
+      "displayName": "J Babu",
+      "totalAssets": 303,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "c0daa749-4064-45b4-b6d0-d4230b9c2fb2",
+      "displayName": "Sherwin Crasto",
+      "totalAssets": 271,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "c5541f08-b3c4-4df4-a19a-c5588904b3a1",
+      "displayName": "Shyam Sharma",
+      "totalAssets": 200,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "3aa9a7ff-f2a1-4bf3-9b01-dd6a7fdf74c6",
+      "displayName": "Pawan Sharma",
+      "totalAssets": 152,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "1bedc37d-6b12-4e35-b29a-8f5fc1615112",
+      "displayName": "Legacy photographer unknown",
+      "totalAssets": 146,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "7a10ae20-bf18-4bbe-a0da-00c6d75e28d8",
+      "displayName": "Rajesh Kumar",
+      "totalAssets": 143,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "f1fa4f78-e016-494f-a029-690c560f7a3a",
+      "displayName": "S Bhargav",
+      "totalAssets": 121,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "923db467-1e0c-43e0-93a1-e6e43b03f8eb",
+      "displayName": "Uday Deolekar",
+      "totalAssets": 111,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "8a4bdbd0-d358-47bd-a7e0-c066c556179b",
+      "displayName": "hemanta kumar nath",
+      "totalAssets": 84,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "aa23a377-3508-44cd-a023-c6859a1c4772",
+      "displayName": "Sanjay Sonkar",
+      "totalAssets": 84,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "cc93c5c5-5957-4a8b-8538-68ae52e69ab5",
+      "displayName": "Vishal Yadav",
+      "totalAssets": 71,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "9a26d84d-09c4-4368-81a7-7eeb6911ded3",
+      "displayName": "anilthakur",
+      "totalAssets": 59,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "d9e95c97-de97-4f5e-a573-00272d9cb0d0",
+      "displayName": "Nandkishor Desai",
+      "totalAssets": 53,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "dcc588f5-0b68-4f92-bc4c-e81404ced180",
+      "displayName": "Gopal Bodhe",
+      "totalAssets": 50,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "8da13542-2602-44dc-9944-30ac4e24fe52",
+      "displayName": "Prashant Nakwe",
+      "totalAssets": 49,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "7e7b24d4-178a-4673-9fdf-740464c9bf14",
+      "displayName": "Satyajit Raut",
+      "totalAssets": 45,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "fab89832-e4e2-43c3-9632-d08a3d5536e9",
+      "displayName": "Hira Punjabi",
+      "totalAssets": 44,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "8f580901-fae6-4f5e-941e-a2cc788e7e72",
+      "displayName": "Yatish Naik",
+      "totalAssets": 41,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "c59891e9-b18a-4532-807a-ad41be1cce9d",
+      "displayName": "Shiva Kumar",
+      "totalAssets": 40,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "2c54930f-82b6-444a-bf16-b190051a9da9",
+      "displayName": "S Surabhi",
+      "totalAssets": 36,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "8c7ec68e-e45b-4074-aaeb-7dd3500c2832",
+      "displayName": "Bilal Rathore Rathore",
+      "totalAssets": 28,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "2acca65b-002d-435c-96df-047f519c0fa0",
+      "displayName": "Ravuri Sumanth",
+      "totalAssets": 25,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "81a97004-3421-41ec-b443-bb3be985061a",
+      "displayName": "Yadnesh Nalawade",
+      "totalAssets": 25,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "7ca665e6-07fe-4af3-8ee0-a9b55b323487",
+      "displayName": "Parag Deshpande",
+      "totalAssets": 24,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "8d195d19-7e3f-4bcc-91c1-47b88fddfa40",
+      "displayName": "Santosh Hirlekar",
+      "totalAssets": 24,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "44309939-4abb-4c70-ae8b-2e7e591c0070",
+      "displayName": "Manas Paran",
+      "totalAssets": 21,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "fb7bc7c7-18f9-435e-a0a3-fd91c27e0dab",
+      "displayName": "Owais",
+      "totalAssets": 20,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "04381479-a3ff-48df-a40c-a03a6110f0bc",
+      "displayName": "Ravikant  Sane",
+      "totalAssets": 20,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "84037d6b-7e1c-42cd-bbbb-37802aacd19e",
+      "displayName": "Hrishikesh Kalita",
+      "totalAssets": 19,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "42fa4845-f47c-4554-aee7-d002db51108c",
+      "displayName": "Joe Paul",
+      "totalAssets": 16,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "895a8d3e-454a-48f5-a5e7-2c4b62f45aaa",
+      "displayName": "Ajay Sha",
+      "totalAssets": 13,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "658bf5d6-03d5-4c00-b2bf-18de60d240ad",
+      "displayName": "K Raj",
+      "totalAssets": 10,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "d6d61143-df93-4f81-8499-abf2eecc9da8",
+      "displayName": "Karann shah",
+      "totalAssets": 9,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "283ef94a-8dfc-4733-87cc-faa14679606c",
+      "displayName": "shailendra",
+      "totalAssets": 9,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "980213f2-d792-4700-894f-9ed2146664ff",
+      "displayName": "Harish  Kataria",
+      "totalAssets": 8,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "85d360cf-9713-44ec-84ae-9a485aaeac8d",
+      "displayName": "Prabhjot Gill",
+      "totalAssets": 7,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "11035917-9de6-45a6-b2d1-fb833d5d5229",
+      "displayName": "Stinger Stin",
+      "totalAssets": 6,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "02eec615-c64e-46f4-bdf0-fcf1042a805d",
+      "displayName": "Chandan  Giri",
+      "totalAssets": 6,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "50139654-fed0-4e0f-90f4-1c97ca8e1feb",
+      "displayName": "Sivaraman Kitta",
+      "totalAssets": 4,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "e6c4f90c-70e8-4273-a3d5-68cc1da5d201",
+      "displayName": "Balu MRS",
+      "totalAssets": 3,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "bae8963f-68a7-4441-b052-5ab7ea5ff774",
+      "displayName": "Mukesh Parpiani",
+      "totalAssets": 3,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "16221e74-a9dd-4a52-ba4e-e5c9015955cb",
+      "displayName": "Admin",
+      "totalAssets": 2,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "2f7576e0-1a5f-40c4-a7a6-16abd29558af",
+      "displayName": "Robert Bogolin",
+      "totalAssets": 1,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "1f472905-d124-4473-b16e-36f26a7703ef",
+      "displayName": "Ajay Bhandari",
+      "totalAssets": 1,
+      "sources": 1
+    },
+    {
+      "canonicalContributorId": "8e3e26e9-ecce-47db-a109-6aa16d9dab2a",
+      "displayName": "hemant",
+      "totalAssets": 1,
+      "sources": 1
+    }
+  ]
+}

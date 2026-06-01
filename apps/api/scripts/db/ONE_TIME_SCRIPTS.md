@@ -18,6 +18,9 @@ Do not add long-lived business logic here — use Drizzle migrations or permanen
 | --- | --- | --- | --- |
 | `backfill-legacy-fotokeys.ts` | `pnpm --dir apps/api db:backfill:legacy-fotokeys` | Copy `legacy_image_code` → `fotokey` (+ `fotokey_date`, `fotokey_sequence`, `fotokey_assigned_at`) for `FC…` codes; sync `fotokey_daily_counters` | Backfill + `db:validate:fotokey-publish` pass on **every** env you care about |
 | `backfill-photo-events-category-id.ts` | `pnpm --dir apps/api db:backfill:photo-events-category-id` | Set `photo_events.category_id` from dominant public `image_assets.category_id` | Backfill verified on **every** env you care about; re-run investigation browse counts |
+| `backfill-image-assets-category-gaps.ts` | `pnpm --dir apps/api db:backfill:image-assets-category-gaps` | Copy event category to null asset rows; assign public ACTIVE uncategorized assets to **More** | Backfill verified on **every** env you care about |
+| `merge-asset-categories.ts` | `pnpm --dir apps/api db:merge:asset-categories` | Merge ShowBiz → Entertainment, Politics → News; delete source categories | Verified on **every** env; reindex Typesense after |
+| `rename-travel-category-to-royalty-free.ts` | `pnpm --dir apps/api db:rename:travel-to-royalty-free` | Rename **Travel** category to **Royalty Free** | Verified on **every** env |
 
 ### `backfill-photo-events-category-id.ts` — how to run
 
@@ -76,4 +79,5 @@ rm apps/api/scripts/db/backfill-legacy-fotokeys.ts
 
 | Script | Completed | Notes |
 | --- | --- | --- |
-| _(none yet)_ | | |
+| Auth revamp P1–P9 one-time scripts (`apply-*`, `validate-*`, `sync-*`, `seed-*`, etc.) | 2026-06-01 (Development) | Removed from repo after Dev cutover; use Drizzle migrations `0039`–`0044` + [`auth-identity-revamp-migration-spec.md`](../../../docs/db-revamp/auth-identity-revamp-migration-spec.md) for history |
+| `apply-contributor-migration-merges.ts` | 2026-06-01 (Development) | P1 manifest merges applied |

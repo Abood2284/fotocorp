@@ -1,15 +1,8 @@
-import { eq, desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import type { DrizzleClient } from "../../../db";
-import { customerAccessInquiries, fotocorpUserProfiles } from "../../../db/schema";
+import { customerAccessInquiries, users } from "../../../db/schema";
+import { createPlatformUser, getPlatformUserById } from "../../../lib/users/platform-user";
 import { isValidUsername, normalizeUsername } from "../../../auth/username";
-import { recordIntendedEmailEvent } from "../../../lib/email/email-service";
-import type {
-  BusinessEmailValidationOptions,
-  BusinessEmailValidationRepository,
-  BusinessEmailValidationResult,
-} from "./business-email-validation";
-import { validateBusinessEmail } from "./business-email-validation";
-
 export const ALLOWED_COMPANY_TYPES = [
   "agency",
   "brand",
@@ -35,12 +28,6 @@ export type ImageQualityPreference = (typeof IMAGE_QUALITY_PREFERENCES)[number];
 
 export type CompanyType = (typeof ALLOWED_COMPANY_TYPES)[number];
 
-export interface RegistrationProfileValidationOptions {
-  emailRepository: BusinessEmailValidationRepository;
-  fetchMx?: BusinessEmailValidationOptions["fetchMx"];
-  now?: Date;
-}
-
 export interface ValidatedRegistrationProfile {
   firstName: string;
   lastName: string;
@@ -51,7 +38,7 @@ export interface ValidatedRegistrationProfile {
   customJobTitle: string | null;
   companyEmail: string;
   companyEmailDomain: string;
-  emailValidationDecision: BusinessEmailValidationResult["decision"];
+  emailValidationDecision: string;
   phoneCountryCode: string;
   phoneNumber: string;
   interestedAssetTypes: InterestAssetType[];
@@ -84,23 +71,13 @@ export class RegistrationProfileValidationError extends Error {
   }
 }
 
-export async function validateRegistrationProfileBody(
-  body: unknown,
-  options: RegistrationProfileValidationOptions,
-): Promise<ValidatedRegistrationProfile> {
+export async function validateRegistrationProfileBody(body: unknown): Promise<ValidatedRegistrationProfile> {
   if (!isObject(body)) {
     throw new RegistrationProfileValidationError("INVALID_REGISTRATION_PROFILE", "Registration profile is required.");
   }
   const email = readRequiredString(body, "email", "Email is required.");
-  const companyEmail = readOptionalString(body, "companyEmail") ?? email;
-  const emailValidation = await validateBusinessEmail(companyEmail, {
-    repository: options.emailRepository,
-    fetchMx: options.fetchMx,
-    now: options.now,
-  });
-  if (!emailValidation.ok || !emailValidation.normalizedEmail || !emailValidation.domain) {
-    throw new RegistrationProfileValidationError(emailValidation.decision, emailValidation.message);
-  }
+  const companyEmailRaw = readOptionalString(body, "companyEmail") ?? email;
+  const { normalizedEmail: companyEmail, domain: companyEmailDomain } = normalizeRegistrationEmail(companyEmailRaw);
   const username = normalizeUsername(readRequiredString(body, "username", "Username is required."));
   if (!isValidUsername(username)) {
     throw new RegistrationProfileValidationError(
@@ -144,9 +121,9 @@ export async function validateRegistrationProfileBody(
     companyName: readRequiredString(body, "companyName", "Company name is required."),
     jobTitle,
     customJobTitle,
-    companyEmail: emailValidation.normalizedEmail,
-    companyEmailDomain: emailValidation.domain,
-    emailValidationDecision: emailValidation.decision,
+    companyEmail,
+    companyEmailDomain,
+    emailValidationDecision: "ALLOW",
     phoneCountryCode: readRequiredString(body, "phoneCountryCode", "Phone country code is required."),
     phoneNumber: readRequiredString(body, "phoneNumber", "Phone number is required."),
     interestedAssetTypes,
@@ -155,62 +132,37 @@ export async function validateRegistrationProfileBody(
   };
 }
 
-export async function createFotocorpUserProfile(db: DrizzleClient, userId: string, profile: ValidatedRegistrationProfile) {
-  const inserted = await db
-    .insert(fotocorpUserProfiles)
-    .values({
-      userId,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      username: profile.username,
-      companyType: profile.companyType,
-      companyName: profile.companyName,
-      jobTitle: profile.jobTitle,
-      customJobTitle: profile.customJobTitle,
-      companyEmail: profile.companyEmail,
-      companyEmailDomain: profile.companyEmailDomain,
-      emailValidationDecision: profile.emailValidationDecision,
-      phoneCountryCode: profile.phoneCountryCode,
-      phoneNumber: profile.phoneNumber,
-      interestedAssetTypes: profile.interestedAssetTypes,
-      imageQuantityRange: profile.imageQuantityRange,
-      imageQualityPreference: profile.imageQualityPreference,
-    })
-    .onConflictDoNothing({ target: fotocorpUserProfiles.userId })
-    .returning({ id: fotocorpUserProfiles.id });
+/** @deprecated Prefer createPlatformUser; kept for Better Auth hook compatibility until P5. */
+export async function createFotocorpUserProfile(
+  db: DrizzleClient,
+  _legacyAuthUserId: string,
+  profile: ValidatedRegistrationProfile,
+  login?: { email: string; displayName?: string | null; avatarUrl?: string | null },
+) {
+  const existing = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.username, profile.username))
+    .limit(1)
 
-  if (inserted.length) {
-    await db.insert(customerAccessInquiries).values({
-      authUserId: userId,
-      status: "PENDING",
-      interestedAssetTypes: profile.interestedAssetTypes,
-      imageQuantityRange: profile.imageQuantityRange,
-      imageQualityPreference: profile.imageQualityPreference,
-    });
-    recordIntendedEmailEvent({
-      templateId: "access_inquiry_received",
-      to: profile.companyEmail,
-      subject: "We received your Fotocorp access request",
-      payload: {
-        userId,
-        interestedAssetTypes: profile.interestedAssetTypes,
-        imageQuantityRange: profile.imageQuantityRange,
-        imageQualityPreference: profile.imageQualityPreference,
-      },
-      createdAt: new Date().toISOString(),
-    });
-  }
+  if (existing[0]) return getFotocorpUserProfileByUserId(db, existing[0].id)
 
-  return getFotocorpUserProfileByUserId(db, userId);
+  const email = login?.email?.trim() ?? profile.companyEmail
+  const created = await createPlatformUser(db, profile, {
+    email,
+    displayName: login?.displayName,
+    avatarUrl: login?.avatarUrl,
+  })
+
+  return created ? getFotocorpUserProfileByUserId(db, created.id) : null
 }
 
 export async function getFotocorpUserProfileByUserId(db: DrizzleClient, userId: string) {
-  const rows = await db.select().from(fotocorpUserProfiles).where(eq(fotocorpUserProfiles.userId, userId)).limit(1);
-  return rows[0] ?? null;
+  return getPlatformUserById(db, userId)
 }
 
 export function toFotocorpUserProfileDto(
-  profile: NonNullable<Awaited<ReturnType<typeof getFotocorpUserProfileByUserId>>>,
+  profile: NonNullable<Awaited<ReturnType<typeof getPlatformUserById>>>,
 ): FotocorpUserProfileDto {
   return {
     firstName: profile.firstName,
@@ -268,7 +220,7 @@ function isImageQualityPreference(value: string): value is ImageQualityPreferenc
   return (IMAGE_QUALITY_PREFERENCES as readonly string[]).includes(value);
 }
 
-export async function findLatestInquiryForUser(db: DrizzleClient, authUserId: string) {
+export async function findLatestInquiryForUser(db: DrizzleClient, userId: string) {
   const rows = await db
     .select({
       id: customerAccessInquiries.id,
@@ -276,7 +228,7 @@ export async function findLatestInquiryForUser(db: DrizzleClient, authUserId: st
       createdAt: customerAccessInquiries.createdAt,
     })
     .from(customerAccessInquiries)
-    .where(eq(customerAccessInquiries.authUserId, authUserId))
+    .where(eq(customerAccessInquiries.userId, userId))
     .orderBy(desc(customerAccessInquiries.createdAt))
     .limit(1);
   return rows[0] ?? null;
@@ -317,4 +269,16 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function toScreamingSnakeCase(value: string) {
   return value.replace(/[A-Z]/g, (letter) => `_${letter}`).toUpperCase();
+}
+
+function normalizeRegistrationEmail(emailInput: string) {
+  const normalizedEmail = emailInput.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    throw new RegistrationProfileValidationError("BLOCK_INVALID_EMAIL", "Please enter a valid email address.");
+  }
+  const domain = normalizedEmail.split("@")[1]?.trim().toLowerCase();
+  if (!domain) {
+    throw new RegistrationProfileValidationError("BLOCK_INVALID_EMAIL", "Please enter a valid email address.");
+  }
+  return { normalizedEmail, domain };
 }

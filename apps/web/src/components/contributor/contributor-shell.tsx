@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation"
 
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { logoutContributor, type ContributorAuthResponse } from "@/lib/api/contributor-api"
+import { buildSignInHref } from "@/lib/auth-sign-in-gateway"
 import { cn } from "@/lib/utils"
 
 const navLinks: {
@@ -151,7 +152,7 @@ export function ContributorShell({
 
   async function handleLogout() {
     await logoutContributor().catch(() => null)
-    router.push("/contributor/login")
+    router.push(buildSignInHref({ persona: "contributor" }))
     router.refresh()
   }
 

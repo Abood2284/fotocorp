@@ -6,6 +6,17 @@
 - [Media pipeline operations (temporary)](../../docs/db-revamp/media-pipeline-operations.md) — one-time derivative migration status and generation commands.
 - [Typesense public search API report](../../docs/db-revamp/reports/typesense-public-search-api-report.md) — parallel public search route, BFF path, Typesense env, request mapping, and production access caveat.
 - [Public route cache audit](../../docs/db-revamp/reports/public-route-cache-audit.md) — public route caller inventory, cache behavior, search back-navigation behavior, and verification commands.
+- [Resend + Google Workspace email integration](../../docs/integrations/email-resend-google-workspace.md) — access-flow transactional email sender, reply handling, env vars, delivery logs, and manual test steps.
+
+## Incremental update (2026-06-01)
+
+- `POST /api/v1/auth/sign-up` remains owned by `apps/api/src/routes/platform-auth/route.ts`; after successful user/account/inquiry creation and session cookie setup it sends `CUSTOMER_ACCESS_REQUEST_RECEIVED` through `apps/api/src/lib/email/email-service.ts`. Email failure is logged and does not fail registration.
+- `POST /api/v1/public/contributor-applications` remains owned by `apps/api/src/routes/public/contributor-applications/route.ts`; after successful application inquiry creation it sends `CONTRIBUTOR_APPLICATION_RECEIVED` when the applicant supplied an email. Email failure is logged and does not fail application submission.
+- `POST /api/v1/staff/access-inquiries/:inquiryId/approve-contributor` remains owned by `apps/api/src/routes/staff/access-inquiries/route.ts`; after successful contributor activation/credential issuance it sends `CONTRIBUTOR_APPLICATION_APPROVED_WITH_CREDENTIALS` when the applicant supplied an email. Temporary passwords are rendered only in the outgoing provider payload, not delivery logs.
+- `POST /api/v1/staff/subscriber-entitlements/:entitlementId/activate` remains owned by `apps/api/src/routes/staff/access-inquiries/route.ts`; after successful entitlement activation it sends `CUSTOMER_ACCESS_APPROVED` with entitlement limits via `apps/api/src/lib/email/entitlement-email.ts`. Idempotency is keyed per `subscriber_entitlement` (separate Image/Video activations each email once).
+- `POST /api/v1/staff/access-inquiries/:inquiryId/activate-entitlements` bulk-activates all **DRAFT** rows for an inquiry (all-or-nothing when any draft lacks a positive download cap) and sends one consolidated `CUSTOMER_ACCESS_APPROVED` email keyed to `entitlement_batch`.
+- `PATCH /api/v1/staff/subscriber-entitlements/:entitlementId` on **ACTIVE** rows sends `CUSTOMER_ENTITLEMENT_UPDATED` when `allowed_downloads` or `quality_access` changes; idempotency keyed per entitlement update timestamp.
+- `POST /api/v1/staff/access-inquiries/:inquiryId/close` remains owned by `apps/api/src/routes/staff/access-inquiries/route.ts`; after successful close it sends `CUSTOMER_ACCESS_REJECTED` or `CONTRIBUTOR_APPLICATION_REJECTED` based on inquiry type. Staff notes remain internal and are not rendered in the public email.
 
 ## Incremental update (2026-05-30)
 
@@ -276,11 +287,13 @@ Next recommended migration group:
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| `GET` | `/api/v1/staff/access-inquiries` | Staff session; roles `SUPER_ADMIN`, `SUPPORT`, `FINANCE`. |
+| `GET` | `/api/v1/staff/access-inquiries` | Staff session; roles `SUPER_ADMIN`, `SUPPORT`, `FINANCE`. Query: `type`, `status`. |
 | `GET` | `/api/v1/staff/access-inquiries/:inquiryId` | Detail + `subscriberAccess` + linked entitlement rows. |
+| `POST` | `/api/v1/staff/access-inquiries/:inquiryId/close` | **PENDING** / **IN_REVIEW** → **CLOSED** (deny without granting access). Optional `staffNotes`. |
 | `POST` | `/api/v1/staff/access-inquiries/:inquiryId/entitlement-draft` | Non-destructive: creates missing **DRAFT** rows per inquiry asset type; never overwrites existing rows. |
-| `PATCH` | `/api/v1/staff/subscriber-entitlements/:entitlementId` | **DRAFT** full edit; **ACTIVE** adjust (`allowed_downloads` ≥ 1 and ≥ `downloads_used`, quality, validity). |
-| `POST` | `/api/v1/staff/subscriber-entitlements/:entitlementId/activate` | **DRAFT** → **ACTIVE**; validates positive `allowed_downloads` + quality; sets inquiry **`ACCESS_GRANTED`**; syncs `app_user_profiles` subscriber flags. |
+| `POST` | `/api/v1/staff/access-inquiries/:inquiryId/activate-entitlements` | Bulk **DRAFT** → **ACTIVE** for all draft rows on inquiry; all-or-nothing validation; sends consolidated approval email. |
+| `PATCH` | `/api/v1/staff/subscriber-entitlements/:entitlementId` | **DRAFT** full edit; **ACTIVE** adjust (`allowed_downloads` ≥ 1 and ≥ `downloads_used`, quality, validity). Sends `CUSTOMER_ENTITLEMENT_UPDATED` when caps change on active rows. |
+| `POST` | `/api/v1/staff/subscriber-entitlements/:entitlementId/activate` | **DRAFT** → **ACTIVE**; validates positive `allowed_downloads` + quality; sets inquiry **`ACCESS_GRANTED`**; syncs subscriber flags; sends per-entitlement approval email with limits. |
 | `POST` | `/api/v1/staff/subscriber-entitlements/:entitlementId/suspend` | **ACTIVE** → **SUSPENDED**. |
 
 Implementation: `apps/api/src/routes/staff/auth/route.ts`, `apps/api/src/routes/staff/access-inquiries/route.ts` + `service.ts` (mounted from `apps/api/src/honoApp.ts`). Same-origin web proxy: `apps/web/src/app/api/staff/[...path]/route.ts` (GET/POST/PATCH).

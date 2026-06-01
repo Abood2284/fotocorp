@@ -1,9 +1,9 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { betterAuthUsers } from "./auth";
+import { users } from "./users";
 import { customerAccessInquiries } from "./customer-access-inquiries";
-import { staffAccounts } from "./staff-accounts";
+import { staffMembers } from "./staff-members";
 
 export const SUBSCRIBER_ENTITLEMENT_STATUSES = ["DRAFT", "ACTIVE", "EXPIRED", "SUSPENDED", "CANCELLED"] as const;
 
@@ -11,9 +11,9 @@ export const subscriberEntitlements = pgTable(
   "subscriber_entitlements",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    userId: text("user_id")
+    userId: uuid("user_id")
       .notNull()
-      .references(() => betterAuthUsers.id, { onDelete: "cascade" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     sourceInquiryId: uuid("source_inquiry_id").references(() => customerAccessInquiries.id, {
       onDelete: "set null",
     }),
@@ -24,10 +24,10 @@ export const subscriberEntitlements = pgTable(
     status: text("status").notNull(),
     validFrom: timestamp("valid_from", { withTimezone: true }),
     validUntil: timestamp("valid_until", { withTimezone: true }),
-    createdByStaffId: uuid("created_by_staff_id").references((): AnyPgColumn => staffAccounts.id, {
+    createdByStaffId: uuid("created_by_staff_id").references((): AnyPgColumn => staffMembers.id, {
       onDelete: "set null",
     }),
-    approvedByStaffId: uuid("approved_by_staff_id").references((): AnyPgColumn => staffAccounts.id, {
+    approvedByStaffId: uuid("approved_by_staff_id").references((): AnyPgColumn => staffMembers.id, {
       onDelete: "set null",
     }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

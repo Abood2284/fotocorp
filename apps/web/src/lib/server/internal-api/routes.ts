@@ -38,6 +38,7 @@ export const internalApiRoutes = {
     `/api/v1/internal/admin/assets/${encodeURIComponent(assetId)}/preview`,
 
   adminCatalogStats: () => "/api/v1/internal/admin/catalog/stats",
+  adminDashboardSummary: () => "/api/v1/internal/admin/dashboard/summary",
   adminMediaPipelineStatus: () => "/api/v1/internal/admin/media-pipeline/status",
 
   adminFilters: () => "/api/v1/internal/admin/filters",

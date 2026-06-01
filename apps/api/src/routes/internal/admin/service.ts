@@ -13,6 +13,7 @@ import {
   updateInternalAdminAssetPublish,
   updateInternalAdminAssetPublishBulk,
 } from "../../../lib/assets/admin-catalog"
+import { getInternalAdminDashboardSummary } from "../../../lib/assets/admin-dashboard-summary"
 import { AppError } from "../../../lib/errors"
 import { json } from "../../../lib/http"
 import { parsePreviewTtl } from "../../../lib/assets/public-assets"
@@ -59,7 +60,7 @@ export async function adminAssetPreviewService(env: Env, assetId: string, varian
   if (object.object.uploaded) headers.set("Last-Modified", object.object.uploaded.toUTCString())
   return new Response(object.object.body, { status: 200, headers })
 }
-export async function adminAssetUpdateService(env: Env, assetId: string, payload: { caption: string | null; headline: string | null; description: string | null; keywords: string[] | null; categoryId: string | null; eventId: string | null; contributorId: string | null }, actor: AdminActor) {
+export async function adminAssetUpdateService(env: Env, assetId: string, payload: { caption: string | null; whoIsInPicture: string | null; headline: string | null; description: string | null; keywords: string[] | null; categoryId: string | null; eventId: string | null; contributorId: string | null }, actor: AdminActor) {
   const result = await updateInternalAdminAssetEditorial(db(env), env, assetId, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env))
   await invalidatePublicAssetCache(env, {
     assetId,
@@ -91,6 +92,9 @@ export async function adminAssetPublishStateBulkService(env: Env, payload: { ass
   return json(await updateInternalAdminAssetPublishBulk(db(env), env, payload.assetIds, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env)))
 }
 export async function adminStatsService(env: Env) { return json(await getInternalAdminCatalogStats(db(env))) }
+export async function adminDashboardSummaryService(env: Env) {
+  return json(await getInternalAdminDashboardSummary(db(env)))
+}
 export async function adminFiltersService(env: Env) { return json(await getInternalAdminFilters(db(env))) }
 export async function adminUsersService(env: Env, request: Request) { return json(await listInternalAdminUsers(db(env), request)) }
 export async function adminUserSubscriptionService(env: Env, authUserId: string, isSubscriber: boolean, actor: AdminActor) { return json(await updateInternalAdminUserSubscription(db(env), authUserId, isSubscriber, actor)) }

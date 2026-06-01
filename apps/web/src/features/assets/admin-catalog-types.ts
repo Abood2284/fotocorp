@@ -49,6 +49,7 @@ export interface AdminCatalogAssetResponse {
 
 export interface AdminCatalogEditorialUpdateInput {
   caption: string | null
+  whoIsInPicture: string | null
   headline: string | null
   description: string | null
   keywords: string[] | null

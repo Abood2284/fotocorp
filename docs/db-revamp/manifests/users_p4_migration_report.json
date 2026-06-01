@@ -1,0 +1,12 @@
+{
+  "phase": "p4_apply",
+  "usersInserted": 2,
+  "validation": {
+    "userCount": 2,
+    "entitlementOrphans": 0,
+    "inquiryOrphans": 0,
+    "betterAuthUserCount": 0,
+    "appProfileCount": 0,
+    "fotocorpProfileCount": 0
+  }
+}

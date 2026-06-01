@@ -8,9 +8,45 @@ Update this file after every meaningful implementation change.
 
 ## Current Goal
 
-- Ship sales-led signup + staff entitlement workflow; verify subscriber downloads against `subscriber_entitlements` in staging.
+- Staff ops UX **PR-A/B/C** landed (dashboard, dynamic guidance, filters, stepper, close). **PR-D:** P7 contributor apply/approve manual smoke when ready.
+
+## Staff ops UX (PR-A–C — completed)
+
+- **PR-A:** `GET /api/v1/internal/admin/dashboard/summary`; fast staff dashboard; dynamic pending-card ? hints by count.
+- **PR-B:** Access inquiries status filters (URL `status`), colored `InquiryStatusBadge`, list help panel with **What to do next** driven by filter + queue counts (not a table column); row ? hints per status.
+- **PR-C:** `access-inquiry-guidance.ts` — dynamic detail stepper + next steps; `POST .../access-inquiries/:id/close`; Close on list (actions column) and detail; full-row click preserved.
+- Shared: `StaffHelpHint`, `StaffAccessInquiriesGuide`, `AccessInquiryGuidancePanel`, `AccessInquiryWorkflowStepper`.
+
+## Pending verification (auth revamp)
+
+- **P7 contributor applications (Development):** Code landed (`0043`, public apply, staff approve). **Manual test deferred** — apply form, staff approve, contributor login with issued password.
+- **P8 sign-in gateway:** User confirmed working on Development.
+
+## Completed (recent)
+
+- **Entitlement activation UX + transactional emails:** Staff detail page adds per-asset activation confirmations, **Activate all drafts** bulk action, and partial-grant helper copy. API: `POST .../activate-entitlements`; individual/bulk activation sends `CUSTOMER_ACCESS_APPROVED` with download limits (per-entitlement or batch idempotency); active entitlement patches send `CUSTOMER_ENTITLEMENT_UPDATED` with before/after values. Branded HTML email layout in `apps/api/src/lib/email/templates.ts`. Docs: [`email-template-review.md`](../docs/integrations/email-template-review.md), [`api-routing-audit.md`](../apps/api/docs/api-routing-audit.md).
+
+- Sign-up UX: platform password minimum is 6 characters (API + client); register form shows inline hints/errors under fields, clears errors on edit, and maps API validation/duplicate responses to field messages.
+- Removed business-email domain blocking from subscriber registration: deleted API `business-email/validate` route and service, web BFF precheck, and register-tab debounced validation; signup now only requires basic email format.
+
+## Completed (auth revamp)
+
+One-time P1–P9 scripts and phase reports were removed from the repo after Development cutover (2026-06-01). History: [`auth-identity-revamp-migration-spec.md`](../docs/db-revamp/auth-identity-revamp-migration-spec.md), manifest JSON under `docs/db-revamp/manifests/`. Contributor credential CSVs kept under `apps/api/exports/photographer-accounts/`.
+
+- **P9 legacy auth drop (Development):** `0044_auth_legacy_drop_p9.sql` — dropped BA tables, legacy profiles, `contributor_accounts` / `staff_accounts` sessions; API Better Auth 410; uploads use `auth_credentials`.
+- **P8 unified sign-in gateway (Development):** `/sign-in` persona tabs; legacy staff/contributor login URLs redirect.
+- **P7 contributor applications (Development):** `0043` + public apply + staff approve → credentials. Manual test deferred.
+- **P6 staff auth (Development):** `0042` — `staff_members` + `auth_credentials` / `auth_sessions`.
+- **P5 unified platform auth (Development):** Platform auth routes + web BFF; contributor CSV sync completed (exports retained).
+- **P4 users (Development):** `users` + claims; legacy profile tables truncated on Dev.
+- **P3 contributor cutover (Development):** `0040` + 93 asset-owner credentials.
+- **P2 auth schema (Development):** `0039` — parallel auth tables.
+- **P1 contributor dedupe (Development):** 3 manifest merges → **93** asset owners (5,386 assets remapped).
+- **P0 manifest (Development):** [`contributor_migration_manifest.csv`](../docs/db-revamp/manifests/contributor_migration_manifest.csv).
 
 ## Completed
+
+- **Resend transactional access email:** Split access emails into customer and contributor template keys (`CUSTOMER_ACCESS_*`, `CONTRIBUTOR_APPLICATION_*`); contributor approval email includes generated username/password and links to the existing `/sign-in?persona=contributor` gateway. Delivery uses Resend `fetch` with a stable idempotency key when `EMAIL_PROVIDER=resend` and falls back to safe console/no-op behavior otherwise. Existing `email_delivery_logs` records provider/status/message id without storing bodies or temporary passwords. Docs: [`docs/integrations/email-resend-google-workspace.md`](../docs/integrations/email-resend-google-workspace.md), [`docs/integrations/email-template-review.md`](../docs/integrations/email-template-review.md).
 
 - **Header browse nav + hero cosmetics:** Replaced header primary nav (Archive, Events, Categories, About, Contact) with Getty-inspired hover dropdowns: Editorial (Entertainment, News, Fashion, Sports, Business, Retro, Royalty Free via `/categories/{slug}` and `/?tab=royalty-free`), Video/Caricature coming-soon panels, and Royalty Free featured-picks link. Mobile browse accordion matches. HomeHero subheading updated to “Editorial, Caricatures, celebrity, and archive imagery…”; hero search is a single bar (Photos/Videos type selector removed). Homepage accepts `?tab=royalty-free` to open the Royalty Free tab and scroll to `#homepage-categories`.
 
@@ -28,7 +64,12 @@ Update this file after every meaningful implementation change.
 
 - **Schema legacy duplication audit (Development):** Read-only Neon SQL + codebase scan documenting `assets` vs `image_assets`, `headline` redundancy (89.7% = event name), `asset_media_access_logs` vs `image_access_logs`, phased deprecation plan. Report: [`docs/db-revamp/reports/schema-legacy-duplication-audit-report.md`](../docs/db-revamp/reports/schema-legacy-duplication-audit-report.md).
 
+- **Legacy event linking repair (Development, 2026-06-01):** Re-imported 4,959 missing `eventtb` rows, backfilled `assets.event_id`, synced clean schema, full Typesense reindex (724,385 docs). Fixed staff catalog **Who is in picture?** to use `whoIsInPicture` (not `headline`). Runbook: [`docs/db-revamp/legacy-event-linking-repair-runbook.md`](../docs/db-revamp/legacy-event-linking-repair-runbook.md); report: [`docs/db-revamp/reports/legacy-event-linking-repair-baseline-dev.md`](../docs/db-revamp/reports/legacy-event-linking-repair-baseline-dev.md).
 - **photo_events.category_id backfill (Development):** Added one-time script `apps/api/scripts/db/backfill-photo-events-category-id.ts` (`pnpm --dir apps/api db:backfill:photo-events-category-id`) to set dominant public `image_assets.category_id` on legacy events where `photo_events.category_id` was null. Applied on Neon Development: **49,106** rows updated, **1** pre-existing category preserved. Report: [`docs/db-revamp/reports/photo-events-category-backfill-report.md`](../docs/db-revamp/reports/photo-events-category-backfill-report.md). Category source investigation: [`docs/db-revamp/reports/homepage-category-source-investigation.md`](../docs/db-revamp/reports/homepage-category-source-investigation.md).
+- **image_assets.category_id gap backfill (Development, 2026-06-01):** One-time script `apps/api/scripts/db/backfill-image-assets-category-gaps.ts` — copied event category to **2,249** null asset rows; assigned **416** public ACTIVE uncategorized assets to **More** (`legacy_category_code` 33). Post-run: **0** public ACTIVE assets without category; **911** null remain (DRAFT/private only). More category total: **486** assets.
+- **asset_categories merge (Development, 2026-06-01):** `merge-asset-categories.ts` — **ShowBiz & LifeStyle → Entertainment** (181,788 image_assets, 7,911 events, 181,196 legacy assets); **Politics → News** (11,928 image_assets, 2,380 events, 11,926 legacy assets); deleted source categories. Total categories: **16**. Reindex Typesense before production cutover.
+- **Travel → Royalty Free category (Development, 2026-06-01):** Renamed category (`legacy_category_code` 10); homepage Royalty Free tab now SSR-fetches only **Royalty Free** category assets via `page.tsx` → `HomeCategorySection`; API `/royalty-free/featured` filters the same category.
+- **Contributor upload category allowlist:** Contributor + staff upload wizard category dropdown limited to Entertainment, News, Fashion, Sports, Business, Retro, Royalty Free (`contributor-upload-categories.ts` + API validation).
 
 - **Homepage category browse tabs:** Added `GET /api/v1/public/events/browse` and same-origin `/api/public/events/browse` for archive-style News/Sports/Entertainment/Retro homepage tabs. Browse now reads **`photo_events` + `asset_categories`** (not `public_event_feed_items`), requires public-ready CARD previews per event, paginates with `limit+1` keyset cursors on `event_date desc nulls last, id desc`, returns no totals, and uses heavy category cache (`public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400`). Latest unchanged. Report: [`docs/db-revamp/reports/homepage-category-browse-report.md`](../docs/db-revamp/reports/homepage-category-browse-report.md).
 

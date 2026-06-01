@@ -4,7 +4,15 @@ export function formatInquiryStatus(status: string | null | undefined): string {
   if (s === "IN_REVIEW") return "In review"
   if (s === "CLOSED") return "Closed"
   if (s === "ACCESS_GRANTED") return "Access granted"
+  if (s === "CONTRIBUTOR_APPROVED") return "Contributor approved"
   return status?.replace(/_/g, " ") ?? "—"
+}
+
+export function formatInquiryType(type: string | null | undefined): string {
+  const t = (type ?? "").trim().toUpperCase()
+  if (t === "USER_ACCESS") return "Customer access"
+  if (t === "CONTRIBUTOR_APPLICATION") return "Contributor application"
+  return type?.replace(/_/g, " ") ?? "—"
 }
 
 export function formatAssetInterestType(value: string | null | undefined): string {

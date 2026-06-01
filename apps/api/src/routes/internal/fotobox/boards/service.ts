@@ -11,7 +11,7 @@ async function executeRows<T>(db: DrizzleClient, query: SQL): Promise<T[]> {
 
 interface FotoboxBoard { id: string; name: string; itemCount: number; sortOrder: number; createdAt: string }
 
-export async function listBoardsService(env: Env, authUserId: string): Promise<Response> {
+export async function listBoardsService(env: Env, userId: string): Promise<Response> {
   const db = dbFor(env)
   const rows = await executeRows<FotoboxBoard>(db, sql`
     SELECT
@@ -22,18 +22,18 @@ export async function listBoardsService(env: Env, authUserId: string): Promise<R
       COUNT(fi.id)::int AS "itemCount"
     FROM fotobox_boards b
     LEFT JOIN asset_fotobox_items fi ON fi.board_id = b.id
-    WHERE b.auth_user_id = ${authUserId}
+    WHERE b.user_id = ${userId}::uuid
     GROUP BY b.id, b.name, b.sort_order, b.created_at
     ORDER BY b.sort_order, b.created_at
   `)
   return safeJson({ ok: true, boards: rows })
 }
 
-export async function createBoardService(env: Env, authUserId: string, name: string): Promise<Response> {
+export async function createBoardService(env: Env, userId: string, name: string): Promise<Response> {
   const db = dbFor(env)
   const rows = await executeRows<FotoboxBoard>(db, sql`
-    INSERT INTO fotobox_boards (auth_user_id, name)
-    VALUES (${authUserId}, ${name})
+    INSERT INTO fotobox_boards (user_id, name)
+    VALUES (${userId}::uuid, ${name})
     RETURNING id, name, sort_order AS "sortOrder", created_at AS "createdAt"
   `)
   const board = rows[0]
@@ -41,30 +41,30 @@ export async function createBoardService(env: Env, authUserId: string, name: str
   return safeJson({ ok: true, board: { ...board, itemCount: 0 } })
 }
 
-export async function renameBoardService(env: Env, boardId: string, authUserId: string, name: string): Promise<Response> {
+export async function renameBoardService(env: Env, boardId: string, userId: string, name: string): Promise<Response> {
   const db = dbFor(env)
-  await assertBoardOwnership(db, boardId, authUserId)
+  await assertBoardOwnership(db, boardId, userId)
   await db.execute(sql`
     UPDATE fotobox_boards SET name = ${name}, updated_at = now() WHERE id = ${boardId}::uuid
   `)
   return safeJson({ ok: true })
 }
 
-export async function deleteBoardService(env: Env, boardId: string, authUserId: string): Promise<Response> {
+export async function deleteBoardService(env: Env, boardId: string, userId: string): Promise<Response> {
   const db = dbFor(env)
-  await assertBoardOwnership(db, boardId, authUserId)
+  await assertBoardOwnership(db, boardId, userId)
   await db.execute(sql`DELETE FROM fotobox_boards WHERE id = ${boardId}::uuid`)
   return safeJson({ ok: true })
 }
 
-export async function migrateAnonService(env: Env, input: { authUserId: string; appUserProfileId: string; boards: Array<{ name: string; items: string[] }> }): Promise<Response> {
+export async function migrateAnonService(env: Env, input: { userId: string; boards: Array<{ name: string; items: string[] }> }): Promise<Response> {
   const db = dbFor(env)
   let totalItems = 0
 
   for (const board of input.boards) {
     const boardRows = await executeRows<{ id: string }>(db, sql`
-      INSERT INTO fotobox_boards (auth_user_id, app_user_profile_id, name)
-      VALUES (${input.authUserId}, ${input.appUserProfileId}, ${board.name})
+      INSERT INTO fotobox_boards (user_id, name)
+      VALUES (${input.userId}::uuid, ${board.name})
       RETURNING id
     `)
     const boardId = boardRows[0]?.id
@@ -83,8 +83,8 @@ export async function migrateAnonService(env: Env, input: { authUserId: string; 
       `)
       if (!isValid[0]?.exists) continue
       await db.execute(sql`
-        INSERT INTO asset_fotobox_items (auth_user_id, app_user_profile_id, board_id, asset_id)
-        VALUES (${input.authUserId}, ${input.appUserProfileId}, ${boardId}::uuid, ${assetId}::uuid)
+        INSERT INTO asset_fotobox_items (user_id, board_id, asset_id)
+        VALUES (${input.userId}::uuid, ${boardId}::uuid, ${assetId}::uuid)
         ON CONFLICT (board_id, asset_id) DO NOTHING
       `)
       totalItems++
@@ -94,11 +94,11 @@ export async function migrateAnonService(env: Env, input: { authUserId: string; 
   return safeJson({ ok: true, migrated: input.boards.length, totalItems })
 }
 
-export async function getAssetBoardIdsService(env: Env, authUserId: string, assetId: string): Promise<Response> {
+export async function getAssetBoardIdsService(env: Env, userId: string, assetId: string): Promise<Response> {
   const db = dbFor(env)
   const rows = await executeRows<{ board_id: string }>(db, sql`
     SELECT board_id FROM asset_fotobox_items
-    WHERE auth_user_id = ${authUserId} AND asset_id = ${assetId}::uuid
+    WHERE user_id = ${userId}::uuid AND asset_id = ${assetId}::uuid
   `)
   return safeJson({ ok: true, boardIds: rows.map((r) => r.board_id) })
 }
@@ -109,9 +109,9 @@ export async function getAnonAssetBoardIds(assetId: string): Promise<string[]> {
   throw new AppError(500, "NOT_IMPL", "Use client-side anon store")
 }
 
-async function assertBoardOwnership(db: DrizzleClient, boardId: string, authUserId: string): Promise<void> {
+async function assertBoardOwnership(db: DrizzleClient, boardId: string, userId: string): Promise<void> {
   const rows = await executeRows<{ id: string }>(db, sql`
-    SELECT id FROM fotobox_boards WHERE id = ${boardId}::uuid AND auth_user_id = ${authUserId} LIMIT 1
+    SELECT id FROM fotobox_boards WHERE id = ${boardId}::uuid AND user_id = ${userId}::uuid LIMIT 1
   `)
   if (!rows[0]) throw new AppError(404, "BOARD_NOT_FOUND", "Board not found or does not belong to this user.")
 }

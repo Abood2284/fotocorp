@@ -19,6 +19,12 @@ export interface Env {
   CLOUDFLARE_CACHE_PURGE_ZONE_ID?: string;
   /** Optional Cloudflare API token with cache purge permission. */
   CLOUDFLARE_CACHE_PURGE_API_TOKEN?: string;
+  /** Resend API key. Store as a Cloudflare secret; never log this value. */
+  RESEND_API_KEY?: string;
+  EMAIL_PROVIDER?: string;
+  EMAIL_FROM_NAME?: string;
+  EMAIL_FROM_ADDRESS?: string;
+  EMAIL_REPLY_TO?: string;
   TYPESENSE_HOST?: string;
   TYPESENSE_API_KEY?: string;
   TYPESENSE_COLLECTION_ALIAS?: string;

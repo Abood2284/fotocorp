@@ -41,7 +41,7 @@ async function main() {
       `[royalty-free-featured] period=${options.period} limit=${options.limit} selected=${candidates.length} dryRun=${options.dryRun}`,
     )
     console.log(
-      "[royalty-free-featured] eligibility=ACTIVE+PUBLIC image assets with ready CARD and DETAIL previews; category name 'creative' is preferred when present, otherwise newest public-ready assets fill the feed.",
+      "[royalty-free-featured] eligibility=ACTIVE+PUBLIC image assets in the Royalty Free category with ready CARD and DETAIL previews.",
     )
 
     if (options.dryRun) {
@@ -88,17 +88,11 @@ async function selectCandidates(pool: pg.Pool, limit: number) {
         and a.visibility = 'PUBLIC'
         and a.media_type = 'IMAGE'
         and a.original_exists_in_storage = true
-      order by
-        case
-          when lower(coalesce(ac.name, ec.name, '')) = 'creative' then 0
-          when lower(coalesce(ac.name, ec.name, '')) like '%creative%' then 1
-          else 2
-        end,
-        a.created_at desc,
-        a.id asc
-      limit $3
+        and lower(coalesce(ac.name, ec.name, '')) = lower($3)
+      order by a.created_at desc, a.id asc
+      limit $4
     `,
-    [CARD_LIGHT_PREVIEW_PROFILE, DETAIL_PREVIEW_PROFILE, limit],
+    [CARD_LIGHT_PREVIEW_PROFILE, DETAIL_PREVIEW_PROFILE, "Royalty Free", limit],
   )
 
   return result.rows

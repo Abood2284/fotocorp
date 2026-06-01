@@ -68,8 +68,8 @@ export async function listDownloadHistoryService(
 async function requireActiveProfile(db: DrizzleClient, authUserId: string): Promise<ProfileRow> {
   const rows = await executeRows<ProfileRow>(db, sql`
     select id, status
-    from app_user_profiles
-    where auth_user_id = ${authUserId}
+    from users
+    where id = ${authUserId}::uuid
     limit 1
   `)
   const profile = rows[0]
@@ -89,7 +89,7 @@ async function listDownloadRows(
   },
 ): Promise<DownloadHistoryRow[]> {
   const filters: SQL[] = [
-    sql`dl.auth_user_id = ${input.authUserId}`,
+    sql`dl.user_id = ${input.authUserId}::uuid`,
     sql`dl.download_status in ('STARTED', 'COMPLETED')`,
     sql`dl.image_asset_id is not null`,
   ]

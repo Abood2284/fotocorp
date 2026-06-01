@@ -21,7 +21,7 @@ import { useEffect, useRef, useState } from "react"
 
 import { PreviewImage } from "@/components/assets/preview-image"
 import { formatDate } from "@/components/assets/public-asset-card"
-import { authClient } from "@/lib/auth-client"
+import { useSharedAuthSession } from "@/lib/use-shared-auth-session"
 import { cn } from "@/lib/utils"
 import {
   type AnonBoard,
@@ -40,7 +40,7 @@ interface FotoboxClientPageProps {
 
 export function FotoboxClientPage({ initialServerBoards, isSubscriber }: FotoboxClientPageProps) {
   const router = useRouter()
-  const { data: session } = authClient.useSession()
+  const { data: session } = useSharedAuthSession()
   const isAuthenticated = !!session?.user
   const [serverBoards, setServerBoards] = useState<ServerBoard[]>(initialServerBoards)
   const [anonBoards, setAnonBoards] = useState<AnonBoard[]>(getAnonBoards())

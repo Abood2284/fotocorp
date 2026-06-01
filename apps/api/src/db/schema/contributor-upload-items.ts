@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import { bigint, check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { contributorAccounts } from "./contributor-accounts";
 import { contributorUploadBatches } from "./contributor-upload-batches";
 import { contributors } from "./contributors";
 import { imageAssets } from "./image-assets";
@@ -17,9 +16,6 @@ export const contributorUploadItems = pgTable(
     contributorId: uuid("contributor_id")
       .notNull()
       .references(() => contributors.id, { onDelete: "restrict" }),
-    contributorAccountId: uuid("contributor_account_id")
-      .notNull()
-      .references(() => contributorAccounts.id, { onDelete: "restrict" }),
     imageAssetId: uuid("image_asset_id").references(() => imageAssets.id, { onDelete: "set null" }),
     originalFileName: text("original_file_name").notNull(),
     originalFileExtension: text("original_file_extension"),
@@ -42,7 +38,6 @@ export const contributorUploadItems = pgTable(
     uniqueIndex("contributor_upload_items_storage_key_uidx").on(table.storageKey),
     index("contributor_upload_items_batch_id_idx").on(table.batchId),
     index("contributor_upload_items_contributor_id_idx").on(table.contributorId),
-    index("contributor_upload_items_account_id_idx").on(table.contributorAccountId),
     index("contributor_upload_items_image_asset_id_idx").on(table.imageAssetId),
     index("contributor_upload_items_upload_status_idx").on(table.uploadStatus),
   ],

@@ -25,8 +25,10 @@ Entry point for the database revamp: clean catalog tables, photographer flows, i
 | [Legacy → clean schema map](./legacy-to-clean-schema-map.md) | Old vs new table/field mapping | Import debugging, migrations, data reasoning |
 | [Validation runbook](./validation-runbook.md) | `pnpm --dir apps/api db:validate:*` commands | After migrations, import, sync, upload, or publish changes |
 | [Import / clean sync runbook](./import-sync-runbook.md) | Legacy import + `legacy:sync-clean-schema` | After CSV/chunk imports or when clean tables drift |
+| [Legacy event linking repair runbook](./legacy-event-linking-repair-runbook.md) | Re-import failed `eventtb` rows, backfill `event_id`, sync, reindex | Missing events on public/admin catalog; post–2020 grouping broken |
 | [Photographer auth runbook](./photographer-auth-runbook.md) | Accounts, sessions, portal auth boundary | Auth/session work, credential CSV handling |
 | [Staff auth runbook](./staff-auth-runbook.md) | Staff accounts/sessions, internal dashboard cookie, bootstrap | Internal `/admin` access, staff login/logout |
+| [Auth & identity revamp migration spec](./auth-identity-revamp-migration-spec.md) | Unified auth schema, contributor asset-owner migration (96→93), dedupe, BA removal plan | **P0–P9 applied** on Development; one-time scripts/reports removed from repo |
 | [Photographer upload runbook](./photographer-upload-runbook.md) | Events, batches, staging, submit semantics | Upload API/UI or staging bucket work |
 | [Fotokey / publish pipeline](./fotokey-publish-pipeline.md) | Fotokey rules, R2 buckets, go-live gating | Approval queue, publish jobs, derivatives |
 | [Media pipeline operations (temporary)](./media-pipeline-operations.md) | One-time derivative migration status + generation commands | Production cutover prep and derivative backlog burn-down |
