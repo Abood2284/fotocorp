@@ -4,11 +4,14 @@ import { SearchFiltersBridge } from "@/components/search/search-filters-bridge"
 
 const EMPTY_FILTERS: PublicAssetFiltersResponse = { categories: [], events: [], cities: [], sources: [] }
 
-export async function SearchFiltersLoader() {
+export async function SearchFiltersLoader({ includeCounts = true }: { includeCounts?: boolean } = {}) {
   const startedAt = Date.now()
 
   try {
-    const filters = await getPublicAssetFilters({ cachePolicy: "public-filters-long" })
+    const filters = await getPublicAssetFilters({
+      cachePolicy: "public-filters-long",
+      includeCounts,
+    })
     const filtersFetchMs = Date.now() - startedAt
     console.info(
       JSON.stringify({

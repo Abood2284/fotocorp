@@ -2,14 +2,15 @@ import { ChevronLeft, ImageOff, Search } from "lucide-react"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 
-import { getCurrentAppUser } from "@/lib/app-user"
 import { getPublicAsset, listPublicAssets } from "@/lib/api/fotocorp-api"
 import { messageForDownloadRedirectError } from "@/lib/download-error-messages"
 import type { PublicAsset } from "@/features/assets/types"
 import { AssetPreviewChrome } from "@/components/assets/asset-preview-chrome"
 import { parseWhoIsInPicture } from "@/lib/who-is-in-picture"
 import { AssetDetailActions, type AssetDetailAccessState, type AssetSizeOption } from "@/components/assets/asset-detail-actions"
-import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
+import { RelatedGallery } from "@/components/assets/related-gallery"
+import { ExpandableCaption } from "@/components/assets/expandable-caption"
+import { cn } from "@/lib/utils"
 
 interface AssetDetailPageProps {
   params: Promise<{ id: string }>
@@ -27,24 +28,23 @@ const SIZE_OPTIONS: AssetSizeOption[] = [
     label: "Low",
     dimensions: "1200 px max edge • 72 dpi",
     description: "Best for web and screen preview",
-    selectable: false,
-    downloadAvailable: false,
-    disabledReason: "Coming soon",
+    selectable: true,
+    downloadAvailable: true,
   },
   {
     id: "medium",
     label: "Medium",
     dimensions: "2400 px max edge • 300 dpi",
     description: "Best for editorial and digital publishing",
-    selectable: false,
-    downloadAvailable: false,
-    disabledReason: "Coming soon",
+    selectable: true,
+    downloadAvailable: true,
   },
   {
     id: "large",
     label: "High",
     dimensions: "Maximum available resolution • 300 dpi",
     description: "Best for print and archive delivery",
+    selectable: true,
     downloadAvailable: true,
   },
 ]
@@ -80,7 +80,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
   if (!asset) notFound()
 
-  const accessState = await resolveAssetDetailAccessState()
+  const accessState: AssetDetailAccessState = "logged-out"
 
   const preview = asset.previews.detail ?? asset.previews.card ?? asset.previews.thumb
   const primaryTitle = getAssetPrimaryTitle(asset)
@@ -96,9 +96,50 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
   const searchDefaultValue = resolvedSearchParams?.q ?? ""
   const actionMetadataRows = getActionMetadataRows(asset)
 
+  // Build back button destination (takes the user back to the active event/category context)
+  let backHref = "/search"
+  const backParams = new URLSearchParams()
+  if (resolvedSearchParams?.q) {
+    backParams.set("q", resolvedSearchParams.q)
+  }
+  if (asset.event?.id) {
+    backParams.set("eventId", asset.event.id)
+  } else if (asset.category?.id) {
+    backParams.set("categoryId", asset.category.id)
+  }
+  const backQuery = backParams.toString()
+  if (backQuery) {
+    backHref = `/search?${backQuery}`
+  }
+
+  // Fetch event assets for pagination and right-rail contact sheet
+  let eventAssets: PublicAsset[] = []
+  let totalEventAssets = 0
+  if (asset.event?.id) {
+    try {
+      const res = await listPublicAssets({ eventId: asset.event.id, limit: 24 })
+      eventAssets = res.items
+      totalEventAssets = asset.event.assetCount ?? res.totalCount ?? eventAssets.length
+    } catch {
+      // fallback
+    }
+  }
+
+  // Ensure current asset is in the event assets list
+  let currentEventIndex = eventAssets.findIndex((a) => a.id === asset.id)
+  if (currentEventIndex === -1 && eventAssets.length > 0) {
+    // If the active asset is not inside the first 24 items, prepend it
+    eventAssets = [asset, ...eventAssets]
+    currentEventIndex = 0
+    totalEventAssets = Math.max(totalEventAssets, eventAssets.length)
+  }
+
+  const prevAsset = currentEventIndex > 0 ? eventAssets[currentEventIndex - 1] : null
+  const nextAsset = currentEventIndex !== -1 && currentEventIndex < eventAssets.length - 1 ? eventAssets[currentEventIndex + 1] : null
+
   return (
-    <div className="bg-background">
-      <div className="border-b border-border bg-surface-warm/70">
+    <div className="bg-background pb-20 lg:pb-0">
+      <div className="bg-surface-warm/70">
         <div className="mx-auto w-full max-w-[1600px] px-3 py-3 sm:px-5 lg:px-8">
           <form action="/search" className="flex min-h-12 items-center gap-3 rounded-none border border-border-strong bg-background px-4 shadow-sm">
             <Search className="shrink-0 text-foreground" aria-hidden size={20} />
@@ -115,7 +156,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             </span>
             <button
               type="submit"
-              className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+              className="button-primary-square inline-flex h-9 items-center justify-center px-5 text-xs font-bold uppercase tracking-wider cursor-pointer"
             >
               Search
             </button>
@@ -123,9 +164,9 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[1600px] px-3 py-5 sm:px-5 lg:px-8 lg:py-7">
-        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/search" className="inline-flex items-center gap-1 transition-colors hover:text-foreground">
+      <div className="mx-auto w-full max-w-[1600px] px-3 pt-3 pb-5 sm:px-5 lg:px-8 lg:pt-4 lg:pb-7">
+        <div className="mb-7 flex flex-wrap items-center gap-2 text-sm text-muted-foreground lg:mb-8">
+          <Link href={backHref} className="inline-flex items-center gap-1 transition-colors hover:text-foreground">
             <ChevronLeft size={16} />
             Back to results
           </Link>
@@ -152,16 +193,62 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             {(primaryTitle || caption) && (
               <header className="shrink-0 space-y-3">
                 {primaryTitle && (
-                  <h1 className="max-w-5xl text-2xl font-semibold tracking-tight text-foreground sm:text-3xl lg:text-[2.45rem] lg:leading-[1.08]">
+                  <h1 className="fc-heading-1 max-w-5xl font-normal tracking-tight text-foreground sm:text-3xl lg:text-[2.45rem] lg:leading-[1.08]">
                     {primaryTitle}
                   </h1>
                 )}
+                {totalEventAssets > 0 && asset.event?.id && (
+                  <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    <a
+                      href="#event-gallery-section"
+                      className="hover:text-black hover:underline underline-offset-2"
+                    >
+                      {totalEventAssets} {totalEventAssets === 1 ? "image" : "images"} from this event
+                    </a>
+                  </div>
+                )}
                 {caption && (
-                  <p className="max-w-5xl text-sm leading-6 text-muted-foreground sm:text-base">
-                    {caption}
-                  </p>
+                  <ExpandableCaption caption={caption} />
                 )}
               </header>
+            )}
+
+            {/* Mobile horizontal event filmstrip */}
+            {eventAssets.length > 0 && (
+              <div className="lg:hidden mt-1 border-b border-border pb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-sans text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Event Coverage ({totalEventAssets} images)
+                  </span>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                  {eventAssets.map((otherAsset) => {
+                    const isActive = otherAsset.id === asset.id
+                    const otherPreview = otherAsset.previews.thumb ?? otherAsset.previews.card
+                    return (
+                      <Link
+                        key={otherAsset.id}
+                        href={`/assets/${otherAsset.id}`}
+                        scroll={false}
+                        className={cn(
+                          "relative aspect-[4/3] h-14 w-auto shrink-0 overflow-hidden bg-muted border transition-all cursor-pointer rounded-none",
+                          isActive ? "border-black border-2" : "border-transparent"
+                        )}
+                      >
+                        {otherPreview?.url ? (
+                          <img
+                            src={otherPreview.url}
+                            alt=""
+                            className="h-full w-full object-cover grayscale saturate-0"
+                          />
+                        ) : (
+                          <div className="h-full w-full bg-muted" />
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
             )}
 
             <figure className="overflow-hidden bg-background lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
@@ -176,6 +263,10 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                     whoIsInPicture={asset.whoIsInPicture}
                     fotokey={asset.fotokey ?? null}
                     assetId={asset.id}
+                    currentPhotoNumber={currentEventIndex !== -1 ? currentEventIndex + 1 : undefined}
+                    totalPhotos={totalEventAssets > 0 ? totalEventAssets : undefined}
+                    prevAssetId={prevAsset?.id ?? null}
+                    nextAssetId={nextAsset?.id ?? null}
                   />
                 </div>
               ) : (
@@ -197,7 +288,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             )}
           </section>
 
-          <aside className="space-y-6 lg:sticky lg:top-24">
+          <aside id="download-card-section" className="scroll-mt-28 space-y-6 lg:sticky lg:top-24">
             <AssetDetailActions
               assetId={asset.id}
               accessState={accessState}
@@ -208,36 +299,45 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               metadataRows={actionMetadataRows}
               whoIsInPictureNames={whoIsInPictureNames}
               keywords={keywords}
+              eventAssets={eventAssets}
+              totalEventAssets={totalEventAssets}
             />
           </aside>
         </div>
 
-        <section className="mt-6 pt-2">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 className="text-2xl font-semibold tracking-tight text-foreground">{relatedLabel}</h2>
-            {relatedCountLabel ? (
-              <span className="text-sm font-normal tabular-nums text-muted-foreground">
-                ({relatedCountLabel})
-              </span>
-            ) : null}
-            <Link
-              href={relatedResult.browseHref}
-              className="text-sm font-normal text-primary underline underline-offset-4 hover:text-primary-hover"
-            >
-              View all
-            </Link>
-          </div>
-          {relatedAssets.length > 0 ? (
-            <div className="mt-6">
-              <PublicAssetGrid assets={relatedAssets} limit={12} />
-            </div>
-          ) : (
-            <div className="mt-6 rounded-xl bg-muted/20 p-8 text-center text-sm text-muted-foreground">
-              Related previews are not available right now. Use archive search to keep browsing.
-            </div>
-          )}
-        </section>
+        <RelatedGallery
+          initialAssets={relatedAssets}
+          initialCursor={relatedResult.nextCursor}
+          currentAssetId={asset.id}
+          eventId={asset.event?.id ?? null}
+          categoryId={asset.category?.id ?? null}
+          contributorId={asset.contributor?.id ?? null}
+          totalCount={relatedResult.totalCount ?? 0}
+          label={relatedLabel}
+          browseHref={relatedResult.browseHref}
+          relatedCountLabel={relatedCountLabel}
+        />
       </div>
+
+      {/* Sticky Bottom Bar on Mobile */}
+      {totalEventAssets > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden border-t border-border bg-white p-3 shadow-md">
+          <div className="flex gap-2">
+            <a
+              href="#event-gallery-section"
+              className="flex-1 text-center py-2.5 border border-black font-sans text-xs font-bold uppercase tracking-wider text-black bg-white hover:bg-neutral-50 rounded-none cursor-pointer"
+            >
+              Event ({totalEventAssets} images)
+            </a>
+            <a
+              href="#download-card-section"
+              className="flex-1 text-center py-2.5 font-sans text-xs font-bold uppercase tracking-wider text-white bg-black hover:bg-neutral-900 rounded-none cursor-pointer"
+            >
+              Download now
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -267,22 +367,11 @@ function splitKeywords(value: string | null) {
   ))
 }
 
-async function resolveAssetDetailAccessState(): Promise<AssetDetailAccessState> {
-  try {
-    const appUser = await getCurrentAppUser()
-    if (!appUser) return "logged-out"
-    if (appUser.isSubscriber && appUser.subscriptionStatus === "ACTIVE") return "subscriber"
-    return "signed-in-without-download"
-  } catch {
-    return "profile-unavailable"
-  }
-}
-
 async function getRelatedAssets(asset: PublicAsset) {
   const targetCount = 12
 
   if (asset.event?.id) {
-    const eventResult = await listPublicAssets({ eventId: asset.event.id, limit: 20 }).catch(() => null)
+    const eventResult = await listPublicAssets({ eventId: asset.event.id, limit: 13 }).catch(() => null)
     const items = collectRelatedItems(
       eventResult?.items ?? [],
       asset.id,
@@ -294,13 +383,14 @@ async function getRelatedAssets(asset: PublicAsset) {
         items,
         label: relatedLabelForSource("event", asset),
         browseHref: relatedBrowseHref("event", asset),
-        totalCount: eventResult?.totalCount,
+        totalCount: asset.event.assetCount ?? eventResult?.totalCount,
+        nextCursor: eventResult?.nextCursor ?? null,
       }
     }
   }
 
   if (asset.category?.id) {
-    const categoryResult = await listPublicAssets({ categoryId: asset.category.id, limit: 20 }).catch(() => null)
+    const categoryResult = await listPublicAssets({ categoryId: asset.category.id, limit: 13 }).catch(() => null)
     const items = collectRelatedItems(categoryResult?.items ?? [], asset.id, targetCount)
     if (items.length > 0) {
       return {
@@ -308,12 +398,13 @@ async function getRelatedAssets(asset: PublicAsset) {
         label: relatedLabelForSource("category", asset),
         browseHref: relatedBrowseHref("category", asset),
         totalCount: categoryResult?.totalCount,
+        nextCursor: categoryResult?.nextCursor ?? null,
       }
     }
   }
 
   if (asset.contributor?.id) {
-    const photographerResult = await listPublicAssets({ contributorId: asset.contributor.id, limit: 20 }).catch(() => null)
+    const photographerResult = await listPublicAssets({ contributorId: asset.contributor.id, limit: 13 }).catch(() => null)
     const items = collectRelatedItems(photographerResult?.items ?? [], asset.id, targetCount)
     if (items.length > 0) {
       return {
@@ -321,17 +412,19 @@ async function getRelatedAssets(asset: PublicAsset) {
         label: relatedLabelForSource("photographer", asset),
         browseHref: relatedBrowseHref("photographer", asset),
         totalCount: photographerResult?.totalCount,
+        nextCursor: photographerResult?.nextCursor ?? null,
       }
     }
   }
 
-  const archiveResult = await listPublicAssets({ limit: 20, sort: "newest" }).catch(() => null)
+  const archiveResult = await listPublicAssets({ limit: 13, sort: "newest" }).catch(() => null)
   const items = collectRelatedItems(archiveResult?.items ?? [], asset.id, targetCount)
   return {
     items,
     label: relatedLabelForSource("archive", asset),
     browseHref: relatedBrowseHref("archive", asset),
     totalCount: archiveResult?.totalCount,
+    nextCursor: archiveResult?.nextCursor ?? null,
   }
 }
 
@@ -408,4 +501,3 @@ function humanizeEnum(value: string) {
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ")
 }
-

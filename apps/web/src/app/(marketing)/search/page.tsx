@@ -1,10 +1,10 @@
-// apps/web/src/app/(marketing)/search/page.tsx
 import { Suspense } from "react"
+
 import { SearchExperience } from "@/components/search/search-experience"
 import { SearchFiltersLoader } from "@/components/search/search-filters-loader"
 import { SearchFiltersProvider } from "@/components/search/search-filters-context"
-import { isTypesenseSearchEnabled, searchAssets } from "@/lib/api/fotocorp-api"
-import type { PublicAssetListResponse, PublicAssetSort } from "@/features/assets/types"
+import { isTypesenseSearchEnabled, searchPublicAssets, searchPublicEvents } from "@/lib/api/fotocorp-api"
+import type { PublicAssetListResponse, PublicAssetSort, PublicSearchEventsResponse } from "@/features/assets/types"
 import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 
 interface SearchPageProps {
@@ -22,6 +22,7 @@ interface SearchPageProps {
     cursor?: string
     page?: string
     view?: string
+    mode?: string
   }>
 }
 
@@ -38,10 +39,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const sort = parseSort(params.sort, q)
   const year = parseOptionalNumber(params.year)
   const month = parseOptionalNumber(params.month)
-  const cursor = normalized(params.cursor)
   const page = parseOptionalNumber(params.page) ?? 1
   const view: "grid" | "card" = params.view === "card" ? "card" : "grid"
-  const useTypesense = isTypesenseSearchEnabled()
+  const mode: "images" | "events" = params.mode === "events" ? "events" : "images"
   const initialParams = {
     q,
     categoryId: normalized(params.categoryId ?? params.category),
@@ -51,61 +51,185 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     year,
     month,
     sort,
-    cursor: useTypesense ? undefined : cursor,
-    page: useTypesense ? page : undefined,
+    cursor: undefined,
+    page,
     view,
+    mode,
   }
 
-  const pageStartedAt = Date.now()
-  let assetsFetchMs = 0
-
-  let initialResult: PublicAssetListResponse = { items: [], nextCursor: null }
-  let hasLoadError = false
-
-  try {
-    const startedAt = Date.now()
-    initialResult = await searchAssets({ ...initialParams, limit: 50 })
-    assetsFetchMs = Date.now() - startedAt
-  } catch {
-    assetsFetchMs = Date.now() - pageStartedAt
-    hasLoadError = true
-  }
+  const typesenseSearchEnabled = isTypesenseSearchEnabled()
+  const isEventsMode = mode === "events" && typesenseSearchEnabled
+  const [
+    { result: initialResult, hasLoadError },
+    initialEventResult,
+    initialImageCount,
+    initialEventCount,
+  ] = await Promise.all([
+    isEventsMode
+      ? Promise.resolve({ result: emptySearchResult(), hasLoadError: false })
+      : loadInitialSearchResult(initialParams),
+    isEventsMode ? loadInitialEventSearchResult(initialParams) : Promise.resolve(null),
+    isEventsMode ? loadInitialImageCount(initialParams) : Promise.resolve(undefined),
+    !isEventsMode && typesenseSearchEnabled ? loadInitialEventCount(initialParams) : Promise.resolve(undefined),
+  ])
 
   const selectedEvent = deriveSelectedEvent(initialParams.eventId, initialResult.items)
-  const totalMs = Date.now() - pageStartedAt
-
-  console.info(
-    JSON.stringify({
-      route: "/search",
-      backend: initialResult.timing?.backend ?? "postgres",
-      eventId: initialParams.eventId ?? null,
-      city: initialParams.city ?? null,
-      timings: {
-        assets_fetch: assetsFetchMs,
-        upstream_took: initialResult.timing?.tookMs,
-        render_prepare: Math.max(0, totalMs - assetsFetchMs),
-        total: totalMs,
-      },
-    }),
-  )
 
   return (
-    <SearchFiltersProvider initialFilters={initialResult.filters}>
+    <SearchFiltersProvider>
       <SearchExperience
         key={JSON.stringify(initialParams)}
         initialParams={initialParams}
         initialResult={initialResult}
+        initialEventResult={initialEventResult}
+        initialImageCount={initialImageCount}
+        initialEventCount={initialEventCount}
         selectedEvent={selectedEvent}
         hasLoadError={hasLoadError}
-        paginationMode={useTypesense ? "page" : "cursor"}
+        paginationMode="page"
+        typesenseSearchEnabled={typesenseSearchEnabled}
       />
-      {!useTypesense && (
-        <Suspense fallback={null}>
-          <SearchFiltersLoader />
-        </Suspense>
-      )}
+      <Suspense fallback={null}>
+        <SearchFiltersLoader includeCounts={false} />
+      </Suspense>
     </SearchFiltersProvider>
   )
+}
+
+async function loadInitialSearchResult(
+  params: {
+    q?: string
+    categoryId?: string
+    eventId?: string
+    city?: string
+    contributorId?: string
+    year?: number
+    month?: number
+    sort: PublicAssetSort
+    page?: number
+  },
+): Promise<{ result: PublicAssetListResponse; hasLoadError: boolean }> {
+  try {
+    return {
+      result: await searchPublicAssets({
+        q: params.q,
+        categoryId: params.categoryId,
+        eventId: params.eventId,
+        city: params.city,
+        contributorId: params.contributorId,
+        year: params.year,
+        month: params.month,
+        sort: params.sort,
+        page: params.page,
+        limit: 50,
+        includeFacets: false,
+      }),
+      hasLoadError: false,
+    }
+  } catch {
+    return {
+      result: { items: [], nextCursor: null },
+      hasLoadError: true,
+    }
+  }
+}
+
+function emptySearchResult(): PublicAssetListResponse {
+  return { items: [], nextCursor: null }
+}
+
+async function loadInitialImageCount(
+  params: {
+    q?: string
+    categoryId?: string
+    eventId?: string
+    city?: string
+    contributorId?: string
+    year?: number
+    month?: number
+    sort: PublicAssetSort
+  },
+): Promise<number | undefined> {
+  try {
+    const result = await searchPublicAssets({
+      q: params.q,
+      categoryId: params.categoryId,
+      eventId: params.eventId,
+      city: params.city,
+      contributorId: params.contributorId,
+      year: params.year,
+      month: params.month,
+      sort: params.sort,
+      page: 1,
+      limit: 1,
+      includeFacets: false,
+    })
+    return result.totalCount
+  } catch {
+    return undefined
+  }
+}
+
+async function loadInitialEventCount(
+  params: {
+    q?: string
+    categoryId?: string
+    eventId?: string
+    city?: string
+    contributorId?: string
+    year?: number
+    month?: number
+    sort: PublicAssetSort
+  },
+): Promise<number | undefined> {
+  try {
+    const result = await searchPublicEvents({
+      q: params.q,
+      categoryId: params.categoryId,
+      eventId: params.eventId,
+      city: params.city,
+      contributorId: params.contributorId,
+      year: params.year,
+      month: params.month,
+      sort: params.sort,
+      page: 1,
+      limit: 1,
+    })
+    return result.foundEvents
+  } catch {
+    return undefined
+  }
+}
+
+async function loadInitialEventSearchResult(
+  params: {
+    q?: string
+    categoryId?: string
+    eventId?: string
+    city?: string
+    contributorId?: string
+    year?: number
+    month?: number
+    sort: PublicAssetSort
+    page?: number
+  },
+): Promise<PublicSearchEventsResponse | null> {
+  try {
+    return await searchPublicEvents({
+      q: params.q,
+      categoryId: params.categoryId,
+      eventId: params.eventId,
+      city: params.city,
+      contributorId: params.contributorId,
+      year: params.year,
+      month: params.month,
+      sort: params.sort,
+      page: params.page,
+      limit: 25,
+    })
+  } catch {
+    return null
+  }
 }
 
 function deriveSelectedEvent(

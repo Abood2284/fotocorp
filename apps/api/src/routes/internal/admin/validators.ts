@@ -14,6 +14,7 @@ export const adminPreviewQuerySchema = z.object({
 
 export const adminAssetUpdateSchema = z.object({
   caption: z.string().trim().max(5000).nullable().optional(),
+  whoIsInPicture: z.string().trim().max(2048).nullable().optional(),
   headline: z.string().trim().max(1024).nullable().optional(),
   description: z.string().trim().max(10000).nullable().optional(),
   keywords: z.array(z.string()).nullable().optional(),

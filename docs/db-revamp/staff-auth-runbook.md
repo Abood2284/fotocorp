@@ -2,7 +2,7 @@
 
 ## Summary
 
-Internal Fotocorp dashboard access uses **staff** identity: separate username/password accounts in Postgres (`staff_accounts`), session rows in `staff_sessions`, and an HttpOnly browser cookie `fotocorp_staff_session`. This is **not** Better Auth and **not** the contributor (`fc_ph_session`) portal.
+Internal Fotocorp dashboard access uses **staff** identity: profiles in `staff_members`, login in `auth_credentials` (`owner_type = STAFF`), sessions in `auth_sessions`, and an HttpOnly browser cookie `fotocorp_staff_session`. Legacy `staff_accounts` / `staff_sessions` are retired on Development after P6. This is **not** Better Auth and **not** the subscriber/contributor `fotocorp_session` cookie.
 
 Public customers remain on Better Auth. Upload contributors remain on contributor auth.
 
@@ -10,8 +10,9 @@ Public customers remain on Better Auth. Upload contributors remain on contributo
 
 Apply migration `0024_staff_auth.sql` (Drizzle journal tag `0024_staff_auth`):
 
-- `staff_accounts` — unique lowercased `username`, scrypt `password_hash`, `role`, `status` (`ACTIVE` | `DISABLED`).
-- `staff_sessions` — `session_token_hash` (SHA-256 of raw token), `expires_at`, optional `ip_address` / `user_agent`, `revoked_at`.
+- `staff_members` — `display_name`, `role`, `status` (`ACTIVE` | `DISABLED`).
+- `auth_credentials` — STAFF username + scrypt `password_hash` (same format as contributor portal).
+- `auth_sessions` — `session_token_hash` (SHA-256), `owner_type = STAFF`, 7-day TTL.
 - `staff_audit_logs` — foundation only; auth events such as `STAFF_LOGIN_SUCCESS`, `STAFF_LOGIN_FAILED`, `STAFF_LOGOUT`.
 
 Run from `apps/api`:

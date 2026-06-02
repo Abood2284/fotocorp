@@ -1,6 +1,7 @@
 import { and, eq, ilike, inArray, sql } from "drizzle-orm"
 import { AppError } from "../errors"
 import { verifyStaffPassword } from "../auth/staff-password"
+import { getStaffCredentialPasswordHash } from "../staff/staff-member"
 import {
   photoEvents,
   imageAssets,
@@ -10,7 +11,7 @@ import {
   imagePublishJobItems,
   contributorUploadBatches,
   contributorUploadItems,
-  staffAccounts,
+  staffMembers,
 } from "../../db/schema"
 import type { DrizzleClient } from "../../db"
 import type { Env } from "../../appTypes"
@@ -151,15 +152,18 @@ export async function purgeInternalAdminEvent(
   if (!actor.authUserId) throw new AppError(401, "UNAUTHORIZED", "Missing authentication.")
 
   const [staff] = await db
-    .select({ role: staffAccounts.role, passwordHash: staffAccounts.passwordHash })
-    .from(staffAccounts)
-    .where(eq(staffAccounts.id, actor.authUserId))
+    .select({ role: staffMembers.role })
+    .from(staffMembers)
+    .where(eq(staffMembers.id, actor.authUserId))
 
   if (!staff || staff.role !== "SUPER_ADMIN") {
     throw new AppError(403, "FORBIDDEN", "Only SUPER_ADMIN can purge events.")
   }
 
-  const isPasswordValid = await verifyStaffPassword(payload.password, staff.passwordHash)
+  const passwordHash = await getStaffCredentialPasswordHash(db, actor.authUserId)
+  if (!passwordHash) throw new AppError(403, "FORBIDDEN", "Staff credentials were not found.")
+
+  const isPasswordValid = await verifyStaffPassword(payload.password, passwordHash)
   if (!isPasswordValid) {
     throw new AppError(400, "INVALID_PASSWORD", "Invalid password provided.")
   }

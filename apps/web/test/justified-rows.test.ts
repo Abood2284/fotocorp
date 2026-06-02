@@ -38,12 +38,14 @@ describe("computeJustifiedRows", () => {
     )
   })
 
-  it("lays out a single full-width row for one landscape item", () => {
+  it("keeps a single leftover item at natural width on the last row", () => {
     const rows = computeJustifiedRows([item("a", 1.5)], 900, BASE_OPTIONS)
     assert.equal(rows.length, 1)
     assert.equal(rows[0].items.length, 1)
-    assert.equal(rows[0].items[0].width, 900)
-    assert.equal(rows[0].items[0].height, 600)
+    assert.equal(rows[0].justified, false)
+    assert.equal(rows[0].items[0].width, 300)
+    assert.equal(rows[0].items[0].height, BASE_OPTIONS.targetRowHeight)
+    assert.ok(getRowContentWidth(rows[0], BASE_OPTIONS.gap) < 900)
   })
 
   it("gives every tile in a row the same height", () => {
@@ -67,7 +69,9 @@ describe("computeJustifiedRows", () => {
     const rows = computeJustifiedRows(items, containerWidth, BASE_OPTIONS)
 
     for (const row of rows) {
-      assert.equal(getRowContentWidth(row, BASE_OPTIONS.gap), containerWidth)
+      if (row.justified) {
+        assert.equal(getRowContentWidth(row, BASE_OPTIONS.gap), containerWidth)
+      }
     }
   })
 
@@ -78,30 +82,40 @@ describe("computeJustifiedRows", () => {
         item("p2", 0.75),
         item("l1", 1.6),
         item("p3", 0.8),
+        item("l2", 1.5),
+        item("p4", 0.7),
+        item("l5", 0.8),
       ],
       1000,
       BASE_OPTIONS,
     )
-    assert.ok(rows.length >= 1)
-    const firstRow = rows[0]
-    const totalWidth = firstRow.items.reduce((sum, tile) => sum + tile.width, 0)
-    const gaps = (firstRow.items.length - 1) * BASE_OPTIONS.gap
+    const fullRow = rows.find((row) => row.justified)
+    assert.ok(fullRow)
+    const totalWidth = fullRow.items.reduce((sum, tile) => sum + tile.width, 0)
+    const gaps = (fullRow.items.length - 1) * BASE_OPTIONS.gap
     assert.ok(Math.abs(totalWidth + gaps - 1000) < 1)
   })
 
-  it("justifies the last row to container width", () => {
+  it("justifies the last row to container width when justifyLastRow is true and it fills the row", () => {
     const rows = computeJustifiedRows(
-      [item("a", 1), item("b", 1), item("c", 0.7)],
+      [
+        item("a", 1.5),
+        item("b", 1.5),
+        item("c", 1.5),
+        item("d", 1.5),
+        item("e", 1.5),
+      ],
       800,
-      BASE_OPTIONS,
+      { ...BASE_OPTIONS, justifyLastRow: true, targetRowHeight: 120 },
     )
     const lastRow = rows[rows.length - 1]
+    assert.equal(lastRow.justified, true)
     const totalWidth = lastRow.items.reduce((sum, tile) => sum + tile.width, 0)
     const gaps = (lastRow.items.length - 1) * BASE_OPTIONS.gap
     assert.ok(Math.abs(totalWidth + gaps - 800) < 1)
   })
 
-  it("uses target height for the last row when justifyLastRow is false", () => {
+  it("does not stretch leftover items on a partial last row", () => {
     const rows = computeJustifiedRows(
       [item("a", 1), item("b", 1.2)],
       1200,
@@ -109,6 +123,8 @@ describe("computeJustifiedRows", () => {
     )
     const lastRow = rows[rows.length - 1]
     assert.equal(lastRow.height, BASE_OPTIONS.targetRowHeight)
+    assert.equal(lastRow.justified, false)
+    assert.ok(getRowContentWidth(lastRow, BASE_OPTIONS.gap) < 1200)
   })
 
   it("creates additional rows on a narrow container", () => {
@@ -130,6 +146,7 @@ describe("computeJustifiedRows", () => {
 
     assert.ok(rows.length > 1)
     for (const row of rows) {
+      if (!row.justified) continue
       const narrowestWidth = Math.min(...row.items.map((tile) => tile.width))
       assert.ok(narrowestWidth >= minTileWidth - 1)
     }

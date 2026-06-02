@@ -1,4 +1,4 @@
-export const DEFAULT_AUTH_REDIRECT = "/search"
+export const DEFAULT_AUTH_REDIRECT = "/"
 
 export function resolveAuthRedirectFromSearchParams(searchParams: URLSearchParams) {
   return resolveAuthRedirectCandidate(

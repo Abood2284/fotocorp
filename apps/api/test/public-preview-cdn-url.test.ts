@@ -1,6 +1,11 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
-import { buildLatestEventsResponse, parseLatestEventsQuery } from "../src/lib/assets/public-homepage"
+import {
+  buildEventCategoryBrowseResponse,
+  buildLatestEventsResponse,
+  parseEventCategoryBrowseQuery,
+  parseLatestEventsQuery,
+} from "../src/lib/assets/public-homepage"
 import {
   buildPublicPreviewCdnUrl,
   resolvePublicStablePreviewUrl,
@@ -128,5 +133,90 @@ describe("buildLatestEventsResponse", () => {
     )
 
     assert.equal(response.items[0]?.previewUrl, stablePath)
+  })
+
+  it("builds pagination cursor from event_date", () => {
+    const query = parseLatestEventsQuery({ windowDays: "30", limit: "1", cursor: null })
+    const response = buildLatestEventsResponse(
+      [
+        {
+          event_id: "22222222-2222-4222-8222-222222222222",
+          title: "Newest by event date",
+          event_date: "2026-05-20T00:00:00.000Z",
+          created_at: "2026-05-01T12:00:00.000Z",
+          asset_count: 2,
+          preview_asset_id: SAMPLE_ASSET_ID,
+          preview_width: 612,
+          preview_height: 408,
+          preview_url: `/api/media/assets/${SAMPLE_ASSET_ID}/preview/card`,
+          preview_storage_key: "previews/v1/card/newest.webp",
+        },
+        {
+          event_id: "33333333-3333-4333-8333-333333333333",
+          title: "Older by event date",
+          event_date: "2026-05-10T00:00:00.000Z",
+          created_at: "2026-05-25T12:00:00.000Z",
+          asset_count: 1,
+          preview_asset_id: SAMPLE_ASSET_ID,
+          preview_width: 612,
+          preview_height: 408,
+          preview_url: `/api/media/assets/${SAMPLE_ASSET_ID}/preview/card`,
+          preview_storage_key: "previews/v1/card/older.webp",
+        },
+      ],
+      query,
+      { baseUrl: null, version: null },
+    )
+
+    assert.equal(response.hasMore, true)
+    assert.ok(response.nextCursor)
+
+    const decoded = JSON.parse(
+      Buffer.from(
+        response.nextCursor.replaceAll("-", "+").replaceAll("_", "/"),
+        "base64",
+      ).toString("utf8"),
+    ) as { eventDate?: string; createdAt?: string; id?: string }
+
+    assert.equal(decoded.eventDate, "2026-05-20T00:00:00.000Z")
+    assert.equal(decoded.createdAt, undefined)
+    assert.equal(decoded.id, "22222222-2222-4222-8222-222222222222")
+  })
+})
+
+describe("buildEventCategoryBrowseResponse", () => {
+  it("defaults to 25, rejects latest, and omits total counts", () => {
+    const query = parseEventCategoryBrowseQuery({ section: "news", limit: null, cursor: null })
+    const response = buildEventCategoryBrowseResponse(
+      [
+        {
+          event_id: "22222222-2222-4222-8222-222222222222",
+          title: "Archive news event",
+          event_date: "2026-01-01T00:00:00.000Z",
+          created_at: "2026-05-01T12:00:00.000Z",
+          asset_count: 2,
+          event_location: null,
+          category_name: "News",
+          preview_asset_id: SAMPLE_ASSET_ID,
+          preview_width: 612,
+          preview_height: 408,
+          preview_url: `/api/media/assets/${SAMPLE_ASSET_ID}/preview/card`,
+          preview_storage_key: "previews/v1/card/news.webp",
+        },
+      ],
+      query,
+      { baseUrl: null, version: null },
+    )
+
+    assert.equal(query.limit, 25)
+    assert.equal(response.section, "news")
+    assert.equal(response.limit, 25)
+    assert.equal(response.items.length, 1)
+    assert.equal(Object.hasOwn(response, "total"), false)
+    assert.equal(Object.hasOwn(response, "totalCount"), false)
+    assert.throws(
+      () => parseEventCategoryBrowseQuery({ section: "latest", limit: "25", cursor: null }),
+      /section must be news, sports, entertainment, or retro/,
+    )
   })
 })

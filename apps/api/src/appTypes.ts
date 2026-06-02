@@ -13,12 +13,28 @@ export interface Env {
   PUBLIC_PREVIEW_CDN_BASE_URL?: string;
   /** Optional CDN path version segment for deterministic preview URLs when storage_key is unavailable. Defaults to v1. */
   PUBLIC_PREVIEW_CDN_VERSION?: string;
+  /** Public web origin used to build targeted Cloudflare cache purge URLs, for example https://www.fotocorp.com. */
+  PUBLIC_WEB_ORIGIN?: string;
+  /** Optional Cloudflare zone id for targeted public cache purge after staff metadata edits. */
+  CLOUDFLARE_CACHE_PURGE_ZONE_ID?: string;
+  /** Optional Cloudflare API token with cache purge permission. */
+  CLOUDFLARE_CACHE_PURGE_API_TOKEN?: string;
+  /** Resend API key. Store as a Cloudflare secret; never log this value. */
+  RESEND_API_KEY?: string;
+  EMAIL_PROVIDER?: string;
+  EMAIL_FROM_NAME?: string;
+  EMAIL_FROM_ADDRESS?: string;
+  EMAIL_REPLY_TO?: string;
   TYPESENSE_HOST?: string;
   TYPESENSE_API_KEY?: string;
   TYPESENSE_COLLECTION_ALIAS?: string;
   TYPESENSE_SEARCH_TIMEOUT_MS?: string;
+  /** Optional higher timeout budget for grouped event search (defaults to 8000ms). */
+  TYPESENSE_EVENT_SEARCH_TIMEOUT_MS?: string;
   TYPESENSE_CF_ACCESS_CLIENT_ID?: string;
   TYPESENSE_CF_ACCESS_CLIENT_SECRET?: string;
+  /** Diagnostic-only flag for homepage and public catalog latency investigation logs. */
+  HOMEPAGE_DEBUG_LATENCY?: string;
   INTERNAL_API_SECRET?: string;
   LEGACY_FIXTURE_ROUTES_ENABLED?: string;
   /**

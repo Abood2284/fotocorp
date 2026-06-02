@@ -30,6 +30,16 @@ describe("Typesense public asset search mapping", () => {
     );
   });
 
+  it("can build search URLs without facets for result-only calls", () => {
+    const query = parseTypesensePublicAssetSearchQuery(new URLSearchParams("includeFacets=false"));
+    const url = buildTypesensePublicAssetSearchUrl(
+      { host: "https://search.example.test", collection: "public_assets_current" },
+      query,
+    );
+
+    assert.equal(url.searchParams.get("facet_by"), null);
+  });
+
   it("builds search URLs from the Typesense host origin even when host includes /collections", () => {
     const query = parseTypesensePublicAssetSearchQuery(new URLSearchParams("q=test"));
     const url = buildTypesensePublicAssetSearchUrl(

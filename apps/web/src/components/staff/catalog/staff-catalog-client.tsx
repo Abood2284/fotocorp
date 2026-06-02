@@ -227,7 +227,7 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                       <div className="h-12 w-20 overflow-hidden rounded border border-border bg-muted">
                         <PreviewImage
                           src={`/staff/catalog/${asset.id}/preview-image?variant=${bestPreviewVariant(asset)}`}
-                          alt={asset.headline || asset.caption || "Preview"}
+                          alt={asset.whoIsInPicture || asset.caption || "Preview"}
                           className="h-full w-full object-cover"
                         />
                       </div>
@@ -239,8 +239,8 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                   </td>
                   <td className="px-3 py-2 max-w-[200px]">
                     <p className="font-mono text-xs">{asset.legacyImageCode ?? asset.id.split('-')[0]}</p>
-                    <p className="mt-0.5 truncate font-medium" title={asset.headline || asset.whoIsInPicture || "Untitled"}>{asset.headline || asset.whoIsInPicture || "Untitled"}</p>
-                    {(!asset.headline && !asset.whoIsInPicture) && <span className="text-[10px] text-amber-600 font-medium">Missing who is in picture</span>}
+                    <p className="mt-0.5 truncate font-medium" title={asset.whoIsInPicture || asset.event?.name || asset.headline || "Untitled"}>{asset.whoIsInPicture || asset.event?.name || asset.headline || "Untitled"}</p>
+                    {!asset.whoIsInPicture && <span className="text-[10px] text-amber-600 font-medium">Missing who is in picture</span>}
                     {!asset.caption && <span className="text-[10px] text-amber-600 font-medium ml-2">Missing caption</span>}
                   </td>
                   <td className="px-3 py-2"><StatusBadge tone="neutral">{asset.status}</StatusBadge></td>

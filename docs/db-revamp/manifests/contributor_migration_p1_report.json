@@ -1,0 +1,55 @@
+{
+  "phase": "p1_apply",
+  "mergeCount": 3,
+  "merges": [
+    {
+      "loserId": "5e8a0312-8e2d-4a24-b058-aa821d36f484",
+      "winnerId": "83513349-e466-4496-938f-3bddb9ef4215",
+      "legacyPhotographerId": 2214,
+      "mergeReason": "MANUAL",
+      "expectedAssets": 4459,
+      "tableUpdates": [
+        {
+          "table": "image_assets",
+          "column": "contributor_id",
+          "rows": 4459
+        }
+      ]
+    },
+    {
+      "loserId": "308d36cb-988e-4fc2-ba34-87ed35cf5526",
+      "winnerId": "9e9c4214-1570-49f2-8d68-3bf50553e210",
+      "legacyPhotographerId": 2218,
+      "mergeReason": "MANUAL",
+      "expectedAssets": 905,
+      "tableUpdates": [
+        {
+          "table": "image_assets",
+          "column": "contributor_id",
+          "rows": 905
+        }
+      ]
+    },
+    {
+      "loserId": "f4dc370d-4da5-4ec5-be17-906a85f4874f",
+      "winnerId": "1515a0fc-5ad9-4807-a4d4-353e89b3e9b9",
+      "legacyPhotographerId": 1072,
+      "mergeReason": "MANUAL",
+      "expectedAssets": 22,
+      "tableUpdates": [
+        {
+          "table": "image_assets",
+          "column": "contributor_id",
+          "rows": 22
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "orphanAssetsOnLosers": [],
+    "distinctAssetOwnerCount": 93,
+    "ganeshLadAssetCount": 148464,
+    "jafarKhanAssetCount": 122508,
+    "subhashBaroliaAssetCount": 937
+  }
+}

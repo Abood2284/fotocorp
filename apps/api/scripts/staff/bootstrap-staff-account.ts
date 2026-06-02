@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 import dotenv from "dotenv"
-import pg from "pg"
-import { hashStaffPassword, validateStaffPasswordLength } from "../../src/lib/auth/staff-password"
+import { createHttpDb } from "../../src/db"
+import { createStaffMember, findStaffMemberByUsername } from "../../src/lib/staff/staff-member"
+import { validateStaffPasswordLength } from "../../src/lib/auth/staff-password"
 
 dotenv.config({ path: ".dev.vars" })
-
-const { Pool } = pg
 
 const ALLOWED_ROLES = [
   "SUPER_ADMIN",
   "CATALOG_MANAGER",
   "REVIEWER",
+  "CAPTION_MANAGER",
   "FINANCE",
   "SUPPORT",
 ] as const
@@ -46,33 +46,26 @@ async function main() {
     process.exit(1)
   }
 
-  const pool = new Pool({ connectionString: databaseUrl })
-  try {
-    const existing = await pool.query<{ id: string }>("select id from staff_accounts where lower(username) = $1 limit 1", [
-      username,
-    ])
-    if (existing.rows[0]) {
-      console.log(`Staff account already exists for username '${username}'. No changes made.`)
-      return
-    }
-
-    const passwordHash = await hashStaffPassword(password)
-    await pool.query(
-      `insert into staff_accounts (
-        username,
-        password_hash,
-        display_name,
-        role,
-        status,
-        password_updated_at
-      ) values ($1, $2, $3, $4, 'ACTIVE', now())`,
-      [username, passwordHash, displayName, role],
-    )
-
-    console.log(`Created staff account '${username}' with role ${role}. Password was not printed.`)
-  } finally {
-    await pool.end()
+  const db = createHttpDb(databaseUrl)
+  const existing = await findStaffMemberByUsername(db, username)
+  if (existing) {
+    console.log(`Staff member already exists for username '${username}'. No changes made.`)
+    return
   }
+
+  const created = await createStaffMember(db, {
+    username,
+    password,
+    displayName,
+    role,
+  })
+
+  if (!created) {
+    console.error("Staff member could not be created.")
+    process.exit(1)
+  }
+
+  console.log(`Created staff member '${username}' with role ${role}. Password was not printed.`)
 }
 
 main().catch((error) => {

@@ -4,6 +4,7 @@ import { createHttpDb } from "../../db";
 import { getPublicAssetCollections, getPublicAssetDetail, getPublicAssetEvents, getPublicAssetFilters, listPublicAssets, parsePreviewTtl } from "../../lib/assets/public-assets";
 import { AppError } from "../../lib/errors";
 import { json } from "../../lib/http";
+import { resolveRequestId } from "../../lib/latency-trace";
 import { parsePublicPreviewCdnConfig } from "../../lib/media/public-preview-cdn-url";
 import { methodNotAllowed } from "../../lib/route-errors";
 import {
@@ -14,19 +15,45 @@ import {
   parseTypesensePublicAssetSearchQuery,
   searchTypesensePublicAssets,
 } from "../../lib/search/typesense-public-assets";
+import { searchTypesensePublicEvents } from "../../lib/search/typesense-public-event-search";
 
 export const publicCatalogRoutes = new Hono<{ Bindings: Env }>();
 
 export const PUBLIC_CATALOG_LIST_CACHE_CONTROL =
   "public, max-age=30, s-maxage=120, stale-while-revalidate=300";
 
+export const PUBLIC_TYPESENSE_SEARCH_CACHE_CONTROL =
+  "public, max-age=30, s-maxage=120, stale-while-revalidate=300";
+
+export const PUBLIC_ASSET_DETAIL_CACHE_CONTROL =
+  "public, max-age=300, s-maxage=2592000, stale-while-revalidate=604800";
+
 export const PUBLIC_CATALOG_FILTERS_CACHE_CONTROL =
   "public, max-age=300, s-maxage=900, stale-while-revalidate=1800";
 
 publicCatalogRoutes.get("/api/v1/assets", async (c) => {
+  const routeStartedAt = Date.now();
+  const requestId = resolveRequestId(c.req.raw.headers);
+  const debugEnabled = c.env.HOMEPAGE_DEBUG_LATENCY === "true" || c.req.header("x-homepage-debug-latency") === "true";
+  const debugLog = (payload: Record<string, unknown>) => {
+    if (!debugEnabled) return;
+    console.info(JSON.stringify({
+      event: "public_assets_latency_step",
+      requestId,
+      route: "/api/v1/assets",
+      ...payload,
+    }));
+  };
+
+  const configStartedAt = Date.now();
   const cdn = parsePublicPreviewCdnConfig(c.env);
-  return json(
-    await listPublicAssets(
+  debugLog({
+    step: "cdn_config_parse_done",
+    durationMs: Date.now() - configStartedAt,
+    cdnConfigured: Boolean(cdn.baseUrl),
+  });
+
+  const result = await listPublicAssets(
       db(c.env),
       {
         q: c.req.query("q"),
@@ -42,10 +69,16 @@ publicCatalogRoutes.get("/api/v1/assets", async (c) => {
       c.env.MEDIA_PREVIEW_TOKEN_SECRET,
       ttl(c.env),
       cdn,
-    ),
-    200,
-    { headers: { "Cache-Control": PUBLIC_CATALOG_LIST_CACHE_CONTROL } },
+      debugLog,
   );
+  debugLog({
+    step: "route_complete",
+    durationMs: Date.now() - routeStartedAt,
+    rowCount: result.items.length,
+    hasMore: result.hasMore,
+  });
+
+  return json(result, 200, { headers: { "Cache-Control": PUBLIC_CATALOG_LIST_CACHE_CONTROL } });
 });
 
 publicCatalogRoutes.all("/api/v1/assets", () => methodNotAllowed());
@@ -94,7 +127,7 @@ publicCatalogRoutes.get("/api/v1/search/assets", async (c) => {
 
     return json(response, 200, {
       headers: {
-        "Cache-Control": "no-store",
+        "Cache-Control": PUBLIC_TYPESENSE_SEARCH_CACHE_CONTROL,
         "X-Content-Type-Options": "nosniff",
       },
     });
@@ -167,8 +200,121 @@ publicCatalogRoutes.get("/api/v1/search/assets", async (c) => {
 
 publicCatalogRoutes.all("/api/v1/search/assets", () => methodNotAllowed());
 
+publicCatalogRoutes.get("/api/v1/search/events", async (c) => {
+  const route = "/api/v1/search/events";
+  const startedAt = Date.now();
+  let q = "*";
+  let page = 1;
+  let limit = 25;
+  let filters = "";
+
+  try {
+    const query = parseTypesensePublicAssetSearchQuery(new URL(c.req.url).searchParams);
+    q = query.q;
+    page = query.page;
+    limit = query.limit;
+    filters = buildTypesensePublicAssetFilterSummary(query);
+
+    const response = await searchTypesensePublicEvents(c.env, query);
+    const durationMs = Date.now() - startedAt;
+
+    console.info(
+      JSON.stringify({
+        event: "typesense_public_event_search",
+        route,
+        durationMs,
+        status: "ok",
+        statusCode: 200,
+        backend: "typesense",
+        q,
+        filters,
+        page,
+        limit,
+        foundEvents: response.foundEvents,
+        hits: response.items.length,
+        tookMs: response.timing.tookMs,
+        timeout: false,
+      }),
+    );
+
+    return json(response, 200, {
+      headers: {
+        "Cache-Control": PUBLIC_TYPESENSE_SEARCH_CACHE_CONTROL,
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+
+    if (isTypesenseNotConfiguredError(error)) {
+      console.error(
+        JSON.stringify({
+          event: "typesense_public_event_search",
+          route,
+          durationMs,
+          status: "error",
+          statusCode: 503,
+          backend: "typesense",
+          q,
+          filters,
+          page,
+          limit,
+          timeout: false,
+        }),
+      );
+      return json({ error: "typesense_not_configured" }, 503);
+    }
+
+    if (isTypesenseSearchInputError(error)) {
+      console.warn(
+        JSON.stringify({
+          event: "typesense_public_event_search",
+          route,
+          durationMs,
+          status: "error",
+          statusCode: 400,
+          backend: "typesense",
+          q,
+          filters,
+          page,
+          limit,
+          timeout: false,
+          error: error.code,
+        }),
+      );
+      return json({ error: error.code }, 400);
+    }
+
+    if (isTypesenseSearchFailedError(error)) {
+      console.error(
+        JSON.stringify({
+          event: "typesense_public_event_search",
+          route,
+          durationMs,
+          status: "error",
+          statusCode: 502,
+          backend: "typesense",
+          q,
+          filters,
+          page,
+          limit,
+          tookMs: durationMs,
+          timeout: error.timedOut,
+          upstreamStatusCode: error.statusCode ?? null,
+        }),
+      );
+      return json({ error: "typesense_search_failed" }, 502);
+    }
+
+    throw error;
+  }
+});
+
+publicCatalogRoutes.all("/api/v1/search/events", () => methodNotAllowed());
+
 publicCatalogRoutes.get("/api/v1/assets/filters", async (c) => {
-  return json(await getPublicAssetFilters(db(c.env)), 200, {
+  const includeCounts = c.req.query("includeCounts") !== "false";
+  return json(await getPublicAssetFilters(db(c.env), { includeCounts }), 200, {
     headers: { "Cache-Control": PUBLIC_CATALOG_FILTERS_CACHE_CONTROL },
   });
 });
@@ -213,6 +359,13 @@ publicCatalogRoutes.get("/api/v1/assets/:assetId", async (c) => {
       ttl(c.env),
       cdn,
     ),
+    200,
+    {
+      headers: {
+        "Cache-Control": PUBLIC_ASSET_DETAIL_CACHE_CONTROL,
+        "X-Content-Type-Options": "nosniff",
+      },
+    },
   );
 });
 

@@ -21,7 +21,7 @@ const downloadRequestSchema = z.object({
 type DownloadSize = z.infer<typeof downloadRequestSchema>["size"]
 interface DownloadProfileRow {
   id: string
-  auth_user_id: string
+  user_id: string
   status: string
   is_subscriber: boolean
   subscription_status: string
@@ -147,7 +147,7 @@ async function assertSourceObjectAvailable(env: Env, asset: DownloadAssetRow & {
 async function findProfile(db: DrizzleClient, authUserId: string): Promise<DownloadProfileRow | null> {
   const rows = await executeRows<DownloadProfileRow>(
     db,
-    sql`select id, auth_user_id, status, is_subscriber, subscription_status from app_user_profiles where auth_user_id = ${authUserId} limit 1`,
+    sql`select id, id as user_id, status, is_subscriber, subscription_status from users where id = ${authUserId}::uuid limit 1`,
   )
   return rows[0] ?? null
 }
@@ -166,8 +166,7 @@ async function writeDownloadStarted(db: DrizzleClient, values: { asset: Download
       sql`
         insert into image_download_logs (
           image_asset_id,
-          auth_user_id,
-          app_user_profile_id,
+          user_id,
           download_size,
           download_status,
           quota_before,
@@ -180,8 +179,7 @@ async function writeDownloadStarted(db: DrizzleClient, values: { asset: Download
         )
         values (
           ${values.asset.id}::uuid,
-          ${values.profile.auth_user_id},
-          ${values.profile.id},
+          ${values.profile.user_id}::uuid,
           ${values.size.toUpperCase()},
           'STARTED',
           ${values.quota.quota_before},
@@ -213,7 +211,7 @@ async function markDownloadCompleted(db: DrizzleClient, logId: string | null): P
     `)
   } catch {}
 }
-async function writeDownloadFailure(db: DrizzleClient, values: { assetId?: string; profile: DownloadProfileRow; size: DownloadSize; failureCode: string; userAgent?: string; ipHash: string | null }): Promise<void> { try { await db.execute(sql`insert into image_download_logs (image_asset_id,auth_user_id,app_user_profile_id,download_size,download_status,failure_code,user_agent,ip_hash,source) values (${values.assetId ?? null}::uuid,${values.profile.auth_user_id},${values.profile.id},${values.size.toUpperCase()},'FAILED',${values.failureCode},${values.userAgent ?? null},${values.ipHash},'APPLICATION')`) } catch {} }
+async function writeDownloadFailure(db: DrizzleClient, values: { assetId?: string; profile: DownloadProfileRow; size: DownloadSize; failureCode: string; userAgent?: string; ipHash: string | null }): Promise<void> { try { await db.execute(sql`insert into image_download_logs (image_asset_id,user_id,download_size,download_status,failure_code,user_agent,ip_hash,source) values (${values.assetId ?? null}::uuid,${values.profile.user_id}::uuid,${values.size.toUpperCase()},'FAILED',${values.failureCode},${values.userAgent ?? null},${values.ipHash},'APPLICATION')`) } catch {} }
 function downloadHeaders(values: { asset: DownloadAssetRow; object: Awaited<ReturnType<typeof getR2Object>>; size: DownloadSize }): Headers { const headers = new Headers(); headers.set("Content-Type", values.object?.contentType ?? "application/octet-stream"); headers.set("Content-Disposition", `attachment; filename="${downloadFilename(values.asset, values.size, values.object?.contentType)}"`); headers.set("Cache-Control", "private, no-store"); headers.set("X-Content-Type-Options", "nosniff"); headers.set("X-Robots-Tag", "noindex, nofollow, noarchive"); if (values.object?.etag) headers.set("ETag", values.object.etag); if (values.object?.contentLength !== null && values.object?.contentLength !== undefined) headers.set("Content-Length", String(values.object.contentLength)); if (values.object?.uploaded) headers.set("Last-Modified", values.object.uploaded.toUTCString()); return headers }
 function downloadFilename(asset: DownloadAssetRow, size: DownloadSize, contentType: string | null | undefined): string { const base = sanitizeFilenamePart(asset.fotokey ?? asset.id); const extension = sanitizeExtension(asset.original_ext) ?? extensionFromFilename(asset.original_filename) ?? extensionFromContentType(contentType); return `fotocorp-${base}-${size}${extension ? `.${extension}` : ""}` }
 function extensionFromFilename(filename: string | null): string | null { if (!filename) return null; const match = filename.match(/\.([A-Za-z0-9]{1,8})$/); return match ? sanitizeExtension(match[1]) : null }

@@ -3,6 +3,7 @@ import "server-only"
 import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { getStaffMe, StaffApiError, type StaffMeResponse } from "@/lib/api/staff-api"
+import { buildSignInHref } from "@/lib/auth-sign-in-gateway"
 import {
   getDefaultStaffLandingPath,
   staffRoleCanAccessPath,
@@ -28,9 +29,19 @@ export async function getOptionalStaffSession(): Promise<StaffMeResponse | null>
   })
 }
 
+function buildStaffSignInRedirect(callbackPath?: string) {
+  return buildSignInHref({
+    persona: "staff",
+    callbackUrl: callbackPath ?? null,
+  })
+}
+
 export async function requireStaff() {
   const session = await getOptionalStaffSession()
-  if (!session) redirect("/staff/login")
+  if (!session) {
+    const pathname = (await headers()).get("x-pathname") ?? ""
+    redirect(buildStaffSignInRedirect(pathname.startsWith("/staff") ? pathname : undefined))
+  }
   return session.staff
 }
 

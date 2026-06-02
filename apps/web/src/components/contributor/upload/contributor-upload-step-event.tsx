@@ -150,7 +150,6 @@ export function ContributorUploadStepEvent({
               {photographerOptions.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.displayName}
-                  {p.email ? ` · ${p.email}` : ""}
                 </option>
               ))}
             </select>

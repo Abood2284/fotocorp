@@ -12,6 +12,8 @@ import {
   THUMB_LIGHT_PREVIEW_PROFILE,
 } from "../media/watermark";
 
+export const PUBLIC_ROYALTY_FREE_CATEGORY_NAME = "Royalty Free";
+
 type SortMode = "newest" | "oldest" | "relevance";
 
 interface PublicAssetQuery {
@@ -25,6 +27,8 @@ interface PublicAssetQuery {
   limit: number;
   sort: SortMode;
 }
+
+type PublicAssetsDebugLog = (payload: Record<string, unknown>) => void;
 
 export interface PublicAssetListQueryInput {
   q?: string | null;
@@ -70,6 +74,7 @@ interface AssetRow {
   event_name: string | null;
   event_date: Date | string | null;
   event_location: string | null;
+  event_asset_count?: number | string | null;
   contributor_id: string | null;
   contributor_display_name: string | null;
   thumb_width: number | null;
@@ -133,7 +138,7 @@ interface AssetDto {
   mediaType: string;
   source: string;
   category: { id: string; name: string } | null;
-  event: { id: string; name: string | null; eventDate: string | null; location: string | null } | null;
+  event: { id: string; name: string | null; eventDate: string | null; location: string | null; assetCount?: number } | null;
   contributor: { id: string; displayName: string } | null;
   previews: {
     thumb: PreviewDto | null;
@@ -148,19 +153,125 @@ export async function listPublicAssets(
   secret: string | undefined,
   ttlSeconds: number,
   cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
+  debugLog?: PublicAssetsDebugLog,
 ) {
+  const startedAt = Date.now();
+  const parseStartedAt = Date.now();
   const query = parseListQuery(input);
-  const rows = await executeRows<AssetRow>(db, buildListSql(query));
+  debugLog?.({
+    step: "request_parse_done",
+    durationMs: Date.now() - parseStartedAt,
+    limit: query.limit,
+    sort: query.sort,
+    hasQuery: Boolean(query.q),
+    hasCursor: Boolean(query.cursor),
+    hasCategoryId: Boolean(query.categoryId),
+    hasEventId: Boolean(query.eventId),
+    hasContributorId: Boolean(query.contributorId),
+  });
+  const sqlStartedAt = Date.now();
+  const querySql = buildListSql(query);
+  debugLog?.({
+    step: "main_db_query_start",
+    limit: query.limit + 1,
+    sort: query.sort,
+  });
+  const rows = await executeRows<AssetRow>(db, querySql);
+  debugLog?.({
+    step: "main_db_query_done",
+    durationMs: Date.now() - sqlStartedAt,
+    rowCount: rows.length,
+  });
+  const paginationStartedAt = Date.now();
   const hasMore = rows.length > query.limit;
   const pageRows = rows.slice(0, query.limit);
+  debugLog?.({
+    step: "pagination_slice_done",
+    durationMs: Date.now() - paginationStartedAt,
+    rowCount: pageRows.length,
+    hasMore,
+  });
+  const mappingStartedAt = Date.now();
   const items = await Promise.all(pageRows.map((row) => toAssetDto(row, secret, ttlSeconds, false, cdn)));
+  debugLog?.({
+    step: "result_mapping_done",
+    durationMs: Date.now() - mappingStartedAt,
+    rowCount: items.length,
+  });
+  const cursorStartedAt = Date.now();
   const lastReturnedRow = pageRows.at(-1);
   const nextCursor = hasMore && lastReturnedRow
     ? encodeCursor(toCursor(lastReturnedRow, query.sort))
     : null;
+  debugLog?.({
+    step: "response_build_done",
+    durationMs: Date.now() - cursorStartedAt,
+    totalDurationMs: Date.now() - startedAt,
+    rowCount: items.length,
+    hasMore,
+    responseBytes: JSON.stringify({ items, nextCursor, hasMore }).length,
+  });
 
   return { items, nextCursor, hasMore };
 }
+
+export interface PublicRoyaltyFreeFeaturedTimings {
+  query: number;
+  previewResolve: number;
+  responseBuild: number;
+  total: number;
+}
+
+export async function listPublicRoyaltyFreeFeaturedAssets(
+  db: DrizzleClient,
+  input: { limit?: string | null },
+  secret: string | undefined,
+  ttlSeconds: number,
+  cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
+) {
+  const totalStartedAt = Date.now();
+  const limit = input.limit ? Math.min(parseLimit(input.limit), 50) : 50;
+
+  const queryStartedAt = Date.now();
+  const rows = await executeRows<AssetRow>(db, sql`
+    ${selectAssetSql(undefined)}
+    ${fromAssetSql()}
+    where ${publicAssetPredicate("a")}
+      and card.id is not null
+      and (
+        ac.name = ${PUBLIC_ROYALTY_FREE_CATEGORY_NAME}
+        or (a.category_id is null and ec.name = ${PUBLIC_ROYALTY_FREE_CATEGORY_NAME})
+      )
+    order by a.created_at desc, a.id asc
+    limit ${limit}
+  `);
+  const query = Date.now() - queryStartedAt;
+
+  const previewResolveStartedAt = Date.now();
+  const items = await Promise.all(rows.map((row) => toAssetDto(row, secret, ttlSeconds, false, cdn)));
+  const previewResolve = Date.now() - previewResolveStartedAt;
+
+  const responseBuildStartedAt = Date.now();
+  const response = {
+    items,
+    nextCursor: null,
+    hasMore: false,
+  };
+  const responseBuild = Date.now() - responseBuildStartedAt;
+
+  return {
+    response,
+    timings: {
+      query,
+      previewResolve,
+      responseBuild,
+      total: Date.now() - totalStartedAt,
+    },
+  };
+}
+
+/** @deprecated Use {@link listPublicRoyaltyFreeFeaturedAssets}. */
+export const listPublicCreativeFeaturedAssets = listPublicRoyaltyFreeFeaturedAssets;
 
 export async function getPublicAssetDetail(
   db: DrizzleClient,
@@ -182,7 +293,15 @@ export async function getPublicAssetDetail(
   return { asset: await toAssetDto(row, secret, ttlSeconds, true, cdn) };
 }
 
-export async function getPublicAssetFilters(db: DrizzleClient) {
+interface PublicAssetFiltersOptions {
+  includeCounts?: boolean;
+}
+
+export async function getPublicAssetFilters(db: DrizzleClient, options: PublicAssetFiltersOptions = {}) {
+  if (options.includeCounts === false) {
+    return getPublicAssetFiltersWithoutCounts(db);
+  }
+
   const categoriesSql = sql`
     select c.id, c.name, count(*)::int as asset_count
     from image_assets a
@@ -233,6 +352,38 @@ export async function getPublicAssetFilters(db: DrizzleClient) {
       name: row.name,
       eventDate: toIso(row.event_date),
       assetCount: Number(row.asset_count),
+    })),
+  };
+}
+
+async function getPublicAssetFiltersWithoutCounts(db: DrizzleClient) {
+  const [categories, events] = await Promise.all([
+    executeRows<{ id: string; name: string | null }>(db, sql`
+      select id, name
+      from asset_categories
+      order by name asc
+      limit 100
+    `),
+    executeRows<{ id: string; name: string | null; event_date: Date | null }>(db, sql`
+      select id, name, event_date
+      from photo_events
+      where status = 'ACTIVE'
+      order by event_date desc nulls last, id desc
+      limit 100
+    `),
+  ]);
+
+  return {
+    categories: categories.map((row) => ({
+      id: row.id,
+      name: row.name ?? "Untitled category",
+      assetCount: 0,
+    })),
+    events: events.map((row) => ({
+      id: row.id,
+      name: row.name,
+      eventDate: toIso(row.event_date),
+      assetCount: 0,
     })),
   };
 }
@@ -486,6 +637,7 @@ function selectAssetSql(q: string | undefined): SQL {
       e.name as event_name,
       e.event_date,
       e.location as event_location,
+      (select count(*)::int from image_assets a3 where a3.event_id = e.id and ${publicAssetPredicate("a3")}) as event_asset_count,
       p.id as contributor_id,
       p.display_name as contributor_display_name,
       thumb.width as thumb_width,
@@ -585,7 +737,17 @@ async function toAssetDto(
     source: row.source,
     category: resolvePublicCategory(row),
     event: row.event_id
-      ? { id: row.event_id, name: row.event_name, eventDate: toIso(row.event_date), location: row.event_location }
+      ? {
+          id: row.event_id,
+          name: row.event_name,
+          eventDate: toIso(row.event_date),
+          location: row.event_location,
+          assetCount: typeof row.event_asset_count === "number"
+            ? row.event_asset_count
+            : typeof row.event_asset_count === "string"
+              ? parseInt(row.event_asset_count, 10)
+              : undefined,
+        }
       : null,
     contributor: row.contributor_id && row.contributor_display_name
       ? { id: row.contributor_id, displayName: row.contributor_display_name }

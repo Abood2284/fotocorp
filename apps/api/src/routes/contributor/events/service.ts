@@ -4,6 +4,7 @@ import type { DrizzleClient } from "../../../db";
 import { AppError } from "../../../lib/errors";
 import { schedulePublicEventFeedSync } from "../../../lib/assets/public-event-feed-projection";
 import { scheduleTypesenseSyncForEvent } from "../../../lib/search/typesense-public-asset-sync";
+import { assertContributorUploadCategoryExists } from "../catalog/service";
 import type { ContributorSessionResult } from "../auth/service";
 import type {
   PhotographerEventCreateBody,
@@ -151,11 +152,10 @@ export async function createPhotographerEvent(
   session: ContributorSessionResult,
   body: PhotographerEventCreateBody,
 ) {
-  await assertCategoryExists(db, body.categoryId);
+  await assertContributorUploadCategoryExists(db, body.categoryId);
 
   const portalRole = session.account.portalRole;
   let ownerContributorId = session.contributor.id;
-  let createdByAccountId: string | null = session.account.id;
   let createdBySource: "CONTRIBUTOR" | "ADMIN" = "CONTRIBUTOR";
 
   if (portalRole === "PORTAL_ADMIN") {
@@ -164,15 +164,12 @@ export async function createPhotographerEvent(
     }
     await assertContributorExists(db, body.targetContributorId);
     ownerContributorId = body.targetContributorId;
-    createdByAccountId = null;
     createdBySource = "ADMIN";
   } else if (body.targetContributorId) {
     throw new AppError(403, "TARGET_CONTRIBUTOR_FORBIDDEN", "You cannot assign events to another photographer.");
   }
 
   const eventDateSql = parseEventDateForSql(body.eventDate);
-  const accountSql =
-    createdByAccountId === null ? sql`null::uuid` : sql`${createdByAccountId}::uuid`;
 
   const inserted = await executeRows<{ id: string }>(
     db,
@@ -191,7 +188,6 @@ export async function createPhotographerEvent(
         status,
         source,
         created_by_contributor_id,
-        created_by_contributor_account_id,
         created_by_source
       )
       values (
@@ -208,7 +204,6 @@ export async function createPhotographerEvent(
         'ACTIVE',
         ${PHOTO_EVENT_SOURCE_FOTOCORP_PORTAL},
         ${ownerContributorId}::uuid,
-        ${accountSql},
         ${createdBySource}
       )
       returning id
@@ -248,7 +243,7 @@ export async function patchPhotographerEvent(
     throw new AppError(403, "EVENT_EDIT_FORBIDDEN", "You can only edit events you created.");
   }
 
-  if (body.categoryId !== undefined) await assertCategoryExists(db, body.categoryId);
+  if (body.categoryId !== undefined) await assertContributorUploadCategoryExists(db, body.categoryId);
 
   const sets: SQL[] = [];
   if (body.name !== undefined) sets.push(sql`name = ${body.name}`);
@@ -274,13 +269,6 @@ export async function patchPhotographerEvent(
   return getPhotographerEvent(db, session, eventId);
 }
 
-async function assertCategoryExists(db: DrizzleClient, categoryId: string) {
-  const rows = await executeRows<{ id: string }>(
-    db,
-    sql`select id from asset_categories where id = ${categoryId}::uuid limit 1`,
-  );
-  if (!rows[0]) throw new AppError(400, "EVENT_CATEGORY_INVALID", "Category was not found.");
-}
 
 async function assertContributorExists(db: DrizzleClient, contributorId: string) {
   const rows = await executeRows<{ id: string }>(

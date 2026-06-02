@@ -25,6 +25,9 @@
     "smoke:public-preview": "tsx scripts/smoke/check-public-preview.ts",
     "media:generate-derivatives": "tsx scripts/media/generate-watermarked-derivatives.ts",
     "media:process-image-publish-jobs": "tsx scripts/media/process-image-publish-jobs.ts",
+    "royalty-free:refresh-featured": "tsx scripts/public/refresh-royalty-free-featured.ts",
+    "creative:refresh-featured": "tsx scripts/public/refresh-royalty-free-featured.ts",
+    "homepage:refresh-hero-sets": "tsx scripts/public/refresh-homepage-hero-sets.ts",
     "legacy:import": "tsx scripts/legacy/import-legacy-fotocorp.ts",
     "legacy:import:chunks": "tsx scripts/legacy/run-legacy-import-chunks.ts",
     "legacy:sync-clean-schema": "tsx scripts/legacy/sync-clean-schema-after-import.ts",
@@ -38,6 +41,10 @@
     "db:validate:admin-photographer-upload-review": "tsx scripts/db/validate-admin-photographer-upload-review.ts",
     "db:validate:fotokey-publish": "tsx scripts/db/validate-fotokey-publish-pipeline.ts",
     "db:backfill:legacy-fotokeys": "tsx scripts/db/backfill-legacy-fotokeys.ts",
+    "db:backfill:photo-events-category-id": "tsx scripts/db/backfill-photo-events-category-id.ts",
+    "db:backfill:image-assets-category-gaps": "tsx scripts/db/backfill-image-assets-category-gaps.ts",
+    "db:merge:asset-categories": "tsx scripts/db/merge-asset-categories.ts",
+    "db:rename:travel-to-royalty-free": "tsx scripts/db/rename-travel-category-to-royalty-free.ts",
     "smoke:fotokey-publish": "tsx scripts/smoke/check-fotokey-publish-pipeline.ts",
     "smoke:photographer-auth": "tsx scripts/smoke/check-photographer-auth.ts",
     "smoke:photographer-analytics": "tsx scripts/smoke/check-photographer-analytics.ts",
@@ -72,6 +79,6 @@
     "drizzle-kit": "^0.31.7",
     "tsx": "^4.21.0",
     "typescript": "^5.8.3",
-    "wrangler": "^4.14.1"
+    "wrangler": "^4.95.0"
   }
 }

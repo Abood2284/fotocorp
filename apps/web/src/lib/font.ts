@@ -1,11 +1,17 @@
 // apps/web/src/lib/font.ts
 import localFont from "next/font/local";
-import { Playfair_Display } from "next/font/google";
+import { Playfair_Display, Lora } from "next/font/google";
 
 export const playfairDisplay = Playfair_Display({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-playfair-display",
+});
+
+export const lora = Lora({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-lora",
 });
 
 // Brand font

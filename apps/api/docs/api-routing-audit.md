@@ -5,6 +5,36 @@
 - [DB revamp docs (README)](../../docs/db-revamp/README.md) — catalog/photographer DB revamp entry point, runbooks, and historical PR reports under `reports/`.
 - [Media pipeline operations (temporary)](../../docs/db-revamp/media-pipeline-operations.md) — one-time derivative migration status and generation commands.
 - [Typesense public search API report](../../docs/db-revamp/reports/typesense-public-search-api-report.md) — parallel public search route, BFF path, Typesense env, request mapping, and production access caveat.
+- [Public route cache audit](../../docs/db-revamp/reports/public-route-cache-audit.md) — public route caller inventory, cache behavior, search back-navigation behavior, and verification commands.
+- [Resend + Google Workspace email integration](../../docs/integrations/email-resend-google-workspace.md) — access-flow transactional email sender, reply handling, env vars, delivery logs, and manual test steps.
+
+## Incremental update (2026-06-01)
+
+- `POST /api/v1/auth/sign-up` remains owned by `apps/api/src/routes/platform-auth/route.ts`; after successful user/account/inquiry creation and session cookie setup it sends `CUSTOMER_ACCESS_REQUEST_RECEIVED` through `apps/api/src/lib/email/email-service.ts`. Email failure is logged and does not fail registration.
+- `POST /api/v1/public/contributor-applications` remains owned by `apps/api/src/routes/public/contributor-applications/route.ts`; after successful application inquiry creation it sends `CONTRIBUTOR_APPLICATION_RECEIVED` when the applicant supplied an email. Email failure is logged and does not fail application submission.
+- `POST /api/v1/staff/access-inquiries/:inquiryId/approve-contributor` remains owned by `apps/api/src/routes/staff/access-inquiries/route.ts`; after successful contributor activation/credential issuance it sends `CONTRIBUTOR_APPLICATION_APPROVED_WITH_CREDENTIALS` when the applicant supplied an email. Temporary passwords are rendered only in the outgoing provider payload, not delivery logs.
+- `POST /api/v1/staff/subscriber-entitlements/:entitlementId/activate` remains owned by `apps/api/src/routes/staff/access-inquiries/route.ts`; after successful entitlement activation it sends `CUSTOMER_ACCESS_APPROVED` with entitlement limits via `apps/api/src/lib/email/entitlement-email.ts`. Idempotency is keyed per `subscriber_entitlement` (separate Image/Video activations each email once).
+- `POST /api/v1/staff/access-inquiries/:inquiryId/activate-entitlements` bulk-activates all **DRAFT** rows for an inquiry (all-or-nothing when any draft lacks a positive download cap) and sends one consolidated `CUSTOMER_ACCESS_APPROVED` email keyed to `entitlement_batch`.
+- `PATCH /api/v1/staff/subscriber-entitlements/:entitlementId` on **ACTIVE** rows sends `CUSTOMER_ENTITLEMENT_UPDATED` when `allowed_downloads` or `quality_access` changes; idempotency keyed per entitlement update timestamp.
+- `POST /api/v1/staff/access-inquiries/:inquiryId/close` remains owned by `apps/api/src/routes/staff/access-inquiries/route.ts`; after successful close it sends `CUSTOMER_ACCESS_REJECTED` or `CONTRIBUTOR_APPLICATION_REJECTED` based on inquiry type. Staff notes remain internal and are not rendered in the public email.
+
+## Incremental update (2026-05-30)
+
+- `GET /api/v1/public/royalty-free/featured` is the canonical public Royalty-Free featured feed in `apps/api/src/routes/public/homepage-routes.ts`; it reads current-month rows from `public_royalty_free_featured_items` (featured-first CTE, then asset/derivative joins) and returns public featured assets with `Cache-Control: public, max-age=86400, s-maxage=2592000, stale-while-revalidate=604800`. Populate with `pnpm --dir apps/api royalty-free:refresh-featured -- --period YYYY-MM --limit 50` (`creative:refresh-featured` remains an alias).
+- `GET /api/v1/public/creative/featured` remains a compatibility alias to the same handler (`legacyRoute: true` in logs). Web BFF `GET`/`HEAD` `/api/public/royalty-free/featured` maps to the canonical route; `/api/public/creative/featured` remains mapped for backward compatibility.
+- `GET /api/v1/public/homepage/hero-set` is owned by `apps/api/src/routes/public/homepage-routes.ts`; it reads the active row from `public_homepage_hero_sets` plus ordered items from `public_homepage_hero_set_items` (no `listPublicAssets`, no `/api/v1/assets`). Returns `Cache-Control: public, max-age=300, s-maxage=900, stale-while-revalidate=3600`. Populate with `pnpm --dir apps/api homepage:refresh-hero-sets` (daily external cron ~03:00 UTC recommended).
+- Web BFF `GET`/`HEAD` `/api/public/homepage/hero-set` maps to the route above with matching public cache headers.
+- `GET /api/v1/public/events/browse` is owned by `apps/api/src/routes/public/homepage-routes.ts`; it supports `section=news|sports|entertainment|retro`, reads `photo_events` joined to `asset_categories` on `photo_events.category_id`, requires at least one public-ready CARD preview asset per event, and uses keyset pagination on `event_date desc nulls last, id desc`. Cache: `public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400`.
+- Web BFF `GET`/`HEAD` `/api/public/events/browse` maps to the browse route above with the same 1-day browser / 30-day edge cache header.
+
+## Incremental update (2026-05-29)
+
+- `GET /api/v1/search/assets` remains owned by `apps/api/src/routes/public/catalog-routes.ts` and now returns `Cache-Control: public, max-age=30, s-maxage=120, stale-while-revalidate=300` for anonymous public Typesense results.
+- `GET /api/v1/assets/:assetId` remains owned by `apps/api/src/routes/public/catalog-routes.ts` and now returns `Cache-Control: public, max-age=300, s-maxage=2592000, stale-while-revalidate=604800` for public metadata.
+- Web BFF `GET`/`HEAD` `/api/public/events/latest`, `/api/public/search/assets`, and `/api/public/assets/:assetId` remain owned by `apps/web/src/app/api/public/[...path]/route.ts`; these public paths explicitly preserve/set public cache headers instead of falling back to `private, no-store`.
+- `GET /api/v1/public/events/latest` now accepts `section=latest|news|sports|entertainment|retro` while staying projection-backed by `public_event_feed_items`.
+- `GET /api/v1/public/creative/featured` was renamed in favor of `GET /api/v1/public/royalty-free/featured` (see 2026-05-30 incremental update); the creative path remains as a compatibility alias.
+- Public marketing layout no longer probes `/api/v1/staff/auth/me`; staff auth remains required under `/staff/*`.
 
 ## Incremental update (2026-05-20)
 
@@ -74,12 +104,15 @@ This makes route behavior hard to reason about and slows root-cause analysis whe
 | Method | Path | Handler | Source file | Notes |
 |---|---|---|---|---|
 | `GET` | `/api/v1/assets` | `publicAssetListRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public catalog list. PR-16I: JSON `fotokey` = `image_assets.fotokey`; `category` = asset category else event default; `categoryId` query matches asset or (null asset + event) category. |
-| `GET` | `/api/v1/assets/filters` | `publicAssetFiltersRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed filters. PR-16I: category counts use resolved category `coalesce(asset, event)`. |
+| `GET` | `/api/v1/assets/filters` | `publicAssetFiltersRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed filters. PR-16I: category counts use resolved category `coalesce(asset, event)`. Pass `includeCounts=false` for a fast taxonomy-only response (no asset aggregation) used by `/search` filter sidebar. |
 | `GET` | `/api/v1/assets/collections` | `publicAssetCollectionsRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed collections. PR-16I: same resolved category for grouping/preview pick. |
 | `GET` | `/api/v1/assets/:id` | `publicAssetDetailRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public asset detail. PR-16I: same `fotokey` + category rules as list. |
-| `GET` | `/api/v1/search/assets` | `searchTypesensePublicAssets` | `apps/api/src/routes/public/catalog-routes.ts` + `apps/api/src/lib/search/typesense-public-assets.ts` | Parallel Typesense-backed public search/facet/count endpoint. Searches `event_title`, `caption`, `who_is_in_picture`, `people`, `keywords`, `category_name`, and `fotokey`; does not search `title`. Supports page pagination and category/event/city name filters for the feature-flagged `/search` cutover. Does not replace `/api/v1/assets` or `/api/v1/assets/filters`. |
-| `GET` | `/api/v1/public/homepage` | `getPublicHomepageFeed` | `apps/api/src/routes/public/homepage-routes.ts` | Lightweight homepage feed: first-page latest-events preview only, ordered by `created_at`; no newest/editorial asset slices. |
-| `GET` | `/api/v1/public/events/latest` | `listPublicLatestEvents` | `apps/api/src/routes/public/homepage-routes.ts` | Cursor-paginated Latest Events from `public_event_feed_items` projection (`windowDays`, `limit`, optional cursor). Card `previewUrl` uses `PUBLIC_PREVIEW_CDN_BASE_URL` + derivative `storage_key` when configured; otherwise stable `/api/media/assets/:id/preview/card` fallback. |
+| `GET` | `/api/v1/search/assets` | `searchTypesensePublicAssets` | `apps/api/src/routes/public/catalog-routes.ts` + `apps/api/src/lib/search/typesense-public-assets.ts` | Parallel Typesense-backed public search/count endpoint. Searches `event_title`, `caption`, `who_is_in_picture`, `people`, `keywords`, `category_name`, and `fotokey`; does not search `title`. Supports page pagination and category/event/city name filters for the feature-flagged `/search` cutover. Facets remain available by default, but callers can pass `includeFacets=false`; the `/search` UI uses `/api/v1/assets/filters` separately for filter data. Does not replace `/api/v1/assets` or `/api/v1/assets/filters`. |
+| `GET` | `/api/v1/search/events` | `searchTypesensePublicEvents` | `apps/api/src/routes/public/catalog-routes.ts` + `apps/api/src/lib/search/typesense-public-event-search.ts` | Typesense grouped search by `event_id` (`group_limit=1`) for matching unique events; filters to event-backed documents with `event_date_ts:>0` and sorts by `event_date_ts` for date browsing so null-event legacy assets do not occupy event result pages. Returns representative asset + preview + per-event matching asset counts. BFF: `/api/public/search/events`. Used by `/search?mode=events`; event cards link to `/assets/[representativeAssetId]`. Does not use `/api/v1/assets`. Report: [`docs/db-revamp/reports/search-event-results-report.md`](../../docs/db-revamp/reports/search-event-results-report.md). |
+| `GET` | `/api/v1/public/homepage` | `getPublicHomepageFeed` | `apps/api/src/routes/public/homepage-routes.ts` | Lightweight homepage feed: first-page latest-events preview only, ordered by `event_date`; no newest/editorial asset slices. |
+| `GET` | `/api/v1/public/homepage/hero-set` | `getPublicHomepageHeroSet` | `apps/api/src/routes/public/homepage-routes.ts` | Active hero backdrop set from `public_homepage_hero_sets` + `public_homepage_hero_set_items`; no catalog list query. Cache `public, max-age=300, s-maxage=900, stale-while-revalidate=3600`. Populate via `pnpm --dir apps/api homepage:refresh-hero-sets`. |
+| `GET` | `/api/v1/public/events/latest` | `listPublicLatestEvents` | `apps/api/src/routes/public/homepage-routes.ts` | Cursor-paginated Latest Events from `public_event_feed_items` projection (`windowDays`, `limit`, optional cursor), filtered and ordered by `event_date desc, event_id desc`. Card `previewUrl` uses `PUBLIC_PREVIEW_CDN_BASE_URL` + derivative `storage_key` when configured; otherwise stable `/api/media/assets/:id/preview/card` fallback. |
+| `GET` | `/api/v1/public/events/browse` | `fetchPublicEventCategoryBrowseRows` | `apps/api/src/routes/public/homepage-routes.ts` + `apps/api/src/lib/assets/public-homepage.ts` | Cursor-paginated homepage category browse for `news`, `sports`, `entertainment`, and `retro`. Reads `photo_events` + `asset_categories` (not `public_event_feed_items`), filters `status = ACTIVE` with a public-ready CARD preview per event, returns `limit+1` keyset pagination, and does not expose total counts. |
 
 ### Public Media Routes
 
@@ -254,11 +287,13 @@ Next recommended migration group:
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| `GET` | `/api/v1/staff/access-inquiries` | Staff session; roles `SUPER_ADMIN`, `SUPPORT`, `FINANCE`. |
+| `GET` | `/api/v1/staff/access-inquiries` | Staff session; roles `SUPER_ADMIN`, `SUPPORT`, `FINANCE`. Query: `type`, `status`. |
 | `GET` | `/api/v1/staff/access-inquiries/:inquiryId` | Detail + `subscriberAccess` + linked entitlement rows. |
+| `POST` | `/api/v1/staff/access-inquiries/:inquiryId/close` | **PENDING** / **IN_REVIEW** → **CLOSED** (deny without granting access). Optional `staffNotes`. |
 | `POST` | `/api/v1/staff/access-inquiries/:inquiryId/entitlement-draft` | Non-destructive: creates missing **DRAFT** rows per inquiry asset type; never overwrites existing rows. |
-| `PATCH` | `/api/v1/staff/subscriber-entitlements/:entitlementId` | **DRAFT** full edit; **ACTIVE** adjust (`allowed_downloads` ≥ 1 and ≥ `downloads_used`, quality, validity). |
-| `POST` | `/api/v1/staff/subscriber-entitlements/:entitlementId/activate` | **DRAFT** → **ACTIVE**; validates positive `allowed_downloads` + quality; sets inquiry **`ACCESS_GRANTED`**; syncs `app_user_profiles` subscriber flags. |
+| `POST` | `/api/v1/staff/access-inquiries/:inquiryId/activate-entitlements` | Bulk **DRAFT** → **ACTIVE** for all draft rows on inquiry; all-or-nothing validation; sends consolidated approval email. |
+| `PATCH` | `/api/v1/staff/subscriber-entitlements/:entitlementId` | **DRAFT** full edit; **ACTIVE** adjust (`allowed_downloads` ≥ 1 and ≥ `downloads_used`, quality, validity). Sends `CUSTOMER_ENTITLEMENT_UPDATED` when caps change on active rows. |
+| `POST` | `/api/v1/staff/subscriber-entitlements/:entitlementId/activate` | **DRAFT** → **ACTIVE**; validates positive `allowed_downloads` + quality; sets inquiry **`ACCESS_GRANTED`**; syncs subscriber flags; sends per-entitlement approval email with limits. |
 | `POST` | `/api/v1/staff/subscriber-entitlements/:entitlementId/suspend` | **ACTIVE** → **SUSPENDED**. |
 
 Implementation: `apps/api/src/routes/staff/auth/route.ts`, `apps/api/src/routes/staff/access-inquiries/route.ts` + `service.ts` (mounted from `apps/api/src/honoApp.ts`). Same-origin web proxy: `apps/web/src/app/api/staff/[...path]/route.ts` (GET/POST/PATCH).

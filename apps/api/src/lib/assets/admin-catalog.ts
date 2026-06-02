@@ -131,6 +131,7 @@ interface AssetDetailResponse {
 
 interface UpdateEditorialInput {
   caption: string | null;
+  whoIsInPicture: string | null;
   headline: string | null;
   description: string | null;
   keywords: string[] | null;
@@ -287,6 +288,7 @@ export async function updateInternalAdminAssetEditorial(
   await db.execute(sql`
     update image_assets
     set
+      who_is_in_picture = ${payload.whoIsInPicture},
       caption = ${payload.caption},
       headline = ${payload.headline},
       description = ${payload.description},
@@ -1113,6 +1115,7 @@ async function executeRows<T>(db: DrizzleClient, query: SQL): Promise<T[]> {
 async function getAuditSnapshot(db: DrizzleClient, assetId: string) {
   const rows = await executeRows<{
     id: string;
+    who_is_in_picture: string | null;
     caption: string | null;
     headline: string | null;
     description: string | null;
@@ -1124,7 +1127,7 @@ async function getAuditSnapshot(db: DrizzleClient, assetId: string) {
     visibility: string;
   }>(db, sql`
     select
-      id, caption, headline, description, keywords, category_id, event_id, contributor_id, status, visibility
+      id, who_is_in_picture, caption, headline, description, keywords, category_id, event_id, contributor_id, status, visibility
     from image_assets
     where id = ${assetId}::uuid
     limit 1

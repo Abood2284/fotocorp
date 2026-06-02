@@ -1,7 +1,6 @@
 // apps/api/src/db/schema/photo-events.ts
 import { sql } from "drizzle-orm";
 import { bigint, check, index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { contributorAccounts } from "./contributor-accounts";
 import { contributors } from "./contributors";
 import { assetCategories } from "./legacy";
 
@@ -35,9 +34,6 @@ export const photoEvents = pgTable(
     createdByContributorId: uuid("created_by_contributor_id").references(() => contributors.id, {
       onDelete: "set null",
     }),
-    createdByContributorAccountId: uuid("created_by_contributor_account_id").references(() => contributorAccounts.id, {
-      onDelete: "set null",
-    }),
     createdBySource: text("created_by_source").default("LEGACY_IMPORT").notNull(),
     legacyPayload: jsonb("legacy_payload"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -57,7 +53,6 @@ export const photoEvents = pgTable(
     index("photo_events_status_idx").on(table.status),
     index("photo_events_source_idx").on(table.source),
     index("photo_events_created_by_contributor_id_idx").on(table.createdByContributorId),
-    index("photo_events_created_by_contributor_account_id_idx").on(table.createdByContributorAccountId),
     index("photo_events_created_by_source_idx").on(table.createdBySource),
   ],
 );

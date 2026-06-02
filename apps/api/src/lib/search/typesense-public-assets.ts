@@ -14,7 +14,9 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const DEFAULT_PAGE = 1;
 const DEFAULT_SEARCH_TIMEOUT_MS = 2_500;
-const QUERY_BY = "event_title,caption,who_is_in_picture,people,keywords,category_name,fotokey";
+export const TYPESENSE_PUBLIC_ASSET_QUERY_BY =
+  "event_title,caption,who_is_in_picture,people,keywords,category_name,fotokey";
+const QUERY_BY = TYPESENSE_PUBLIC_ASSET_QUERY_BY;
 // Live alias may predate the `city` facet field; use fields present on public_assets_current.
 const FACET_BY = "category_name,event_title,source";
 const DEFAULT_SORT_BY = "created_at_ts:desc";
@@ -33,6 +35,7 @@ export interface TypesensePublicAssetSearchQuery {
   limit: number;
   page: number;
   sort: "newest" | "oldest" | "relevance";
+  includeFacets: boolean;
 }
 
 interface TypesensePublicSearchConfig {
@@ -165,6 +168,7 @@ export function parseTypesensePublicAssetSearchQuery(
   const limit = parseBoundedInteger(searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT, "limit");
   const page = parseBoundedInteger(searchParams.get("page"), DEFAULT_PAGE, 1, 10_000, "page");
   const sort = parseSort(searchParams.get("sort"), q);
+  const includeFacets = parseBooleanParam(searchParams.get("includeFacets"), true);
 
   return {
     q,
@@ -180,6 +184,7 @@ export function parseTypesensePublicAssetSearchQuery(
     limit,
     page,
     sort,
+    includeFacets,
   };
 }
 
@@ -235,9 +240,9 @@ export function buildTypesensePublicAssetSearchUrl(
   const params = new URLSearchParams();
   params.set("q", query.q);
   params.set("query_by", QUERY_BY);
-  params.set("filter_by", buildFilterBy(query));
-  params.set("sort_by", buildSortBy(query));
-  params.set("facet_by", FACET_BY);
+  params.set("filter_by", buildTypesensePublicAssetFilterBy(query));
+  params.set("sort_by", buildTypesensePublicAssetSortBy(query));
+  if (query.includeFacets) params.set("facet_by", FACET_BY);
   params.set("per_page", String(query.limit));
   params.set("page", String(query.page));
   url.search = params.toString();
@@ -330,10 +335,10 @@ export function isTypesenseSearchInputError(error: unknown): error is TypesenseS
 }
 
 export function buildTypesensePublicAssetFilterSummary(query: TypesensePublicAssetSearchQuery): string {
-  return buildFilterBy(query);
+  return buildTypesensePublicAssetFilterBy(query);
 }
 
-function buildFilterBy(query: TypesensePublicAssetSearchQuery): string {
+export function buildTypesensePublicAssetFilterBy(query: TypesensePublicAssetSearchQuery): string {
   const filters = ["status:=ACTIVE", "visibility:=PUBLIC"];
 
   const resolvedEventId = uuidFrom(query.eventId) ?? uuidFrom(query.event);
@@ -358,7 +363,7 @@ function buildFilterBy(query: TypesensePublicAssetSearchQuery): string {
   return filters.join(" && ");
 }
 
-function buildSortBy(query: TypesensePublicAssetSearchQuery): string {
+export function buildTypesensePublicAssetSortBy(query: TypesensePublicAssetSearchQuery): string {
   if (query.sort === "oldest") return "created_at_ts:asc";
   if (query.sort === "relevance" && query.q !== "*") {
     return "_text_match:desc,created_at_ts:desc";
@@ -499,6 +504,14 @@ function parseSort(value: string | null, q: string): TypesensePublicAssetSearchQ
   if (normalized === "newest" || normalized === "oldest") return normalized;
   if (normalized === "relevance" && q !== "*") return normalized;
   throw new TypesenseSearchInputError("Sort is invalid for this request.", "invalid_sort");
+}
+
+function parseBooleanParam(value: string | null, defaultValue: boolean): boolean {
+  const normalized = normalizeOptional(value);
+  if (!normalized) return defaultValue;
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  throw new TypesenseSearchInputError("includeFacets must be true or false.", "invalid_include_facets");
 }
 
 function parseYear(value: string | null): number | null {

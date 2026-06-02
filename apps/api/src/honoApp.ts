@@ -6,8 +6,8 @@ import { errorResponse } from "./lib/http";
 import { requestContextMiddleware } from "./middleware/context";
 import { healthRoute } from "./routes/system/health/route";
 import { authProfileRoutes } from "./routes/auth/profile-routes";
+import { platformAuthRoutes } from "./routes/platform-auth/route";
 import { authRoutes } from "./routes/auth/routes";
-import { authValidationRoutes } from "./routes/auth/validation-routes";
 import { staffAuthRoutes } from "./routes/staff/auth/route";
 import { staffAccessInquiryRoutes } from "./routes/staff/access-inquiries/route";
 import { internalAccountRoutes } from "./routes/internal/account-downloads/route";
@@ -25,6 +25,7 @@ import { photographerEventRoutes } from "./routes/contributor/events/route";
 import { photographerImageRoutes } from "./routes/contributor/images/route";
 import { photographerUploadRoutes } from "./routes/contributor/uploads/route";
 import { publicCatalogRoutes } from "./routes/public/catalog-routes";
+import { publicContributorApplicationRoutes } from "./routes/public/contributor-applications/route";
 import { publicHomepageRoutes } from "./routes/public/homepage-routes";
 import { publicMediaRoutes } from "./routes/public/media-routes";
 
@@ -64,8 +65,8 @@ honoApp.get("/health", async () => {
 });
 
 honoApp.route("/", authRoutes);
+honoApp.route("/", platformAuthRoutes);
 honoApp.route("/", authProfileRoutes);
-honoApp.route("/", authValidationRoutes);
 honoApp.route("/", staffAuthRoutes);
 honoApp.route("/", staffAccessInquiryRoutes);
 honoApp.route("/", photographerAuthRoutes);
@@ -88,6 +89,7 @@ honoApp.route("/", internalSearchTypesenseRoutes);
 honoApp.route("/", internalAdminContributorUploadRoutes);
 honoApp.route("/", internalAdminStaffUploadWizardRoutes);
 honoApp.route("/", publicCatalogRoutes);
+honoApp.route("/", publicContributorApplicationRoutes);
 honoApp.route("/", publicHomepageRoutes);
 honoApp.route("/", publicMediaRoutes);
 honoApp.route("/", legacyFixtureRoutes);

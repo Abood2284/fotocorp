@@ -5,12 +5,12 @@ import type { Env } from "../../../appTypes";
 import { createHttpDb, type AppRequestVariables } from "../../../db";
 import { AppError } from "../../../lib/errors";
 import { methodNotAllowed } from "../../../lib/route-errors";
+import { FOTOCORP_SESSION_COOKIE, isSecureAuthCookie } from "../../../lib/auth/platform-session";
 import {
   changePhotographerPassword,
   getCurrentPhotographerSession,
   loginPhotographer,
   logoutPhotographer,
-  CONTRIBUTOR_SESSION_COOKIE,
 } from "./service";
 import { photographerChangePasswordSchema, photographerLoginSchema } from "./validators";
 
@@ -29,10 +29,10 @@ photographerAuthRoutes.post(
       },
     );
 
-    setCookie(c, CONTRIBUTOR_SESSION_COOKIE, result.rawSessionToken, {
+    setCookie(c, FOTOCORP_SESSION_COOKIE, result.rawSessionToken, {
       httpOnly: true,
       sameSite: "Lax",
-      secure: isSecureCookie(c.req.raw),
+      secure: isSecureAuthCookie(c.req.raw),
       path: "/",
       maxAge: result.cookieMaxAgeSeconds,
       expires: result.sessionExpiresAt,
@@ -49,10 +49,10 @@ photographerAuthRoutes.post(
 photographerAuthRoutes.all("/api/v1/contributor/auth/login", () => methodNotAllowed());
 
 photographerAuthRoutes.post("/api/v1/contributor/auth/logout", async (c) => {
-  await logoutPhotographer(db(c.env), getCookie(c, CONTRIBUTOR_SESSION_COOKIE));
-  deleteCookie(c, CONTRIBUTOR_SESSION_COOKIE, {
+  await logoutPhotographer(db(c.env), getCookie(c, FOTOCORP_SESSION_COOKIE));
+  deleteCookie(c, FOTOCORP_SESSION_COOKIE, {
     path: "/",
-    secure: isSecureCookie(c.req.raw),
+    secure: isSecureAuthCookie(c.req.raw),
     sameSite: "Lax",
   });
   return c.json({ ok: true });
@@ -61,7 +61,7 @@ photographerAuthRoutes.post("/api/v1/contributor/auth/logout", async (c) => {
 photographerAuthRoutes.all("/api/v1/contributor/auth/logout", () => methodNotAllowed());
 
 photographerAuthRoutes.get("/api/v1/contributor/auth/me", async (c) => {
-  const session = await getCurrentPhotographerSession(db(c.env), getCookie(c, CONTRIBUTOR_SESSION_COOKIE));
+  const session = await getCurrentPhotographerSession(db(c.env), getCookie(c, FOTOCORP_SESSION_COOKIE));
   if (!session) throw new AppError(401, "CONTRIBUTOR_AUTH_REQUIRED", "Photographer authentication is required.");
 
   return c.json({
@@ -79,7 +79,7 @@ photographerAuthRoutes.post(
   async (c) => {
     const session = await changePhotographerPassword(
       db(c.env),
-      getCookie(c, CONTRIBUTOR_SESSION_COOKIE),
+      getCookie(c, FOTOCORP_SESSION_COOKIE),
       c.req.valid("json"),
     );
 
@@ -98,7 +98,3 @@ function db(env: Env) {
   return createHttpDb(env.DATABASE_URL);
 }
 
-/** Secure cookies only for HTTPS requests (production API URLs); localhost HTTP dev keeps Secure off. */
-function isSecureCookie(request: Request) {
-  return new URL(request.url).protocol === "https:";
-}

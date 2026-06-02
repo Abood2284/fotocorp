@@ -20,7 +20,7 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
   const [isZoomed, setIsZoomed] = useState(false)
   const [isSaving, startTransition] = useTransition()
 
-  const [title, setTitle] = useState("")
+  const [whoIsInPicture, setWhoIsInPicture] = useState("")
   const [caption, setCaption] = useState("")
   const [categoryId, setCategoryId] = useState("")
   const [eventId, setEventId] = useState("")
@@ -32,7 +32,7 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
     fetchAdminAssetAction(assetId).then(res => {
       if (mounted && res?.asset) {
         setAsset(res.asset)
-        setTitle(res.asset.headline || res.asset.whoIsInPicture || "")
+        setWhoIsInPicture(res.asset.whoIsInPicture || "")
         setCaption(res.asset.caption || "")
         setCategoryId(res.asset.category?.id || "")
         setEventId(res.asset.event?.id || "")
@@ -50,7 +50,8 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
     startTransition(async () => {
       try {
         await updateAdminAssetEditorialAction(asset.id, {
-          headline: title || null,
+          whoIsInPicture: whoIsInPicture.trim() || null,
+          headline: asset.headline,
           caption: caption || null,
           categoryId: categoryId || null,
           eventId: eventId || null,
@@ -77,6 +78,8 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
       }
     })
   }
+
+  const previewAlt = asset?.whoIsInPicture || asset?.caption || "Preview"
 
   return (
     <>
@@ -113,7 +116,7 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
               <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg border border-border bg-muted group">
                 <PreviewImage
                   src={`/staff/catalog/${asset.id}/preview-image?variant=detail`}
-                  alt={asset.headline || "Preview"}
+                  alt={previewAlt}
                   className="h-full w-full object-contain"
                 />
                 <button 
@@ -146,8 +149,8 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
                 <label className="text-xs font-medium text-foreground">Who is in picture?</label>
                 <input 
                   type="text" 
-                  value={title} 
-                  onChange={e => setTitle(e.target.value)} 
+                  value={whoIsInPicture} 
+                  onChange={e => setWhoIsInPicture(e.target.value)} 
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" 
                 />
               </div>

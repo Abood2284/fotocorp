@@ -7,9 +7,14 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.unsplash.com",
       },
+      {
+        protocol: "https",
+        hostname: "media.fotocorp.com",
+        pathname: "/**",
+      },
     ],
   },
-}
+};
 
 export default nextConfig
 

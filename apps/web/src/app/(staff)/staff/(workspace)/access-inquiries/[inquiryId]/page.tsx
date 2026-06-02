@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { getStaffAccessInquiryDetail, StaffApiError } from "@/lib/api/staff-api"
 import { StaffAccessInquiryDetail } from "@/components/staff/staff-access-inquiry-detail"
+import { StaffContributorApplicationDetail } from "@/components/staff/staff-contributor-application-detail"
 import { getStaffCookieHeader } from "@/lib/staff-session"
 
 export const metadata = {
@@ -21,6 +22,11 @@ export default async function StaffAccessInquiryDetailPage({ params }: PageProps
     throw caught
   }
   if (!detail?.ok) notFound()
+
+  const inquiryType = String(detail.inquiry.inquiryType ?? "USER_ACCESS")
+  if (inquiryType === "CONTRIBUTOR_APPLICATION") {
+    return <StaffContributorApplicationDetail inquiryId={inquiryId} initial={detail} />
+  }
 
   return <StaffAccessInquiryDetail inquiryId={inquiryId} initial={detail} />
 }

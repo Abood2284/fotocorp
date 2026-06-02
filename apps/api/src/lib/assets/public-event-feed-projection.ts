@@ -79,7 +79,7 @@ export async function syncPublicEventFeedForEvent(
     return { eventId, action: "not_found", isPublic: false }
   }
 
-  const withinWindow = await isEventWithinFeedWindow(db, event.created_at)
+  const withinWindow = event.event_date ? await isEventWithinFeedWindow(db, event.event_date) : false
   const eventEligible = event.status === "ACTIVE" && withinWindow
 
   if (!eventEligible) {
@@ -284,7 +284,8 @@ export async function deleteOldPublicEventFeedItems(
   const windowDays = options?.windowDays ?? PUBLIC_EVENT_FEED_WINDOW_DAYS
   const result = await db.execute(sql`
     delete from public_event_feed_items
-    where created_at < now() - (${windowDays}::int * interval '1 day')
+    where event_date is null
+      or event_date < now() - (${windowDays}::int * interval '1 day')
   `)
   const deletedOldRows = readDeletedCount(result)
 
@@ -362,7 +363,8 @@ export async function reconcilePublicEventFeedProjectionDrift(
         select pe.id::text as event_id
         from photo_events pe
         where pe.status = 'ACTIVE'
-          and pe.created_at >= now() - (${PUBLIC_EVENT_FEED_WINDOW_DAYS}::int * interval '1 day')
+          and pe.event_date is not null
+          and pe.event_date >= now() - (${PUBLIC_EVENT_FEED_WINDOW_DAYS}::int * interval '1 day')
           and not exists (select 1 from public_event_feed_items f where f.event_id = pe.id)
           and exists (
             select 1
@@ -480,12 +482,12 @@ function sleep(ms: number): Promise<void> {
 
 async function isEventWithinFeedWindow(
   db: DrizzleClient,
-  createdAt: Date | string,
+  eventDate: Date | string,
 ): Promise<boolean> {
   const rows = await executeRows<{ within_window: boolean }>(
     db,
     sql`
-      select (${createdAt}::timestamptz >= now() - (${PUBLIC_EVENT_FEED_WINDOW_DAYS}::int * interval '1 day')) as within_window
+      select (${eventDate}::timestamptz >= now() - (${PUBLIC_EVENT_FEED_WINDOW_DAYS}::int * interval '1 day')) as within_window
     `,
   )
   return Boolean(rows[0]?.within_window)

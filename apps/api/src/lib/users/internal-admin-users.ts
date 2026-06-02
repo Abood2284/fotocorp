@@ -94,7 +94,7 @@ export async function updateInternalAdminUserSubscription(
 
   if (isSubscriber) {
     await db.execute(sql`
-      update app_user_profiles
+      update users
       set
         is_subscriber = true,
         subscription_status = 'ACTIVE',
@@ -102,16 +102,16 @@ export async function updateInternalAdminUserSubscription(
         subscription_ends_at = null,
         download_quota_limit = coalesce(download_quota_limit, 100),
         updated_at = now()
-      where auth_user_id = ${authUserId}
+      where id = ${authUserId}::uuid
     `);
   } else {
     await db.execute(sql`
-      update app_user_profiles
+      update users
       set
         is_subscriber = false,
         subscription_status = 'CANCELLED',
         updated_at = now()
-      where auth_user_id = ${authUserId}
+      where id = ${authUserId}::uuid
     `);
   }
 
@@ -183,41 +183,41 @@ function buildListUsersSql(query: AdminUsersQuery) {
     const term = `%${escapeLike(query.q)}%`;
     where.push(
       sql`(
-        lower(aup.email) like lower(${term}) escape '\\'
-        or lower(coalesce(aup.display_name, '')) like lower(${term}) escape '\\'
-        or aup.auth_user_id::text like ${term} escape '\\'
+        lower(u.email) like lower(${term}) escape '\\'
+        or lower(coalesce(u.display_name, '')) like lower(${term}) escape '\\'
+        or u.id::text like ${term} escape '\\'
       )`,
     );
   }
-  if (query.role) where.push(sql`aup.role = ${query.role}`);
-  if (query.status) where.push(sql`aup.status = ${query.status}`);
-  if (query.isSubscriber !== undefined) where.push(sql`aup.is_subscriber = ${query.isSubscriber}`);
+  if (query.role) where.push(sql`u.role = ${query.role}`);
+  if (query.status) where.push(sql`u.status = ${query.status}`);
+  if (query.isSubscriber !== undefined) where.push(sql`u.is_subscriber = ${query.isSubscriber}`);
   if (query.cursor) {
     where.push(cursorPredicate(query.cursor));
   }
 
   const order = query.sort === "oldest"
-    ? sql`order by aup.created_at asc, aup.auth_user_id asc`
-    : sql`order by aup.created_at desc, aup.auth_user_id desc`;
+    ? sql`order by u.created_at asc, u.id asc`
+    : sql`order by u.created_at desc, u.id desc`;
 
   return sql`
     select
-      aup.id,
-      aup.auth_user_id,
-      aup.email,
-      aup.display_name,
-      aup.role,
-      aup.status,
-      aup.is_subscriber,
-      aup.subscription_status,
-      aup.subscription_plan_id,
-      aup.subscription_started_at,
-      aup.subscription_ends_at,
-      aup.download_quota_limit,
-      aup.download_quota_used,
-      aup.created_at,
-      aup.updated_at
-    from app_user_profiles aup
+      u.id,
+      u.id as auth_user_id,
+      u.email,
+      u.display_name,
+      u.role,
+      u.status,
+      u.is_subscriber,
+      u.subscription_status,
+      u.subscription_plan_id,
+      u.subscription_started_at,
+      u.subscription_ends_at,
+      u.download_quota_limit,
+      u.download_quota_used,
+      u.created_at,
+      u.updated_at
+    from users u
     ${where.length ? sql`where ${sql.join(where, sql` and `)}` : sql``}
     ${order}
     limit ${query.limit}
@@ -228,7 +228,7 @@ async function getUserByAuthId(db: DrizzleClient, authUserId: string) {
   const result = await db.execute<AdminUserRow>(sql`
     select
       id,
-      auth_user_id,
+      id as auth_user_id,
       email,
       display_name,
       role,
@@ -242,8 +242,8 @@ async function getUserByAuthId(db: DrizzleClient, authUserId: string) {
       download_quota_used,
       created_at,
       updated_at
-    from app_user_profiles
-    where auth_user_id = ${authUserId}
+    from users
+    where id = ${authUserId}::uuid
     limit 1
   `);
   return result.rows[0] ?? null;
@@ -252,41 +252,40 @@ async function getUserByAuthId(db: DrizzleClient, authUserId: string) {
 async function getUserWithProfileByAuthId(db: DrizzleClient, authUserId: string) {
   const result = await db.execute<AdminUserWithProfileRow>(sql`
     select
-      aup.id,
-      aup.auth_user_id,
-      aup.email,
-      aup.display_name,
-      aup.role,
-      aup.status,
-      aup.is_subscriber,
-      aup.subscription_status,
-      aup.subscription_plan_id,
-      aup.subscription_started_at,
-      aup.subscription_ends_at,
-      aup.download_quota_limit,
-      aup.download_quota_used,
-      aup.created_at,
-      aup.updated_at,
-      fup.first_name as profile_first_name,
-      fup.last_name as profile_last_name,
-      fup.username as profile_username,
-      fup.company_type as profile_company_type,
-      fup.company_name as profile_company_name,
-      fup.job_title as profile_job_title,
-      fup.custom_job_title as profile_custom_job_title,
-      fup.company_email as profile_company_email,
-      fup.company_email_domain as profile_company_email_domain,
-      fup.email_validation_decision as profile_email_validation_decision,
-      fup.phone_country_code as profile_phone_country_code,
-      fup.phone_number as profile_phone_number,
-      fup.interested_asset_types as profile_interested_asset_types,
-      fup.image_quantity_range as profile_image_quantity_range,
-      fup.image_quality_preference as profile_image_quality_preference,
-      fup.created_at as profile_created_at,
-      fup.updated_at as profile_updated_at
-    from app_user_profiles aup
-    left join fotocorp_user_profiles fup on aup.auth_user_id = fup.user_id
-    where aup.auth_user_id = ${authUserId}
+      u.id,
+      u.id as auth_user_id,
+      u.email,
+      u.display_name,
+      u.role,
+      u.status,
+      u.is_subscriber,
+      u.subscription_status,
+      u.subscription_plan_id,
+      u.subscription_started_at,
+      u.subscription_ends_at,
+      u.download_quota_limit,
+      u.download_quota_used,
+      u.created_at,
+      u.updated_at,
+      u.first_name as profile_first_name,
+      u.last_name as profile_last_name,
+      u.username as profile_username,
+      u.company_type as profile_company_type,
+      u.company_name as profile_company_name,
+      u.job_title as profile_job_title,
+      u.custom_job_title as profile_custom_job_title,
+      u.company_email as profile_company_email,
+      u.company_email_domain as profile_company_email_domain,
+      u.email_validation_decision as profile_email_validation_decision,
+      u.phone_country_code as profile_phone_country_code,
+      u.phone_number as profile_phone_number,
+      u.interested_asset_types as profile_interested_asset_types,
+      u.image_quantity_range as profile_image_quantity_range,
+      u.image_quality_preference as profile_image_quality_preference,
+      u.created_at as profile_created_at,
+      u.updated_at as profile_updated_at
+    from users u
+    where u.id = ${authUserId}::uuid
     limit 1
   `);
   return result.rows[0] ?? null;
@@ -321,9 +320,9 @@ export async function updateInternalAdminUserRole(
   }
 
   await db.execute(sql`
-    update app_user_profiles
+    update users
     set role = ${role}, updated_at = now()
-    where auth_user_id = ${authUserId}
+    where id = ${authUserId}::uuid
   `);
 
   const after = await getUserByAuthId(db, authUserId);
@@ -365,9 +364,9 @@ export async function updateInternalAdminUserStatus(
   }
 
   await db.execute(sql`
-    update app_user_profiles
+    update users
     set status = ${status}, updated_at = now()
-    where auth_user_id = ${authUserId}
+    where id = ${authUserId}::uuid
   `);
 
   const after = await getUserByAuthId(db, authUserId);
@@ -459,9 +458,9 @@ export async function updateInternalAdminUserSubscriptionDetail(
   }
 
   await db.execute(sql`
-    update app_user_profiles
+    update users
     set ${sql.join(sets, sql`, `)}
-    where auth_user_id = ${authUserId}
+    where id = ${authUserId}::uuid
   `);
 
   const after = await getUserByAuthId(db, authUserId);
@@ -618,7 +617,7 @@ function decodeCursor(raw: string): UserCursor | null {
 
 function cursorPredicate(cursor: UserCursor) {
   if (cursor.sort === "oldest") {
-    return sql`(aup.created_at, aup.auth_user_id) > (${cursor.createdAt}::timestamptz, ${cursor.id})`;
+    return sql`(u.created_at, u.id) > (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`;
   }
-  return sql`(aup.created_at, aup.auth_user_id) < (${cursor.createdAt}::timestamptz, ${cursor.id})`;
+  return sql`(u.created_at, u.id) < (${cursor.createdAt}::timestamptz, ${cursor.id}::uuid)`;
 }

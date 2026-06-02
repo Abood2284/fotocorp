@@ -70,8 +70,6 @@ WITH normalized_profiles AS (
       WHEN btrim(coalesce(pp.legacy_payload->>'pstatus', '')) = 'Deleted' THEN 'DELETED'
       ELSE 'UNKNOWN'
     END AS status,
-    CASE WHEN NULLIF(btrim(pp.legacy_payload->>'pstatus'), '') IS NULL OR upper(btrim(pp.legacy_payload->>'pstatus')) = 'NULL' THEN NULL ELSE btrim(pp.legacy_payload->>'pstatus') END AS legacy_status,
-    pp.legacy_payload,
     pp.created_at,
     pp.id::text AS profile_id_text,
     CASE WHEN coalesce(NULLIF(btrim(pp.legacy_payload->>'pemail'), ''), NULLIF(btrim(pp.email), '')) ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$' THEN 1 ELSE 0 END AS has_valid_email,
@@ -121,9 +119,7 @@ INSERT INTO contributors (
   country,
   postal_code,
   status,
-  legacy_status,
   source,
-  legacy_payload,
   updated_at
 )
 SELECT
@@ -141,9 +137,7 @@ SELECT
   country,
   postal_code,
   status,
-  legacy_status,
   'LEGACY_IMPORT',
-  legacy_payload,
   now()
 FROM canonical_photographer_profiles
 ON CONFLICT (legacy_photographer_id) DO UPDATE SET
@@ -160,9 +154,7 @@ ON CONFLICT (legacy_photographer_id) DO UPDATE SET
   country = excluded.country,
   postal_code = excluded.postal_code,
   status = excluded.status,
-  legacy_status = excluded.legacy_status,
   source = excluded.source,
-  legacy_payload = excluded.legacy_payload,
   updated_at = now();
 `
 

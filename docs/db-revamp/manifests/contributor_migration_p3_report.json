@@ -1,0 +1,15 @@
+{
+  "phase": "p3_seed_apply",
+  "created": 93,
+  "skipped": 0,
+  "conflict": 0,
+  "missingLegacyId": 0,
+  "placeholderEmailOwners": 28,
+  "conflicts": [],
+  "validation": {
+    "distinctAssetOwnerCount": 93,
+    "contributorUsernameCredentialCount": 93,
+    "contributorUsernameClaimCount": 93,
+    "legacyColumnCount": 0
+  }
+}

@@ -3,16 +3,24 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { useEffect, useMemo, useState, useTransition } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { all as allCountries } from "country-codes-list"
-import { authClient } from "@/lib/auth-client"
+import { platformLogin, platformSignUp } from "@/lib/api/platform-auth-api"
+import { loginStaff, StaffApiError } from "@/lib/api/staff-api"
+import {
+  buildSignInHref,
+  readSignInPersona,
+  signInPersonaLabel,
+  type SignInPersona,
+} from "@/lib/auth-sign-in-gateway"
+import { SHARED_AUTH_SESSION_QUERY_KEY } from "@/lib/use-shared-auth-session"
 import { resolveAuthRedirectFromSearchParams } from "@/lib/auth-redirect"
-import { validateBusinessEmail } from "@/lib/api/auth-api"
+import { resolveStaffPostLoginRedirect } from "@/lib/staff/staff-route-access"
 import { isValidUsername, normalizeUsername } from "@/lib/username"
 import { migrateAnonBoardsToServer } from "@/lib/storage/fotobox-anon-store"
 
 type AuthTab = "sign-in" | "register"
-type EmailValidationStatus = "idle" | "checking" | "allowed" | "blocked" | "error"
 type FormErrors = Record<string, string>
 
 interface SelectOption {
@@ -132,6 +140,9 @@ const JOB_TITLE_GROUPS: SelectGroup[] = [
 ]
 
 const USERNAME_ERROR_MESSAGE = "Username can only use letters, numbers, dots, and underscores."
+const PASSWORD_MIN_LENGTH = 6
+const PASSWORD_HINT = `Use at least ${PASSWORD_MIN_LENGTH} characters.`
+const PASSWORD_MIN_LENGTH_MESSAGE = `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`
 
 const SIGN_IN_FIELD_ORDER = ["identifier", "password"] as const
 
@@ -152,7 +163,17 @@ const REGISTER_FIELD_ORDER = [
   "password",
 ] as const
 
-const fieldErrorTextClass = "text-xs font-medium text-red-600"
+function clearAuthFieldError(
+  setErrors: React.Dispatch<React.SetStateAction<FormErrors>>,
+  fieldName: string,
+) {
+  setErrors((current) => {
+    if (!current[fieldName]) return current
+    const next = { ...current }
+    delete next[fieldName]
+    return next
+  })
+}
 
 function scrollFirstAuthFieldErrorIntoView(tab: AuthTab, errors: FormErrors) {
   const order = tab === "register" ? REGISTER_FIELD_ORDER : SIGN_IN_FIELD_ORDER
@@ -178,6 +199,7 @@ function queueScrollToFirstFieldError(tab: AuthTab, errors: FormErrors) {
 
 export function SplitAuthPage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<AuthTab>(() => {
     const tab = searchParams.get("tab")
@@ -185,28 +207,37 @@ export function SplitAuthPage() {
   })
   const [errors, setErrors] = useState<FormErrors>({})
   const [jobTitle, setJobTitle] = useState("")
-  const [companyEmail, setCompanyEmail] = useState("")
   const [interest, setInterest] = useState({ IMAGE: false, VIDEO: false, CARICATURE: false })
   const [notice, setNotice] = useState("")
-  const [emailStatus, setEmailStatus] = useState<EmailValidationStatus>("idle")
-  const [emailStatusMessage, setEmailStatusMessage] = useState("")
   const [isPending, startTransition] = useTransition()
-  const [isEmailCheckPending, startEmailCheckTransition] = useTransition()
   const callingCodes = useMemo(getCallingCodeOptions, [])
-  const debounceTimeoutRef = useRef<number | null>(null)
 
   const redirectTo = useMemo(() => resolveAuthRedirectFromSearchParams(searchParams), [searchParams])
+  const [persona, setPersona] = useState<SignInPersona>(() => readSignInPersona(searchParams.get("persona")))
+  const showRegisterTab = persona === "subscriber"
 
   useEffect(() => {
-    const tab = searchParams.get("tab")
-    if (tab === "register") setActiveTab("register")
+    setPersona(readSignInPersona(searchParams.get("persona")))
   }, [searchParams])
 
   useEffect(() => {
-    return () => {
-      if (debounceTimeoutRef.current) window.clearTimeout(debounceTimeoutRef.current)
-    }
-  }, [])
+    const tab = searchParams.get("tab")
+    if (tab === "register" && persona === "subscriber") setActiveTab("register")
+    if (tab === "register" && persona !== "subscriber") setActiveTab("sign-in")
+  }, [searchParams, persona])
+
+  function switchPersona(next: SignInPersona) {
+    setPersona(next)
+    setErrors({})
+    setNotice("")
+    if (next !== "subscriber" && activeTab === "register") setActiveTab("sign-in")
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === "subscriber") params.delete("persona")
+    else params.set("persona", next)
+    if (next !== "subscriber") params.delete("tab")
+    const query = params.toString()
+    router.replace(query ? `/sign-in?${query}` : "/sign-in")
+  }
 
   function switchTab(tab: AuthTab) {
     setActiveTab(tab)
@@ -215,53 +246,9 @@ export function SplitAuthPage() {
     if (tab === "sign-in") setInterest({ IMAGE: false, VIDEO: false, CARICATURE: false })
   }
 
-  function handleCompanyEmailBlur() {
-    if (activeTab !== "register") return
-    void runEmailPrecheck(companyEmail)
-  }
-
-  function handleCompanyEmailChange(value: string) {
-    const normalizedEmail = value.trim()
-    setCompanyEmail(normalizedEmail)
-    if (!isBasicEmail(normalizedEmail)) {
-      setEmailStatus("idle")
-      setEmailStatusMessage("")
-      return
-    }
-
-    if (debounceTimeoutRef.current) window.clearTimeout(debounceTimeoutRef.current)
-    debounceTimeoutRef.current = window.setTimeout(() => {
-      void runEmailPrecheck(normalizedEmail)
-    }, 500)
-  }
-
-  async function runEmailPrecheck(rawEmail: string) {
-    const normalizedEmail = rawEmail.trim()
-    if (!isBasicEmail(normalizedEmail)) {
-      setEmailStatus("idle")
-      setEmailStatusMessage("")
-      return
-    }
-
-    setEmailStatus("checking")
-    setEmailStatusMessage("Checking company email...")
-    startEmailCheckTransition(async () => {
-      const response = await validateBusinessEmail({ email: normalizedEmail }).catch(() => null)
-      if (!response) {
-        setEmailStatus("error")
-        setEmailStatusMessage("Email validation is temporarily unavailable. Please try again.")
-        return
-      }
-
-      if (response.ok) {
-        setEmailStatus("allowed")
-        setEmailStatusMessage(response.message)
-        return
-      }
-
-      setEmailStatus("blocked")
-      setEmailStatusMessage(response.message)
-    })
+  function clearFieldError(fieldName: string) {
+    clearAuthFieldError(setErrors, fieldName)
+    setNotice("")
   }
 
   function handleSignIn(event: React.FormEvent<HTMLFormElement>) {
@@ -272,7 +259,10 @@ export function SplitAuthPage() {
     const identifier = String(formData.get("identifier") ?? "").trim()
     const password = String(formData.get("password") ?? "")
 
-    if (!identifier) nextErrors.identifier = "Username or company email is required."
+    const identifierLabel =
+      persona === "subscriber" ? "Username or company email" : "Username"
+
+    if (!identifier) nextErrors.identifier = `${identifierLabel} is required.`
     if (!password) nextErrors.password = "Password is required."
 
     setErrors(nextErrors)
@@ -282,14 +272,58 @@ export function SplitAuthPage() {
     }
 
     startTransition(async () => {
+      if (persona === "staff") {
+        try {
+          const me = await loginStaff(identifier, password)
+          const next = resolveStaffPostLoginRedirect(me.staff.role, searchParams.get("callbackUrl"))
+          router.push(next)
+        } catch (caught) {
+          if (caught instanceof StaffApiError && caught.status >= 500) {
+            setNotice("We could not sign you in right now. Please try again.")
+          } else {
+            setErrors({ password: "Invalid username or password." })
+          }
+        }
+        return
+      }
+
       try {
-        const response = identifier.includes("@")
-          ? await authClient.signIn.email({ email: identifier, password })
-          : await authClient.signIn.username({ username: normalizeUsername(identifier), password })
+        const loginIdentifier = identifier.includes("@") ? identifier : normalizeUsername(identifier)
+        const scope = persona === "contributor" ? "CONTRIBUTOR" : "USER"
+        const response = await platformLogin(loginIdentifier, password, { scope })
 
         if (response.error) {
           applySignInServerError({ error: response.error, setErrors, setNotice, tab: "sign-in" })
           return
+        }
+
+        if (persona === "contributor") {
+          if (response.ownerType !== "CONTRIBUTOR" && !response.contributor) {
+            await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+            setNotice("Use the Subscriber tab for customer accounts.")
+            return
+          }
+          router.push("/contributor/dashboard")
+          router.refresh()
+          return
+        }
+
+        if (response.ownerType === "CONTRIBUTOR") {
+          await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+          setNotice(`Contributor accounts should use the ${signInPersonaLabel("contributor")} tab above.`)
+          return
+        }
+
+        if (response.user) {
+          queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, {
+            user: {
+              id: response.user.id,
+              email: response.user.email,
+              name: response.user.displayName ?? null,
+            },
+          })
+        } else {
+          await queryClient.invalidateQueries({ queryKey: SHARED_AUTH_SESSION_QUERY_KEY })
         }
         await migrateAnonBoardsToServer()
       } catch (error) {
@@ -315,7 +349,12 @@ export function SplitAuthPage() {
     requireField(formData, nextErrors, "jobTitle", "Job title is required.")
     requireField(formData, nextErrors, "phoneCountryCode", "Phone country code is required.")
     requireField(formData, nextErrors, "phoneNumber", "Telephone is required.")
-    requireField(formData, nextErrors, "password", "Password is required.")
+    const password = String(formData.get("password") ?? "")
+    if (!password) {
+      nextErrors.password = "Password is required."
+    } else if (password.length < PASSWORD_MIN_LENGTH) {
+      nextErrors.password = PASSWORD_MIN_LENGTH_MESSAGE
+    }
 
     const username = normalizeUsername(String(formData.get("username") ?? ""))
     if (!username) {
@@ -336,11 +375,6 @@ export function SplitAuthPage() {
       requireField(formData, nextErrors, "customJobTitle", "Job title is required.")
     }
 
-    if (emailStatus === "blocked") nextErrors.companyEmail = emailStatusMessage || "This company email is not allowed."
-    if (emailStatus === "checking" || isEmailCheckPending) {
-      nextErrors.companyEmail = "Please wait until company email validation completes."
-    }
-
     const interestedAssetTypes = (["IMAGE", "VIDEO", "CARICATURE"] as const).filter((k) => interest[k])
     if (!interestedAssetTypes.length) {
       nextErrors.interestedAssetTypes = "Select at least one content type you are interested in."
@@ -356,7 +390,6 @@ export function SplitAuthPage() {
       return
     }
 
-    const password = String(formData.get("password") ?? "")
     const firstName = String(formData.get("firstName") ?? "").trim()
     const lastName = String(formData.get("lastName") ?? "").trim()
     const companyType = String(formData.get("companyType") ?? "").trim()
@@ -387,13 +420,22 @@ export function SplitAuthPage() {
         signUpPayload.imageQualityPreference = String(formData.get("imageQualityPreference") ?? "").trim()
       }
 
-      const signUp = authClient.signUp.email as unknown as (payload: Record<string, unknown>) => Promise<{ error?: unknown }>
-
       try {
-        const response = await signUp(signUpPayload)
+        const response = await platformSignUp(signUpPayload)
         if (response.error) {
           applyRegisterServerError({ error: response.error, setErrors, setNotice, tab: "register" })
           return
+        }
+        if (response.user) {
+          queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, {
+            user: {
+              id: response.user.id,
+              email: response.user.email,
+              name: response.user.displayName ?? null,
+            },
+          })
+        } else {
+          await queryClient.invalidateQueries({ queryKey: SHARED_AUTH_SESSION_QUERY_KEY })
         }
         await migrateAnonBoardsToServer()
       } catch (error) {
@@ -405,8 +447,6 @@ export function SplitAuthPage() {
       router.refresh()
     })
   }
-
-  const isCreateDisabled = isPending || emailStatus === "checking" || emailStatus === "blocked" || isEmailCheckPending
 
   return (
     <main className="min-h-screen bg-white text-foreground lg:grid lg:h-screen lg:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.7fr)] lg:overflow-hidden xl:grid-cols-[minmax(0,1.45fr)_minmax(460px,0.65fr)]">
@@ -437,20 +477,44 @@ export function SplitAuthPage() {
 
         <div className="flex min-h-0 flex-1 flex-col px-5 pb-8 sm:px-8 lg:px-10 xl:px-12">
           <div className="mx-auto flex w-full max-w-[520px] flex-1 flex-col pt-4 sm:pt-8 lg:max-w-none lg:pt-16">
-            <div className="mb-8 flex border-b border-border-subtle">
+            <div className="mb-6 flex border-b border-border-subtle">
               <TabButton active={activeTab === "sign-in"} onClick={() => switchTab("sign-in")}>
                 SIGN IN
               </TabButton>
-              <TabButton active={activeTab === "register"} onClick={() => switchTab("register")}>
-                REGISTER
-              </TabButton>
+              {showRegisterTab ? (
+                <TabButton active={activeTab === "register"} onClick={() => switchTab("register")}>
+                  REGISTER
+                </TabButton>
+              ) : null}
             </div>
+
+            {activeTab === "sign-in" ? (
+              <nav
+                className="mb-6 flex flex-wrap gap-2"
+                aria-label="Sign in as"
+              >
+                {(["subscriber", "contributor", "staff"] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => switchPersona(value)}
+                    className={
+                      persona === value
+                        ? "rounded-none border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-background"
+                        : "rounded-none border border-border-subtle px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                    }
+                  >
+                    {signInPersonaLabel(value)}
+                  </button>
+                ))}
+              </nav>
+            ) : null}
 
             <div className="min-h-0 flex-1 lg:pr-1">
               {activeTab === "sign-in" ? (
                 <form data-auth-form="sign-in" onSubmit={handleSignIn} noValidate className="space-y-5">
                   <TextField
-                    label="Username or company email"
+                    label={persona === "subscriber" ? "Username or company email" : "Username"}
                     name="identifier"
                     autoComplete="username"
                     error={errors.identifier}
@@ -474,41 +538,91 @@ export function SplitAuthPage() {
                   <SubmitButton disabled={isPending}>
                     {isPending ? "Signing In..." : "Sign In"}
                   </SubmitButton>
+                  {persona === "contributor" ? (
+                    <p className="text-center text-sm text-muted-foreground">
+                      New to Fotocorp?{" "}
+                      <Link href="/apply-contributor" className="font-medium text-foreground underline-offset-4 hover:underline">
+                        Apply to contribute
+                      </Link>
+                    </p>
+                  ) : null}
                   <FormNotice isError>{notice}</FormNotice>
                 </form>
               ) : (
                 <form data-auth-form="register" onSubmit={handleRegister} noValidate className="space-y-4 pb-4">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <TextField label="First Name" name="firstName" autoComplete="given-name" error={errors.firstName} required />
-                    <TextField label="Last Name" name="lastName" autoComplete="family-name" error={errors.lastName} required />
+                    <TextField
+                      label="First Name"
+                      name="firstName"
+                      autoComplete="given-name"
+                      error={errors.firstName}
+                      onFieldChange={() => clearFieldError("firstName")}
+                      required
+                    />
+                    <TextField
+                      label="Last Name"
+                      name="lastName"
+                      autoComplete="family-name"
+                      error={errors.lastName}
+                      onFieldChange={() => clearFieldError("lastName")}
+                      required
+                    />
                   </div>
-                  <TextField label="Username" name="username" autoComplete="username" error={errors.username} required />
-                  <SelectField label="Company Type" name="companyType" groups={COMPANY_TYPE_GROUPS} error={errors.companyType} required />
-                  <TextField label="Company Name" name="companyName" autoComplete="organization" error={errors.companyName} required />
+                  <TextField
+                    label="Username"
+                    name="username"
+                    autoComplete="username"
+                    error={errors.username}
+                    onFieldChange={() => clearFieldError("username")}
+                    required
+                  />
+                  <SelectField
+                    label="Company Type"
+                    name="companyType"
+                    groups={COMPANY_TYPE_GROUPS}
+                    error={errors.companyType}
+                    onFieldChange={() => clearFieldError("companyType")}
+                    required
+                  />
+                  <TextField
+                    label="Company Name"
+                    name="companyName"
+                    autoComplete="organization"
+                    error={errors.companyName}
+                    onFieldChange={() => clearFieldError("companyName")}
+                    required
+                  />
                   <SelectField
                     label="Job Title"
                     name="jobTitle"
                     groups={JOB_TITLE_GROUPS}
                     value={jobTitle}
-                    onChange={setJobTitle}
+                    onChange={(value) => {
+                      setJobTitle(value)
+                      clearFieldError("jobTitle")
+                    }}
                     error={errors.jobTitle}
                     required
                   />
                   {jobTitle === "Other" ? (
-                    <TextField label="Job title" name="customJobTitle" autoComplete="organization-title" error={errors.customJobTitle} required />
+                    <TextField
+                      label="Job title"
+                      name="customJobTitle"
+                      autoComplete="organization-title"
+                      error={errors.customJobTitle}
+                      onFieldChange={() => clearFieldError("customJobTitle")}
+                      required
+                    />
                   ) : null}
                   <TextField
                     label="Company Email"
                     name="companyEmail"
                     type="email"
                     autoComplete="email"
-                    value={companyEmail}
-                    onChange={handleCompanyEmailChange}
-                    onBlur={handleCompanyEmailBlur}
                     error={errors.companyEmail}
+                    onFieldChange={() => clearFieldError("companyEmail")}
                     required
                   />
-                  <EmailStatusNotice status={emailStatus} message={emailStatusMessage} />
                   <fieldset data-auth-field="interestedAssetTypes" className="space-y-3 rounded-md border border-border-subtle p-3">
                     <legend className={labelClassName}>Tell us what you need *</legend>
                     <div className="flex flex-col gap-2 text-sm">
@@ -516,7 +630,10 @@ export function SplitAuthPage() {
                         <input
                           type="checkbox"
                           checked={interest.IMAGE}
-                          onChange={(e) => setInterest((s) => ({ ...s, IMAGE: e.target.checked }))}
+                          onChange={(e) => {
+                            setInterest((s) => ({ ...s, IMAGE: e.target.checked }))
+                            clearFieldError("interestedAssetTypes")
+                          }}
                           className="h-4 w-4 rounded border-input"
                         />
                         Images
@@ -525,7 +642,10 @@ export function SplitAuthPage() {
                         <input
                           type="checkbox"
                           checked={interest.VIDEO}
-                          onChange={(e) => setInterest((s) => ({ ...s, VIDEO: e.target.checked }))}
+                          onChange={(e) => {
+                            setInterest((s) => ({ ...s, VIDEO: e.target.checked }))
+                            clearFieldError("interestedAssetTypes")
+                          }}
                           className="h-4 w-4 rounded border-input"
                         />
                         Videos
@@ -534,7 +654,10 @@ export function SplitAuthPage() {
                         <input
                           type="checkbox"
                           checked={interest.CARICATURE}
-                          onChange={(e) => setInterest((s) => ({ ...s, CARICATURE: e.target.checked }))}
+                          onChange={(e) => {
+                            setInterest((s) => ({ ...s, CARICATURE: e.target.checked }))
+                            clearFieldError("interestedAssetTypes")
+                          }}
                           className="h-4 w-4 rounded border-input"
                         />
                         Caricatures
@@ -584,10 +707,27 @@ export function SplitAuthPage() {
                       </select>
                       <FieldError>{errors.phoneCountryCode}</FieldError>
                     </label>
-                    <TextField label="Phone Number" name="phoneNumber" type="tel" autoComplete="tel-national" error={errors.phoneNumber} required />
+                    <TextField
+                      label="Phone Number"
+                      name="phoneNumber"
+                      type="tel"
+                      autoComplete="tel-national"
+                      error={errors.phoneNumber}
+                      onFieldChange={() => clearFieldError("phoneNumber")}
+                      required
+                    />
                   </div>
-                  <TextField label="Password" name="password" type="password" autoComplete="new-password" error={errors.password} required />
-                  <SubmitButton disabled={isCreateDisabled}>
+                  <TextField
+                    label="Password"
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    hint={PASSWORD_HINT}
+                    error={errors.password}
+                    onFieldChange={() => clearFieldError("password")}
+                    required
+                  />
+                  <SubmitButton disabled={isPending}>
                     {isPending ? "Creating Account..." : "Create Account"}
                   </SubmitButton>
                   <FormNotice isError>{notice}</FormNotice>
@@ -625,10 +765,12 @@ interface TextFieldProps {
   name: string
   type?: string
   autoComplete?: string
+  hint?: string
   error?: string
   value?: string
   onChange?: (value: string) => void
   onBlur?: () => void
+  onFieldChange?: () => void
   required?: boolean
 }
 
@@ -637,14 +779,20 @@ function TextField({
   name,
   type = "text",
   autoComplete,
+  hint,
   error,
   value,
   onChange,
   onBlur,
+  onFieldChange,
   required = false,
 }: TextFieldProps) {
+  const hintId = hint ? `${name}-hint` : undefined
+  const errorId = error ? `${name}-error` : undefined
+  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined
+
   return (
-    <label data-auth-field={name} className="block space-y-2">
+    <label data-auth-field={name} className="block space-y-1.5">
       <span className={labelClassName}>
         {label}
         {required ? " *" : ""}
@@ -653,13 +801,22 @@ function TextField({
         name={name}
         type={type}
         autoComplete={autoComplete}
-        className={inputClassName}
+        className={error ? inputErrorClassName : inputClassName}
         aria-invalid={Boolean(error)}
+        aria-describedby={describedBy}
         value={value}
-        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
+        onChange={(event) => {
+          onFieldChange?.()
+          onChange?.(event.target.value)
+        }}
         onBlur={onBlur}
       />
-      <FieldError>{error}</FieldError>
+      {hint ? (
+        <p id={hintId} className="text-xs text-muted-foreground">
+          {hint}
+        </p>
+      ) : null}
+      <FieldError id={errorId}>{error}</FieldError>
     </label>
   )
 }
@@ -671,6 +828,7 @@ function SelectField({
   value,
   onChange,
   error,
+  onFieldChange,
   required = false,
 }: {
   label: string
@@ -679,10 +837,13 @@ function SelectField({
   value?: string
   onChange?: (value: string) => void
   error?: string
+  onFieldChange?: () => void
   required?: boolean
 }) {
+  const errorId = error ? `${name}-error` : undefined
+
   return (
-    <label data-auth-field={name} className="block space-y-2">
+    <label data-auth-field={name} className="block space-y-1.5">
       <span className={labelClassName}>
         {label}
         {required ? " *" : ""}
@@ -690,9 +851,13 @@ function SelectField({
       <select
         name={name}
         value={value}
-        onChange={(event) => onChange?.(event.target.value)}
-        className={inputClassName}
+        onChange={(event) => {
+          onFieldChange?.()
+          onChange?.(event.target.value)
+        }}
+        className={error ? inputErrorClassName : inputClassName}
         aria-invalid={Boolean(error)}
+        aria-describedby={errorId}
       >
         <option value="">Select</option>
         {groups.map((group) => (
@@ -705,30 +870,18 @@ function SelectField({
           </optgroup>
         ))}
       </select>
-      <FieldError>{error}</FieldError>
+      <FieldError id={errorId}>{error}</FieldError>
     </label>
   )
 }
 
-function EmailStatusNotice({
-  status,
-  message,
-}: {
-  status: EmailValidationStatus
-  message: string
-}) {
-  if (status === "idle" || !message) return null
-  const colorClass = status === "allowed"
-    ? "text-green-700"
-    : status === "checking"
-      ? "text-muted-foreground"
-      : "text-red-600"
-  return <p className={`text-xs font-medium ${colorClass}`}>{message}</p>
-}
-
-function FieldError({ children }: { children?: string }) {
+function FieldError({ children, id }: { children?: string; id?: string }) {
   if (!children) return null
-  return <p className={fieldErrorTextClass}>{children}</p>
+  return (
+    <p id={id} role="alert" className="text-xs leading-snug text-red-600">
+      {children}
+    </p>
+  )
 }
 
 function FormNotice({
@@ -803,24 +956,25 @@ function humanizeAuthErrorMessage(error: unknown, mode: AuthTab) {
   const backendMessage = readErrorMessage(error)
 
   if (errorCode === "username_is_already_taken") return "This username is already taken."
+  if (errorCode === "user_already_exists") {
+    return "An account with this email or username already exists."
+  }
   if (errorCode === "user_already_exists_use_another_email") return "An account with this email already exists."
   if (errorCode === "invalid_username") return USERNAME_ERROR_MESSAGE
   if (errorCode === "missing_or_null_origin") return "Authentication request is invalid. Please refresh and try again."
-  if (errorCode === "block_free_email") return "Please use your company email address. Personal email providers are not accepted."
-  if (errorCode === "block_disposable_email") return "Temporary email addresses are not accepted."
-  if (errorCode === "block_no_mx") return "This email domain does not appear to accept email."
-  if (errorCode === "block_by_email_override") return "This email address is not allowed."
-  if (errorCode === "block_by_domain_override") return "This email domain is not allowed."
-  if (errorCode === "valid_validation_error" || errorCode === "validation_error") {
-    return "Email validation is temporarily unavailable. Please try again."
-  }
   if (errorCode.includes("email")) return "Please check your company email and try again."
 
   if (backendMessage) {
     const rawMessage = backendMessage.trim()
     const message = rawMessage.toLowerCase()
 
-    if (message.includes("invalid credential")) return "Invalid credentials. Please check your username or email and password."
+    if (
+      message.includes("invalid credential") ||
+      message.includes("invalid username or password") ||
+      message.includes("invalid email or password")
+    ) {
+      return "Invalid credentials. Please check your username or email and password."
+    }
     if (message.includes("invalid username")) return USERNAME_ERROR_MESSAGE
     if (message.includes("already") && message.includes("email")) return "An account with this email already exists."
     if (message.includes("already") && message.includes("username")) return "This username is already taken."
@@ -852,13 +1006,33 @@ function applyRegisterServerError({
   setNotice: (notice: string) => void
   tab: AuthTab
 }) {
+  const duplicateErrors = buildRegisterDuplicateErrors(error)
+  if (Object.keys(duplicateErrors).length) {
+    setErrors(duplicateErrors)
+    queueScrollToFirstFieldError(tab, duplicateErrors)
+    setNotice("")
+    return
+  }
+
+  const fieldErrors = buildRegisterFieldErrors(error)
+  if (Object.keys(fieldErrors).length) {
+    setErrors(fieldErrors)
+    queueScrollToFirstFieldError(tab, fieldErrors)
+    setNotice("")
+    return
+  }
+
   const message = humanizeAuthErrorMessage(error, "register")
   const fieldName = mapRegisterServerErrorToField(error, message)
   if (fieldName) {
     const next = { [fieldName]: message }
     setErrors(next)
     queueScrollToFirstFieldError(tab, next)
+    setNotice("")
+    return
   }
+
+  setErrors({})
   setNotice(message)
 }
 
@@ -883,10 +1057,142 @@ function applySignInServerError({
   setNotice(message)
 }
 
+function buildRegisterFieldErrors(error: unknown): FormErrors {
+  const issues = readValidationIssues(error)
+  const fieldErrors: FormErrors = {}
+
+  for (const issue of issues) {
+    const fieldName = mapRegisterApiPathToField(issue.path)
+    if (!fieldName) continue
+    const message = formatRegisterIssueMessage(fieldName, issue.message)
+    if (!fieldErrors[fieldName]) fieldErrors[fieldName] = message
+  }
+
+  return fieldErrors
+}
+
+function readValidationIssues(error: unknown) {
+  const detail = getNestedValue(error, "detail")
+  if (!detail || typeof detail !== "object" || Array.isArray(detail)) return []
+
+  const issues = (detail as { issues?: unknown }).issues
+  if (!Array.isArray(issues)) return []
+
+  return issues
+    .map((issue) => {
+      if (!issue || typeof issue !== "object") return null
+      const path = "path" in issue ? String(issue.path ?? "") : ""
+      const message = "message" in issue ? String(issue.message ?? "") : ""
+      if (!path || !message) return null
+      return { path, message }
+    })
+    .filter((issue): issue is { path: string; message: string } => Boolean(issue))
+}
+
+function mapRegisterApiPathToField(path: string): string | null {
+  const normalized = path.trim().toLowerCase()
+  if (normalized === "password") return "password"
+  if (normalized === "email" || normalized === "companyemail") return "companyEmail"
+  if (normalized === "username") return "username"
+  if (normalized === "firstname") return "firstName"
+  if (normalized === "lastname") return "lastName"
+  if (normalized === "companytype") return "companyType"
+  if (normalized === "companyname") return "companyName"
+  if (normalized === "jobtitle") return "jobTitle"
+  if (normalized === "customjobtitle") return "customJobTitle"
+  if (normalized === "phonecountrycode") return "phoneCountryCode"
+  if (normalized === "phonenumber") return "phoneNumber"
+  if (normalized === "interestedassettypes") return "interestedAssetTypes"
+  if (normalized === "imagequantityrange") return "imageQuantityRange"
+  if (normalized === "imagequalitypreference") return "imageQualityPreference"
+  return null
+}
+
+function buildRegisterDuplicateErrors(error: unknown): FormErrors {
+  const errorCode = readErrorCode(error).toLowerCase()
+  if (errorCode !== "user_already_exists" && errorCode !== "user_already_exists_use_another_email") {
+    return {}
+  }
+
+  const message = humanizeAuthErrorMessage(error, "register")
+  return {
+    companyEmail: message,
+    username: "This username may already be taken. Try another.",
+  }
+}
+
+function formatRegisterIssueMessage(fieldName: string, message: string) {
+  const normalized = message.toLowerCase()
+
+  if (normalized.includes("too small") || normalized.includes("at least")) {
+    if (fieldName === "password") return PASSWORD_MIN_LENGTH_MESSAGE
+    if (fieldName === "username") return "Username must be at least 3 characters."
+  }
+
+  if (normalized.includes("too big") || normalized.includes("at most")) {
+    if (fieldName === "username") return "Username must be 30 characters or fewer."
+  }
+
+  if (normalized.includes("invalid") && (fieldName === "companyEmail" || fieldName === "email")) {
+    return "Enter a valid company email."
+  }
+
+  if (normalized.includes("required") || normalized.includes("expected")) {
+    return registerRequiredMessage(fieldName)
+  }
+
+  if (fieldName === "password" && normalized.includes("too small")) return PASSWORD_MIN_LENGTH_MESSAGE
+
+  return message
+}
+
+function registerRequiredMessage(fieldName: string) {
+  switch (fieldName) {
+    case "firstName":
+      return "First name is required."
+    case "lastName":
+      return "Last name is required."
+    case "username":
+      return "Username is required."
+    case "companyType":
+      return "Company type is required."
+    case "companyName":
+      return "Company name is required."
+    case "jobTitle":
+      return "Job title is required."
+    case "customJobTitle":
+      return "Job title is required."
+    case "companyEmail":
+      return "Company email is required."
+    case "phoneCountryCode":
+      return "Phone country code is required."
+    case "phoneNumber":
+      return "Telephone is required."
+    case "password":
+      return "Password is required."
+    case "interestedAssetTypes":
+      return "Select at least one content type you are interested in."
+    case "imageQuantityRange":
+      return "Image quantity range is required when Images is selected."
+    case "imageQualityPreference":
+      return "Image quality preference is required when Images is selected."
+    default:
+      return "This field is required."
+  }
+}
+
 function mapRegisterServerErrorToField(error: unknown, message: string): string | null {
   const errorCode = readErrorCode(error).toLowerCase()
-  if (errorCode === "username_is_already_taken" || errorCode === "invalid_username") return "username"
-  if (errorCode === "user_already_exists_use_another_email") return "companyEmail"
+  if (errorCode === "username_is_already_taken" || errorCode === "invalid_username") {
+    return "username"
+  }
+  if (errorCode === "user_already_exists" || errorCode === "user_already_exists_use_another_email") {
+    return "companyEmail"
+  }
+  if (errorCode === "block_invalid_email") return "companyEmail"
+  if (errorCode.startsWith("missing_") || errorCode.startsWith("invalid_")) {
+    return mapRegisterValidationCodeToField(errorCode)
+  }
 
   const combined = `${errorCode} ${message}`.toLowerCase()
 
@@ -904,14 +1210,33 @@ function mapRegisterServerErrorToField(error: unknown, message: string): string 
   return null
 }
 
+function mapRegisterValidationCodeToField(errorCode: string): string | null {
+  if (errorCode.includes("username")) return "username"
+  if (errorCode.includes("email") || errorCode.includes("company_email")) return "companyEmail"
+  if (errorCode.includes("first_name")) return "firstName"
+  if (errorCode.includes("last_name")) return "lastName"
+  if (errorCode.includes("company_type")) return "companyType"
+  if (errorCode.includes("company_name")) return "companyName"
+  if (errorCode.includes("job_title")) return "jobTitle"
+  if (errorCode.includes("phone_country")) return "phoneCountryCode"
+  if (errorCode.includes("phone_number")) return "phoneNumber"
+  if (errorCode.includes("interested_asset")) return "interestedAssetTypes"
+  if (errorCode.includes("image_quantity")) return "imageQuantityRange"
+  if (errorCode.includes("image_quality")) return "imageQualityPreference"
+  if (errorCode.includes("password")) return "password"
+  return null
+}
+
 function mapSignInServerErrorToField(error: unknown, message: string): string | null {
   const errorCode = readErrorCode(error).toLowerCase()
   if (errorCode === "invalid_credential" || errorCode === "invalid_credentials") return "identifier"
 
   const combined = `${errorCode} ${message}`.toLowerCase()
-  if (combined.includes("username")) return "identifier"
-  if (combined.includes("email")) return "identifier"
+  if (combined.includes("invalid_credentials") || combined.includes("invalid credential")) return "identifier"
+  if (combined.includes("invalid username or password")) return "identifier"
+  if (errorCode === "invalid_username") return "identifier"
   if (combined.includes("credential")) return "identifier"
+  if (combined.includes("email") && !combined.includes("invalid_credentials")) return "identifier"
   if (combined.includes("password")) return "password"
 
   return null
@@ -992,6 +1317,9 @@ function getNestedValue(target: unknown, path: string) {
 }
 
 const inputClassName =
-  "h-11 w-full border border-border bg-white px-3 text-sm text-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-0 aria-[invalid=true]:border-red-600"
+  "h-11 w-full border border-border bg-white px-3 text-sm text-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-0"
+
+const inputErrorClassName =
+  "h-11 w-full border border-red-500 bg-red-50/40 px-3 text-sm text-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground focus:border-red-600 focus:ring-0"
 
 const labelClassName = "fc-label text-xs uppercase tracking-[0.11em] text-foreground"

@@ -2,41 +2,41 @@
 
 /* ── Design tokens ──────────────────────────────────────────── */
 :root {
-  /* Semantic colors */
+  /* Semantic colors (Wired B&W editorial style overrides) */
   --background: #ffffff;
-  --foreground: #0d0f1a;
+  --foreground: #000000;
 
   --card: #ffffff;
-  --card-foreground: #0d0f1a;
+  --card-foreground: #000000;
 
   --muted: #ede9e0;
-  --muted-foreground: #6b7280;
-  --foreground-caption: #9ca3af;
+  --muted-foreground: #757575;
+  --foreground-caption: #757575;
 
-  --border: #e5dfd3;
-  --input: #e5dfd3;
-  --ring: #1a2540;
-  --border-subtle: #ede9e0;
-  --border-strong: #c9c0b0;
+  --border: #e0e0e0;
+  --input: #e0e0e0;
+  --ring: #000000;
+  --border-subtle: #f5f5f5;
+  --border-strong: #000000;
 
-  --primary: #1a2540;
-  --primary-hover: #131c31;
-  --primary-muted: #263460;
-  --primary-wash: #eef1f8;
+  --primary: #000000;
+  --primary-hover: #1a1a1a;
+  --primary-muted: #111111;
+  --primary-wash: #f5f5f5;
   --primary-foreground: #ffffff;
 
-  --secondary: #f4f5f7;
-  --secondary-foreground: #1a2540;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #000000;
 
-  --accent: #c07c0a;
-  --accent-hover: #9a6108;
-  --accent-mid: #f0c96b;
-  --accent-wash: #fdf4e3;
+  --accent: #000000;
+  --accent-hover: #1a1a1a;
+  --accent-mid: #000000;
+  --accent-wash: #f5f5f5;
   --accent-foreground: #ffffff;
-  /* Soft CTA surface — light amber fill for download / secondary licensing actions */
-  --accent-soft: #fdf4e3;
-  --accent-soft-foreground: #7a4d06;
-  --accent-soft-border: rgba(192, 124, 10, 0.28);
+  /* Soft CTA surface — light grey fill for secondary licensing actions */
+  --accent-soft: #f5f5f5;
+  --accent-soft-foreground: #000000;
+  --accent-soft-border: #e0e0e0;
 
   --destructive: #b91c1c;
   --destructive-light: #fef2f2;
@@ -46,20 +46,20 @@
 
   /* Nav surface */
   --nav: #ffffff;
-  --nav-foreground: #111827;
+  --nav-foreground: #000000;
 
   /* Marketing surfaces */
-  --surface-warm: #faf8f5;
-  --surface-stone: #f3efe8;
+  --surface-warm: #ffffff;
+  --surface-stone: #f5f5f5;
   --surface-elevated: #ffffff;
-  --hero-tint: #f5f3ff;
-  --foreground-body: #4b5563;
+  --hero-tint: #ffffff;
+  --foreground-body: #000000;
 
-  /* Radius */
-  --radius: 0.5rem;
-  --radius-sm: 0.25rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
+  /* Radius overrides (Square geometry) */
+  --radius: 0px;
+  --radius-sm: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 }
 
 .contributor-dark-theme {
@@ -182,10 +182,10 @@
   --color-surface-elevated: var(--surface-elevated);
   --color-hero-tint: var(--hero-tint);
 
-  --font-body: var(--font-monument-grotesk);
+  --font-body: var(--font-lora);
   --font-heading: var(--font-playfair-display);
-  --font-brand: var(--font-monument-grotesk);
-  --font-sans: var(--font-body);
+  --font-brand: var(--font-playfair-display);
+  --font-sans: var(--font-monument-grotesk);
 
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius);
@@ -334,4 +334,157 @@ h6 {
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+/* ── Typography & Layout Classes (design.md Wired style) ────── */
+.fc-display-hero {
+  font-family: var(--font-heading), serif;
+  font-size: 64px;
+  font-weight: 400;
+  line-height: 59.5px;
+  letter-spacing: -0.5px;
+}
+
+.fc-display-lg {
+  font-family: var(--font-heading), serif;
+  font-size: 48px;
+  font-weight: 400;
+  line-height: 50.4px;
+  letter-spacing: -0.4px;
+}
+
+.fc-display-md {
+  font-family: var(--font-heading), serif;
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 35.2px;
+  letter-spacing: -0.3px;
+}
+
+.fc-display-sm {
+  font-family: var(--font-heading), serif;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 28px;
+  letter-spacing: 0px;
+}
+
+.fc-display-xs {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 24px;
+  letter-spacing: -0.28px;
+  text-transform: uppercase;
+}
+
+.fc-body-serif-lg {
+  font-family: var(--font-body), serif;
+  font-size: 19px;
+  font-weight: 400;
+  line-height: 27.93px;
+  letter-spacing: 0.108px;
+}
+
+.fc-body-serif-md {
+  font-family: var(--font-body), serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+  letter-spacing: 0.09px;
+}
+
+.fc-body-sans {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 20px;
+  letter-spacing: 0px;
+}
+
+.fc-body-sans-strong {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 22px;
+  letter-spacing: -0.144px;
+}
+
+.fc-body-sans-sm {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 18px;
+  letter-spacing: 0.4px;
+}
+
+.fc-byline {
+  font-family: var(--font-body), serif;
+  font-size: 12.73px;
+  font-weight: 700;
+  line-height: 28px;
+  letter-spacing: 0.108px;
+}
+
+.fc-caption-sans {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  letter-spacing: 0px;
+}
+
+/* Square inputs and buttons defaults override */
+button,
+input,
+select,
+textarea,
+a.button-primary-square,
+a.button-outline-square {
+  border-radius: 0px !important;
+}
+
+.button-primary-square {
+  background-color: #000000;
+  color: #ffffff;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+  letter-spacing: 0.3px;
+  padding: 12px 20px;
+  border-radius: 0px !important;
+  border: 1px solid #000000;
+  text-align: center;
+  transition: background-color 150ms;
+}
+.button-primary-square:hover {
+  background-color: #1a1a1a;
+}
+
+.button-outline-square {
+  background-color: #ffffff;
+  color: #000000;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+  letter-spacing: 0.3px;
+  padding: 12px 20px;
+  border-radius: 0px !important;
+  border: 1px solid #000000;
+  text-align: center;
+  transition: background-color 150ms;
+}
+.button-outline-square:hover {
+  background-color: #f5f5f5;
+}
+
+.link-inline-blue {
+  color: #057dbc;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.link-inline-blue:hover {
+  color: #046699;
 }

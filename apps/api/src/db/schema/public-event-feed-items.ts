@@ -25,5 +25,8 @@ export const publicEventFeedItems = pgTable(
     index("public_event_feed_items_public_created_idx")
       .on(table.createdAt, table.eventId)
       .where(sql`${table.isPublic} = true`),
+    index("public_event_feed_items_public_event_date_idx")
+      .on(table.eventDate, table.eventId)
+      .where(sql`${table.isPublic} = true and ${table.eventDate} is not null`),
   ],
 )

@@ -137,12 +137,25 @@ export function StaffCaptionsEditor({ asset, filters, onSaveAndNext, onSkip, onP
           </div>
 
           <form id="caption-form" onSubmit={handleSubmit} className="space-y-5">
+            <input type="hidden" name="description" value={asset.description ?? ""} />
+            <input type="hidden" name="contributorId" value={asset.contributor?.id ?? ""} />
+
             {error && (
               <div className="p-3 text-sm text-destructive bg-destructive/10 rounded border border-destructive/20">
                 {error}
               </div>
             )}
             
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Who is in picture?</label>
+              <Input
+                name="whoIsInPicture"
+                defaultValue={asset.whoIsInPicture || ""}
+                placeholder="Names or subjects visible in the image..."
+                className={!asset.whoIsInPicture ? "border-amber-500/50 focus-visible:ring-amber-500" : ""}
+              />
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-sm font-semibold">Title (Headline)</label>
               <Input 

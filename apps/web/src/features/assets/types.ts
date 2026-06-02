@@ -16,6 +16,7 @@ export interface PublicAssetEvent {
   name: string | null
   eventDate: string | null
   location: string | null
+  assetCount?: number
 }
 
 export interface PublicAssetContributor {
@@ -112,12 +113,40 @@ export interface PublicEventListResponse {
   items: PublicEvent[]
 }
 
+export interface PublicSearchEventResult {
+  eventId: string
+  eventTitle: string | null
+  eventDate: string | null
+  eventLocation: string | null
+  matchingAssetCount: number
+  representativeAssetId: string
+  previewUrl: string | null
+  previewWidth: number | null
+  previewHeight: number | null
+}
+
+export interface PublicSearchEventsResponse {
+  query: string
+  page: number
+  limit: number
+  foundEvents: number
+  totalPages: number
+  hasMore: boolean
+  items: PublicSearchEventResult[]
+  timing?: {
+    backend: "typesense"
+    tookMs: number
+  }
+}
+
 export interface PublicHomepageEvent {
   id: string
   title: string
   slug?: string | null
   eventDate?: string | null
   createdAt: string
+  location?: string | null
+  categoryName?: string | null
   assetCount: number
   previewUrl: string
   previewWidth?: number | null
@@ -166,6 +195,23 @@ export type PublicHomepageFeedResult =
   | { ok: true; feed: PublicHomepageFeed; durationMs: number }
   | { ok: false; error: string; code?: string; status?: number; durationMs: number }
 
+export interface PublicHomepageHeroSetItem {
+  slot: number
+  assetId: string
+  fotokey: string | null
+  title: string
+  eventId: string | null
+  eventName: string | null
+  previewUrl: string
+}
+
+export interface PublicHomepageHeroSetResponse {
+  setKey: string | null
+  activeFrom: string | null
+  activeUntil: string | null
+  items: PublicHomepageHeroSetItem[]
+}
+
 export interface PublicAssetListParams {
   q?: string
   categoryId?: string
@@ -180,4 +226,13 @@ export interface PublicAssetListParams {
   page?: number
   limit?: number
   sort?: PublicAssetSort
+  includeFacets?: boolean
+}
+
+export type PublicLatestEventsSection = "latest" | "news" | "sports" | "entertainment" | "retro"
+export type PublicEventBrowseSection = Exclude<PublicLatestEventsSection, "latest">
+
+export interface PublicEventCategoryBrowseResponse extends PublicLatestEventsResponse {
+  section: PublicEventBrowseSection
+  limit: number
 }

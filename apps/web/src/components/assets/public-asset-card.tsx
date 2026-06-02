@@ -16,6 +16,7 @@ interface PublicAssetCardProps {
   gridLayout?: PublicAssetGridLayout
   className?: string
   priority?: boolean
+  detailHref?: string
 }
 
 export function PublicAssetCard({
@@ -24,11 +25,12 @@ export function PublicAssetCard({
   gridLayout = "intrinsic",
   className,
   priority = false,
+  detailHref,
 }: PublicAssetCardProps) {
   const preview = asset.previews.card ?? asset.previews.thumb
   const eventTitle = getAssetEventTitle(asset)
   const imageAlt = getAssetImageAlt(asset)
-  const href = `/assets/${asset.id}`
+  const href = detailHref ?? `/assets/${asset.id}`
   const isJustifiedGrid = variant === "grid" && gridLayout === "justified"
   const gridFrameStyle =
     variant === "grid" && gridLayout === "intrinsic"
@@ -78,6 +80,7 @@ export function PublicAssetCard({
 
         <Link
           href={href}
+          prefetch
           aria-label={eventTitle ? `View ${eventTitle}` : "View image"}
           className="absolute inset-0 z-10 rounded-[inherit] outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
         />
@@ -103,6 +106,7 @@ export function PublicAssetCard({
         <div className="flex min-w-0 flex-col justify-center gap-2 p-4">
           <Link
             href={href}
+            prefetch
             className="line-clamp-2 text-sm font-medium leading-5 text-foreground hover:underline"
           >
             {eventTitle ?? asset.caption}
@@ -123,6 +127,7 @@ export function PublicAssetCard({
           </div>
           <Link
             href={href}
+            prefetch
             className="line-clamp-3 text-xl font-medium leading-tight tracking-normal text-foreground hover:underline"
           >
             {eventTitle ?? asset.caption}

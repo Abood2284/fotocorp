@@ -25,8 +25,10 @@ Entry point for the database revamp: clean catalog tables, photographer flows, i
 | [Legacy → clean schema map](./legacy-to-clean-schema-map.md) | Old vs new table/field mapping | Import debugging, migrations, data reasoning |
 | [Validation runbook](./validation-runbook.md) | `pnpm --dir apps/api db:validate:*` commands | After migrations, import, sync, upload, or publish changes |
 | [Import / clean sync runbook](./import-sync-runbook.md) | Legacy import + `legacy:sync-clean-schema` | After CSV/chunk imports or when clean tables drift |
+| [Legacy event linking repair runbook](./legacy-event-linking-repair-runbook.md) | Re-import failed `eventtb` rows, backfill `event_id`, sync, reindex | Missing events on public/admin catalog; post–2020 grouping broken |
 | [Photographer auth runbook](./photographer-auth-runbook.md) | Accounts, sessions, portal auth boundary | Auth/session work, credential CSV handling |
 | [Staff auth runbook](./staff-auth-runbook.md) | Staff accounts/sessions, internal dashboard cookie, bootstrap | Internal `/admin` access, staff login/logout |
+| [Auth & identity revamp migration spec](./auth-identity-revamp-migration-spec.md) | Unified auth schema, contributor asset-owner migration (96→93), dedupe, BA removal plan | **P0–P9 applied** on Development; one-time scripts/reports removed from repo |
 | [Photographer upload runbook](./photographer-upload-runbook.md) | Events, batches, staging, submit semantics | Upload API/UI or staging bucket work |
 | [Fotokey / publish pipeline](./fotokey-publish-pipeline.md) | Fotokey rules, R2 buckets, go-live gating | Approval queue, publish jobs, derivatives |
 | [Media pipeline operations (temporary)](./media-pipeline-operations.md) | One-time derivative migration status + generation commands | Production cutover prep and derivative backlog burn-down |
@@ -57,6 +59,7 @@ Detailed PR write-ups live under [`reports/`](./reports/). They are kept for aud
 | [fotokey-publish-pipeline-report.md](./reports/fotokey-publish-pipeline-report.md) | PR-15.1 Fotokey + publish |
 | [pr-16i-asset-category-canonicalization-report.md](./reports/pr-16i-asset-category-canonicalization-report.md) | PR-16I public Fotokey + category model |
 | [pr-16e-jobs-docker-vps-deployment-report.md](./reports/pr-16e-jobs-docker-vps-deployment-report.md) | PR-16E jobs Docker + VPS |
+| [schema-legacy-duplication-audit-report.md](./reports/schema-legacy-duplication-audit-report.md) | Legacy vs clean schema audit, headline/log duplication, deprecation plan |
 
 > **Note:** `image-runtime-compatibility-spike-report.md` and `image-runtime-fallback-spike-report.md` are reserved names for future spikes if checked in; they are not present in the repo today.
 

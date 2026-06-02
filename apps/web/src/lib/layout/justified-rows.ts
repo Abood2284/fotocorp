@@ -23,6 +23,8 @@ export interface JustifiedLayoutRow {
   key: string
   height: number
   items: JustifiedLayoutTile[]
+  /** False when the row keeps natural tile widths and may leave trailing space. */
+  justified: boolean
 }
 
 const DEFAULT_ASPECT_RATIO = 4 / 3
@@ -74,11 +76,15 @@ export function computeJustifiedRows(
     }
 
     const isLastRow = index >= items.length
-    rows.push(buildJustifiedRow(rowItems, containerWidth, gap, isLastRow, {
-      targetRowHeight,
-      minRowHeight,
-      justifyLastRow,
-    }))
+    const rowWidthAtTarget =
+      aspectRatioSum * targetRowHeight + Math.max(0, rowItems.length - 1) * gap
+    rows.push(
+      buildJustifiedRow(rowItems, containerWidth, gap, isLastRow, rowWidthAtTarget, {
+        targetRowHeight,
+        minRowHeight,
+        justifyLastRow,
+      }),
+    )
   }
 
   return rows
@@ -110,14 +116,15 @@ function wouldNarrowestTileBeTooSmall(
 }
 
 /**
- * Sizes every row edge-to-edge: sum(tile widths) + gaps === containerWidth.
- * Height is derived from aspect ratios only (no clamping that leaves trailing space).
+ * Full rows stretch edge-to-edge. The last row keeps natural tile widths at target height
+ * when it would not fill the container, leaving trailing space instead of oversized tiles.
  */
 function buildJustifiedRow(
   rowItems: JustifiedLayoutItem[],
   containerWidth: number,
   gap: number,
   isLastRow: boolean,
+  rowWidthAtTarget: number,
   options: Pick<JustifiedRowsOptions, "targetRowHeight" | "minRowHeight" | "justifyLastRow">,
 ) {
   const itemCount = rowItems.length
@@ -125,16 +132,31 @@ function buildJustifiedRow(
   const availableWidth = Math.max(0, containerWidth - gaps)
   const aspectRatioSum = rowItems.reduce((sum, item) => sum + item.aspectRatio, 0)
 
+  const partialLastRow =
+    isLastRow && (!options.justifyLastRow || rowWidthAtTarget < containerWidth)
+
+  if (partialLastRow) {
+    const height = options.targetRowHeight
+    const items = rowItems.map((item) => ({
+      id: item.id,
+      width: Math.round(item.aspectRatio * height),
+      height,
+    }))
+
+    return {
+      key: rowItems.map((item) => item.id).join("-"),
+      height,
+      items,
+      justified: false,
+    }
+  }
+
   let height =
     aspectRatioSum > 0
       ? availableWidth / aspectRatioSum
       : options.targetRowHeight
 
-  if (isLastRow && !options.justifyLastRow) {
-    height = options.targetRowHeight
-  } else {
-    height = Math.max(options.minRowHeight, height)
-  }
+  height = Math.max(options.minRowHeight, height)
 
   const tiles: JustifiedLayoutTile[] = []
   let usedWidth = 0
@@ -154,6 +176,7 @@ function buildJustifiedRow(
     key: rowItems.map((item) => item.id).join("-"),
     height,
     items: tiles,
+    justified: true,
   }
 }
 
