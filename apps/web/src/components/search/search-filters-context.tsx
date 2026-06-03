@@ -27,7 +27,7 @@ export function SearchFiltersProvider({
 }) {
   const [state, setState] = useState({
     filters: initialFilters ?? EMPTY_FILTERS,
-    isLoading: !hasPopulatedAssetFilters(initialFilters),
+    isLoading: false,
   })
 
   const mergeFilters = useCallback((filters: PublicAssetFiltersResponse) => {

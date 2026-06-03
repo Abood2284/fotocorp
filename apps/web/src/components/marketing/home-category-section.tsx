@@ -7,9 +7,8 @@ import Link from "next/link"
 
 import { PublicEventsGrid } from "@/components/assets/public-events-grid"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
-import { fetchPublicEventCategoryBrowse, fetchPublicLatestEvents } from "@/lib/api/fotocorp-api"
+import { fetchPublicEventCategoryBrowse, fetchPublicLatestEvents, fetchRoyaltyFreeFeaturedAssets } from "@/lib/api/fotocorp-api"
 import type {
-  PublicAsset,
   PublicEvent,
   PublicEventBrowseSection,
   PublicHomepageEvent,
@@ -22,13 +21,14 @@ type EditorialSubcategory = "Latest" | "News" | "Sports" | "Entertainment" | "Re
 type LoadState = "loading" | "ready" | "error"
 
 interface HomeCategorySectionProps {
-  initialTab?: "Editorial" | "Creative"
-  royaltyFreeAssets?: PublicAsset[]
+  initialTab?: "Editorial"
 }
 
 const LATEST_EVENTS_LIMIT = 15
 const CATEGORY_BROWSE_EVENTS_LIMIT = 25
 const RECENT_EVENTS_WINDOW_DAYS = 30
+const ROYALTY_FREE_FEATURED_LIMIT = 50
+const ROYALTY_FREE_FEATURED_STALE_MS = 86_400_000
 
 const EDITORIAL_SECTIONS: Record<EditorialSubcategory, PublicLatestEventsSection> = {
   Latest: "latest",
@@ -107,13 +107,10 @@ async function fetchHomepageEventsSection(section: PublicLatestEventsSection): P
   return { response, mode: "category-browse" }
 }
 
-export function HomeCategorySection({
-  initialTab = "Editorial",
-  royaltyFreeAssets = [],
-}: HomeCategorySectionProps) {
+export function HomeCategorySection(_props: HomeCategorySectionProps = {}) {
   const sectionRef = useRef<HTMLElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [activeTab, setActiveTab] = useState<TabType>(initialTab === "Creative" ? "Creative" : "Editorial")
+  const [activeTab, setActiveTab] = useState<TabType>("Editorial")
   const [editorialSub, setEditorialSub] = useState<EditorialSubcategory>("Latest")
   const selectedSection = EDITORIAL_SECTIONS[editorialSub]
   const [eventPageItems, setEventPageItems] = useState<PublicHomepageEvent[]>([])
@@ -133,14 +130,20 @@ export function HomeCategorySection({
     refetchOnWindowFocus: false,
   })
   const baseEventData = eventQuery.data
-
-  useEffect(() => {
-    if (initialTab !== "Creative") return
-    setActiveTab("Creative")
-    requestAnimationFrame(() => {
-      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-    })
-  }, [initialTab])
+  const royaltyFreeQuery = useQuery({
+    queryKey: ["homepage", "royalty-free-featured", ROYALTY_FREE_FEATURED_LIMIT],
+    queryFn: () => fetchRoyaltyFreeFeaturedAssets({ limit: ROYALTY_FREE_FEATURED_LIMIT }),
+    enabled: activeTab === "Creative",
+    staleTime: ROYALTY_FREE_FEATURED_STALE_MS,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+  })
+  const royaltyFreeAssets = royaltyFreeQuery.data?.items ?? []
+  const royaltyFreeState: LoadState = royaltyFreeQuery.isError
+    ? "error"
+    : royaltyFreeQuery.isFetching && royaltyFreeAssets.length === 0
+      ? "loading"
+      : "ready"
 
   useEffect(() => {
     setEventPageItems([])
@@ -202,7 +205,7 @@ export function HomeCategorySection({
   }
 
   const handleTabClick = (tab: TabType) => {
-    if (tab === "Video" || tab === "Caricature") return
+    if (tab === "Video" || tab === "Caricature" || tab === "Creative") return
     setActiveTab(tab)
   }
 
@@ -245,12 +248,8 @@ export function HomeCategorySection({
             Caricature
           </button>
           <button
-            onClick={() => handleTabClick("Creative")}
-            className={`pb-1.5 transition-all cursor-pointer ${
-              activeTab === "Creative"
-                ? "border-b-2 border-black text-black font-bold"
-                : "border-b-2 border-transparent text-muted-foreground hover:text-black"
-            }`}
+            disabled
+            className="cursor-not-allowed border-b-2 border-transparent pb-1.5 text-muted-foreground/50"
           >
             Royalty Free
           </button>
@@ -283,7 +282,6 @@ export function HomeCategorySection({
               hasMore={hasMoreEventPages}
               loadingMore={loadingMoreEvents}
               onLoadMore={loadMoreEvents}
-              onShowCreative={() => setActiveTab("Creative")}
               onShowLatest={() => {
                 setActiveTab("Editorial")
                 setEditorialSub("Latest")
@@ -362,8 +360,11 @@ export function HomeCategorySection({
             </div>
 
             <div className="mt-1 w-full">
-              {royaltyFreeAssets.length === 0 ? (
+              {royaltyFreeState === "loading" ? (
+                <SectionSkeleton featuredGrid />
+              ) : royaltyFreeState === "error" || royaltyFreeAssets.length === 0 ? (
                 <RoyaltyFreeEmptyState
+                  error={royaltyFreeState === "error"}
                   onShowLatest={() => {
                     setActiveTab("Editorial")
                     setEditorialSub("Latest")
@@ -389,7 +390,6 @@ function LatestEventsPanel({
   hasMore,
   loadingMore,
   onLoadMore,
-  onShowCreative,
   onShowLatest,
   state,
   sectionLabel,
@@ -398,7 +398,6 @@ function LatestEventsPanel({
   hasMore: boolean
   loadingMore: boolean
   onLoadMore: () => void
-  onShowCreative: () => void
   onShowLatest: () => void
   state: LoadState
   sectionLabel: EditorialSubcategory
@@ -419,7 +418,6 @@ function LatestEventsPanel({
     return (
       <EditorialEmptyState
         sectionLabel={sectionLabel}
-        onShowCreative={onShowCreative}
         onShowLatest={onShowLatest}
       />
     )
@@ -445,21 +443,19 @@ function LatestEventsPanel({
 }
 
 function EditorialEmptyState({
-  onShowCreative,
   onShowLatest,
   sectionLabel,
 }: {
-  onShowCreative: () => void
   onShowLatest: () => void
   sectionLabel: EditorialSubcategory
 }) {
   const isLatest = sectionLabel === "Latest"
-  const browseHref = isLatest ? "/search?sort=newest" : `/search?q=${encodeURIComponent(sectionLabel)}`
+  const browseHref = isLatest ? "/search?mode=events" : `/search?q=${encodeURIComponent(sectionLabel)}`
   const title = isLatest
     ? "No recent Editorial events yet."
     : `No ${sectionLabel} events found.`
   const description = isLatest
-    ? "View the latest image coverage or explore royalty-free picks."
+    ? "View the latest image coverage or browse editorial categories."
     : `Browse all ${sectionLabel} images or view latest Editorial coverage.`
 
   return (
@@ -479,13 +475,6 @@ function EditorialEmptyState({
             View Latest Editorial
           </button>
         )}
-        <button
-          type="button"
-          onClick={onShowCreative}
-          className="button-outline-square px-5 py-3 text-xs uppercase tracking-wider"
-        >
-          Explore Royalty-Free Picks
-        </button>
       </div>
     </div>
   )

@@ -71,7 +71,6 @@ interface ShellProps extends HeaderProps {
   pathname: string
   sortParam: string | null
   modeParam: string | null
-  tabParam: string | null
   categoryIdParam: string | null
 }
 
@@ -80,13 +79,13 @@ const BROWSE_NAV_TRIGGER_CLASS =
   "flex items-center gap-1 px-3 py-2 font-sans text-sm font-medium transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
 const EDITORIAL_LINKS: HeaderLink[] = [
+  { label: "Latest", href: "/search?mode=events" },
   { label: "Entertainment", href: "/categories/entertainment" },
   { label: "News", href: "/categories/news" },
   { label: "Fashion", href: "/categories/fashion" },
   { label: "Sports", href: "/categories/sports" },
   { label: "Business", href: "/categories/business" },
   { label: "Retro", href: "/categories/retro" },
-  { label: "Royalty Free", href: "/?tab=royalty-free" },
 ]
 
 type BrowseDropdownId = "editorial" | "video" | "caricature"
@@ -112,7 +111,6 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
       pathname={pathname}
       sortParam={searchParams.get("sort")}
       modeParam={searchParams.get("mode")}
-      tabParam={searchParams.get("tab")}
       categoryIdParam={searchParams.get("categoryId") ?? searchParams.get("category")}
     />
   )
@@ -126,7 +124,6 @@ function HeaderStatic({ userProfile, staffBrief }: HeaderProps) {
       pathname="/"
       sortParam={null}
       modeParam={null}
-      tabParam={null}
       categoryIdParam={null}
     />
   )
@@ -138,7 +135,6 @@ function HeaderShell({
   pathname,
   sortParam,
   modeParam,
-  tabParam,
   categoryIdParam,
 }: ShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -184,8 +180,7 @@ function HeaderShell({
     setOpenDropdown(id)
   }
 
-  const editorialActive = isEditorialNavActive(pathname, categoryIdParam)
-  const royaltyFreeActive = isRoyaltyFreeNavActive(pathname, tabParam)
+  const editorialActive = isEditorialNavActive(pathname, categoryIdParam, modeParam)
 
   return (
     <header
@@ -223,11 +218,7 @@ function HeaderShell({
             onCloseSchedule={scheduleCloseDropdown}
             onCloseCancel={cancelCloseDropdown}
           />
-          <BrowseNavLink
-            label="Royalty Free"
-            href="/?tab=royalty-free"
-            active={royaltyFreeActive}
-          />
+          <BrowseNavDisabled label="Royalty Free" />
           <RoleMainLinks
             userProfile={userProfile}
             staffBrief={staffBrief}
@@ -238,17 +229,6 @@ function HeaderShell({
         </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-4 sm:gap-6">
-          <Link
-            href="/fotobox"
-            className={cn(
-              NAV_LABEL_CLASS,
-              "hidden items-center gap-2 text-muted-foreground transition-colors hover:text-foreground lg:flex",
-            )}
-          >
-            <Archive size={14} />
-            Fotobox
-          </Link>
-
           <div className="hidden lg:flex">
             <AccountMenu userProfile={userProfile} staffBrief={staffBrief} />
           </div>
@@ -321,7 +301,7 @@ function HeaderShell({
           className="mx-auto grid max-w-[1600px] gap-6 px-4 py-5 sm:px-6"
           aria-label="Mobile navigation"
         >
-          <MobileBrowseNav pathname={pathname} tabParam={tabParam} />
+          <MobileBrowseNav pathname={pathname} sortParam={sortParam} modeParam={modeParam} />
           <MobileRoleLinks
             userProfile={userProfile}
             staffBrief={staffBrief}
@@ -336,18 +316,15 @@ function HeaderShell({
   )
 }
 
-function BrowseNavLink({ label, href, active }: { label: string; href: string; active: boolean }) {
+function BrowseNavDisabled({ label }: { label: string }) {
   return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        BROWSE_NAV_TRIGGER_CLASS,
-        active ? "text-foreground" : "text-muted-foreground",
-      )}
+    <span
+      className={cn(BROWSE_NAV_TRIGGER_CLASS, "cursor-not-allowed text-muted-foreground/50")}
+      aria-disabled="true"
+      title="Coming soon"
     >
       {label}
-    </Link>
+    </span>
   )
 }
 
@@ -413,9 +390,15 @@ function BrowseDropdownPanel({
   )
 }
 
-function MobileBrowseNav({ pathname, tabParam }: { pathname: string; tabParam: string | null }) {
-  const royaltyFreeActive = isRoyaltyFreeNavActive(pathname, tabParam)
-
+function MobileBrowseNav({
+  pathname,
+  sortParam,
+  modeParam,
+}: {
+  pathname: string
+  sortParam: string | null
+  modeParam: string | null
+}) {
   return (
     <section>
       <h2 className="mb-2 font-sans text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Browse</h2>
@@ -428,8 +411,8 @@ function MobileBrowseNav({ pathname, tabParam }: { pathname: string; tabParam: s
                 key={link.href + link.label}
                 link={link}
                 pathname={pathname}
-                sortParam={null}
-                modeParam={null}
+                sortParam={sortParam}
+                modeParam={modeParam}
               />
             ))}
           </div>
@@ -441,16 +424,9 @@ function MobileBrowseNav({ pathname, tabParam }: { pathname: string; tabParam: s
           <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
             Caricature — Coming soon
           </span>
-          <Link
-            href="/?tab=royalty-free"
-            aria-current={royaltyFreeActive ? "page" : undefined}
-            className={cn(
-              "border-l-2 px-3 py-2 font-sans text-xs font-medium transition-colors hover:bg-secondary hover:text-foreground",
-              royaltyFreeActive ? "border-foreground bg-secondary text-foreground" : "border-transparent text-muted-foreground",
-            )}
-          >
-            Royalty Free
-          </Link>
+          <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
+            Royalty Free — Coming soon
+          </span>
         </div>
       </div>
     </section>
@@ -733,7 +709,7 @@ function MobileRoleLinks({
   const subscriber = isActiveSubscriber(userProfile)
   const accountLinks: HeaderLink[] = [
     { label: "My account", href: "/account" },
-    { label: "Fotobox", href: "/fotobox" },
+    { label: "My Fotobox", href: "/account/fotobox" },
     subscriber ? { label: "Downloads", href: "/account/downloads" } : { label: "Subscription", href: "/account/subscription" },
   ]
 
@@ -973,14 +949,11 @@ function isActiveSubscriber(userProfile: HeaderUserProfile) {
   return userProfile.isSubscriber && userProfile.subscriptionStatus === "ACTIVE"
 }
 
-function isEditorialNavActive(pathname: string, categoryIdParam: string | null) {
+function isEditorialNavActive(pathname: string, categoryIdParam: string | null, modeParam: string | null) {
   if (pathname === "/search" && categoryIdParam) return true
+  if (pathname === "/search" && modeParam?.toLowerCase() === "events") return true
   if (pathname.startsWith("/categories/")) return true
   return false
-}
-
-function isRoyaltyFreeNavActive(pathname: string, tabParam: string | null) {
-  return pathname === "/" && tabParam?.toLowerCase() === "royalty-free"
 }
 
 function isActivePath(pathname: string, href: string, sortParam: string | null, modeParam: string | null) {
@@ -989,13 +962,10 @@ function isActivePath(pathname: string, href: string, sortParam: string | null, 
 
   if (pathname === "/search") {
     if (href === "/search?mode=events") {
-      return normalizedMode === "events"
+      return normalizedMode === "events" || normalizedSort === "latest"
     }
     if (href === "/search") {
-      return normalizedMode !== "events"
-    }
-    if (href === "/search?sort=latest") {
-      return normalizedMode !== "events" && normalizedSort === "latest"
+      return normalizedMode !== "events" && normalizedSort !== "latest"
     }
   }
 

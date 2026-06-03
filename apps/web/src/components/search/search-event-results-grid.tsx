@@ -3,7 +3,7 @@ import Link from "next/link"
 
 import { PreviewImage } from "@/components/assets/preview-image"
 import type { PublicSearchEventResult } from "@/features/assets/types"
-import { formatInteger } from "@/lib/utils"
+import { cn, formatInteger } from "@/lib/utils"
 
 interface SearchEventResultsGridProps {
   events: PublicSearchEventResult[]
@@ -14,7 +14,10 @@ export function SearchEventResultsGrid({ events }: SearchEventResultsGridProps) 
 
   return (
     <div className="grid w-full grid-cols-1 gap-[1px] bg-background sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-[280px] sm:auto-rows-[320px]">
-      {events.map((event) => (
+      {events.map((event) => {
+        const eventDateLabel = formatEventDate(event.eventDate)
+
+        return (
         <Link
           key={event.eventId}
           href={`/assets/${event.representativeAssetId}`}
@@ -40,17 +43,26 @@ export function SearchEventResultsGrid({ events }: SearchEventResultsGridProps) 
           )}
 
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-5 pt-16">
-            <h3 className="line-clamp-2 text-lg font-medium leading-snug text-white">
+            {eventDateLabel && (
+              <time
+                dateTime={event.eventDate ?? undefined}
+                className="block line-clamp-1 text-sm font-medium text-white"
+              >
+                {eventDateLabel}
+              </time>
+            )}
+            <h3 className={cn("line-clamp-2 text-lg font-medium leading-snug text-white", eventDateLabel && "mt-1")}>
               {event.eventTitle || "Untitled event"}
             </h3>
-            {(event.eventDate || event.eventLocation) && (
+            {event.eventLocation && (
               <p className="mt-1 line-clamp-1 text-sm text-white/85">
-                {[formatEventDate(event.eventDate), event.eventLocation].filter(Boolean).join(" · ")}
+                {event.eventLocation}
               </p>
             )}
           </div>
         </Link>
-      ))}
+        )
+      })}
     </div>
   )
 }

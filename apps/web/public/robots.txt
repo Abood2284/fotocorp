@@ -1,0 +1,10 @@
+User-agent: *
+Disallow: /api/
+Disallow: /api/public/
+Disallow: /search
+Disallow: /staff/
+Disallow: /contributor/
+Disallow: /assets/*?*
+Allow: /
+
+Sitemap: https://fotocorp.com/sitemap.xml

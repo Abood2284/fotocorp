@@ -36,7 +36,7 @@ export default async function AccountFotoboxPage() {
             <Link href="/search" className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90">
               Search archive
             </Link>
-            <Link href="/search?sort=latest" className="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm font-medium text-foreground hover:bg-muted">
+            <Link href="/search?mode=events" className="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm font-medium text-foreground hover:bg-muted">
               View latest
             </Link>
           </div>

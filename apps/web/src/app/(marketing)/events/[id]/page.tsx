@@ -1,10 +1,10 @@
 import { ArrowRight } from "lucide-react"
 import Link from "next/link"
 
-import { getPublicAssetFilters, listPublicAssets } from "@/lib/api/fotocorp-api"
 import { formatDate } from "@/components/assets/public-asset-card"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
 import { PlaceholderPage } from "@/components/layout/placeholder-page"
+import { listPublicAssets } from "@/lib/api/fotocorp-api"
 
 interface EventDetailPageProps {
   params: Promise<{ id: string }>
@@ -20,12 +20,12 @@ export async function generateMetadata({ params }: EventDetailPageProps) {
 export default async function EventDetailPage({ params }: EventDetailPageProps) {
   const { id } = await params
 
-  const [events, result] = await Promise.all([
-    getPublicAssetFilters().then((response) => response.events).catch(() => []),
-    listPublicAssets({ eventId: id, limit: 18, sort: "newest" }).catch(() => ({ items: [], nextCursor: null })),
-  ])
+  const result = await listPublicAssets({ eventId: id, limit: 18, sort: "newest" }).catch(() => ({
+    items: [],
+    nextCursor: null,
+  }))
 
-  const event = events.find((item) => item.id === id)
+  const event = result.items.find((item) => item.event?.id === id)?.event ?? null
   if (!event && result.items.length === 0) {
     return (
       <PlaceholderPage
@@ -45,9 +45,9 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             {event?.name ?? "Event archive"}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {event?.eventDate ? `${formatDate(event.eventDate)} · ` : ""}{(event?.assetCount ?? result.items.length).toLocaleString()} public images
-          </p>
+          {event?.eventDate ? (
+            <p className="mt-2 text-sm text-muted-foreground">{formatDate(event.eventDate)}</p>
+          ) : null}
         </div>
         <Link
           href={`/search?eventId=${encodeURIComponent(id)}`}

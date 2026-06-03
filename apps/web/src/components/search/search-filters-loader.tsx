@@ -1,17 +1,14 @@
 import type { PublicAssetFiltersResponse } from "@/features/assets/types"
-import { getPublicAssetFilters } from "@/lib/api/fotocorp-api"
+import { getPublicCatalogTaxonomy } from "@/lib/api/fotocorp-api"
 import { SearchFiltersBridge } from "@/components/search/search-filters-bridge"
 
 const EMPTY_FILTERS: PublicAssetFiltersResponse = { categories: [], events: [], cities: [], sources: [] }
 
-export async function SearchFiltersLoader({ includeCounts = true }: { includeCounts?: boolean } = {}) {
+export async function SearchFiltersLoader() {
   const startedAt = Date.now()
 
   try {
-    const filters = await getPublicAssetFilters({
-      cachePolicy: "public-filters-long",
-      includeCounts,
-    })
+    const filters = await getPublicCatalogTaxonomy({ cachePolicy: "public-filters-long" })
     const filtersFetchMs = Date.now() - startedAt
     console.info(
       JSON.stringify({

@@ -2,9 +2,13 @@
 
 import { Archive, Check, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
 import { useState } from "react"
 
+import { FotoboxBoardPicker } from "@/components/assets/fotobox-board-picker"
 import { Button } from "@/components/ui/button"
+import { buildFotoboxAuthPathname } from "@/lib/fotobox-auth-gate"
+import { useSharedAuthSession } from "@/lib/use-shared-auth-session"
 import { cn } from "@/lib/utils"
 
 interface FotoboxSaveButtonProps {
@@ -16,8 +20,6 @@ interface FotoboxSaveButtonProps {
   icon?: React.ReactNode
   iconOnly?: boolean
   hoverLabel?: string
-  /** Placeholder — no API call (e.g. future “Save as” flow). */
-  stub?: boolean
 }
 
 export function FotoboxSaveButton({
@@ -29,40 +31,40 @@ export function FotoboxSaveButton({
   icon,
   iconOnly = false,
   hoverLabel = "save to fotobox",
-  stub = false,
 }: FotoboxSaveButtonProps) {
-  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const router = useRouter()
+  const pathname = usePathname()
+  const { data: session, isPending } = useSharedAuthSession()
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [saved, setSaved] = useState(false)
 
-  async function save(event: React.MouseEvent<HTMLButtonElement>) {
-    event.preventDefault()
-    event.stopPropagation()
-    if (stub) return
-
-    setState("saving")
-    const response = await fetch("/api/fotobox", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assetId }),
-    }).catch(() => null)
-
-    if (response?.ok) {
-      setState("saved")
-      return
-    }
-
-    setState("error")
+  function openAuthGate() {
+    router.push(buildFotoboxAuthPathname(pathname))
   }
 
-  const label = stub ? text : state === "saving" ? "Saving" : state === "saved" ? "Saved to Fotobox" : text
-  const tooltip = stub ? (hoverLabel || "Save as") : hoverLabel
-  const actionIcon =
-    state === "saving" ? (
-      <Loader2 className="animate-spin" size={20} />
-    ) : state === "saved" ? (
-      <Check size={20} />
-    ) : (
-      icon ?? <Archive size={20} />
-    )
+  function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (isPending) return
+    if (!session?.user) {
+      openAuthGate()
+      return
+    }
+    setPickerOpen(true)
+  }
+
+  function handlePickerClose(open: boolean) {
+    setPickerOpen(open)
+    if (!open && session?.user) setSaved(true)
+  }
+
+  const label = saved ? "Saved to Fotobox" : text
+  const tooltip = hoverLabel
+  const actionIcon = saved ? (
+    <Check size={20} />
+  ) : (
+    icon ?? <Archive size={20} />
+  )
 
   return (
     <div className={cn(iconOnly ? "group relative" : "space-y-2", className)}>
@@ -74,13 +76,18 @@ export function FotoboxSaveButton({
           iconOnly ? "h-9 w-9 border-0 p-0" : variant !== "ghost" && "h-11 w-full",
           buttonClassName,
         )}
-        onClick={save}
-        disabled={!stub && (state === "saving" || state === "saved")}
+        onClick={handleClick}
+        disabled={isPending}
         aria-label={iconOnly ? tooltip : label}
+        aria-busy={isPending}
       >
-        {iconOnly ? actionIcon : (
+        {isPending ? (
+          <Loader2 className="animate-spin" size={iconOnly ? 20 : 16} />
+        ) : iconOnly ? (
+          actionIcon
+        ) : (
           <>
-            {state === "saving" ? <Loader2 className="animate-spin mr-2" size={16} /> : state === "saved" ? <Check className="mr-2" size={16} /> : icon ? icon : <Archive className="mr-2" size={16} />}
+            {saved ? <Check className="mr-2" size={16} /> : icon ? icon : <Archive className="mr-2" size={16} />}
             {label}
           </>
         )}
@@ -90,16 +97,18 @@ export function FotoboxSaveButton({
           {tooltip}
         </span>
       )}
-      {!iconOnly && state === "saved" && (
+      {!iconOnly && saved && (
         <Link href="/account/fotobox" className="block text-center text-sm font-medium text-foreground underline underline-offset-4">
           View Fotobox
         </Link>
       )}
-      {state === "error" && (
-        <p className="text-center text-sm text-muted-foreground">
-          Could not save this image. Please try again.
-        </p>
-      )}
+      {session?.user ? (
+        <FotoboxBoardPicker
+          assetId={assetId}
+          open={pickerOpen}
+          onOpenChange={handlePickerClose}
+        />
+      ) : null}
     </div>
   )
 }

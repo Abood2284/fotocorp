@@ -78,7 +78,6 @@ export function AssetPreviewChrome({
           <span className="hidden h-6 w-px bg-border/80 sm:block" aria-hidden />
           <FotoboxSaveButton
             assetId={assetId}
-            stub
             variant="ghost"
             className="m-0 shrink-0"
             buttonClassName="h-9 gap-1.5 rounded-none border border-black bg-black px-4 text-xs font-bold uppercase tracking-wider text-white shadow-none hover:bg-neutral-800 cursor-pointer"

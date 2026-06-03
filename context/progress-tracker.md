@@ -8,7 +8,16 @@ Update this file after every meaningful implementation change.
 
 ## Current Goal
 
-- Staff ops UX **PR-A/B/C** landed (dashboard, dynamic guidance, filters, stepper, close). **PR-D:** P7 contributor apply/approve manual smoke when ready.
+- **Catalog Neon P2C:** `/search` shell-only on first load; filters and search APIs run only after user intent. **robots.txt** blocks crawlers from expensive routes.
+- Staff ops UX **PR-D:** P7 contributor apply/approve manual smoke when ready.
+
+## Completed (recent)
+
+- **Search lazy-load + robots.txt (Neon P2C / bot containment):** Added [`apps/web/public/robots.txt`](../apps/web/public/robots.txt) disallowing `/api/`, `/search`, staff/contributor paths, and query-string asset URLs. `/search` SSR is shell-only (no Typesense/Neon calls). [`search-intent.ts`](../apps/web/src/lib/search/search-intent.ts) gates client fetches; filters load on input focus, filter drawer open, or active search params; search/events queries run only when URL params indicate intent.
+
+- **Public filters P2A/B:** `GET /api/v1/assets/filters` now defaults to taxonomy-only (`includeCounts=true` opt-in). Web adds `getPublicCatalogTaxonomy()`. `/categories`, `/events`, slug redirect, event detail use taxonomy — no aggregate counts, no count labels on category/event browse cards (events show date when available). Event detail derives metadata from `listPublicAssets` results.
+
+- **Homepage filters removal (Neon P1):** Removed blocking SSR chain `getPublicAssetFilters()` → `listPublicAssets()` from [`apps/web/src/app/(marketing)/page.tsx`](../apps/web/src/app/(marketing)/page.tsx). Default `GET /` makes no catalog API calls during SSR. Creative/Royalty Free tab lazy-loads via `fetchRoyaltyFreeFeaturedAssets()` in [`home-category-section.tsx`](../apps/web/src/components/marketing/home-category-section.tsx). API `listPublicRoyaltyFreeFeaturedAssets` now reads `public_royalty_free_featured_items` for current month (empty fallback, no live category scan). Populate featured rows with `pnpm --dir apps/api royalty-free:refresh-featured -- --period YYYY-MM --limit 50`.
 
 ## Staff ops UX (PR-A–C — completed)
 

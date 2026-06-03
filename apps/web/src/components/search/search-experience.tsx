@@ -20,10 +20,11 @@ import {
   SearchFilterPanelSkeleton,
 } from "@/components/search/search-filter-skeletons"
 import { SearchEventResultsGrid } from "@/components/search/search-event-results-grid"
-import { useSearchFilters } from "@/components/search/search-filters-context"
+import { useSearchFilters, hasPopulatedAssetFilters } from "@/components/search/search-filters-context"
 import { Button } from "@/components/ui/button"
 import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
-import { getPublicAssetFilters, isTypesenseSearchEnabled, searchPublicAssets, searchPublicEvents } from "@/lib/api/fotocorp-api"
+import { getPublicCatalogTaxonomy, isTypesenseSearchEnabled, searchPublicAssets, searchPublicEvents } from "@/lib/api/fotocorp-api"
+import { hasSearchIntent } from "@/lib/search/search-intent"
 import { cn, formatInteger } from "@/lib/utils"
 import { Calendars, ChevronDown, ChevronLeft, ChevronRight, Images, SlidersHorizontal, X, SearchIcon, ListFilterIcon } from "lucide-react"
 
@@ -93,16 +94,14 @@ export function SearchExperience({
   typesenseSearchEnabled: typesenseSearchEnabledProp,
 }: SearchExperienceProps) {
   const router = useRouter()
-  const { filters, isLoading: filtersLoading, mergeFilters } = useSearchFilters()
+  const { filters, mergeFilters } = useSearchFilters()
+  const searchActive = hasSearchIntent(initialParams)
+  const [filtersRequested, setFiltersRequested] = useState(searchActive)
   const [isPending, startTransition] = useTransition()
   const [showFilters, setShowFilters] = useState(false)
   const [queryDraft, setQueryDraft] = useState(initialParams.q ?? "")
   const resultMode = initialParams.mode ?? "images"
-  const typesenseSearchEnabled = resolveTypesenseSearchEnabled({
-    serverFlag: typesenseSearchEnabledProp,
-    initialEventCount,
-    initialEventResult,
-  })
+  const typesenseSearchEnabled = resolveTypesenseSearchEnabled(typesenseSearchEnabledProp)
   const searchQueryParams = useMemo(
     () => buildSearchQueryParams(initialParams, paginationMode),
     [initialParams, paginationMode],
@@ -149,17 +148,18 @@ export function SearchExperience({
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    enabled: resultMode === "images",
+    enabled: searchActive && resultMode === "images",
   })
   const {
     data: filterSnapshot,
+    isFetching: isFiltersFetching,
   } = useQuery({
-    queryKey: ["public-search-filters", { includeCounts: false }],
-    queryFn: () => getPublicAssetFilters({ includeCounts: false }),
+    queryKey: ["public-search-filters"],
+    queryFn: () => getPublicCatalogTaxonomy(),
     staleTime: 5 * 60_000,
     gcTime: 10 * 60_000,
     refetchOnWindowFocus: false,
-    enabled: filtersLoading,
+    enabled: filtersRequested,
   })
   const eventSearchQueryParams = useMemo(
     () => buildEventSearchQueryParams(initialParams, paginationMode),
@@ -186,7 +186,7 @@ export function SearchExperience({
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    enabled: typesenseSearchEnabled && resultMode === "events",
+    enabled: searchActive && typesenseSearchEnabled && resultMode === "events",
   })
   const {
     data: eventCountSnapshot,
@@ -208,7 +208,7 @@ export function SearchExperience({
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    enabled: typesenseSearchEnabled && resultMode === "images",
+    enabled: searchActive && typesenseSearchEnabled && resultMode === "images",
   })
   const {
     data: displayEventResult = initialEventResult ?? undefined,
@@ -233,7 +233,7 @@ export function SearchExperience({
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    enabled: typesenseSearchEnabled && resultMode === "events",
+    enabled: searchActive && typesenseSearchEnabled && resultMode === "events",
   })
   const items = displayResult?.items ?? initialResult.items
   const nextCursor = displayResult?.nextCursor ?? initialResult.nextCursor
@@ -251,6 +251,19 @@ export function SearchExperience({
   const isPagePagination = paginationMode === "page"
   const isEventsMode = resultMode === "events"
   const activePageSize = isEventsMode ? EVENT_PAGE_SIZE : PAGE_SIZE
+  const filtersReady = hasPopulatedAssetFilters(filters)
+  const showFiltersLoading = filtersRequested && !filtersReady && isFiltersFetching
+
+  function requestFilters() {
+    setFiltersRequested(true)
+  }
+
+  function toggleFiltersPanel() {
+    setShowFilters((value) => {
+      if (!value) requestFilters()
+      return !value
+    })
+  }
 
   const [history, setHistory] = useState<(string | undefined)[]>([undefined])
   const baseParamsKey = JSON.stringify({ ...initialParams, cursor: undefined })
@@ -298,7 +311,7 @@ export function SearchExperience({
   const topCategories = filters.categories.slice(0, 5)
   const eventChipLabel = eventName
     ?? (initialParams.eventId
-      ? filtersLoading || isFetching
+      ? showFiltersLoading || isFetching
         ? "Loading event…"
         : "Selected event"
       : undefined)
@@ -336,11 +349,11 @@ export function SearchExperience({
     if (merged.mode === "events") params.set("mode", "events")
 
     const effectiveSort = forceSort
-      ? merged.q
-        ? (merged.sort === "oldest" || merged.sort === "newest" ? merged.sort : "relevance")
-        : merged.sort === "relevance"
-          ? "newest"
-          : (merged.sort ?? "newest")
+      ? merged.sort === "relevance" && merged.q
+        ? "relevance"
+        : merged.sort === "oldest"
+          ? "oldest"
+          : "newest"
       : merged.sort
 
     if (effectiveSort && effectiveSort !== "newest") params.set("sort", effectiveSort)
@@ -357,7 +370,7 @@ export function SearchExperience({
     const q = queryDraft.trim()
     updateParams({
       q: q || undefined,
-      sort: q ? "relevance" : "newest",
+      sort: "newest",
       ...(q
         ? {
             eventId: undefined,
@@ -457,106 +470,33 @@ export function SearchExperience({
   const hasImageResults = items.length > 0
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <section
-        className="sticky top-0 z-50 border-b border-foreground/80 bg-background shadow-sm"
-      >
-        <form onSubmit={submitSearch} className="grid min-h-[72px] grid-cols-[1fr_auto] items-stretch border-b border-border bg-background focus-within:outline-none md:grid-cols-[1fr_260px_auto]">
-          <label className="flex min-w-0 items-center gap-3 px-4 sm:px-6 lg:px-8">
-            <SearchIcon className="shrink-0 text-foreground" strokeWidth={2.1} size={24} />
-            <span className="sr-only">Search the Fotocorp archive</span>
-            <input
-              value={queryDraft}
-              onChange={(event) => setQueryDraft(event.target.value)}
-              placeholder="Search images, events, categories, Fotokey"
-              className="h-full min-w-0 flex-1 border-0 bg-transparent text-lg font-medium text-foreground shadow-none outline-none ring-0 placeholder:text-lg placeholder:text-muted-foreground focus:border-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 md:text-xl md:placeholder:text-xl"
-            />
-          </label>
-
-          <div className="hidden items-center justify-center border-l border-border px-6 text-base font-medium text-foreground md:flex">
-            Editorial images
-            <ChevronDown className="ml-3" size={16} />
-          </div>
-
-          <div className="flex items-center border-l border-border">
-            {queryDraft && (
-              <button
-                type="button"
-                onClick={() => setQueryDraft("")}
-                className="flex h-full w-14 items-center justify-center text-foreground hover:bg-muted"
-                aria-label="Clear search text"
-              >
-                <X size={24} />
-              </button>
-            )}
-            <Button type="submit" className="m-3 h-12 rounded-none px-5" disabled={isPending} aria-busy={isPending || isFetching}>
-              {isPending ? "Searching…" : "Search"}
-            </Button>
-          </div>
-        </form>
-
-        <div className="grid border-b border-border bg-background md:grid-cols-[250px_1fr]">
-          <button
-            type="button"
-            onClick={() => setShowFilters((value) => !value)}
-            className={cn(
-              "flex h-16 items-center justify-between border-b border-border px-5 text-left text-base font-semibold uppercase tracking-wide transition-colors md:border-b-0 md:border-r",
-              showFilters ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted",
-            )}
-            aria-expanded={showFilters}
-          >
-            <span className="inline-flex items-center gap-3">
-              <SlidersHorizontal size={20} />
-              Filters
-            </span>
-            <ChevronLeft className={cn(" transition-transform", !showFilters &&"rotate-180")} size={20} />
-          </button>
-
-          {filtersLoading ? (
-            <SearchCategoryTabsSkeleton />
-          ) : (
-            <div className="flex min-w-0 items-center gap-3 overflow-x-auto px-4 py-3 sm:px-6">
-              <FilterTab active={!initialParams.categoryId} onClick={() => updateParams({ categoryId: undefined })}>
-                All
-              </FilterTab>
-              {topCategories.map((category) => (
-                <FilterTab
-                  key={category.id}
-                  active={initialParams.categoryId === category.id}
-                  onClick={() => updateParams({ categoryId: category.id })}
-                >
-                  {category.name}
-                </FilterTab>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="bg-surface-warm px-3 py-6 sm:px-5 lg:px-6">
+    <>
+      <section className="order-2 bg-surface-warm px-3 py-6 sm:px-5 lg:px-6">
         <div className="mb-6 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <ActiveChips chips={filterChips} onClearAll={clearAll} />
 
-          <div className="ml-auto flex items-end gap-8">
-            <ResultMetric
-              active={!isEventsMode}
-              label="Images"
-              value={isEventsMode ? inactiveImageCount : displayCount}
-              suffix={!isEventsMode && exactTotalCount === undefined && hasMore ? "+" : undefined}
-              onClick={() => setResultMode("images")}
-            />
-            <ResultMetric
-              active={isEventsMode}
-              label="Events"
-              value={activeEventCount}
-              onClick={typesenseSearchEnabled ? () => setResultMode("events") : undefined}
-            />
-          </div>
+          {searchActive && (
+            <div className="ml-auto flex items-end gap-8">
+              <ResultMetric
+                active={!isEventsMode}
+                label="Images"
+                value={isEventsMode ? inactiveImageCount : displayCount}
+                suffix={!isEventsMode && exactTotalCount === undefined && hasMore ? "+" : undefined}
+                onClick={() => setResultMode("images")}
+              />
+              <ResultMetric
+                active={isEventsMode}
+                label="Events"
+                value={activeEventCount}
+                onClick={typesenseSearchEnabled ? () => setResultMode("events") : undefined}
+              />
+            </div>
+          )}
         </div>
 
         <div className={cn("grid gap-5", showFilters && "lg:grid-cols-[300px_minmax(0,1fr)]")}>
           {showFilters && (
-            filtersLoading ? (
+            showFiltersLoading ? (
               <SearchFilterPanelSkeleton />
             ) : (
               <FilterPanel
@@ -577,7 +517,15 @@ export function SearchExperience({
                 aria-hidden="true"
               />
             )}
-            {isEventsMode ? (
+            {!searchActive ? (
+              <div className="border border-border bg-background py-16">
+                <EmptyState
+                  icon={SearchIcon}
+                  title="Search the Fotocorp archive"
+                  description="Enter a keyword, Fotokey, or event name, or open filters to explore editorial images."
+                />
+              </div>
+            ) : isEventsMode ? (
               hasEventResults ? (
                 <>
                   <SearchEventResultsGrid events={eventItems} />
@@ -601,7 +549,7 @@ export function SearchExperience({
                     description={effectiveHasLoadError
                       ? "Search is temporarily unavailable. Try again in a moment."
                       : hasActiveFilters ? "Try a broader search or remove a few filters." : "Try a different search term."}
-                    action={{ label: "View latest", href: "/search" }}
+                    action={{ label: "View latest", href: "/search?mode=events" }}
                   />
                 </div>
               )
@@ -648,14 +596,92 @@ export function SearchExperience({
                   description={effectiveHasLoadError
                     ? "Search is temporarily unavailable. Try again in a moment."
                     : hasActiveFilters ? "Try a broader search or remove a few filters." : "Try a different search term."}
-                  action={{ label: "View latest", href: "/search" }}
+                  action={{ label: "View latest", href: "/search?mode=events" }}
                 />
               </div>
             )}
           </main>
         </div>
       </section>
-    </div>
+
+      <div className="order-1 bg-background text-foreground">
+      <section
+        className="sticky top-0 z-50 border-b border-foreground/80 bg-background shadow-sm"
+      >
+        <form onSubmit={submitSearch} className="grid min-h-[72px] grid-cols-[1fr_auto] items-stretch border-b border-border bg-background focus-within:outline-none md:grid-cols-[1fr_260px_auto]">
+          <label className="flex min-w-0 items-center gap-3 px-4 sm:px-6 lg:px-8">
+            <SearchIcon className="shrink-0 text-foreground" strokeWidth={2.1} size={24} />
+            <span className="sr-only">Search the Fotocorp archive</span>
+            <input
+              value={queryDraft}
+              onChange={(event) => setQueryDraft(event.target.value)}
+              onFocus={requestFilters}
+              placeholder="Search images, events, categories, Fotokey"
+              className="h-full min-w-0 flex-1 border-0 bg-transparent text-lg font-medium text-foreground shadow-none outline-none ring-0 placeholder:text-lg placeholder:text-muted-foreground focus:border-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 md:text-xl md:placeholder:text-xl"
+            />
+          </label>
+
+          <div className="hidden items-center justify-center border-l border-border px-6 text-base font-medium text-foreground md:flex">
+            Editorial images
+            <ChevronDown className="ml-3" size={16} />
+          </div>
+
+          <div className="flex items-center border-l border-border">
+            {queryDraft && (
+              <button
+                type="button"
+                onClick={() => setQueryDraft("")}
+                className="flex h-full w-14 items-center justify-center text-foreground hover:bg-muted"
+                aria-label="Clear search text"
+              >
+                <X size={24} />
+              </button>
+            )}
+            <Button type="submit" className="m-3 h-12 rounded-none px-5" disabled={isPending} aria-busy={isPending || isFetching}>
+              {isPending ? "Searching…" : "Search"}
+            </Button>
+          </div>
+        </form>
+
+        <div className="grid border-b border-border bg-background md:grid-cols-[250px_1fr]">
+          <button
+            type="button"
+            onClick={toggleFiltersPanel}
+            className={cn(
+              "flex h-16 items-center justify-between border-b border-border px-5 text-left text-base font-semibold uppercase tracking-wide transition-colors md:border-b-0 md:border-r",
+              showFilters ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted",
+            )}
+            aria-expanded={showFilters}
+          >
+            <span className="inline-flex items-center gap-3">
+              <SlidersHorizontal size={20} />
+              Filters
+            </span>
+            <ChevronLeft className={cn(" transition-transform", !showFilters &&"rotate-180")} size={20} />
+          </button>
+
+          {showFiltersLoading ? (
+            <SearchCategoryTabsSkeleton />
+          ) : (
+            <div className="flex min-w-0 items-center gap-3 overflow-x-auto px-4 py-3 sm:px-6">
+              <FilterTab active={!initialParams.categoryId} onClick={() => updateParams({ categoryId: undefined })}>
+                All
+              </FilterTab>
+              {topCategories.map((category) => (
+                <FilterTab
+                  key={category.id}
+                  active={initialParams.categoryId === category.id}
+                  onClick={() => updateParams({ categoryId: category.id })}
+                >
+                  {category.name}
+                </FilterTab>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+      </div>
+    </>
   )
 }
 
@@ -1114,16 +1140,7 @@ function buildSearchScrollKey(searchCacheKey: string) {
   return `${searchCacheKey}:scrollY`
 }
 
-function resolveTypesenseSearchEnabled({
-  serverFlag,
-  initialEventCount,
-  initialEventResult,
-}: {
-  serverFlag?: boolean
-  initialEventCount?: number
-  initialEventResult?: PublicSearchEventsResponse | null
-}) {
+function resolveTypesenseSearchEnabled(serverFlag?: boolean) {
   if (serverFlag !== undefined) return serverFlag
-  if (initialEventCount !== undefined || initialEventResult != null) return true
   return isTypesenseSearchEnabled()
 }

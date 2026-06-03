@@ -8,6 +8,10 @@
 - [Public route cache audit](../../docs/db-revamp/reports/public-route-cache-audit.md) — public route caller inventory, cache behavior, search back-navigation behavior, and verification commands.
 - [Resend + Google Workspace email integration](../../docs/integrations/email-resend-google-workspace.md) — access-flow transactional email sender, reply handling, env vars, delivery logs, and manual test steps.
 
+## Incremental update (2026-06-02)
+
+- `GET /api/v1/assets/filters` defaults to taxonomy-only (`includeCounts` omitted or not `"true"`). Heavy category/event aggregate counts require explicit `?includeCounts=true` (opt-in). Public marketing pages (`/categories`, `/events`, `/search`, slug/event detail) use web helper `getPublicCatalogTaxonomy()` → lightweight reads from `asset_categories` / `photo_events` without asset aggregation.
+
 ## Incremental update (2026-06-01)
 
 - `POST /api/v1/auth/sign-up` remains owned by `apps/api/src/routes/platform-auth/route.ts`; after successful user/account/inquiry creation and session cookie setup it sends `CUSTOMER_ACCESS_REQUEST_RECEIVED` through `apps/api/src/lib/email/email-service.ts`. Email failure is logged and does not fail registration.
@@ -104,7 +108,7 @@ This makes route behavior hard to reason about and slows root-cause analysis whe
 | Method | Path | Handler | Source file | Notes |
 |---|---|---|---|---|
 | `GET` | `/api/v1/assets` | `publicAssetListRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public catalog list. PR-16I: JSON `fotokey` = `image_assets.fotokey`; `category` = asset category else event default; `categoryId` query matches asset or (null asset + event) category. |
-| `GET` | `/api/v1/assets/filters` | `publicAssetFiltersRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed filters. PR-16I: category counts use resolved category `coalesce(asset, event)`. Pass `includeCounts=false` for a fast taxonomy-only response (no asset aggregation) used by `/search` filter sidebar. |
+| `GET` | `/api/v1/assets/filters` | `publicAssetFiltersRoute` | `apps/api/src/routes/public/catalog-routes.ts` | Taxonomy by default (`asset_categories`, `photo_events`). Pass `includeCounts=true` only when aggregate counts are explicitly required; public UX should use `getPublicCatalogTaxonomy()` on web instead. |
 | `GET` | `/api/v1/assets/collections` | `publicAssetCollectionsRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed collections. PR-16I: same resolved category for grouping/preview pick. |
 | `GET` | `/api/v1/assets/:id` | `publicAssetDetailRoute` | `apps/api/src/routes/publicAssets.ts` | DB-backed public asset detail. PR-16I: same `fotokey` + category rules as list. |
 | `GET` | `/api/v1/search/assets` | `searchTypesensePublicAssets` | `apps/api/src/routes/public/catalog-routes.ts` + `apps/api/src/lib/search/typesense-public-assets.ts` | Parallel Typesense-backed public search/count endpoint. Searches `event_title`, `caption`, `who_is_in_picture`, `people`, `keywords`, `category_name`, and `fotokey`; does not search `title`. Supports page pagination and category/event/city name filters for the feature-flagged `/search` cutover. Facets remain available by default, but callers can pass `includeFacets=false`; the `/search` UI uses `/api/v1/assets/filters` separately for filter data. Does not replace `/api/v1/assets` or `/api/v1/assets/filters`. |
