@@ -15,6 +15,8 @@ interface PublicAssetSaveButtonProps {
   compact?: boolean
   compactLabel?: string
   assetTitle?: string
+  /** Grid tiles: avoid per-card saved-state lookups on page load. */
+  skipInitialSavedCheck?: boolean
 }
 
 export function PublicAssetSaveButton({
@@ -22,19 +24,27 @@ export function PublicAssetSaveButton({
   compact = false,
   compactLabel = "Save as",
   assetTitle,
+  skipInitialSavedCheck = false,
 }: PublicAssetSaveButtonProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [pickerOpen, setPickerOpen] = useState(false)
   const { data: session, isPending: authPending } = useSharedAuthSession()
-  const isAuthenticated = !!session?.user
+  const isAuthenticated = session?.kind === "user" && Boolean(session.user)
+  const [hasMounted, setHasMounted] = useState(false)
   const [hasSaved, setHasSaved] = useState(false)
-  const [checking, setChecking] = useState(true)
+  const [checking, setChecking] = useState(() => !skipInitialSavedCheck)
   const [removing, setRemoving] = useState(false)
 
   useEffect(() => {
+    setHasMounted(true)
+  }, [])
+
+  const authLoading = hasMounted && authPending
+
+  useEffect(() => {
     async function checkSaved() {
-      if (!isAuthenticated) {
+      if (!isAuthenticated || skipInitialSavedCheck) {
         setHasSaved(false)
         setChecking(false)
         return
@@ -53,7 +63,7 @@ export function PublicAssetSaveButton({
       }
     }
     checkSaved()
-  }, [assetId, isAuthenticated])
+  }, [assetId, isAuthenticated, skipInitialSavedCheck])
 
   function openAuthGate() {
     const search = typeof window !== "undefined" ? window.location.search.replace(/^\?/, "") : ""
@@ -89,7 +99,7 @@ export function PublicAssetSaveButton({
   function handleSaveClick(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
     event.stopPropagation()
-    if (authPending) return
+    if (authLoading) return
     if (!isAuthenticated) {
       openAuthGate()
       return
@@ -110,7 +120,7 @@ export function PublicAssetSaveButton({
     }
   }
 
-  if (checking || authPending) {
+  if (checking || authLoading) {
     return (
       <button
         type="button"

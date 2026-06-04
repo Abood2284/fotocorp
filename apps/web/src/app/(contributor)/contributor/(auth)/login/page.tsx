@@ -14,7 +14,6 @@ export default async function ContributorLoginPage({ searchParams }: Contributor
   const params = await searchParams
   redirect(
     buildSignInHref({
-      persona: "contributor",
       callbackUrl: params.callbackUrl ?? null,
     }),
   )

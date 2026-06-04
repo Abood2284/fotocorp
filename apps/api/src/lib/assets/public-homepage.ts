@@ -56,7 +56,7 @@ interface PublicLatestEventsQuery {
   section: PublicLatestEventsSection
 }
 
-export type PublicLatestEventsSection = "latest" | "news" | "sports" | "entertainment" | "retro"
+export type PublicLatestEventsSection = "latest" | "news" | "sports" | "entertainment" | "fashion" | "retro"
 export type PublicEventBrowseSection = Exclude<PublicLatestEventsSection, "latest">
 
 interface LatestEventsCursor {
@@ -446,11 +446,12 @@ function parseSection(value: string | null): PublicLatestEventsSection {
     normalized === "news" ||
     normalized === "sports" ||
     normalized === "entertainment" ||
+    normalized === "fashion" ||
     normalized === "retro"
   ) {
     return normalized
   }
-  throw new AppError(400, "INVALID_SECTION", "section must be latest, news, sports, entertainment, or retro.")
+  throw new AppError(400, "INVALID_SECTION", "section must be latest, news, sports, entertainment, fashion, or retro.")
 }
 
 function parseBrowseSection(value: string | null): PublicEventBrowseSection {
@@ -459,11 +460,12 @@ function parseBrowseSection(value: string | null): PublicEventBrowseSection {
     normalized === "news" ||
     normalized === "sports" ||
     normalized === "entertainment" ||
+    normalized === "fashion" ||
     normalized === "retro"
   ) {
     return normalized
   }
-  throw new AppError(400, "INVALID_SECTION", "section must be news, sports, entertainment, or retro.")
+  throw new AppError(400, "INVALID_SECTION", "section must be news, sports, entertainment, fashion, or retro.")
 }
 
 function latestEventsSectionWhere(section: PublicLatestEventsSection): SQL {

@@ -8,6 +8,17 @@
 - [Public route cache audit](../../docs/db-revamp/reports/public-route-cache-audit.md) — public route caller inventory, cache behavior, search back-navigation behavior, and verification commands.
 - [Resend + Google Workspace email integration](../../docs/integrations/email-resend-google-workspace.md) — access-flow transactional email sender, reply handling, env vars, delivery logs, and manual test steps.
 
+## Incremental update (2026-06-04)
+
+- `POST /api/v1/auth/forgot-password` — body `{ email }`; always returns generic success message; creates `password_reset_tokens` row and sends `CUSTOMER_PASSWORD_RESET` when an ACTIVE USER email credential exists; rate-limited per user/IP. Web BFF `POST /api/auth/forgot-password`.
+- `GET /api/v1/auth/reset-password/validate?token=` — validates unused non-expired token hash. Web BFF `GET /api/auth/reset-password/validate`.
+- `POST /api/v1/auth/reset-password` — body `{ token, newPassword }`; updates USER credential hashes, marks token used, revokes all USER sessions (no auto-login). Web BFF `POST /api/auth/reset-password`. Migration: `0045_password_reset_tokens.sql`.
+- `POST /api/v1/auth/change-password` (`apps/api/src/routes/platform-auth/route.ts`): requires valid `fotocorp_session` with `owner_type = USER`; body `{ currentPassword, newPassword }`; verifies current password, enforces portal strength rules, updates all ACTIVE USER `auth_credentials` (EMAIL + USERNAME rows), revokes other USER sessions for that account. Web BFF `POST /api/auth/change-password` proxies to this route.
+
+## Incremental update (2026-06-03)
+
+- `GET /api/v1/auth/session` (`apps/api/src/routes/platform-auth/route.ts`): lightweight platform session from `fotocorp_session`; returns `{ ok, ownerType, user?, contributor? }` without registration profile/inquiry payload. Web BFF `GET /api/auth/get-session` prefers staff cookie when present, else proxies this route (legacy fallback: `contributor/auth/me` + `auth/me`).
+
 ## Incremental update (2026-06-02)
 
 - `GET /api/v1/assets/filters` defaults to taxonomy-only (`includeCounts` omitted or not `"true"`). Heavy category/event aggregate counts require explicit `?includeCounts=true` (opt-in). Public marketing pages (`/categories`, `/events`, `/search`, slug/event detail) use web helper `getPublicCatalogTaxonomy()` → lightweight reads from `asset_categories` / `photo_events` without asset aggregation.
@@ -28,7 +39,7 @@
 - `GET /api/v1/public/creative/featured` remains a compatibility alias to the same handler (`legacyRoute: true` in logs). Web BFF `GET`/`HEAD` `/api/public/royalty-free/featured` maps to the canonical route; `/api/public/creative/featured` remains mapped for backward compatibility.
 - `GET /api/v1/public/homepage/hero-set` is owned by `apps/api/src/routes/public/homepage-routes.ts`; it reads the active row from `public_homepage_hero_sets` plus ordered items from `public_homepage_hero_set_items` (no `listPublicAssets`, no `/api/v1/assets`). Returns `Cache-Control: public, max-age=300, s-maxage=900, stale-while-revalidate=3600`. Populate with `pnpm --dir apps/api homepage:refresh-hero-sets` (daily external cron ~03:00 UTC recommended).
 - Web BFF `GET`/`HEAD` `/api/public/homepage/hero-set` maps to the route above with matching public cache headers.
-- `GET /api/v1/public/events/browse` is owned by `apps/api/src/routes/public/homepage-routes.ts`; it supports `section=news|sports|entertainment|retro`, reads `photo_events` joined to `asset_categories` on `photo_events.category_id`, requires at least one public-ready CARD preview asset per event, and uses keyset pagination on `event_date desc nulls last, id desc`. Cache: `public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400`.
+- `GET /api/v1/public/events/browse` is owned by `apps/api/src/routes/public/homepage-routes.ts`; it supports `section=news|sports|entertainment|fashion|retro`, reads `photo_events` joined to `asset_categories` on `photo_events.category_id`, requires at least one public-ready CARD preview asset per event, and uses keyset pagination on `event_date desc nulls last, id desc`. Cache: `public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400`.
 - Web BFF `GET`/`HEAD` `/api/public/events/browse` maps to the browse route above with the same 1-day browser / 30-day edge cache header.
 
 ## Incremental update (2026-05-29)
@@ -36,7 +47,7 @@
 - `GET /api/v1/search/assets` remains owned by `apps/api/src/routes/public/catalog-routes.ts` and now returns `Cache-Control: public, max-age=30, s-maxage=120, stale-while-revalidate=300` for anonymous public Typesense results.
 - `GET /api/v1/assets/:assetId` remains owned by `apps/api/src/routes/public/catalog-routes.ts` and now returns `Cache-Control: public, max-age=300, s-maxage=2592000, stale-while-revalidate=604800` for public metadata.
 - Web BFF `GET`/`HEAD` `/api/public/events/latest`, `/api/public/search/assets`, and `/api/public/assets/:assetId` remain owned by `apps/web/src/app/api/public/[...path]/route.ts`; these public paths explicitly preserve/set public cache headers instead of falling back to `private, no-store`.
-- `GET /api/v1/public/events/latest` now accepts `section=latest|news|sports|entertainment|retro` while staying projection-backed by `public_event_feed_items`.
+- `GET /api/v1/public/events/latest` now accepts `section=latest|news|sports|entertainment|fashion|retro` while staying projection-backed by `public_event_feed_items`.
 - `GET /api/v1/public/creative/featured` was renamed in favor of `GET /api/v1/public/royalty-free/featured` (see 2026-05-30 incremental update); the creative path remains as a compatibility alias.
 - Public marketing layout no longer probes `/api/v1/staff/auth/me`; staff auth remains required under `/staff/*`.
 
@@ -116,7 +127,7 @@ This makes route behavior hard to reason about and slows root-cause analysis whe
 | `GET` | `/api/v1/public/homepage` | `getPublicHomepageFeed` | `apps/api/src/routes/public/homepage-routes.ts` | Lightweight homepage feed: first-page latest-events preview only, ordered by `event_date`; no newest/editorial asset slices. |
 | `GET` | `/api/v1/public/homepage/hero-set` | `getPublicHomepageHeroSet` | `apps/api/src/routes/public/homepage-routes.ts` | Active hero backdrop set from `public_homepage_hero_sets` + `public_homepage_hero_set_items`; no catalog list query. Cache `public, max-age=300, s-maxage=900, stale-while-revalidate=3600`. Populate via `pnpm --dir apps/api homepage:refresh-hero-sets`. |
 | `GET` | `/api/v1/public/events/latest` | `listPublicLatestEvents` | `apps/api/src/routes/public/homepage-routes.ts` | Cursor-paginated Latest Events from `public_event_feed_items` projection (`windowDays`, `limit`, optional cursor), filtered and ordered by `event_date desc, event_id desc`. Card `previewUrl` uses `PUBLIC_PREVIEW_CDN_BASE_URL` + derivative `storage_key` when configured; otherwise stable `/api/media/assets/:id/preview/card` fallback. |
-| `GET` | `/api/v1/public/events/browse` | `fetchPublicEventCategoryBrowseRows` | `apps/api/src/routes/public/homepage-routes.ts` + `apps/api/src/lib/assets/public-homepage.ts` | Cursor-paginated homepage category browse for `news`, `sports`, `entertainment`, and `retro`. Reads `photo_events` + `asset_categories` (not `public_event_feed_items`), filters `status = ACTIVE` with a public-ready CARD preview per event, returns `limit+1` keyset pagination, and does not expose total counts. |
+| `GET` | `/api/v1/public/events/browse` | `fetchPublicEventCategoryBrowseRows` | `apps/api/src/routes/public/homepage-routes.ts` + `apps/api/src/lib/assets/public-homepage.ts` | Cursor-paginated homepage category browse for `news`, `sports`, `entertainment`, `fashion`, and `retro`. Reads `photo_events` + `asset_categories` (not `public_event_feed_items`), filters `status = ACTIVE` with a public-ready CARD preview per event, returns `limit+1` keyset pagination, and does not expose total counts. |
 
 ### Public Media Routes
 

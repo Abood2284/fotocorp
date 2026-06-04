@@ -98,6 +98,72 @@ export async function updateAppUserRolePlaceholder() {
   throw new Error("Role updates are not implemented in this PR.")
 }
 
+export interface SubscriberEntitlementRow {
+  id: string
+  assetType: string
+  allowedDownloads: number | null
+  downloadsUsed: number
+  qualityAccess: string
+  status: string
+  validFrom: Date | null
+  validUntil: Date | null
+}
+
+export async function listSubscriberEntitlements(authUserId: string): Promise<SubscriberEntitlementRow[]> {
+  const result = await getPgPool().query<{
+    id: string
+    asset_type: string
+    allowed_downloads: number | null
+    downloads_used: number
+    quality_access: string
+    status: string
+    valid_from: Date | null
+    valid_until: Date | null
+  }>(
+    `
+      select
+        id,
+        asset_type,
+        allowed_downloads,
+        downloads_used,
+        quality_access,
+        status,
+        valid_from,
+        valid_until
+      from subscriber_entitlements
+      where user_id = $1::uuid
+      order by
+        case asset_type
+          when 'IMAGE' then 1
+          when 'VIDEO' then 2
+          when 'CARICATURE' then 3
+          else 4
+        end,
+        status,
+        created_at
+    `,
+    [authUserId],
+  )
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    assetType: row.asset_type,
+    allowedDownloads: row.allowed_downloads,
+    downloadsUsed: Number(row.downloads_used),
+    qualityAccess: row.quality_access,
+    status: row.status,
+    validFrom: row.valid_from,
+    validUntil: row.valid_until,
+  }))
+}
+
+export function isEntitlementCurrentlyValid(row: SubscriberEntitlementRow, now = new Date()): boolean {
+  if (row.status !== "ACTIVE") return false
+  if (row.validFrom && row.validFrom > now) return false
+  if (row.validUntil && row.validUntil <= now) return false
+  return true
+}
+
 export async function getActiveSubscriberEntitlementQuota(authUserId: string): Promise<{ used: number; limit: number } | null> {
   const result = await getPgPool().query<{
     total_used: number

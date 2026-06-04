@@ -216,7 +216,10 @@ describe("buildEventCategoryBrowseResponse", () => {
     assert.equal(Object.hasOwn(response, "totalCount"), false)
     assert.throws(
       () => parseEventCategoryBrowseQuery({ section: "latest", limit: "25", cursor: null }),
-      /section must be news, sports, entertainment, or retro/,
+      /section must be news, sports, entertainment, fashion, or retro/,
     )
+
+    const fashionQuery = parseEventCategoryBrowseQuery({ section: "fashion", limit: null, cursor: null })
+    assert.equal(fashionQuery.section, "fashion")
   })
 })

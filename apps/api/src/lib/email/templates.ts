@@ -44,6 +44,10 @@ export const EMAIL_TEMPLATE_METADATA: Record<EmailTemplateKey, { displayName: st
     displayName: "Contributor Application Rejected",
     subject: "Update on your Fotocorp contributor application",
   },
+  CUSTOMER_PASSWORD_RESET: {
+    displayName: "Customer Password Reset",
+    subject: "Reset your Fotocorp password",
+  },
 }
 
 export function renderAccessEmailTemplate(
@@ -188,6 +192,27 @@ function bodyLines(
         "Thank you for your interest in Fotocorp.",
         "After reviewing your access request, we are unable to approve access at this time.",
       ],
+    }
+  }
+
+  if (templateKey === "CUSTOMER_PASSWORD_RESET") {
+    const resetUrl = data.resetPasswordUrl?.trim() || loginUrl
+    const expiresMinutes = data.resetLinkExpiresMinutes ?? 60
+    const intro = [
+      `Hello ${greetingName},`,
+      "We received a request to reset your Fotocorp password.",
+      `Use the link below within ${expiresMinutes} minutes. If you did not request this, you can ignore this email.`,
+    ]
+    const textLines = [
+      ...intro,
+      "",
+      `Reset your password: ${resetUrl}`,
+    ]
+    return {
+      introLines: intro,
+      textLines,
+      ctaLabel: "Reset password",
+      ctaUrl: resetUrl,
     }
   }
 

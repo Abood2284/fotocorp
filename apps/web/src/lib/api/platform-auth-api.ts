@@ -59,6 +59,100 @@ export async function platformLogin(
   return payload
 }
 
+export class PlatformAuthApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string,
+    message: string,
+    public readonly detail?: unknown,
+  ) {
+    super(message)
+    this.name = "PlatformAuthApiError"
+  }
+}
+
+async function platformAuthJson<T>(
+  path: string,
+  input: { method: "GET" | "POST"; body?: unknown },
+): Promise<T> {
+  let response: Response
+  try {
+    response = await fetch(path, {
+      method: input.method,
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        ...(input.body ? { "Content-Type": "application/json" } : {}),
+      },
+      body: input.body ? JSON.stringify(input.body) : undefined,
+    })
+  } catch {
+    throw new PlatformAuthApiError(503, "NETWORK_ERROR", "We could not reach the server. Please try again.")
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as { error?: PlatformAuthError | { code?: string; message?: string } }
+
+  if (!response.ok) {
+    const err = normalizeError(payload)
+    throw new PlatformAuthApiError(response.status, err.code ?? "AUTH_ERROR", err.message ?? "Request failed.", err.detail)
+  }
+
+  return payload as T
+}
+
+export async function requestPlatformPasswordReset(email: string): Promise<{ ok: true; message: string }> {
+  return platformAuthJson("/api/auth/forgot-password", {
+    method: "POST",
+    body: { email },
+  })
+}
+
+export async function validatePlatformPasswordResetToken(token: string): Promise<{ ok: true }> {
+  const query = new URLSearchParams({ token })
+  return platformAuthJson(`/api/auth/reset-password/validate?${query}`, { method: "GET" })
+}
+
+export async function completePlatformPasswordReset(
+  token: string,
+  newPassword: string,
+): Promise<{ ok: true; message: string }> {
+  return platformAuthJson("/api/auth/reset-password", {
+    method: "POST",
+    body: { token, newPassword },
+  })
+}
+
+export async function changePlatformPassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<PlatformAuthResponse> {
+  let response: Response
+  try {
+    response = await fetch("/api/auth/change-password", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    })
+  } catch {
+    throw new PlatformAuthApiError(503, "NETWORK_ERROR", "We could not reach the server. Please try again.")
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as PlatformAuthResponse & {
+    error?: PlatformAuthError | { code?: string; message?: string }
+  }
+
+  if (!response.ok) {
+    const err = normalizeError(payload)
+    throw new PlatformAuthApiError(response.status, err.code ?? "AUTH_ERROR", err.message ?? "Request failed.", err.detail)
+  }
+
+  return payload
+}
+
 export async function platformSignUp(body: Record<string, unknown>): Promise<PlatformAuthResponse> {
   const response = await fetch("/api/auth/sign-up", {
     method: "POST",

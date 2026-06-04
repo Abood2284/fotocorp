@@ -152,7 +152,7 @@ export function ContributorShell({
 
   async function handleLogout() {
     await logoutContributor().catch(() => null)
-    router.push(buildSignInHref({ persona: "contributor" }))
+    router.push(buildSignInHref())
     router.refresh()
   }
 

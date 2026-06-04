@@ -8,25 +8,16 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react"
 
 import { FotocorpLogoLink } from "@/components/layout/fotocorp-logo-link"
+import {
+  getAccountLinksFromSession,
+  getMobileRoleLinksFromSession,
+  getSessionDisplayName,
+  getSessionSubtitle,
+  type AccountLink,
+} from "@/components/layout/header-account-links"
 import { SHARED_AUTH_SESSION_QUERY_KEY, useSharedAuthSession } from "@/lib/use-shared-auth-session"
 import { cn } from "@/lib/utils"
-import {
-  Archive,
-  Camera,
-  ChevronDown,
-  CloudUpload,
-  Download,
-  Gauge,
-  Image,
-  Inbox,
-  LogOut,
-  Menu,
-  Shield,
-  UserRound,
-  Users,
-  X,
-  type LucideIcon,
-} from "lucide-react"
+import { ChevronDown, LogOut, Menu, X } from "lucide-react"
 
 /** Editorial masthead: seamless white canvas, no shadow (design.md). */
 const HEADER_SHELL_CLASS =
@@ -220,8 +211,6 @@ function HeaderShell({
           />
           <BrowseNavDisabled label="Royalty Free" />
           <RoleMainLinks
-            userProfile={userProfile}
-            staffBrief={staffBrief}
             pathname={pathname}
             sortParam={sortParam}
             modeParam={modeParam}
@@ -303,8 +292,6 @@ function HeaderShell({
         >
           <MobileBrowseNav pathname={pathname} sortParam={sortParam} modeParam={modeParam} />
           <MobileRoleLinks
-            userProfile={userProfile}
-            staffBrief={staffBrief}
             pathname={pathname}
             sortParam={sortParam}
             modeParam={modeParam}
@@ -462,18 +449,16 @@ function SectionNavLink({
 }
 
 function RoleMainLinks({
-  staffBrief,
   pathname,
   sortParam,
   modeParam,
 }: {
-  userProfile?: HeaderUserProfile | null
-  staffBrief?: StaffBrief | null
   pathname: string
   sortParam: string | null
   modeParam: string | null
 }) {
-  if (!staffBrief) return null
+  const { data: session } = useSharedAuthSession()
+  if (session?.kind !== "staff") return null
 
   return (
     <SectionNavLink
@@ -487,7 +472,6 @@ function RoleMainLinks({
 
 function AccountMenu({
   userProfile,
-  staffBrief,
 }: {
   userProfile?: HeaderUserProfile | null
   staffBrief?: StaffBrief | null
@@ -497,7 +481,6 @@ function AccountMenu({
   const { data: session, isPending } = useSharedAuthSession()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
-  const user = session?.user
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -519,16 +502,14 @@ function AccountMenu({
   }, [])
 
   async function handleSignOut() {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+    if (session?.kind === "staff") {
+      await fetch("/api/staff/auth/logout", { method: "POST", credentials: "include" })
+    } else {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+    }
     queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, null)
     setOpen(false)
     router.push("/sign-in")
-    router.refresh()
-  }
-
-  async function handleStaffSignOut() {
-    await fetch("/api/staff/auth/logout", { method: "POST", credentials: "include" })
-    setOpen(false)
     router.refresh()
   }
 
@@ -536,64 +517,7 @@ function AccountMenu({
     return <div className="h-10 w-32 bg-muted" aria-hidden />
   }
 
-  if (!user) {
-    if (staffBrief) {
-      const staffLabel = staffBrief.displayName.trim() || staffBrief.username
-      return (
-        <div ref={menuRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            className="flex h-10 max-w-56 items-center gap-2 border border-border bg-background px-2 pr-3 font-sans text-sm font-medium text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-expanded={open}
-            aria-haspopup="menu"
-          >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
-              {getUserInitial(staffLabel)}
-            </span>
-            <span className="truncate">{staffLabel}</span>
-            <ChevronDown className={cn("text-muted-foreground transition-transform", open && "rotate-180")} size={16} />
-          </button>
-          {open && (
-            <div
-              role="menu"
-              className="absolute right-0 top-full z-50 mt-2 w-72 border border-border bg-background p-2"
-            >
-              <div className="border-b border-border px-3 py-2">
-                <p className="truncate font-sans text-sm font-semibold text-foreground">{staffLabel}</p>
-                <p className="truncate font-sans text-xs text-muted-foreground">Staff · {staffBrief.role}</p>
-              </div>
-              <div className="py-2">
-                {getStaffToolAccountLinks().map((item) => (
-                  <AccountMenuLink key={item.href} item={item} onNavigate={() => setOpen(false)} />
-                ))}
-              </div>
-              <div className="border-t border-border pt-2">
-                <Link
-                  href="/sign-in"
-                  role="menuitem"
-                  className="flex items-center gap-2 px-3 py-2 font-sans text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                  onClick={() => setOpen(false)}
-                >
-                  <UserRound className="h-4 w-4" />
-                  Customer sign in
-                </Link>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => void handleStaffSignOut()}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                >
-                  <LogOut size={16} />
-                  Staff sign out
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )
-    }
-
+  if (!session?.kind) {
     return (
       <Link href="/sign-in" className={cn(PRIMARY_BTN_CLASS, "px-6 py-2")}>
         Sign In
@@ -601,8 +525,9 @@ function AccountMenu({
     )
   }
 
-  const displayName = getUserDisplayName(userProfile, user)
-  const menuItems = getAccountLinks(userProfile, staffBrief)
+  const displayName = getSessionDisplayName(session, userProfile)
+  const subtitle = getSessionSubtitle(session, userProfile)
+  const menuItems = getAccountLinksFromSession(session, userProfile)
 
   return (
     <div ref={menuRef} className="relative">
@@ -627,28 +552,19 @@ function AccountMenu({
         >
           <div className="border-b border-border px-3 py-2">
             <p className="truncate font-sans text-sm font-semibold text-foreground">{displayName}</p>
-            <p className="truncate font-sans text-xs text-muted-foreground">{userProfile?.email ?? user.email}</p>
+            {subtitle ? (
+              <p className="truncate font-sans text-xs text-muted-foreground">{subtitle}</p>
+            ) : null}
           </div>
           <div className="py-2">
             {menuItems.map((item) => (
-              <AccountMenuLink key={item.href} item={item} onNavigate={() => setOpen(false)} />
+              <AccountMenuLink key={item.href + item.label} item={item} onNavigate={() => setOpen(false)} />
             ))}
           </div>
-          {staffBrief ? (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => void handleStaffSignOut()}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              <LogOut size={16} />
-              Staff sign out
-            </button>
-          ) : null}
           <button
             type="button"
             role="menuitem"
-            onClick={handleSignOut}
+            onClick={() => void handleSignOut()}
             className="flex w-full items-center gap-2 px-3 py-2 text-left font-sans text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             <LogOut size={16} />
@@ -684,59 +600,30 @@ function MobileLinkGroup({
 }
 
 function MobileRoleLinks({
-  userProfile,
-  staffBrief,
   pathname,
   sortParam,
   modeParam,
 }: {
-  userProfile?: HeaderUserProfile | null
-  staffBrief?: StaffBrief | null
   pathname: string
   sortParam: string | null
   modeParam: string | null
 }) {
-  const staffRoleLinks = staffBrief ? getStaffRoleLinks() : []
-
-  if (!userProfile) {
-    if (staffRoleLinks.length === 0) return null
-    return (
-      <MobileLinkGroup group={{ title: "Staff", links: staffRoleLinks }} pathname={pathname} sortParam={sortParam} modeParam={modeParam} />
-    )
-  }
-
-  const roleLinks = getRoleLinks(userProfile, staffBrief)
-  const subscriber = isActiveSubscriber(userProfile)
-  const accountLinks: HeaderLink[] = [
-    { label: "My account", href: "/account" },
-    { label: "My Fotobox", href: "/account/fotobox" },
-    subscriber ? { label: "Downloads", href: "/account/downloads" } : { label: "Subscription", href: "/account/subscription" },
-  ]
+  const { data: session } = useSharedAuthSession()
+  const group = getMobileRoleLinksFromSession(session)
+  if (!group) return null
 
   return (
-    <>
-      <MobileLinkGroup group={{ title: "Account", links: accountLinks }} pathname={pathname} sortParam={sortParam} modeParam={modeParam} />
-      {staffRoleLinks.length > 0 && (
-        <MobileLinkGroup group={{ title: "Staff", links: staffRoleLinks }} pathname={pathname} sortParam={sortParam} modeParam={modeParam} />
-      )}
-      {roleLinks.length > 0 && (
-        <MobileLinkGroup
-          group={{
-            title: userProfile.role === "PHOTOGRAPHER" ? "Contributor" : "Workspace",
-            links: roleLinks,
-          }}
-          pathname={pathname}
-          sortParam={sortParam}
-          modeParam={modeParam}
-        />
-      )}
-    </>
+    <MobileLinkGroup
+      group={group}
+      pathname={pathname}
+      sortParam={sortParam}
+      modeParam={modeParam}
+    />
   )
 }
 
 function MobileAccountMenu({
   userProfile,
-  staffBrief,
 }: {
   userProfile?: HeaderUserProfile | null
   staffBrief?: StaffBrief | null
@@ -744,17 +631,15 @@ function MobileAccountMenu({
   const router = useRouter()
   const queryClient = useQueryClient()
   const { data: session, isPending } = useSharedAuthSession()
-  const user = session?.user
 
   async function handleSignOut() {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+    if (session?.kind === "staff") {
+      await fetch("/api/staff/auth/logout", { method: "POST", credentials: "include" })
+    } else {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+    }
     queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, null)
     router.push("/sign-in")
-    router.refresh()
-  }
-
-  async function handleStaffSignOut() {
-    await fetch("/api/staff/auth/logout", { method: "POST", credentials: "include" })
     router.refresh()
   }
 
@@ -762,36 +647,7 @@ function MobileAccountMenu({
     return <div className="h-16 bg-muted" aria-hidden />
   }
 
-  if (!user) {
-    if (staffBrief) {
-      const staffLabel = staffBrief.displayName.trim() || staffBrief.username
-      return (
-        <section className="border border-border bg-secondary p-3">
-          <div className="mb-3 flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">
-              {getUserInitial(staffLabel)}
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate font-sans text-sm font-semibold text-foreground">{staffLabel}</span>
-              <span className="block truncate font-sans text-xs text-muted-foreground">Staff session</span>
-            </span>
-          </div>
-          <div className="grid gap-2">
-            <Link href="/staff/dashboard" className={cn(OUTLINE_BTN_CLASS, "w-full")}>
-              Staff dashboard
-            </Link>
-            <button type="button" onClick={() => void handleStaffSignOut()} className={cn(OUTLINE_BTN_CLASS, "w-full text-muted-foreground")}>
-              <LogOut size={16} />
-              Staff sign out
-            </button>
-            <Link href="/sign-in" className={cn(PRIMARY_BTN_CLASS, "w-full")}>
-              Customer sign in
-            </Link>
-          </div>
-        </section>
-      )
-    }
-
+  if (!session?.kind) {
     return (
       <section>
         <h2 className="mb-2 font-sans text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Account</h2>
@@ -802,7 +658,9 @@ function MobileAccountMenu({
     )
   }
 
-  const displayName = getUserDisplayName(userProfile, user)
+  const displayName = getSessionDisplayName(session, userProfile)
+  const subtitle = getSessionSubtitle(session, userProfile)
+  const primary = getAccountLinksFromSession(session, userProfile)[0]
 
   return (
     <section className="border border-border bg-secondary p-3">
@@ -812,17 +670,18 @@ function MobileAccountMenu({
         </span>
         <span className="min-w-0">
           <span className="block truncate font-sans text-sm font-semibold text-foreground">{displayName}</span>
-          <span className="block truncate font-sans text-xs text-muted-foreground">{userProfile?.email ?? user.email}</span>
+          {subtitle ? (
+            <span className="block truncate font-sans text-xs text-muted-foreground">{subtitle}</span>
+          ) : null}
         </span>
       </div>
       <div className="grid gap-2">
-        {staffBrief ? (
-          <button type="button" onClick={() => void handleStaffSignOut()} className={cn(OUTLINE_BTN_CLASS, "w-full text-muted-foreground")}>
-            <LogOut size={16} />
-            Staff sign out
-          </button>
+        {primary ? (
+          <Link href={primary.href} className={cn(PRIMARY_BTN_CLASS, "w-full")}>
+            {primary.label}
+          </Link>
         ) : null}
-        <button type="button" onClick={handleSignOut} className={cn(OUTLINE_BTN_CLASS, "w-full text-muted-foreground")}>
+        <button type="button" onClick={() => void handleSignOut()} className={cn(OUTLINE_BTN_CLASS, "w-full text-muted-foreground")}>
           <LogOut size={16} />
           Sign out
         </button>
@@ -858,8 +717,6 @@ function MobileNavLink({
   )
 }
 
-type AccountLink = HeaderLink & { icon: LucideIcon }
-
 function AccountMenuLink({ item, onNavigate }: { item: AccountLink; onNavigate: () => void }) {
   const Icon = item.icon
 
@@ -874,79 +731,6 @@ function AccountMenuLink({ item, onNavigate }: { item: AccountLink; onNavigate: 
       {item.label}
     </Link>
   )
-}
-
-function getStaffToolAccountLinks(): AccountLink[] {
-  return [
-    { label: "Staff dashboard", href: "/staff/dashboard", icon: Gauge },
-    { label: "Contributor uploads", href: "/staff/contributor-uploads", icon: Inbox },
-    { label: "Catalog", href: "/staff/catalog", icon: Image },
-    { label: "Users", href: "/staff/users", icon: Users },
-    { label: "Audit", href: "/staff/audit", icon: Shield },
-  ]
-}
-
-function getStaffRoleLinks(): HeaderLink[] {
-  return [
-    { label: "Staff dashboard", href: "/staff/dashboard" },
-    { label: "Contributor uploads", href: "/staff/contributor-uploads" },
-  ]
-}
-
-function getAccountLinks(userProfile?: HeaderUserProfile | null, staffBrief?: StaffBrief | null): AccountLink[] {
-  const staffPrefix = staffBrief ? getStaffToolAccountLinks() : []
-
-  if (!userProfile) {
-    return staffPrefix.length > 0
-      ? staffPrefix
-      : [
-          { label: "My account", href: "/account", icon: UserRound },
-          { label: "My Fotobox", href: "/account/fotobox", icon: Archive },
-          { label: "My downloads", href: "/account/downloads", icon: Download },
-          { label: "Subscription", href: "/account/subscription", icon: Shield },
-        ]
-  }
-
-  if (userProfile.role === "PHOTOGRAPHER") {
-    return [
-      ...staffPrefix,
-      { label: "Contributor dashboard", href: "/contributor/dashboard", icon: Camera },
-      { label: "Uploads", href: "/contributor/uploads", icon: CloudUpload },
-      { label: "Download reports", href: "/contributor/download-reports", icon: Download },
-      { label: "My account", href: "/account", icon: UserRound },
-    ]
-  }
-
-  return [
-    ...staffPrefix,
-    { label: "My account", href: "/account", icon: UserRound },
-    { label: "My Fotobox", href: "/account/fotobox", icon: Archive },
-    { label: "My downloads", href: "/account/downloads", icon: Download },
-    { label: isActiveSubscriber(userProfile) ? "Download access" : "Subscription", href: "/account/subscription", icon: Shield },
-  ]
-}
-
-function getRoleLinks(userProfile: HeaderUserProfile, staffBrief?: StaffBrief | null): HeaderLink[] {
-  if (userProfile.role === "PHOTOGRAPHER") {
-    return [
-      { label: "Contributor dashboard", href: "/contributor/dashboard" },
-      { label: "Uploads", href: "/contributor/uploads" },
-      { label: "Download reports", href: "/contributor/download-reports" },
-    ]
-  }
-
-  if (staffBrief) {
-    return [
-      { label: "Catalog", href: "/staff/catalog" },
-      { label: "Users", href: "/staff/users" },
-    ]
-  }
-
-  return []
-}
-
-function isActiveSubscriber(userProfile: HeaderUserProfile) {
-  return userProfile.isSubscriber && userProfile.subscriptionStatus === "ACTIVE"
 }
 
 function isEditorialNavActive(pathname: string, categoryIdParam: string | null, modeParam: string | null) {
@@ -972,19 +756,6 @@ function isActivePath(pathname: string, href: string, sortParam: string | null, 
   const path = href.split("?")[0]
   if (path === "/") return pathname === "/"
   return pathname === path || pathname.startsWith(`${path}/`)
-}
-
-function getUserDisplayName(userProfile: HeaderUserProfile | null | undefined, user: { name?: string | null; email?: string | null }) {
-  const profileName = userProfile?.displayName?.trim()
-  if (profileName) return profileName
-
-  const name = user.name?.trim()
-  if (name) return name
-
-  const email = userProfile?.email?.trim() || user.email?.trim()
-  if (email) return email
-
-  return "Your account"
 }
 
 function getUserInitial(displayName: string) {

@@ -1,12 +1,15 @@
-# Private Fotocorp jobs worker (Node + Sharp). No published ports.
+# Private Fotocorp jobs processor (Node + Sharp). No published ports.
 # Copy apps/jobs/.env.production.example → apps/jobs/.env.production on the VPS.
 #
-# Build / update after code changes (repo root — image embeds apps/jobs; restart alone is not enough):
-#   docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production up -d --build fotocorp-jobs
-# See docs/db-revamp/jobs-direct-vps-deployment-runbook.md
+# Production: one-shot drain (no idle Neon polling). Typical invocation:
+#   docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs
 #
-# Optional: pass the same file to Compose for variable interpolation in this file.
-# Container env is loaded via `env_file` below.
+# Dev-only continuous poller (profile):
+#   docker compose -f docker-compose.jobs.yml --profile dev-worker up -d fotocorp-jobs-worker
+#
+# Build after code changes (repo root):
+#   docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production build fotocorp-jobs
+# See docs/db-revamp/media-pipeline-operations.md (VPS jobs section)
 
 services:
   fotocorp-jobs:
@@ -15,7 +18,8 @@ services:
       dockerfile: apps/jobs/Dockerfile
     image: fotocorp-jobs:latest
     container_name: fotocorp-jobs
-    restart: unless-stopped
+    restart: "no"
+    command: ["pnpm", "--dir", "apps/jobs", "run", "publish:drain"]
     env_file:
       - apps/jobs/.env.production
     environment:
@@ -23,10 +27,35 @@ services:
       NODE_ENV: production
       MALLOC_ARENA_MAX: "2"
       UV_THREADPOOL_SIZE: "2"
+      PUBLISH_DRAIN_MAX_JOBS: "25"
+      PUBLISH_DRAIN_MAX_RUNTIME_SECONDS: "300"
+      # PR-16G: set IMAGE_PUBLISH_PROCESSING_ENABLED=true on the VPS when Neon + R2 env is complete.
+      IMAGE_PUBLISH_PROCESSING_ENABLED: ${IMAGE_PUBLISH_PROCESSING_ENABLED:-false}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  fotocorp-jobs-worker:
+    profiles: ["dev-worker"]
+    build:
+      context: .
+      dockerfile: apps/jobs/Dockerfile
+    image: fotocorp-jobs:latest
+    container_name: fotocorp-jobs-worker
+    restart: unless-stopped
+    command: ["pnpm", "--dir", "apps/jobs", "run", "publish:worker"]
+    env_file:
+      - apps/jobs/.env.production
+    environment:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      NODE_ENV: production
+      ALLOW_CONTINUOUS_JOB_WORKER: "true"
+      MALLOC_ARENA_MAX: "2"
+      UV_THREADPOOL_SIZE: "2"
       IMAGE_PUBLISH_WORKER_CONCURRENCY: "1"
       IMAGE_PUBLISH_POLL_INTERVAL_MS: "15000"
-      # PR-16G: set IMAGE_PUBLISH_PROCESSING_ENABLED=true on the VPS only when Neon + R2
-      # env is complete and you want real Sharp publish processing. Default false = count only.
       IMAGE_PUBLISH_PROCESSING_ENABLED: ${IMAGE_PUBLISH_PROCESSING_ENABLED:-false}
     logging:
       driver: json-file

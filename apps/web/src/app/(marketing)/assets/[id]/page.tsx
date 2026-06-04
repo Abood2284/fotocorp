@@ -10,6 +10,7 @@ import { parseWhoIsInPicture } from "@/lib/who-is-in-picture"
 import { AssetDetailActions, type AssetDetailAccessState, type AssetSizeOption } from "@/components/assets/asset-detail-actions"
 import { RelatedGallery } from "@/components/assets/related-gallery"
 import { ExpandableCaption } from "@/components/assets/expandable-caption"
+import { isLandscapePreview } from "@/lib/asset-preview-orientation"
 import { cn } from "@/lib/utils"
 
 interface AssetDetailPageProps {
@@ -136,6 +137,20 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
   const prevAsset = currentEventIndex > 0 ? eventAssets[currentEventIndex - 1] : null
   const nextAsset = currentEventIndex !== -1 && currentEventIndex < eventAssets.length - 1 ? eventAssets[currentEventIndex + 1] : null
+  const isLandscape = isLandscapePreview(preview?.width, preview?.height)
+
+  const relatedGalleryProps = {
+    initialAssets: relatedAssets,
+    initialCursor: relatedResult.nextCursor,
+    currentAssetId: asset.id,
+    eventId: asset.event?.id ?? null,
+    categoryId: asset.category?.id ?? null,
+    contributorId: asset.contributor?.id ?? null,
+    totalCount: relatedResult.totalCount ?? 0,
+    label: relatedLabel,
+    browseHref: relatedResult.browseHref,
+    relatedCountLabel: relatedCountLabel,
+  }
 
   return (
     <div className="bg-background pb-20 lg:pb-0">
@@ -188,8 +203,18 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
           )}
         </div>
 
-        <div className="grid gap-7 lg:grid-cols-[minmax(0,1.62fr)_minmax(340px,0.58fr)] lg:items-stretch">
-          <section className="min-w-0 space-y-5 lg:flex lg:min-h-0 lg:flex-col lg:gap-5">
+        <div
+          className={cn(
+            "grid gap-7 lg:grid-cols-[minmax(0,1.62fr)_minmax(340px,0.58fr)]",
+            isLandscape ? "lg:items-start" : "lg:items-stretch",
+          )}
+        >
+          <section
+            className={cn(
+              "min-w-0 space-y-5",
+              !isLandscape && "lg:flex lg:min-h-0 lg:flex-col lg:gap-5",
+            )}
+          >
             {(primaryTitle || caption) && (
               <header className="shrink-0 space-y-3">
                 {primaryTitle && (
@@ -251,15 +276,26 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               </div>
             )}
 
-            <figure className="overflow-hidden bg-background lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+            <figure
+              className={cn(
+                "overflow-hidden bg-background",
+                !isLandscape && "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col",
+              )}
+            >
               {preview ? (
-                <div className="flex w-full flex-col bg-background px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:px-6 lg:pb-6 lg:pt-2">
+                <div
+                  className={cn(
+                    "flex w-full flex-col bg-background px-4 pb-4 pt-2 sm:px-5 sm:pb-5 sm:pt-2 lg:px-6 lg:pb-6 lg:pt-2",
+                    !isLandscape && "lg:flex lg:min-h-0 lg:flex-1 lg:flex-col",
+                  )}
+                >
                   <AssetPreviewChrome
                     src={preview.url}
                     alt={getAssetAlt(asset)}
                     width={preview.width}
                     height={preview.height}
                     loading="eager"
+                    orientation={isLandscape ? "landscape" : "portrait"}
                     whoIsInPicture={asset.whoIsInPicture}
                     fotokey={asset.fotokey ?? null}
                     assetId={asset.id}
@@ -286,9 +322,13 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                 {downloadError}
               </div>
             )}
+
+            {isLandscape ? (
+              <RelatedGallery {...relatedGalleryProps} placement="column" />
+            ) : null}
           </section>
 
-          <aside id="download-card-section" className="scroll-mt-28 space-y-6 lg:sticky lg:top-24">
+          <aside id="download-card-section" className="scroll-mt-28">
             <AssetDetailActions
               assetId={asset.id}
               accessState={accessState}
@@ -303,20 +343,10 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               totalEventAssets={totalEventAssets}
             />
           </aside>
+
         </div>
 
-        <RelatedGallery
-          initialAssets={relatedAssets}
-          initialCursor={relatedResult.nextCursor}
-          currentAssetId={asset.id}
-          eventId={asset.event?.id ?? null}
-          categoryId={asset.category?.id ?? null}
-          contributorId={asset.contributor?.id ?? null}
-          totalCount={relatedResult.totalCount ?? 0}
-          label={relatedLabel}
-          browseHref={relatedResult.browseHref}
-          relatedCountLabel={relatedCountLabel}
-        />
+        {!isLandscape ? <RelatedGallery {...relatedGalleryProps} placement="full" /> : null}
       </div>
 
       {/* Sticky Bottom Bar on Mobile */}

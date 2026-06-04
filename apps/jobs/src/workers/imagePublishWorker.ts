@@ -25,36 +25,43 @@ export interface RunOnceOptions {
   jobsEnv?: JobsEnvConfig
 }
 
+export interface RunOnceResult {
+  /** `QUEUED` job count when DB is reachable; `null` when DB access was skipped. */
+  pendingCount: number | null
+  /** True when this iteration claimed and entered processing for one publish job. */
+  claimedJob: boolean
+}
+
 export class ImagePublishWorker {
   constructor(private readonly jobService: ImagePublishJobService | undefined) {}
 
-  async runOnce(options: RunOnceOptions): Promise<void> {
+  async runOnce(options: RunOnceOptions): Promise<RunOnceResult> {
     if (options.skipDbAccess || !this.jobService) {
       console.log("[fotocorp-jobs] db access skipped (no DATABASE_URL); pending publish jobs=unknown")
-      return
+      return { pendingCount: null, claimedJob: false }
     }
 
     const pendingCount = await this.jobService.countPendingJobs()
     console.log(`[fotocorp-jobs] pending publish jobs=${pendingCount}`)
 
-    if (options.dryRun) return
+    if (options.dryRun) return { pendingCount, claimedJob: false }
 
     if (!options.processingEnabled) {
       console.log(
         "[fotocorp-jobs] processing disabled (IMAGE_PUBLISH_PROCESSING_ENABLED=false); no jobs claimed"
       )
-      return
+      return { pendingCount, claimedJob: false }
     }
 
     if (pendingCount === 0) {
       console.log("[fotocorp-jobs] no pending publish jobs; nothing to claim")
-      return
+      return { pendingCount, claimedJob: false }
     }
 
     const claimed = await this.jobService.claimNextPendingJob()
     if (!claimed) {
       console.log("[fotocorp-jobs] no pending publish jobs claimable this iteration")
-      return
+      return { pendingCount, claimedJob: false }
     }
 
     const { job, items } = claimed
@@ -68,12 +75,13 @@ export class ImagePublishWorker {
         failureMessage: "Worker invoked processing without typed jobs env (internal error)."
       })
       await this.jobService.reconcilePublishJobAggregate(job.id)
-      return
+      return { pendingCount, claimedJob: false }
     }
 
     try {
       const processor = new ImagePublishProcessor(this.jobService, options.jobsEnv)
       await processor.processClaimedJob(claimed)
+      return { pendingCount, claimedJob: true }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)
       console.error(`[fotocorp-jobs] fatal publish iteration error: ${message}`)

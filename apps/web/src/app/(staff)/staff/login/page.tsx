@@ -15,7 +15,6 @@ export default async function StaffLoginPage({ searchParams }: StaffLoginPagePro
   const params = await searchParams
   redirect(
     buildSignInHref({
-      persona: "staff",
       callbackUrl: params.callbackUrl ?? null,
     }),
   )

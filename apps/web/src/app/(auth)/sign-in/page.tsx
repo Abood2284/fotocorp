@@ -1,8 +1,10 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
-import { resolveAuthRedirectCandidate } from "@/lib/auth-redirect"
-import { getCurrentAuthUser } from "@/lib/app-user"
 import { SplitAuthPage } from "@/components/auth/split-auth-page"
+import { resolveSignedInPageRedirect } from "@/lib/auth-post-login"
+import { getCurrentAuthUser } from "@/lib/app-user"
+import { getOptionalContributorSession } from "@/lib/contributor-session"
+import { getOptionalStaffSession } from "@/lib/staff-session"
 
 export const metadata = {
   title: "Sign in",
@@ -13,12 +15,30 @@ interface SignInPageProps {
 }
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
-  const authUser = await getCurrentAuthUser()
   const resolvedSearchParams = await searchParams
   const callbackUrl = readQueryParam(resolvedSearchParams, "callbackUrl")
-  const redirectTo = readQueryParam(resolvedSearchParams, "redirectTo")
+    ?? readQueryParam(resolvedSearchParams, "redirectTo")
 
-  if (authUser) redirect(resolveAuthRedirectCandidate(callbackUrl ?? redirectTo))
+  const authUser = await getCurrentAuthUser()
+  if (authUser) {
+    redirect(resolveSignedInPageRedirect({ kind: "user", callbackUrl }))
+  }
+
+  const contributorSession = await getOptionalContributorSession()
+  if (contributorSession) {
+    redirect(resolveSignedInPageRedirect({ kind: "contributor", callbackUrl }))
+  }
+
+  const staffSession = await getOptionalStaffSession()
+  if (staffSession) {
+    redirect(
+      resolveSignedInPageRedirect({
+        kind: "staff",
+        staffRole: staffSession.staff.role,
+        callbackUrl,
+      }),
+    )
+  }
 
   return (
     <Suspense fallback={null}>

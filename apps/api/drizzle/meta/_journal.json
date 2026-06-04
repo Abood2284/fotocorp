@@ -316,6 +316,13 @@
       "when": 1780260000000,
       "tag": "0044_auth_legacy_drop_p9",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1780562000000,
+      "tag": "0045_password_reset_tokens",
+      "breakpoints": true
     }
   ]
 }

@@ -21,7 +21,7 @@ export default function ApplyContributorPage() {
       </div>
       <p className="mt-8 text-sm text-muted-foreground">
         Already have credentials?{" "}
-        <Link href="/sign-in?persona=contributor" className="font-medium text-primary hover:underline">
+        <Link href="/sign-in" className="font-medium text-primary hover:underline">
           Sign in to the contributor portal
         </Link>
         .

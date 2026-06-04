@@ -8,6 +8,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
   const requestId = resolveRequestIdFromHeaders(await headers()) ?? crypto.randomUUID()
   const shellTracker = createTimingTracker(shellStartedAt)
 
+  /** Marketing shell: signed-in state comes from client `GET /api/auth/get-session` (unified session). */
   const headerUser: HeaderUserProfile | null = null
   const staffBrief: StaffBrief | null = null
   shellTracker.mark("public_shell")

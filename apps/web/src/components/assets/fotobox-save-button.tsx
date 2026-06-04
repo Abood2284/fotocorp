@@ -3,7 +3,7 @@
 import { Archive, Check, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { FotoboxBoardPicker } from "@/components/assets/fotobox-board-picker"
 import { Button } from "@/components/ui/button"
@@ -35,8 +35,15 @@ export function FotoboxSaveButton({
   const router = useRouter()
   const pathname = usePathname()
   const { data: session, isPending } = useSharedAuthSession()
+  const [hasMounted, setHasMounted] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
+
+  const authLoading = hasMounted && isPending
 
   function openAuthGate() {
     router.push(buildFotoboxAuthPathname(pathname))
@@ -45,8 +52,8 @@ export function FotoboxSaveButton({
   function handleClick(event: React.MouseEvent<HTMLButtonElement>) {
     event.preventDefault()
     event.stopPropagation()
-    if (isPending) return
-    if (!session?.user) {
+    if (authLoading) return
+    if (session?.kind !== "user" || !session.user) {
       openAuthGate()
       return
     }
@@ -77,11 +84,11 @@ export function FotoboxSaveButton({
           buttonClassName,
         )}
         onClick={handleClick}
-        disabled={isPending}
+        disabled={authLoading}
         aria-label={iconOnly ? tooltip : label}
-        aria-busy={isPending}
+        aria-busy={authLoading}
       >
-        {isPending ? (
+        {authLoading ? (
           <Loader2 className="animate-spin" size={iconOnly ? 20 : 16} />
         ) : iconOnly ? (
           actionIcon

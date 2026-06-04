@@ -117,8 +117,99 @@ export function AssetDetailActions({
     }
   }
 
+  const detailsSection = (restrictions || whoIsInPictureNames.length > 0 || metadataRows.length > 0) ? (
+    <div className="space-y-3 border-t border-border pt-5">
+      <button
+        type="button"
+        onClick={() => setDetailsOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between text-left lg:pointer-events-none cursor-pointer"
+        aria-expanded={detailsOpen}
+      >
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">Details</h3>
+        <span className="text-muted-foreground lg:hidden">
+          {detailsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </span>
+      </button>
+
+      <div className={cn("space-y-3 lg:block", detailsOpen ? "block" : "hidden")}>
+        {restrictions ? (
+          <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs leading-relaxed">
+            <p className="text-muted-foreground">Restrictions:</p>
+            <p className="text-foreground">{restrictions}</p>
+          </div>
+        ) : null}
+        {whoIsInPictureNames.length > 0 ? (
+          <dl className="space-y-2 text-xs leading-relaxed">
+            <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
+              <dt className="text-muted-foreground">Who is in picture:</dt>
+              <dd className="text-foreground">
+                <p className="flex flex-wrap items-center gap-x-1 gap-y-1">
+                  {whoIsInPictureNames.map((name, index) => (
+                    <span key={name} className="inline-flex items-center">
+                      {index > 0 ? <span className="mr-1 text-muted-foreground">,</span> : null}
+                      <Link
+                        href={`/search?q=${encodeURIComponent(name)}`}
+                        className="text-primary underline underline-offset-4 hover:text-primary-hover"
+                      >
+                        {name}
+                      </Link>
+                    </span>
+                  ))}
+                </p>
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+        {metadataRows.length > 0 ? (
+          <dl className="space-y-2 text-xs leading-relaxed">
+            {metadataRows.map((row) => (
+              <div key={row.label} className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
+                <dt className="text-muted-foreground">{row.label}</dt>
+                <dd className="text-foreground" title={row.value}>
+                  {row.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </div>
+    </div>
+  ) : null
+
+  const keywordsSection = keywords.length > 0 ? (
+    <div className="border-t border-border/60 pt-4">
+      <button
+        type="button"
+        onClick={() => setKeywordsOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between text-left lg:pointer-events-none cursor-pointer"
+        aria-expanded={keywordsOpen}
+      >
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+          Keywords
+        </h3>
+        <span className="text-muted-foreground lg:hidden">
+          {keywordsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </span>
+      </button>
+
+      <div className={cn("mt-3 lg:block", keywordsOpen ? "block" : "hidden")}>
+        <div className="flex flex-wrap gap-1.5 font-sans">
+          {keywords.map((keyword) => (
+            <Link
+              key={keyword}
+              href={`/search?q=${encodeURIComponent(keyword)}`}
+              className="rounded-none border border-border bg-muted/30 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              {keyword}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  ) : null
+
   return (
-    <section className="relative space-y-6 rounded-none border border-border bg-white p-5 sm:p-6 shadow-none">
+    <section className="relative rounded-none border border-border bg-white p-5 shadow-none sm:p-6">
       <iframe
         ref={downloadFrameRef}
         title="Download"
@@ -127,6 +218,7 @@ export function AssetDetailActions({
         aria-hidden
       />
 
+      <div className="space-y-6">
       <div className="flex items-center gap-2">
         <h2 className="text-sm font-semibold tracking-tight text-foreground sm:text-base">
           How can I use this image?
@@ -286,96 +378,9 @@ export function AssetDetailActions({
         </div>
       )}
 
-      {(restrictions || whoIsInPictureNames.length > 0 || metadataRows.length > 0) && (
-        <div className="space-y-3 border-t border-border pt-5">
-          <button
-            type="button"
-            onClick={() => setDetailsOpen((prev) => !prev)}
-            className="flex w-full items-center justify-between text-left lg:pointer-events-none cursor-pointer"
-            aria-expanded={detailsOpen}
-          >
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">Details</h3>
-            <span className="text-muted-foreground lg:hidden">
-              {detailsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </span>
-          </button>
-
-          <div className={cn("space-y-3 lg:block", detailsOpen ? "block" : "hidden")}>
-            {restrictions ? (
-              <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs leading-relaxed">
-                <p className="text-muted-foreground">Restrictions:</p>
-                <p className="text-foreground">{restrictions}</p>
-              </div>
-            ) : null}
-            {whoIsInPictureNames.length > 0 ? (
-              <dl className="space-y-2 text-xs leading-relaxed">
-                <div className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
-                  <dt className="text-muted-foreground">Who is in picture:</dt>
-                  <dd className="text-foreground">
-                    <p className="flex flex-wrap items-center gap-x-1 gap-y-1">
-                      {whoIsInPictureNames.map((name, index) => (
-                        <span key={name} className="inline-flex items-center">
-                          {index > 0 ? <span className="mr-1 text-muted-foreground">,</span> : null}
-                          <Link
-                            href={`/search?q=${encodeURIComponent(name)}`}
-                            className="text-primary underline underline-offset-4 hover:text-primary-hover"
-                          >
-                            {name}
-                          </Link>
-                        </span>
-                      ))}
-                    </p>
-                  </dd>
-                </div>
-              </dl>
-            ) : null}
-            {metadataRows.length > 0 ? (
-              <dl className="space-y-2 text-xs leading-relaxed">
-                {metadataRows.map((row) => (
-                  <div key={row.label} className="grid grid-cols-[minmax(0,34%)_minmax(0,1fr)] gap-x-4 gap-y-1">
-                    <dt className="text-muted-foreground">{row.label}</dt>
-                    <dd className="text-foreground" title={row.value}>
-                      {row.value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            ) : null}
-          </div>
-        </div>
-      )}
-
-      {keywords.length > 0 ? (
-        <div className="border-t border-border/60 pt-4">
-          <button
-            type="button"
-            onClick={() => setKeywordsOpen((prev) => !prev)}
-            className="flex w-full items-center justify-between text-left lg:pointer-events-none cursor-pointer"
-            aria-expanded={keywordsOpen}
-          >
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-              Keywords
-            </h3>
-            <span className="text-muted-foreground lg:hidden">
-              {keywordsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </span>
-          </button>
-
-          <div className={cn("mt-3 lg:block", keywordsOpen ? "block" : "hidden")}>
-            <div className="flex flex-wrap gap-1.5 font-sans">
-              {keywords.map((keyword) => (
-                <Link
-                  key={keyword}
-                  href={`/search?q=${encodeURIComponent(keyword)}`}
-                  className="rounded-none border border-border bg-muted/30 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  {keyword}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {detailsSection}
+      {keywordsSection}
+      </div>
     </section>
   )
 }

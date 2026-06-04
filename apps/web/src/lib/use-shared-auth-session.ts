@@ -1,14 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-
-export interface SharedAuthSession {
-  user?: {
-    id?: string
-    name?: string | null
-    email?: string | null
-  } | null
-}
+import type { SharedAuthSession, UnifiedAuthSession } from "@/lib/auth-session-types"
 
 export const SHARED_AUTH_SESSION_QUERY_KEY = ["auth-session"] as const
 
@@ -23,7 +16,7 @@ export function useSharedAuthSession() {
   })
 }
 
-async function fetchSession(): Promise<SharedAuthSession | null> {
+async function fetchSession(): Promise<UnifiedAuthSession | null> {
   const response = await fetch("/api/auth/get-session", {
     method: "GET",
     credentials: "include",
@@ -33,6 +26,18 @@ async function fetchSession(): Promise<SharedAuthSession | null> {
   if (response.status === 401 || response.status === 204) return null
   if (!response.ok) return null
 
-  const data = await response.json().catch(() => null) as SharedAuthSession | null
-  return data?.user ? data : null
+  const data = (await response.json().catch(() => null)) as SharedAuthSession | null
+  if (!data?.kind) return null
+
+  return data as UnifiedAuthSession
+}
+
+/** Subscriber-only consumers (Fotobox, etc.) */
+export function useSubscriberAuthUser() {
+  const query = useSharedAuthSession()
+  const user = query.data?.kind === "user" ? query.data.user ?? null : null
+  return {
+    ...query,
+    data: user ? { user } : null,
+  }
 }

@@ -34,6 +34,23 @@ describe("access email templates", () => {
     })
   }
 
+  it("renders CUSTOMER_PASSWORD_RESET with reset link CTA", () => {
+    const rendered = renderAccessEmailTemplate("CUSTOMER_PASSWORD_RESET", {
+      recipient: { email: "reader@example.com", firstName: "Ada" },
+      loginUrl: "https://fotocorp.com/sign-in",
+      data: {
+        resetPasswordUrl: "https://fotocorp.com/reset-password?token=abc",
+        resetLinkExpiresMinutes: 60,
+      },
+    })
+
+    assert.equal(rendered.subject, "Reset your Fotocorp password")
+    assert.match(rendered.text, /reset your Fotocorp password/i)
+    assert.match(rendered.text, /within 60 minutes/)
+    assert.match(rendered.text, /reset-password\?token=abc/)
+    assert.match(rendered.html, /Reset password/)
+  })
+
   it("renders CUSTOMER_ACCESS_APPROVED with entitlement limits and branded layout", () => {
     const rendered = renderAccessEmailTemplate("CUSTOMER_ACCESS_APPROVED", {
       recipient: { email: "reader@example.com", firstName: "Ada" },
@@ -188,14 +205,14 @@ describe("email delivery safety", () => {
       data: {
         contributorUsername: "mira.news",
         temporaryPassword: "TempPass-123",
-        contributorLoginUrl: "https://fotocorp.com/sign-in?persona=contributor",
+        contributorLoginUrl: "https://fotocorp.com/sign-in",
       },
     }, { provider })
 
     assert.equal(result.status, "SENT")
     assert.match(text, /mira\.news/)
     assert.match(text, /TempPass-123/)
-    assert.match(text, /https:\/\/fotocorp\.com\/sign-in\?persona=contributor/)
+    assert.match(text, /https:\/\/fotocorp\.com\/sign-in/)
     assert.match(html, /mira\.news/)
     assert.match(html, /TempPass-123/)
   })
@@ -221,7 +238,7 @@ describe("email delivery safety", () => {
       data: {
         contributorUsername: "mira.news",
         temporaryPassword: "TempPass-123",
-        contributorLoginUrl: "https://fotocorp.com/sign-in?persona=contributor",
+        contributorLoginUrl: "https://fotocorp.com/sign-in",
       },
     }, { provider })
 

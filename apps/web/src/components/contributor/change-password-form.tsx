@@ -67,7 +67,7 @@ export function ChangeContributorPasswordForm() {
       />
 
       <div className="rounded-xl border border-border bg-muted/30 p-4 text-xs leading-5 text-muted-foreground">
-        Use at least 12 characters with uppercase, lowercase, a number, and a symbol.
+        Use at least 6 characters.
       </div>
 
       {error && (
@@ -114,11 +114,7 @@ function PasswordField({
 }
 
 function validatePassword(password: string, confirmation: string) {
-  if (password.length < 12) return "New password must be at least 12 characters."
-  if (!/[A-Z]/.test(password)) return "New password must include an uppercase letter."
-  if (!/[a-z]/.test(password)) return "New password must include a lowercase letter."
-  if (!/[0-9]/.test(password)) return "New password must include a number."
-  if (!/[^A-Za-z0-9]/.test(password)) return "New password must include a symbol."
+  if (password.length < 6) return "New password must be at least 6 characters."
   if (password !== confirmation) return "New passwords do not match."
   return null
 }

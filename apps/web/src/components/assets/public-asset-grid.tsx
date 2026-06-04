@@ -83,6 +83,8 @@ export interface PublicAssetGridProps {
   dense?: boolean
   /** Larger tiles with ~3–4 per row (e.g. homepage Royalty Free). */
   featured?: boolean
+  /** Override justified-row tuning (e.g. asset detail narrow column). */
+  justifiedOptions?: JustifiedRowsOptions
   className?: string
   emptyTitle?: string
   emptyDescription?: string
@@ -98,6 +100,7 @@ export function PublicAssetGrid({
   priorityCount = 8,
   dense = false,
   featured = false,
+  justifiedOptions,
   className,
   emptyTitle = "Previews are being prepared",
   emptyDescription = "The public archive will appear here as soon as watermarked previews are ready.",
@@ -126,8 +129,8 @@ export function PublicAssetGrid({
   const items = useMemo(() => assets.slice(0, limit), [assets, limit])
   const layoutMode = featured ? "featured" : dense ? "dense" : "default"
   const layoutOptions = useMemo(
-    () => resolveJustifiedOptions(layoutMode, containerWidth),
-    [layoutMode, containerWidth],
+    () => justifiedOptions ?? resolveJustifiedOptions(layoutMode, containerWidth),
+    [justifiedOptions, layoutMode, containerWidth],
   )
   const gap = layoutOptions.gap
 
