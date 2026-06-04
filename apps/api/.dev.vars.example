@@ -33,6 +33,11 @@ TYPESENSE_CF_ACCESS_CLIENT_SECRET=
 #
 # Must match apps/web `.env.local` INTERNAL_API_SECRET. Web proxies /api/auth/* and internal routes here.
 INTERNAL_API_SECRET=replace-with-long-random-internal-secret
+#
+# VPS jobs publish drain wake (PR-3). After staff contributor approval, Worker POSTs here (fire-and-forget).
+# `JOBS_DRAIN_WEBHOOK_SECRET` must equal `JOBS_WAKE_SECRET` in `apps/jobs/.env.production` on the VPS.
+JOBS_DRAIN_WEBHOOK_URL=https://jobs-internal.fotocorp.com/internal/publish/drain
+JOBS_DRAIN_WEBHOOK_SECRET=
 
 # Transactional email for registration/access approval flow.
 # Store RESEND_API_KEY as a Cloudflare secret in deployed environments; do not commit real keys.

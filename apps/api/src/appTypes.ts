@@ -36,6 +36,10 @@ export interface Env {
   /** Diagnostic-only flag for homepage and public catalog latency investigation logs. */
   HOMEPAGE_DEBUG_LATENCY?: string;
   INTERNAL_API_SECRET?: string;
+  /** VPS jobs wake URL (PR-3), e.g. https://jobs-internal.fotocorp.com/internal/publish/drain */
+  JOBS_DRAIN_WEBHOOK_URL?: string;
+  /** Shared secret; must match `JOBS_WAKE_SECRET` on the jobs VPS container. */
+  JOBS_DRAIN_WEBHOOK_SECRET?: string;
   LEGACY_FIXTURE_ROUTES_ENABLED?: string;
   /**
    * R2 S3 API — optional; required for contributor direct (presigned PUT) uploads, staging verification,

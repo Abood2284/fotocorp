@@ -10,6 +10,7 @@
 
 ## Incremental update (2026-06-04)
 
+- `POST /api/v1/internal/admin/contributor-uploads/approve` — after Neon publish job rows are committed, the Worker fire-and-forget POSTs `JOBS_DRAIN_WEBHOOK_URL` (VPS `publish:wake`) with header `x-jobs-wake-secret` = `JOBS_DRAIN_WEBHOOK_SECRET` (must match VPS `JOBS_WAKE_SECRET`). Approval response is unchanged if the wake fails. Implementation: `apps/api/src/lib/jobs/publish-drain-webhook.ts`.
 - `POST /api/v1/auth/forgot-password` — body `{ email }`; always returns generic success message; creates `password_reset_tokens` row and sends `CUSTOMER_PASSWORD_RESET` when an ACTIVE USER email credential exists; rate-limited per user/IP. Web BFF `POST /api/auth/forgot-password`.
 - `GET /api/v1/auth/reset-password/validate?token=` — validates unused non-expired token hash. Web BFF `GET /api/auth/reset-password/validate`.
 - `POST /api/v1/auth/reset-password` — body `{ token, newPassword }`; updates USER credential hashes, marks token used, revokes all USER sessions (no auto-login). Web BFF `POST /api/auth/reset-password`. Migration: `0045_password_reset_tokens.sql`.

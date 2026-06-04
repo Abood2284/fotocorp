@@ -17,6 +17,7 @@ import {
   hasContributorStagingS3Config,
   verifyContributorStagingObjectExists,
 } from "../../../lib/r2-contributor-uploads";
+import { schedulePublishDrainWebhook } from "../../../lib/jobs/publish-drain-webhook";
 import { createContributorStagingPresignedPutUrl } from "../../../lib/r2-presigned-put";
 import type {
   AdminContributorUploadApproveBody,
@@ -570,6 +571,13 @@ export async function approveAdminContributorUploadsService(
     });
   } finally {
     await writeDb.close().catch(() => undefined);
+  }
+
+  if (approvedItems.length > 0) {
+    schedulePublishDrainWebhook(env, {
+      publishJobId,
+      approvedCount: approvedItems.length,
+    })
   }
 
   return json({

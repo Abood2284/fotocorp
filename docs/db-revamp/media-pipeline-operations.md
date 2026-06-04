@@ -195,7 +195,7 @@ curl -sS -X POST "http://127.0.0.1:18765/internal/publish/drain?wait=1" \
   -H "x-jobs-wake-secret: $JOBS_WAKE_SECRET"
 ```
 
-**Cloudflare Tunnel (operator):** add a private hostname (e.g. `jobs-internal.yourdomain.com`) → `http://127.0.0.1:18765`, same host as Typesense tunnel. Restrict with Access or allow only Worker egress if needed. PR-3 will set `JOBS_DRAIN_WEBHOOK_URL` on the API to `https://<that-host>/internal/publish/drain`.
+**Cloudflare Tunnel (operator):** `jobs-internal.fotocorp.com` → `http://127.0.0.1:18765`. **API Worker secrets (PR-3):** `JOBS_DRAIN_WEBHOOK_URL=https://jobs-internal.fotocorp.com/internal/publish/drain`, `JOBS_DRAIN_WEBHOOK_SECRET` = same as VPS `JOBS_WAKE_SECRET`. Deploy with `wrangler secret put` (see `apps/api/.dev.vars.example`).
 
 Example backup cron (every 2 days — adjust path/schedule):
 

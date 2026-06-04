@@ -8,7 +8,7 @@ Update this file after every meaningful implementation change.
 
 ## Current Goal
 
-- **Jobs publish (PR-1/2 done):** `publish:drain` one-shot + `publish:wake` HTTP (`POST /internal/publish/drain`, `x-jobs-wake-secret`, `fotocorp-jobs-wake` on `127.0.0.1:18765`). **Next:** PR-3 API webhook on approve; PR-4 backup cron on VPS.
+- **Jobs publish (PR-1/2/3):** `publish:drain` + `publish:wake` on VPS (`jobs-internal.fotocorp.com`); API `schedulePublishDrainWebhook` after staff contributor approve (`apps/api/src/lib/jobs/publish-drain-webhook.ts`). **Next:** PR-4 backup cron on VPS.
 
 - **Account + password reset:** Plan [`docs/plans/account-and-password-reset.md`](../docs/plans/account-and-password-reset.md) — PR-1–3 complete. Forgot/reset: `0045_password_reset_tokens`, `POST/GET forgot + reset API`, `CUSTOMER_PASSWORD_RESET` email, `/forgot-password` + `/reset-password`, sign-in link.
 
@@ -19,6 +19,9 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Contributor staging R2 CORS (production uploads):** Production browser PUTs required `https://fotocorp.com` (and `www`) on bucket `fotocorp-2026-contributor-uploads`; example policy updated in [`apps/api/docs/r2-contributor-staging-cors.example.json`](../apps/api/docs/r2-contributor-staging-cors.example.json).
+
+- **Jobs PR-3 — approve webhook:** `JOBS_DRAIN_WEBHOOK_URL` + `JOBS_DRAIN_WEBHOOK_SECRET` on API Worker; non-blocking POST after `publishJobId` commit in `approveAdminContributorUploadsService`.
 - **Jobs PR-2 — wake HTTP:** `publish:wake`, `publishWakeServer.ts`, `JOBS_WAKE_SECRET`, compose service `fotocorp-jobs-wake` (loopback port 18765). Mutex: concurrent POST → `409`. Async default `202`; `?wait=1` for synchronous drain.
 - **Jobs PR-1 — one-shot `publish:drain`:** Added `apps/jobs/src/publishDrain.ts`, `--drain` CLI, production guard on `publish:worker`, Docker default CMD/compose drain (`restart: "no"`), `dev-worker` profile for poller. Docs: `apps/jobs/README.md`, `docs/db-revamp/media-pipeline-operations.md`, `context/architecture.md`.
 
