@@ -1,15 +1,16 @@
 import { ArrowRight } from "lucide-react"
 import Link from "next/link"
 
-import { getPublicAssetFilters } from "@/lib/api/fotocorp-api"
+import { formatDate } from "@/components/assets/public-asset-card"
 import { PlaceholderPage } from "@/components/layout/placeholder-page"
+import { getPublicCatalogTaxonomy } from "@/lib/api/fotocorp-api"
 
 export const metadata = {
   title: "Events — Fotocorp",
 }
 
 export default async function EventsPage() {
-  const events = await getPublicAssetFilters()
+  const events = await getPublicCatalogTaxonomy()
     .then((result) => result.events)
     .catch(() => [])
 
@@ -33,7 +34,7 @@ export default async function EventsPage() {
             Explore date-wise image sets from recent coverage.
           </p>
         </div>
-        <Link href="/search?sort=latest" className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+        <Link href="/search?mode=events" className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
           Latest images <ArrowRight size={16} />
         </Link>
       </div>
@@ -45,7 +46,9 @@ export default async function EventsPage() {
             className="rounded-xl border border-border bg-background p-5 transition-colors hover:bg-muted/50"
           >
             <span className="block text-lg font-semibold text-foreground">{event.name ?? "Untitled event"}</span>
-            <span className="mt-2 block text-sm text-muted-foreground">{event.assetCount.toLocaleString()} public images</span>
+            {event.eventDate ? (
+              <span className="mt-2 block text-sm text-muted-foreground">{formatDate(event.eventDate)}</span>
+            ) : null}
           </Link>
         ))}
       </div>

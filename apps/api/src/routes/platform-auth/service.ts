@@ -5,7 +5,11 @@ import {
   FOTOCORP_SESSION_TTL_SECONDS,
   hashPlatformSessionToken,
 } from "../../lib/auth/platform-session"
-import { hashPhotographerPortalPassword, verifyPhotographerPortalPassword } from "../../lib/auth/contributor-password"
+import {
+  hashPhotographerPortalPassword,
+  validatePhotographerPortalPasswordStrength,
+  verifyPhotographerPortalPassword,
+} from "../../lib/auth/contributor-password"
 import { AppError } from "../../lib/errors"
 import { createPlatformUser } from "../../lib/users/platform-user"
 import type { ValidatedRegistrationProfile } from "../auth/services/fotocorp-registration-profile"
@@ -258,6 +262,81 @@ export async function requirePlatformSession(
   if (ownerType && session.ownerType !== ownerType) {
     throw new AppError(401, "AUTH_REQUIRED", "Authentication is required.")
   }
+  return session
+}
+
+export interface ChangePlatformPasswordInput {
+  currentPassword: string
+  newPassword: string
+}
+
+export async function changePlatformUserPassword(
+  db: DrizzleClient,
+  token: string | undefined,
+  input: ChangePlatformPasswordInput,
+): Promise<PlatformSessionResult> {
+  if (!token) throw new AppError(401, "AUTH_REQUIRED", "Authentication is required.")
+
+  const tokenHash = await hashPlatformSessionToken(token)
+  const rows = await executeRows<{
+    session_id: string
+    owner_id: string
+    password_hash: string
+  }>(db, sql`
+    select
+      s.id as session_id,
+      s.owner_id,
+      c.password_hash
+    from auth_sessions s
+    join auth_credentials c on c.id = s.credential_id
+    where s.session_token_hash = ${tokenHash}
+      and s.owner_type = 'USER'
+      and s.revoked_at is null
+      and s.expires_at > now()
+      and c.status = 'ACTIVE'
+    limit 1
+  `)
+
+  const row = rows[0]
+  if (!row) throw new AppError(401, "AUTH_REQUIRED", "Authentication is required.")
+
+  const currentMatches = await verifyPhotographerPortalPassword(input.currentPassword, row.password_hash)
+  if (!currentMatches) throw new AppError(401, "INVALID_CURRENT_PASSWORD", "Current password is invalid.")
+
+  const strengthError = validatePhotographerPortalPasswordStrength(input.newPassword)
+  if (strengthError) throw new AppError(400, "WEAK_PASSWORD", strengthError)
+
+  if (input.currentPassword === input.newPassword) {
+    throw new AppError(400, "PASSWORD_UNCHANGED", "Choose a password different from your current password.")
+  }
+
+  const newHash = await hashPhotographerPortalPassword(input.newPassword)
+
+  await db.execute(sql`
+    update auth_credentials
+    set password_hash = ${newHash},
+        must_reset_password = false,
+        password_updated_at = now(),
+        updated_at = now()
+    where owner_type = 'USER'
+      and owner_id = ${row.owner_id}::uuid
+      and status = 'ACTIVE'
+  `)
+
+  await db.execute(sql`
+    update auth_sessions
+    set revoked_at = now()
+    where owner_type = 'USER'
+      and owner_id = ${row.owner_id}::uuid
+      and id <> ${row.session_id}::uuid
+      and revoked_at is null
+  `)
+
+  const session = await getPlatformSession(db, token)
+  if (!session || session.ownerType !== "USER" || !session.user) {
+    throw new AppError(401, "AUTH_REQUIRED", "Authentication is required.")
+  }
+
   return session
 }
 

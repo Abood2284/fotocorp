@@ -8,7 +8,32 @@ Update this file after every meaningful implementation change.
 
 ## Current Goal
 
-- Staff ops UX **PR-A/B/C** landed (dashboard, dynamic guidance, filters, stepper, close). **PR-D:** P7 contributor apply/approve manual smoke when ready.
+- **Jobs publish drain (PR-1 done):** Production uses `publish:drain` (one-shot, structured logs, `PUBLISH_DRAIN_MAX_*` limits). `publish:worker` blocked in production unless `ALLOW_CONTINUOUS_JOB_WORKER=true`; compose `dev-worker` profile for local poller. **Next:** PR-2 VPS wake HTTP + tunnel; PR-3 API webhook on approve; PR-4 backup cron.
+
+- **Account + password reset:** Plan [`docs/plans/account-and-password-reset.md`](../docs/plans/account-and-password-reset.md) — PR-1–3 complete. Forgot/reset: `0045_password_reset_tokens`, `POST/GET forgot + reset API`, `CUSTOMER_PASSWORD_RESET` email, `/forgot-password` + `/reset-password`, sign-in link.
+
+- **Unified sign-in (in progress):** Single `/sign-in` form (no persona tabs); platform `scope=ANY` then staff fallback; contributor → dashboard, subscriber/staff → homepage with safe `callbackUrl`. PR2+ unified session BFF and header menus follow.
+
+- **Catalog Neon P2C:** `/search` shell-only on first load; filters and search APIs run only after user intent. **robots.txt** blocks crawlers from expensive routes.
+- Staff ops UX **PR-D:** P7 contributor apply/approve manual smoke when ready.
+
+## Completed (recent)
+
+- **Jobs PR-1 — one-shot `publish:drain`:** Added `apps/jobs/src/publishDrain.ts`, `--drain` CLI, production guard on `publish:worker`, Docker default CMD/compose drain (`restart: "no"`), `dev-worker` profile for poller. Docs: `apps/jobs/README.md`, `docs/db-revamp/media-pipeline-operations.md`, `context/architecture.md`.
+
+- **Password reset email flow (PR-3):** `password_reset_tokens` + forgot/reset API + `CUSTOMER_PASSWORD_RESET` email + web routes. Migration `0045` registered in `drizzle/meta/_journal.json`; apply via `pnpm db:migrate` or `pnpm --dir apps/api exec tsx scripts/db/apply-0045-password-reset-tokens.ts` if the table was missing (fixes forgot-password 500).
+
+- **Platform change password (PR-2):** Authenticated USER password change at `POST /api/v1/auth/change-password`; updates EMAIL + USERNAME credential hashes; revokes other USER sessions; web proxy + account security form. Tests: `apps/api/test/platform-change-password.test.ts`, `apps/web/test/platform-password-validation.test.ts`.
+
+- **Account download access by entitlement:** [`/account/subscription`](../apps/web/src/app/(marketing)/account/subscription/page.tsx) lists per–asset-type limits (Images, Video, Caricature) with downloads used/allowed, quality tier + resolution description, validity dates; `listSubscriberEntitlements` in [`app-user-profile-store.ts`](../apps/web/src/lib/app-user-profile-store.ts).
+
+- **Account overview PR-1 (design.md):** Revamped [`/account`](../apps/web/src/app/(marketing)/account/page.tsx) with capability-focused copy (browse, Fotobox, downloads), profile fields without raw enums, square/hairline [`AccountShell`](../apps/web/src/components/account/account-shell.tsx), [`/account/security`](../apps/web/src/app/(marketing)/account/security/page.tsx) shell. Plan: [`docs/plans/account-and-password-reset.md`](../docs/plans/account-and-password-reset.md).
+
+- **Search lazy-load + robots.txt (Neon P2C / bot containment):** Added [`apps/web/public/robots.txt`](../apps/web/public/robots.txt) disallowing `/api/`, `/search`, staff/contributor paths, and query-string asset URLs. `/search` SSR is shell-only (no Typesense/Neon calls). [`search-intent.ts`](../apps/web/src/lib/search/search-intent.ts) gates client fetches; filters load on input focus, filter drawer open, or active search params; search/events queries run only when URL params indicate intent.
+
+- **Public filters P2A/B:** `GET /api/v1/assets/filters` now defaults to taxonomy-only (`includeCounts=true` opt-in). Web adds `getPublicCatalogTaxonomy()`. `/categories`, `/events`, slug redirect, event detail use taxonomy — no aggregate counts, no count labels on category/event browse cards (events show date when available). Event detail derives metadata from `listPublicAssets` results.
+
+- **Homepage filters removal (Neon P1):** Removed blocking SSR chain `getPublicAssetFilters()` → `listPublicAssets()` from [`apps/web/src/app/(marketing)/page.tsx`](../apps/web/src/app/(marketing)/page.tsx). Default `GET /` makes no catalog API calls during SSR. Creative/Royalty Free tab lazy-loads via `fetchRoyaltyFreeFeaturedAssets()` in [`home-category-section.tsx`](../apps/web/src/components/marketing/home-category-section.tsx). API `listPublicRoyaltyFreeFeaturedAssets` now reads `public_royalty_free_featured_items` for current month (empty fallback, no live category scan). Populate featured rows with `pnpm --dir apps/api royalty-free:refresh-featured -- --period YYYY-MM --limit 50`.
 
 ## Staff ops UX (PR-A–C — completed)
 
@@ -129,7 +154,7 @@ One-time P1–P9 scripts and phase reports were removed from the repo after Deve
 
 - **Marketing asset detail — primary title is event name only:** Public asset detail `<h1>` now shows only `asset.event.name` (no caption/headline/category/generic fallbacks). Caption renders separately below when present. Metadata title falls back to Fotokey only for the browser tab (`apps/web/src/app/(marketing)/assets/[id]/page.tsx`). Public asset detail `<h1>` now shows only `asset.event.name` (no caption/headline/category/generic fallbacks). Caption renders separately below when present. Metadata title falls back to Fotokey only for the browser tab (`apps/web/src/app/(marketing)/assets/[id]/page.tsx`).
 
-- **Marketing asset detail — preview layout + related grid:** On `lg+`, the preview column stretches to match the download sidebar (`lg:items-stretch`, flex-growing `figure`); detail image scales with `lg:max-h-full` inside the flex area. `AssetPreviewChrome` splits image card from actions (who is in picture, Fotokey, Save) on the stone figure without the fused white gradient bar. Related assets use sequential fallback only—**“More images from this event”** no longer backfills category/photographer/archive when the event query returns any siblings (`apps/web/src/app/(marketing)/assets/[id]/page.tsx`, `asset-preview-chrome.tsx`).
+- **Marketing asset detail — landscape column gallery:** When preview is landscape (`width > height`), related gallery renders once below the image in the left grid column (`RelatedGallery` `placement="column"`, full justified grid, no L-shaped split). Portrait keeps gallery full-width below the grid. Sidebar is not sticky. Related assets use sequential fallback only—**“More images from this event”** no longer backfills category/photographer/archive when the event query returns any siblings (`apps/web/src/app/(marketing)/assets/[id]/page.tsx`, `related-gallery.tsx`).
 
 - **`image_assets.title` → `who_is_in_picture`:** Migration `apps/api/drizzle/0034_image_assets_who_is_in_picture.sql`; Drizzle schema + public/admin/contributor SQL/DTOs expose `whoIsInPicture`. Public search FTS includes `who_is_in_picture` alongside `search_text`. Marketing asset detail: Getty-style glass action bar below preview (`AssetPreviewChrome` — who is in picture, Fotokey, Save); Details row with comma-separated search links; H1 uses headline/caption only. Staff catalog/captions filters use `missingWhoIsInPicture`; contributor upload metadata PATCH uses `whoIsInPicture`.
 

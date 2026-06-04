@@ -1,11 +1,13 @@
 import { loadJobsEnv } from "./config/env"
 import { closeJobsPool } from "./db/client"
+import { readPublishDrainMaxJobs, readPublishDrainMaxRuntimeMs, runPublishDrain } from "./publishDrain"
 import { ImagePublishJobService } from "./services/imagePublishJobService"
 import { ImagePublishWorker } from "./workers/imagePublishWorker"
 
-type JobsCliMode = "dry-run" | "once" | "worker"
+type JobsCliMode = "dry-run" | "once" | "drain" | "worker"
 
 function parseMode(argv: string[]): JobsCliMode {
+  if (argv.includes("--drain")) return "drain"
   if (argv.includes("--worker")) return "worker"
   if (argv.includes("--once")) return "once"
   return "dry-run"
@@ -43,6 +45,21 @@ function sleep(ms: number): Promise<void> {
   })
 }
 
+function assertContinuousWorkerAllowed(): void {
+  if (process.env.NODE_ENV !== "production") return
+  const allowed = process.env.ALLOW_CONTINUOUS_JOB_WORKER === "true"
+  if (allowed) return
+  console.error(
+    JSON.stringify({
+      event: "continuous_worker_blocked",
+      message:
+        "publish:worker is disabled in production. Use publish:drain (one-shot) or set ALLOW_CONTINUOUS_JOB_WORKER=true for local VPS debugging only.",
+    })
+  )
+  process.exitCode = 1
+  throw new Error("continuous worker blocked in production")
+}
+
 async function main() {
   const argv = process.argv.slice(2)
   const mode = parseMode(argv)
@@ -61,7 +78,31 @@ async function main() {
     env.databaseUrl !== undefined ? new ImagePublishJobService(env.databaseUrl) : undefined
   const worker = new ImagePublishWorker(jobService)
 
+  if (mode === "drain") {
+    try {
+      const summary = await runPublishDrain({
+        worker,
+        jobService,
+        skipDbAccess,
+        processingEnabled: env.imagePublishProcessingEnabled,
+        jobsEnv: env,
+        limits: {
+          maxJobs: readPublishDrainMaxJobs(),
+          maxRuntimeMs: readPublishDrainMaxRuntimeMs(),
+        },
+      })
+      if (summary.stopReason === "processing_disabled" && summary.pendingAtStart > 0) {
+        process.exitCode = 1
+      }
+    } finally {
+      await closeJobsPool()
+    }
+    console.log("[fotocorp-jobs] done")
+    return
+  }
+
   if (mode === "worker") {
+    assertContinuousWorkerAllowed()
     const pollIntervalMs = readWorkerPollIntervalMs()
     const concurrency = readWorkerConcurrency()
     console.log(
@@ -75,7 +116,7 @@ async function main() {
             skipDbAccess,
             dryRun: false,
             processingEnabled: env.imagePublishProcessingEnabled,
-            jobsEnv: env
+            jobsEnv: env,
           })
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : String(error)
@@ -98,7 +139,7 @@ async function main() {
       skipDbAccess,
       dryRun,
       processingEnabled: env.imagePublishProcessingEnabled,
-      jobsEnv: env
+      jobsEnv: env,
     })
   } finally {
     await closeJobsPool()
@@ -108,6 +149,10 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  if (process.argv.includes("--drain")) {
+    console.error(JSON.stringify({ event: "publish_drain_failed", error: message }))
+  }
   console.error(error)
   process.exitCode = 1
   closeJobsPool().catch(() => {

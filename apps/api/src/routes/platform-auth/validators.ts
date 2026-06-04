@@ -25,3 +25,17 @@ export const platformSignUpSchema = z.object({
   imageQualityPreference: z.string().trim().optional(),
   name: z.string().trim().optional(),
 })
+
+export const platformChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(512),
+  newPassword: z.string().min(6).max(512),
+})
+
+export const platformForgotPasswordSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address."),
+})
+
+export const platformResetPasswordSchema = z.object({
+  token: z.string().trim().min(1).max(512),
+  newPassword: z.string().min(6).max(512),
+})

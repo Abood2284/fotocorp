@@ -197,11 +197,17 @@ export async function getPublicAsset(assetId: string): Promise<PublicAssetDetail
   }
 }
 
+export async function getPublicCatalogTaxonomy(
+  options: { cachePolicy?: PublicJsonCachePolicy } = {},
+): Promise<PublicAssetFiltersResponse> {
+  return getPublicAssetFilters({ ...options, includeCounts: false })
+}
+
 export async function getPublicAssetFilters(
   options: { cachePolicy?: PublicJsonCachePolicy; includeCounts?: boolean } = {},
 ): Promise<PublicAssetFiltersResponse> {
   const searchParams = new URLSearchParams()
-  if (options.includeCounts === false) searchParams.set("includeCounts", "false")
+  if (options.includeCounts === true) searchParams.set("includeCounts", "true")
   const query = searchParams.toString()
   const path = `${resolveFiltersPath()}${query ? `?${query}` : ""}`
 
@@ -360,8 +366,9 @@ export async function fetchRoyaltyFreeFeaturedAssets(params: {
   const searchParams = new URLSearchParams()
   appendParam(searchParams, "limit", params.limit)
   const query = searchParams.toString()
+  const path = `${resolveRoyaltyFreeFeaturedPath()}${query ? `?${query}` : ""}`
   const response = await getJson<PublicAssetListResponse & { assets?: PublicAsset[] }>(
-    `/api/public/royalty-free/featured${query ? `?${query}` : ""}`,
+    path,
     {
       cachePolicy: "public-royalty-free-long",
       traceRoute: "/api/public/royalty-free/featured",
@@ -581,6 +588,12 @@ function resolveHomepageHeroSetPath() {
   return typeof window === "undefined"
     ? "/api/v1/public/homepage/hero-set"
     : "/api/public/homepage/hero-set"
+}
+
+function resolveRoyaltyFreeFeaturedPath() {
+  return typeof window === "undefined"
+    ? "/api/v1/public/royalty-free/featured"
+    : "/api/public/royalty-free/featured"
 }
 
 async function readApiError(response: Response) {

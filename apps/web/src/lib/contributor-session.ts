@@ -23,7 +23,7 @@ export async function getOptionalContributorSession(): Promise<ContributorAuthRe
 
 export async function requireContributorPortalSession() {
   const session = await getOptionalContributorSession()
-  if (!session) redirect(buildSignInHref({ persona: "contributor" }))
+  if (!session) redirect(buildSignInHref())
   return session
 }
 

@@ -229,7 +229,7 @@ export interface PublicAssetListParams {
   includeFacets?: boolean
 }
 
-export type PublicLatestEventsSection = "latest" | "news" | "sports" | "entertainment" | "retro"
+export type PublicLatestEventsSection = "latest" | "news" | "sports" | "entertainment" | "fashion" | "retro"
 export type PublicEventBrowseSection = Exclude<PublicLatestEventsSection, "latest">
 
 export interface PublicEventCategoryBrowseResponse extends PublicLatestEventsResponse {

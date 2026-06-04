@@ -161,7 +161,9 @@ Shards 1–4: same command with `--shard-index 1` … `4` and matching `--report
 
 Dry-run on Windows first: add `--dry-run --limit 20`.
 
-### VPS jobs redeploy (after jobs code merge)
+### VPS jobs (one-shot drain — no idle Neon polling)
+
+Production uses **`publish:drain`**: process all `QUEUED` `image_publish_jobs` (up to `PUBLISH_DRAIN_MAX_JOBS` / `PUBLISH_DRAIN_MAX_RUNTIME_SECONDS`), then exit. Pending jobs stay in Neon until the next drain (cron backup or approve-time webhook in PR-2/3).
 
 From repo root on VPS (e.g. `/opt/fotocorp/app`):
 
@@ -171,11 +173,20 @@ git pull
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production build fotocorp-jobs
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs pnpm --dir apps/jobs smoke:sharp
-docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production up -d --build fotocorp-jobs
-docker compose -f docker-compose.jobs.yml logs -f --tail=100 fotocorp-jobs
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs
 ```
 
-`docker compose restart` does **not** load new code; always `up -d --build` after `git pull`.
+Example backup cron (every 2 days — adjust path/schedule):
+
+```cron
+0 3 */2 * * cd /opt/fotocorp/app && docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs >> /var/log/fotocorp-jobs-drain.log 2>&1
+```
+
+Set `IMAGE_PUBLISH_PROCESSING_ENABLED=true` in `apps/jobs/.env.production` before expecting real publishes.
+
+**Dev-only** continuous 15s poller: `docker compose -f docker-compose.jobs.yml --profile dev-worker up -d fotocorp-jobs-worker` (requires `ALLOW_CONTINUOUS_JOB_WORKER=true` in compose).
+
+`docker compose restart` does **not** load new code; rebuild the image after `git pull`.
 
 ### Typesense (after backfill)
 

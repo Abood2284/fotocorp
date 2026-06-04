@@ -8,15 +8,15 @@ import { useQueryClient } from "@tanstack/react-query"
 import { all as allCountries } from "country-codes-list"
 import { platformLogin, platformSignUp } from "@/lib/api/platform-auth-api"
 import { loginStaff, StaffApiError } from "@/lib/api/staff-api"
+import { stripLegacyPersonaFromSignInSearchParams } from "@/lib/auth-sign-in-gateway"
 import {
-  buildSignInHref,
-  readSignInPersona,
-  signInPersonaLabel,
-  type SignInPersona,
-} from "@/lib/auth-sign-in-gateway"
+  isPlatformInvalidCredentials,
+  resolvePlatformPostLoginRedirect,
+  resolveStaffPostLoginRedirectFromSignIn,
+} from "@/lib/auth-post-login"
+import { buildUnifiedSessionFromPlatform } from "@/lib/auth-session-build"
 import { SHARED_AUTH_SESSION_QUERY_KEY } from "@/lib/use-shared-auth-session"
 import { resolveAuthRedirectFromSearchParams } from "@/lib/auth-redirect"
-import { resolveStaffPostLoginRedirect } from "@/lib/staff/staff-route-access"
 import { isValidUsername, normalizeUsername } from "@/lib/username"
 import { migrateAnonBoardsToServer } from "@/lib/storage/fotobox-anon-store"
 
@@ -213,31 +213,17 @@ export function SplitAuthPage() {
   const callingCodes = useMemo(getCallingCodeOptions, [])
 
   const redirectTo = useMemo(() => resolveAuthRedirectFromSearchParams(searchParams), [searchParams])
-  const [persona, setPersona] = useState<SignInPersona>(() => readSignInPersona(searchParams.get("persona")))
-  const showRegisterTab = persona === "subscriber"
+  const callbackUrl = searchParams.get("callbackUrl")
 
   useEffect(() => {
-    setPersona(readSignInPersona(searchParams.get("persona")))
-  }, [searchParams])
+    const nextPath = stripLegacyPersonaFromSignInSearchParams(searchParams)
+    if (nextPath) router.replace(nextPath)
+  }, [searchParams, router])
 
   useEffect(() => {
     const tab = searchParams.get("tab")
-    if (tab === "register" && persona === "subscriber") setActiveTab("register")
-    if (tab === "register" && persona !== "subscriber") setActiveTab("sign-in")
-  }, [searchParams, persona])
-
-  function switchPersona(next: SignInPersona) {
-    setPersona(next)
-    setErrors({})
-    setNotice("")
-    if (next !== "subscriber" && activeTab === "register") setActiveTab("sign-in")
-    const params = new URLSearchParams(searchParams.toString())
-    if (next === "subscriber") params.delete("persona")
-    else params.set("persona", next)
-    if (next !== "subscriber") params.delete("tab")
-    const query = params.toString()
-    router.replace(query ? `/sign-in?${query}` : "/sign-in")
-  }
+    if (tab === "register") setActiveTab("register")
+  }, [searchParams])
 
   function switchTab(tab: AuthTab) {
     setActiveTab(tab)
@@ -259,10 +245,7 @@ export function SplitAuthPage() {
     const identifier = String(formData.get("identifier") ?? "").trim()
     const password = String(formData.get("password") ?? "")
 
-    const identifierLabel =
-      persona === "subscriber" ? "Username or company email" : "Username"
-
-    if (!identifier) nextErrors.identifier = `${identifierLabel} is required.`
+    if (!identifier) nextErrors.identifier = "Email or username is required."
     if (!password) nextErrors.password = "Password is required."
 
     setErrors(nextErrors)
@@ -272,67 +255,74 @@ export function SplitAuthPage() {
     }
 
     startTransition(async () => {
-      if (persona === "staff") {
-        try {
-          const me = await loginStaff(identifier, password)
-          const next = resolveStaffPostLoginRedirect(me.staff.role, searchParams.get("callbackUrl"))
-          router.push(next)
-        } catch (caught) {
-          if (caught instanceof StaffApiError && caught.status >= 500) {
-            setNotice("We could not sign you in right now. Please try again.")
-          } else {
-            setErrors({ password: "Invalid username or password." })
-          }
-        }
-        return
-      }
+      const loginIdentifier = identifier.includes("@") ? identifier : normalizeUsername(identifier)
 
       try {
-        const loginIdentifier = identifier.includes("@") ? identifier : normalizeUsername(identifier)
-        const scope = persona === "contributor" ? "CONTRIBUTOR" : "USER"
-        const response = await platformLogin(loginIdentifier, password, { scope })
+        const response = await platformLogin(loginIdentifier, password, { scope: "ANY" })
 
-        if (response.error) {
-          applySignInServerError({ error: response.error, setErrors, setNotice, tab: "sign-in" })
-          return
-        }
+        if (!response.error) {
+          await fetch("/api/staff/auth/logout", { method: "POST", credentials: "include" }).catch(() => null)
 
-        if (persona === "contributor") {
-          if (response.ownerType !== "CONTRIBUTOR" && !response.contributor) {
-            await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
-            setNotice("Use the Subscriber tab for customer accounts.")
-            return
+          const ownerType = response.ownerType === "CONTRIBUTOR" ? "CONTRIBUTOR" : "USER"
+
+          const unified = buildUnifiedSessionFromPlatform({
+            ownerType,
+            user: response.user
+              ? {
+                  id: response.user.id,
+                  email: response.user.email,
+                  displayName: response.user.displayName ?? null,
+                  username: response.user.username ?? null,
+                }
+              : null,
+            contributor: response.contributor
+              ? {
+                  id: response.contributor.id,
+                  displayName: response.contributor.displayName,
+                  username: response.contributor.username,
+                  email: response.contributor.email ?? null,
+                }
+              : null,
+          })
+
+          if (unified) {
+            queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, unified)
+          } else {
+            await queryClient.invalidateQueries({ queryKey: SHARED_AUTH_SESSION_QUERY_KEY })
           }
-          router.push("/contributor/dashboard")
+
+          if (ownerType === "USER") {
+            await migrateAnonBoardsToServer()
+          }
+
+          router.push(resolvePlatformPostLoginRedirect(ownerType, callbackUrl))
           router.refresh()
           return
         }
 
-        if (response.ownerType === "CONTRIBUTOR") {
-          await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
-          setNotice(`Contributor accounts should use the ${signInPersonaLabel("contributor")} tab above.`)
+        if (!isPlatformInvalidCredentials(response.error)) {
+          applySignInServerError({ error: response.error, setErrors, setNotice, tab: "sign-in" })
           return
         }
-
-        if (response.user) {
-          queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, {
-            user: {
-              id: response.user.id,
-              email: response.user.email,
-              name: response.user.displayName ?? null,
-            },
-          })
-        } else {
-          await queryClient.invalidateQueries({ queryKey: SHARED_AUTH_SESSION_QUERY_KEY })
-        }
-        await migrateAnonBoardsToServer()
       } catch (error) {
         applySignInServerError({ error, setErrors, setNotice, tab: "sign-in" })
         return
       }
 
-      router.push(redirectTo)
-      router.refresh()
+      try {
+        const me = await loginStaff(identifier, password)
+        await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => null)
+        await queryClient.invalidateQueries({ queryKey: SHARED_AUTH_SESSION_QUERY_KEY })
+        const next = resolveStaffPostLoginRedirectFromSignIn(me.staff.role, callbackUrl)
+        router.push(next)
+        router.refresh()
+      } catch (caught) {
+        if (caught instanceof StaffApiError && caught.status >= 500) {
+          setNotice("We could not sign you in right now. Please try again.")
+        } else {
+          setErrors({ password: "Invalid email, username, or password." })
+        }
+      }
     })
   }
 
@@ -426,14 +416,20 @@ export function SplitAuthPage() {
           applyRegisterServerError({ error: response.error, setErrors, setNotice, tab: "register" })
           return
         }
-        if (response.user) {
-          queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, {
-            user: {
-              id: response.user.id,
-              email: response.user.email,
-              name: response.user.displayName ?? null,
-            },
-          })
+        const unified = response.user
+          ? buildUnifiedSessionFromPlatform({
+              ownerType: "USER",
+              user: {
+                id: response.user.id,
+                email: response.user.email,
+                displayName: response.user.displayName ?? null,
+                username: response.user.username ?? null,
+              },
+            })
+          : null
+
+        if (unified) {
+          queryClient.setQueryData(SHARED_AUTH_SESSION_QUERY_KEY, unified)
         } else {
           await queryClient.invalidateQueries({ queryKey: SHARED_AUTH_SESSION_QUERY_KEY })
         }
@@ -452,7 +448,7 @@ export function SplitAuthPage() {
     <main className="min-h-screen bg-white text-foreground lg:grid lg:h-screen lg:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.7fr)] lg:overflow-hidden xl:grid-cols-[minmax(0,1.45fr)_minmax(460px,0.65fr)]">
       <section className="relative hidden min-h-screen overflow-hidden bg-primary lg:block lg:h-screen">
         <Image
-          src="/images/auth_stock.png"
+          src="/images/auth_stock.jpg"
           alt=""
           fill
           priority
@@ -481,40 +477,16 @@ export function SplitAuthPage() {
               <TabButton active={activeTab === "sign-in"} onClick={() => switchTab("sign-in")}>
                 SIGN IN
               </TabButton>
-              {showRegisterTab ? (
-                <TabButton active={activeTab === "register"} onClick={() => switchTab("register")}>
-                  REGISTER
-                </TabButton>
-              ) : null}
+              <TabButton active={activeTab === "register"} onClick={() => switchTab("register")}>
+                REGISTER
+              </TabButton>
             </div>
-
-            {activeTab === "sign-in" ? (
-              <nav
-                className="mb-6 flex flex-wrap gap-2"
-                aria-label="Sign in as"
-              >
-                {(["subscriber", "contributor", "staff"] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => switchPersona(value)}
-                    className={
-                      persona === value
-                        ? "rounded-none border border-foreground bg-foreground px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-background"
-                        : "rounded-none border border-border-subtle px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
-                    }
-                  >
-                    {signInPersonaLabel(value)}
-                  </button>
-                ))}
-              </nav>
-            ) : null}
 
             <div className="min-h-0 flex-1 lg:pr-1">
               {activeTab === "sign-in" ? (
                 <form data-auth-form="sign-in" onSubmit={handleSignIn} noValidate className="space-y-5">
                   <TextField
-                    label={persona === "subscriber" ? "Username or company email" : "Username"}
+                    label="Email or username"
                     name="identifier"
                     autoComplete="username"
                     error={errors.identifier}
@@ -530,22 +502,23 @@ export function SplitAuthPage() {
                   />
 
                   <div className="flex items-center justify-between gap-4 pt-1">
-                    <button type="button" className="fc-label text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                    <Link
+                      href="/forgot-password"
+                      className="fc-label text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
                       Forgot password?
-                    </button>
+                    </Link>
                   </div>
 
                   <SubmitButton disabled={isPending}>
                     {isPending ? "Signing In..." : "Sign In"}
                   </SubmitButton>
-                  {persona === "contributor" ? (
-                    <p className="text-center text-sm text-muted-foreground">
-                      New to Fotocorp?{" "}
-                      <Link href="/apply-contributor" className="font-medium text-foreground underline-offset-4 hover:underline">
-                        Apply to contribute
-                      </Link>
-                    </p>
-                  ) : null}
+                  <p className="text-center text-sm text-muted-foreground">
+                    New to Fotocorp?{" "}
+                    <Link href="/apply-contributor" className="font-medium text-foreground underline-offset-4 hover:underline">
+                      Apply to contribute
+                    </Link>
+                  </p>
                   <FormNotice isError>{notice}</FormNotice>
                 </form>
               ) : (

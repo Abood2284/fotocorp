@@ -6,6 +6,7 @@ import type { PublicAsset } from "@/features/assets/types"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
 import { listPublicAssets } from "@/lib/api/fotocorp-api"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 interface RelatedGalleryProps {
   initialAssets: PublicAsset[]
@@ -18,6 +19,8 @@ interface RelatedGalleryProps {
   label: string
   browseHref: string
   relatedCountLabel: string | null
+  /** `column` = left column on landscape detail (width stops at sidebar). `full` = below the grid. */
+  placement?: "full" | "column"
 }
 
 export function RelatedGallery({
@@ -31,11 +34,13 @@ export function RelatedGallery({
   label,
   browseHref,
   relatedCountLabel,
+  placement = "full",
 }: RelatedGalleryProps) {
   const [assets, setAssets] = useState<PublicAsset[]>(initialAssets)
   const [cursor, setCursor] = useState<string | null>(initialCursor)
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(initialCursor !== null && initialAssets.length < totalCount)
+  const isColumn = placement === "column"
 
   async function handleLoadMore() {
     if (loading || !cursor) return
@@ -46,7 +51,7 @@ export function RelatedGallery({
         eventId: eventId ?? undefined,
         categoryId: categoryId ?? undefined,
         contributorId: contributorId ?? undefined,
-        cursor: cursor,
+        cursor,
         limit: 12,
       })
 
@@ -63,7 +68,13 @@ export function RelatedGallery({
   }
 
   return (
-    <section id="event-gallery-section" className="scroll-mt-28 mt-6 pt-2 border-t border-border">
+    <section
+      id="event-gallery-section"
+      className={cn(
+        "scroll-mt-28 min-w-0",
+        isColumn ? "mt-6 lg:mt-5" : "mt-6 border-t border-border pt-2",
+      )}
+    >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="text-2xl font-semibold tracking-tight text-foreground">{label}</h2>
         {relatedCountLabel ? (
@@ -78,14 +89,13 @@ export function RelatedGallery({
           View all
         </Link>
       </div>
-      
+
       {assets.length > 0 ? (
         <>
           <div className="mt-6">
             <PublicAssetGrid assets={assets} limit={assets.length} />
           </div>
 
-          {/* Proper justified row skeleton during loading */}
           {loading && (
             <div className="mt-2 w-full animate-pulse" aria-hidden>
               <div className="flex w-full" style={{ gap: 8, height: 200, marginBottom: 8 }}>

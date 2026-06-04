@@ -12,7 +12,7 @@ const NUM = "23456789";
 const SYM = "#%^&*-_=+";
 const POOL = UPPER + LOWER + NUM + SYM;
 const MIN_TEMP_PASSWORD_LEN = 14;
-const MIN_NEW_PASSWORD_LEN = 12;
+const MIN_NEW_PASSWORD_LEN = 6;
 
 interface ScryptEnvelope {
   n: number;
@@ -75,11 +75,9 @@ export function generatePhotographerPortalTemporaryPassword(): string {
 }
 
 export function validatePhotographerPortalPasswordStrength(password: string): string | null {
-  if (password.length < MIN_NEW_PASSWORD_LEN) return "Password must be at least 12 characters.";
-  if (!/[A-Z]/.test(password)) return "Password must include an uppercase letter.";
-  if (!/[a-z]/.test(password)) return "Password must include a lowercase letter.";
-  if (!/[0-9]/.test(password)) return "Password must include a number.";
-  if (!/[^A-Za-z0-9]/.test(password)) return "Password must include a symbol.";
+  if (password.length < MIN_NEW_PASSWORD_LEN) {
+    return `Password must be at least ${MIN_NEW_PASSWORD_LEN} characters.`;
+  }
   return null;
 }
 

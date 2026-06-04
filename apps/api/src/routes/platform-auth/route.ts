@@ -11,8 +11,25 @@ import { AppError } from "../../lib/errors"
 import { zodValidationHook } from "../../lib/zod-validation-hook"
 import { methodNotAllowed } from "../../lib/route-errors"
 import { FOTOCORP_SESSION_COOKIE, isSecureAuthCookie } from "../../lib/auth/platform-session"
-import { loginPlatformAuth, logoutPlatformAuth, signUpPlatformUser } from "./service"
-import { platformLoginSchema, platformSignUpSchema } from "./validators"
+import {
+  changePlatformUserPassword,
+  getPlatformSession,
+  loginPlatformAuth,
+  logoutPlatformAuth,
+  signUpPlatformUser,
+} from "./service"
+import {
+  completePlatformPasswordReset,
+  requestPlatformPasswordReset,
+  validatePlatformPasswordResetToken,
+} from "./password-reset"
+import {
+  platformChangePasswordSchema,
+  platformForgotPasswordSchema,
+  platformLoginSchema,
+  platformResetPasswordSchema,
+  platformSignUpSchema,
+} from "./validators"
 import { safeSendAccessInquiryEmail } from "../../lib/email/email-service"
 import { findLatestInquiryForPlatformUser } from "../../lib/users/platform-user"
 
@@ -55,6 +72,22 @@ platformAuthRoutes.post("/api/v1/auth/logout", async (c) => {
 })
 
 platformAuthRoutes.all("/api/v1/auth/logout", () => methodNotAllowed())
+
+platformAuthRoutes.get("/api/v1/auth/session", async (c) => {
+  const session = await getPlatformSession(db(c.env), getCookie(c, FOTOCORP_SESSION_COOKIE))
+  if (!session) {
+    throw new AppError(401, "AUTH_REQUIRED", "Authentication is required.")
+  }
+
+  return c.json({
+    ok: true,
+    ownerType: session.ownerType,
+    user: session.user,
+    contributor: session.contributor,
+  })
+})
+
+platformAuthRoutes.all("/api/v1/auth/session", () => methodNotAllowed())
 
 platformAuthRoutes.post(
   "/api/v1/auth/sign-up",
@@ -113,6 +146,57 @@ platformAuthRoutes.post(
 })
 
 platformAuthRoutes.all("/api/v1/auth/sign-up", () => methodNotAllowed())
+
+platformAuthRoutes.post(
+  "/api/v1/auth/change-password",
+  zValidator("json", platformChangePasswordSchema, zodValidationHook),
+  async (c) => {
+    const session = await changePlatformUserPassword(
+      db(c.env),
+      getCookie(c, FOTOCORP_SESSION_COOKIE),
+      c.req.valid("json"),
+    )
+
+    return c.json({
+      ok: true,
+      ownerType: session.ownerType,
+      user: session.user,
+      contributor: session.contributor,
+    })
+  },
+)
+
+platformAuthRoutes.all("/api/v1/auth/change-password", () => methodNotAllowed())
+
+platformAuthRoutes.post(
+  "/api/v1/auth/forgot-password",
+  zValidator("json", platformForgotPasswordSchema, zodValidationHook),
+  async (c) => {
+    const result = await requestPlatformPasswordReset(db(c.env), c.env, c.req.valid("json"), requestMeta(c))
+    return c.json({ ok: true, message: result.message })
+  },
+)
+
+platformAuthRoutes.all("/api/v1/auth/forgot-password", () => methodNotAllowed())
+
+platformAuthRoutes.get("/api/v1/auth/reset-password/validate", async (c) => {
+  const token = c.req.query("token")
+  await validatePlatformPasswordResetToken(db(c.env), token)
+  return c.json({ ok: true })
+})
+
+platformAuthRoutes.all("/api/v1/auth/reset-password/validate", () => methodNotAllowed())
+
+platformAuthRoutes.post(
+  "/api/v1/auth/reset-password",
+  zValidator("json", platformResetPasswordSchema, zodValidationHook),
+  async (c) => {
+    const result = await completePlatformPasswordReset(db(c.env), c.req.valid("json"))
+    return c.json(result)
+  },
+)
+
+platformAuthRoutes.all("/api/v1/auth/reset-password", () => methodNotAllowed())
 
 function db(env: Env) {
   if (!env.DATABASE_URL) throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")

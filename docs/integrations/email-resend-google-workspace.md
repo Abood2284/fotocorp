@@ -29,7 +29,7 @@ Optional:
 PUBLIC_WEB_ORIGIN=https://fotocorp.com
 ```
 
-When `PUBLIC_WEB_ORIGIN` is set, customer approval emails link to `/sign-in` on that origin and contributor approval emails link to `/sign-in?persona=contributor`. If it is not set, emails use `https://fotocorp.com`.
+When `PUBLIC_WEB_ORIGIN` is set, customer and contributor approval emails link to `/sign-in` on that origin. If it is not set, emails use `https://fotocorp.com/sign-in`.
 
 ## Templates
 
@@ -38,8 +38,9 @@ When `PUBLIC_WEB_ORIGIN` is set, customer approval emails link to `/sign-in` on 
 - `CUSTOMER_ENTITLEMENT_UPDATED`: sent when staff adjusts an active entitlement's download limit or quality cap.
 - `CUSTOMER_ACCESS_REJECTED`: sent after staff closes a customer inquiry without granting access.
 - `CONTRIBUTOR_APPLICATION_RECEIVED`: sent after contributor application creation when applicant email exists.
-- `CONTRIBUTOR_APPLICATION_APPROVED_WITH_CREDENTIALS`: sent after staff approves a contributor application. Includes contributor username, generated temporary password, and `/sign-in?persona=contributor`.
+- `CONTRIBUTOR_APPLICATION_APPROVED_WITH_CREDENTIALS`: sent after staff approves a contributor application. Includes contributor username, generated temporary password, and `/sign-in`.
 - `CONTRIBUTOR_APPLICATION_REJECTED`: sent after staff closes a contributor application without granting access.
+- `CUSTOMER_PASSWORD_RESET`: sent after a customer requests forgot-password on `/forgot-password`. Includes a one-time link to `/reset-password?token=…` (60-minute TTL). Idempotency keyed per `password_reset` token row.
 
 Each template renders HTML and plain text, uses minimal inline styles, and includes:
 
@@ -90,9 +91,9 @@ curl -i -X POST http://127.0.0.1:3000/api/auth/sign-up \
 
 6. Submit a contributor application through `/apply-contributor`. This should send `CONTRIBUTOR_APPLICATION_RECEIVED` when applicant email exists.
 
-7. Approve the contributor application from `/staff/access-inquiries`. This should send `CONTRIBUTOR_APPLICATION_APPROVED_WITH_CREDENTIALS` with the generated username/password and `/sign-in?persona=contributor`.
+7. Approve the contributor application from `/staff/access-inquiries`. This should send `CONTRIBUTOR_APPLICATION_APPROVED_WITH_CREDENTIALS` with the generated username/password and `/sign-in`.
 
-8. Sign in through `/sign-in?persona=contributor` with the received credentials and change the temporary password when prompted/supported.
+8. Sign in through `/sign-in` with the received credentials (contributors are redirected to `/contributor/dashboard`) and change the temporary password when prompted/supported.
 
 9. Close a separate contributor application. This should send `CONTRIBUTOR_APPLICATION_REJECTED`.
 

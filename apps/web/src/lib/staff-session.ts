@@ -31,7 +31,6 @@ export async function getOptionalStaffSession(): Promise<StaffMeResponse | null>
 
 function buildStaffSignInRedirect(callbackPath?: string) {
   return buildSignInHref({
-    persona: "staff",
     callbackUrl: callbackPath ?? null,
   })
 }

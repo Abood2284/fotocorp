@@ -6,6 +6,7 @@
     "dev": "tsx src/index.ts --dry-run",
     "publish:dry-run": "tsx src/index.ts --dry-run",
     "publish:once": "tsx src/index.ts --once",
+    "publish:drain": "tsx src/index.ts --drain",
     "publish:worker": "tsx src/index.ts --worker",
     "smoke:sharp": "tsx scripts/smoke/check-sharp-node.ts",
     "check": "tsc -p tsconfig.json --noEmit"

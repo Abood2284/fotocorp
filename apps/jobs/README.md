@@ -9,7 +9,8 @@ Node CLI package for background image publish work. This is **not** a Cloudflare
 | `dev` | `tsx src/index.ts --dry-run` | Local developer convenience. |
 | `publish:dry-run` | `tsx src/index.ts --dry-run` | Safe read-only mode. Connects to Neon only if `DATABASE_URL` is set; if unset, the CLI warns and reports `pending publish jobs=unknown`. Never claims or mutates rows. |
 | `publish:once` | `tsx src/index.ts --once` | Validates required env, runs one poll iteration, then exits. Gated by `IMAGE_PUBLISH_PROCESSING_ENABLED` (see below). |
-| `publish:worker` | `tsx src/index.ts --worker` | Production poll loop (`IMAGE_PUBLISH_POLL_INTERVAL_MS`). Same gating as `publish:once`; exits non-zero on unexpected fatal errors so Docker `restart: unless-stopped` can recover. |
+| `publish:drain` | `tsx src/index.ts --drain` | **Production default.** Processes queued publish jobs until the queue is empty or `PUBLISH_DRAIN_MAX_JOBS` / `PUBLISH_DRAIN_MAX_RUNTIME_SECONDS` limits are hit, then exits. Emits structured `publish_drain_*` logs. No sleep loop. |
+| `publish:worker` | `tsx src/index.ts --worker` | **Dev/manual only.** Continuous poll loop (`IMAGE_PUBLISH_POLL_INTERVAL_MS`). Blocked in production unless `ALLOW_CONTINUOUS_JOB_WORKER=true`. Use Docker profile `dev-worker` (`fotocorp-jobs-worker`). |
 | `smoke:sharp` | `tsx scripts/smoke/check-sharp-node.ts` | Proves Sharp loads and encodes a tiny in-memory image. |
 | `check` | `tsc -p tsconfig.json --noEmit` | Typecheck. |
 
@@ -35,11 +36,11 @@ IMAGE_PUBLISH_PROCESSING_ENABLED=false   # default — count queued jobs only, n
 IMAGE_PUBLISH_PROCESSING_ENABLED=true      # VPS — claim and run Sharp + R2 publish
 ```
 
-| Flag | `publish:dry-run` | `publish:once` / `publish:worker` |
+| Flag | `publish:dry-run` | `publish:once` / `publish:drain` / `publish:worker` |
 | --- | --- | --- |
 | any | counts queued jobs if `DATABASE_URL` is set; never claims | — |
-| `false` | — | counts queued jobs, logs `processing disabled`, does **not** claim |
-| `true` | — | claims one queued job, runs `ImagePublishProcessor` for contributor IMAGE items |
+| `false` | — | counts queued jobs, logs `processing disabled`, does **not** claim (`publish:drain` exits non-zero if jobs remain queued) |
+| `true` | — | claims queued jobs (one per `runOnce`; `publish:drain` loops until empty or limits) |
 
 **Invariant:** assets stay `APPROVED+PRIVATE` until all required derivatives are written to R2 and `completeSuccessfulPublishItem` commits `ACTIVE+PUBLIC`. Leave `IMAGE_PUBLISH_PROCESSING_ENABLED=false` until Neon + R2 credentials on the VPS match production buckets.
 
@@ -67,8 +68,10 @@ docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production c
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production build fotocorp-jobs
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs pnpm --dir apps/jobs smoke:sharp
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs pnpm --dir apps/jobs publish:dry-run
-docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production up -d fotocorp-jobs
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs
 ```
+
+The default `fotocorp-jobs` service runs **`publish:drain`** once and exits (`restart: "no"`). Schedule it with VPS cron or invoke after staff approval (PR-2/3 webhook). Do **not** leave the old 15s poller running in production.
 
 ### Deploy or refresh after merging jobs code (VPS)
 
@@ -77,16 +80,18 @@ From the repo root (example path `/opt/fotocorp/app`):
 ```bash
 cd /opt/fotocorp/app
 git pull
-docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production up -d --build fotocorp-jobs
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production build fotocorp-jobs
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs
 ```
 
-Operator-focused steps (Ubuntu, `/opt/fotocorp/app`, SSH-only firewall, logs, `restart` vs rebuild) live in **[`docs/db-revamp/jobs-direct-vps-deployment-runbook.md`](../../docs/db-revamp/jobs-direct-vps-deployment-runbook.md)**.
+Operator steps (cron backup drain, logs, dev poller profile) live in **[`docs/db-revamp/media-pipeline-operations.md`](../../docs/db-revamp/media-pipeline-operations.md)** (VPS jobs section).
 
 **CapRover / DNS** are not required for this deployment path; they can be added later if you want a platform domain in front of other services. The jobs worker stays **off the public internet**.
 
 ## Layout
 
-- `src/index.ts` — CLI entry (no Worker `fetch` export).
+- `src/index.ts` — CLI entry (`--dry-run`, `--once`, `--drain`, `--worker`).
+- `src/publishDrain.ts` — one-shot drain loop and structured `publish_drain_*` logs.
 - `src/config/env.ts` — typed env loader; dry-run tolerates missing service env vars with warnings; parses `IMAGE_PUBLISH_PROCESSING_ENABLED`.
 - `src/db/client.ts` — Node-native `pg.Pool` singleton and `withJobsTransaction` helper.
 - `src/lib/r2Client.ts` — AWS4-signed GET/HEAD/PUT for R2 (originals + previews buckets).

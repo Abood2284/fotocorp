@@ -1,3 +1,4 @@
+// apps/api/src/routes/public/catalog-routes.ts
 import { Hono } from "hono";
 import type { Env } from "../../appTypes";
 import { createHttpDb } from "../../db";
@@ -313,7 +314,7 @@ publicCatalogRoutes.get("/api/v1/search/events", async (c) => {
 publicCatalogRoutes.all("/api/v1/search/events", () => methodNotAllowed());
 
 publicCatalogRoutes.get("/api/v1/assets/filters", async (c) => {
-  const includeCounts = c.req.query("includeCounts") !== "false";
+  const includeCounts = c.req.query("includeCounts") === "true";
   return json(await getPublicAssetFilters(db(c.env), { includeCounts }), 200, {
     headers: { "Cache-Control": PUBLIC_CATALOG_FILTERS_CACHE_CONTROL },
   });

@@ -115,7 +115,7 @@ function StaffProfileMenu({ staff, collapsed }: { staff: StaffShellStaff, collap
   async function handleSignOut() {
     setOpen(false)
     await fetch("/api/staff/auth/logout", { method: "POST", credentials: "include" })
-    router.push(buildSignInHref({ persona: "staff" }))
+    router.push(buildSignInHref())
     router.refresh()
   }
 

@@ -41,7 +41,7 @@ interface FotoboxClientPageProps {
 export function FotoboxClientPage({ initialServerBoards, isSubscriber }: FotoboxClientPageProps) {
   const router = useRouter()
   const { data: session } = useSharedAuthSession()
-  const isAuthenticated = !!session?.user
+  const isAuthenticated = session?.kind === "user" && Boolean(session.user)
   const [serverBoards, setServerBoards] = useState<ServerBoard[]>(initialServerBoards)
   const [anonBoards, setAnonBoards] = useState<AnonBoard[]>(getAnonBoards())
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null)

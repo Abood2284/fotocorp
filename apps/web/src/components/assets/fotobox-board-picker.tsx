@@ -33,7 +33,7 @@ export function FotoboxBoardPicker({
   assetTitle,
 }: FotoboxBoardPickerProps) {
   const { data: session } = useSharedAuthSession()
-  const isAuthenticated = !!session?.user
+  const isAuthenticated = session?.kind === "user" && Boolean(session.user)
   const [mounted, setMounted] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [serverBoards, setServerBoards] = useState<ServerBoard[]>([])

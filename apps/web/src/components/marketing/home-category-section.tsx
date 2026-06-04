@@ -7,9 +7,8 @@ import Link from "next/link"
 
 import { PublicEventsGrid } from "@/components/assets/public-events-grid"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
-import { fetchPublicEventCategoryBrowse, fetchPublicLatestEvents } from "@/lib/api/fotocorp-api"
+import { fetchPublicEventCategoryBrowse, fetchPublicLatestEvents, fetchRoyaltyFreeFeaturedAssets } from "@/lib/api/fotocorp-api"
 import type {
-  PublicAsset,
   PublicEvent,
   PublicEventBrowseSection,
   PublicHomepageEvent,
@@ -18,23 +17,25 @@ import type {
 } from "@/features/assets/types"
 
 type TabType = "Editorial" | "Video" | "Caricature" | "Creative"
-type EditorialSubcategory = "Latest" | "News" | "Sports" | "Entertainment" | "Retro"
+type EditorialSubcategory = "Latest" | "News" | "Sports" | "Entertainment" | "Fashion" | "Retro"
 type LoadState = "loading" | "ready" | "error"
 
 interface HomeCategorySectionProps {
-  initialTab?: "Editorial" | "Creative"
-  royaltyFreeAssets?: PublicAsset[]
+  initialTab?: "Editorial"
 }
 
 const LATEST_EVENTS_LIMIT = 15
 const CATEGORY_BROWSE_EVENTS_LIMIT = 25
 const RECENT_EVENTS_WINDOW_DAYS = 30
+const ROYALTY_FREE_FEATURED_LIMIT = 50
+const ROYALTY_FREE_FEATURED_STALE_MS = 86_400_000
 
 const EDITORIAL_SECTIONS: Record<EditorialSubcategory, PublicLatestEventsSection> = {
   Latest: "latest",
   News: "news",
   Sports: "sports",
   Entertainment: "entertainment",
+  Fashion: "fashion",
   Retro: "retro",
 }
 
@@ -107,13 +108,10 @@ async function fetchHomepageEventsSection(section: PublicLatestEventsSection): P
   return { response, mode: "category-browse" }
 }
 
-export function HomeCategorySection({
-  initialTab = "Editorial",
-  royaltyFreeAssets = [],
-}: HomeCategorySectionProps) {
+export function HomeCategorySection(_props: HomeCategorySectionProps = {}) {
   const sectionRef = useRef<HTMLElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [activeTab, setActiveTab] = useState<TabType>(initialTab === "Creative" ? "Creative" : "Editorial")
+  const [activeTab, setActiveTab] = useState<TabType>("Editorial")
   const [editorialSub, setEditorialSub] = useState<EditorialSubcategory>("Latest")
   const selectedSection = EDITORIAL_SECTIONS[editorialSub]
   const [eventPageItems, setEventPageItems] = useState<PublicHomepageEvent[]>([])
@@ -133,14 +131,20 @@ export function HomeCategorySection({
     refetchOnWindowFocus: false,
   })
   const baseEventData = eventQuery.data
-
-  useEffect(() => {
-    if (initialTab !== "Creative") return
-    setActiveTab("Creative")
-    requestAnimationFrame(() => {
-      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-    })
-  }, [initialTab])
+  const royaltyFreeQuery = useQuery({
+    queryKey: ["homepage", "royalty-free-featured", ROYALTY_FREE_FEATURED_LIMIT],
+    queryFn: () => fetchRoyaltyFreeFeaturedAssets({ limit: ROYALTY_FREE_FEATURED_LIMIT }),
+    enabled: activeTab === "Creative",
+    staleTime: ROYALTY_FREE_FEATURED_STALE_MS,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+  })
+  const royaltyFreeAssets = royaltyFreeQuery.data?.items ?? []
+  const royaltyFreeState: LoadState = royaltyFreeQuery.isError
+    ? "error"
+    : royaltyFreeQuery.isFetching && royaltyFreeAssets.length === 0
+      ? "loading"
+      : "ready"
 
   useEffect(() => {
     setEventPageItems([])
@@ -202,7 +206,7 @@ export function HomeCategorySection({
   }
 
   const handleTabClick = (tab: TabType) => {
-    if (tab === "Video" || tab === "Caricature") return
+    if (tab === "Video" || tab === "Caricature" || tab === "Creative") return
     setActiveTab(tab)
   }
 
@@ -220,59 +224,57 @@ export function HomeCategorySection({
       id="homepage-categories"
       className="scroll-mt-16 w-full bg-background pt-4 pb-10"
     >
-      <div className="mx-auto flex w-full flex-col items-center">
-        <div className="flex w-full flex-wrap justify-center gap-x-12 gap-y-4 pb-0 text-xs font-bold uppercase tracking-wider text-foreground sm:gap-x-16 font-sans">
-          <button
-            onClick={() => handleTabClick("Editorial")}
-            className={`pb-1.5 transition-all cursor-pointer ${
-              activeTab === "Editorial"
-                ? "border-b-2 border-black text-black font-bold"
-                : "border-b-2 border-transparent text-muted-foreground hover:text-black"
-            }`}
-          >
-            Editorial
-          </button>
-          <button
-            disabled
-            className="cursor-not-allowed border-b-2 border-transparent pb-1.5 text-muted-foreground/50"
-          >
-            Video
-          </button>
-          <button
-            disabled
-            className="cursor-not-allowed border-b-2 border-transparent pb-1.5 text-muted-foreground/50"
-          >
-            Caricature
-          </button>
-          <button
-            onClick={() => handleTabClick("Creative")}
-            className={`pb-1.5 transition-all cursor-pointer ${
-              activeTab === "Creative"
-                ? "border-b-2 border-black text-black font-bold"
-                : "border-b-2 border-transparent text-muted-foreground hover:text-black"
-            }`}
-          >
-            Royalty Free
-          </button>
-        </div>
+      <div className="mx-auto flex w-full flex-col items-center px-4 sm:px-6">
+        <div className="mx-auto inline-grid w-max max-w-full grid-cols-1 justify-items-stretch">
+          <div className="flex w-full justify-between gap-6 pb-0 font-sans text-xs font-bold uppercase tracking-wider text-foreground sm:gap-8">
+            <button
+              onClick={() => handleTabClick("Editorial")}
+              className={`shrink-0 pb-1.5 transition-all cursor-pointer ${
+                activeTab === "Editorial"
+                  ? "border-b-2 border-black text-black font-bold"
+                  : "border-b-2 border-transparent text-muted-foreground hover:text-black"
+              }`}
+            >
+              Editorial
+            </button>
+            <button
+              disabled
+              className="shrink-0 cursor-not-allowed border-b-2 border-transparent pb-1.5 text-muted-foreground/50"
+            >
+              Video
+            </button>
+            <button
+              disabled
+              className="shrink-0 cursor-not-allowed border-b-2 border-transparent pb-1.5 text-muted-foreground/50"
+            >
+              Caricature
+            </button>
+            <button
+              disabled
+              className="shrink-0 cursor-not-allowed border-b-2 border-transparent pb-1.5 text-muted-foreground/50"
+            >
+              Royalty Free
+            </button>
+          </div>
 
-        {activeTab === "Editorial" && (
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-2 font-sans text-xs font-bold uppercase tracking-wider">
-            {(["Latest", "News", "Sports", "Entertainment", "Retro"] as EditorialSubcategory[]).map((sub) => (
-              <button
-                key={sub}
-                onClick={() => setEditorialSub(sub)}
-                className={`px-4 py-2 transition-colors cursor-pointer rounded-none border ${
-                  editorialSub === sub
-                    ? "bg-black text-white border-black"
-                    : "bg-transparent text-foreground border-border hover:bg-black/5 hover:border-black"
-                }`}
+          {activeTab === "Editorial" && (
+            <div className="mt-5 flex w-full flex-wrap items-center justify-center gap-3 font-sans text-xs font-bold uppercase tracking-wider sm:gap-3.5">
+              {(["Latest", "News", "Sports", "Entertainment", "Fashion", "Retro"] as EditorialSubcategory[]).map((sub) => (
+                <button
+                  key={sub}
+                  onClick={() => setEditorialSub(sub)}
+                  className={`px-3 py-2 transition-colors cursor-pointer rounded-none border sm:px-4 ${
+                    editorialSub === sub
+                      ? "bg-black text-white border-black"
+                      : "bg-transparent text-foreground border-border hover:bg-black/5 hover:border-black"
+                  }`}
               >
                 {sub}
               </button>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-6 w-full">
@@ -283,7 +285,6 @@ export function HomeCategorySection({
               hasMore={hasMoreEventPages}
               loadingMore={loadingMoreEvents}
               onLoadMore={loadMoreEvents}
-              onShowCreative={() => setActiveTab("Creative")}
               onShowLatest={() => {
                 setActiveTab("Editorial")
                 setEditorialSub("Latest")
@@ -362,8 +363,11 @@ export function HomeCategorySection({
             </div>
 
             <div className="mt-1 w-full">
-              {royaltyFreeAssets.length === 0 ? (
+              {royaltyFreeState === "loading" ? (
+                <SectionSkeleton featuredGrid />
+              ) : royaltyFreeState === "error" || royaltyFreeAssets.length === 0 ? (
                 <RoyaltyFreeEmptyState
+                  error={royaltyFreeState === "error"}
                   onShowLatest={() => {
                     setActiveTab("Editorial")
                     setEditorialSub("Latest")
@@ -389,7 +393,6 @@ function LatestEventsPanel({
   hasMore,
   loadingMore,
   onLoadMore,
-  onShowCreative,
   onShowLatest,
   state,
   sectionLabel,
@@ -398,7 +401,6 @@ function LatestEventsPanel({
   hasMore: boolean
   loadingMore: boolean
   onLoadMore: () => void
-  onShowCreative: () => void
   onShowLatest: () => void
   state: LoadState
   sectionLabel: EditorialSubcategory
@@ -419,7 +421,6 @@ function LatestEventsPanel({
     return (
       <EditorialEmptyState
         sectionLabel={sectionLabel}
-        onShowCreative={onShowCreative}
         onShowLatest={onShowLatest}
       />
     )
@@ -445,21 +446,19 @@ function LatestEventsPanel({
 }
 
 function EditorialEmptyState({
-  onShowCreative,
   onShowLatest,
   sectionLabel,
 }: {
-  onShowCreative: () => void
   onShowLatest: () => void
   sectionLabel: EditorialSubcategory
 }) {
   const isLatest = sectionLabel === "Latest"
-  const browseHref = isLatest ? "/search?sort=newest" : `/search?q=${encodeURIComponent(sectionLabel)}`
+  const browseHref = isLatest ? "/search?mode=events" : `/search?q=${encodeURIComponent(sectionLabel)}`
   const title = isLatest
     ? "No recent Editorial events yet."
     : `No ${sectionLabel} events found.`
   const description = isLatest
-    ? "View the latest image coverage or explore royalty-free picks."
+    ? "View the latest image coverage or browse editorial categories."
     : `Browse all ${sectionLabel} images or view latest Editorial coverage.`
 
   return (
@@ -479,13 +478,6 @@ function EditorialEmptyState({
             View Latest Editorial
           </button>
         )}
-        <button
-          type="button"
-          onClick={onShowCreative}
-          className="button-outline-square px-5 py-3 text-xs uppercase tracking-wider"
-        >
-          Explore Royalty-Free Picks
-        </button>
       </div>
     </div>
   )

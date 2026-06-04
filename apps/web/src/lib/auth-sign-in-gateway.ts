@@ -1,23 +1,8 @@
-export type SignInPersona = "subscriber" | "contributor" | "staff"
-
-const PERSONA_QUERY = "persona"
-
-export function readSignInPersona(value: string | null | undefined): SignInPersona {
-  const normalized = (value ?? "").trim().toLowerCase()
-  if (normalized === "contributor" || normalized === "photographer") return "contributor"
-  if (normalized === "staff" || normalized === "internal") return "staff"
-  return "subscriber"
-}
-
 export function buildSignInHref(input: {
-  persona?: SignInPersona
   callbackUrl?: string | null
   tab?: "register"
 } = {}): string {
   const params = new URLSearchParams()
-  if (input.persona && input.persona !== "subscriber") {
-    params.set(PERSONA_QUERY, input.persona)
-  }
   if (input.tab === "register") params.set("tab", "register")
   const callback = input.callbackUrl?.trim()
   if (callback?.startsWith("/") && !callback.startsWith("//")) {
@@ -27,8 +12,11 @@ export function buildSignInHref(input: {
   return query ? `/sign-in?${query}` : "/sign-in"
 }
 
-export function signInPersonaLabel(persona: SignInPersona): string {
-  if (persona === "contributor") return "Contributor"
-  if (persona === "staff") return "Staff"
-  return "Subscriber"
+/** Strip legacy persona query params from sign-in URLs. */
+export function stripLegacyPersonaFromSignInSearchParams(searchParams: URLSearchParams): string | null {
+  if (!searchParams.get("persona")) return null
+  const params = new URLSearchParams(searchParams.toString())
+  params.delete("persona")
+  const query = params.toString()
+  return query ? `/sign-in?${query}` : "/sign-in"
 }

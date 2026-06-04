@@ -21,6 +21,8 @@ interface AssetPreviewChromeProps {
   totalPhotos?: number
   prevAssetId?: string | null
   nextAssetId?: string | null
+  /** Landscape detail pages top-align the preview; portrait keeps the tall hero stage. */
+  orientation?: "landscape" | "portrait"
 }
 
 export function AssetPreviewChrome({
@@ -37,12 +39,19 @@ export function AssetPreviewChrome({
   totalPhotos,
   prevAssetId,
   nextAssetId,
+  orientation = "portrait",
 }: AssetPreviewChromeProps) {
   const peopleLabel = whoIsInPicture?.trim()
   const showPagination = currentPhotoNumber !== undefined && totalPhotos !== undefined && totalPhotos > 1
+  const isLandscape = orientation === "landscape"
 
   return (
-    <div className="flex h-full w-full max-w-full flex-col gap-4 bg-background">
+    <div
+      className={cn(
+        "flex w-full max-w-full flex-col gap-4 bg-background",
+        !isLandscape && "h-full",
+      )}
+    >
       <div
         className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border pb-3 px-1 sm:px-0"
         aria-label="Image actions"
@@ -78,7 +87,6 @@ export function AssetPreviewChrome({
           <span className="hidden h-6 w-px bg-border/80 sm:block" aria-hidden />
           <FotoboxSaveButton
             assetId={assetId}
-            stub
             variant="ghost"
             className="m-0 shrink-0"
             buttonClassName="h-9 gap-1.5 rounded-none border border-black bg-black px-4 text-xs font-bold uppercase tracking-wider text-white shadow-none hover:bg-neutral-800 cursor-pointer"
@@ -90,7 +98,12 @@ export function AssetPreviewChrome({
       </div>
 
       <div
-        className="relative flex min-h-[50vh] w-full max-h-[68vh] flex-1 items-center justify-center bg-background sm:min-h-[55vh] lg:min-h-0 lg:max-h-none"
+        className={cn(
+          "relative flex w-full bg-background",
+          isLandscape
+            ? "items-start justify-center min-h-0 max-h-none lg:max-h-[min(70vh,900px)]"
+            : "min-h-[50vh] max-h-[68vh] flex-1 items-center justify-center sm:min-h-[55vh] lg:min-h-0 lg:max-h-none",
+        )}
       >
         <PreviewImage
           src={src}
@@ -98,7 +111,9 @@ export function AssetPreviewChrome({
           width={width}
           height={height}
           className={cn(
-            "h-full w-full max-h-full max-w-full object-contain",
+            isLandscape
+              ? "mx-auto block h-auto w-full max-h-[min(70vh,900px)] max-w-full object-contain"
+              : "h-full w-full max-h-full max-w-full object-contain",
             className,
           )}
           loading={loading}

@@ -1,3 +1,4 @@
+// apps/api/src/lib/assets/public-assets.ts
 import { sql, type SQL } from "drizzle-orm";
 import type { DrizzleClient } from "../../db";
 import { AppError } from "../errors";
@@ -222,6 +223,10 @@ export interface PublicRoyaltyFreeFeaturedTimings {
   total: number;
 }
 
+function currentRoyaltyFreeFeaturedPeriodKey(date = new Date()) {
+  return date.toISOString().slice(0, 7);
+}
+
 export async function listPublicRoyaltyFreeFeaturedAssets(
   db: DrizzleClient,
   input: { limit?: string | null },
@@ -231,19 +236,45 @@ export async function listPublicRoyaltyFreeFeaturedAssets(
 ) {
   const totalStartedAt = Date.now();
   const limit = input.limit ? Math.min(parseLimit(input.limit), 50) : 50;
+  const periodKey = currentRoyaltyFreeFeaturedPeriodKey();
 
   const queryStartedAt = Date.now();
   const rows = await executeRows<AssetRow>(db, sql`
+    with featured as (
+      select asset_id, rank
+      from public_royalty_free_featured_items
+      where period_key = ${periodKey}
+        and status = 'ACTIVE'
+      order by rank asc
+      limit ${limit}
+    )
     ${selectAssetSql(undefined)}
-    ${fromAssetSql()}
+    from featured f
+    join image_assets a on a.id = f.asset_id
+    join image_derivatives card
+      on card.image_asset_id = a.id
+      and card.variant = 'CARD'
+      and card.generation_status = 'READY'
+      and card.is_watermarked = true
+      and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
+    left join image_derivatives thumb
+      on thumb.image_asset_id = a.id
+      and thumb.variant = 'THUMB'
+      and thumb.generation_status = 'READY'
+      and thumb.is_watermarked = true
+      and thumb.watermark_profile = ${THUMB_LIGHT_PREVIEW_PROFILE}
+    left join image_derivatives detail
+      on detail.image_asset_id = a.id
+      and detail.variant = 'DETAIL'
+      and detail.generation_status = 'READY'
+      and detail.is_watermarked = true
+      and detail.watermark_profile = ${DETAIL_PREVIEW_PROFILE}
+    left join asset_categories ac on ac.id = a.category_id
+    left join photo_events e on e.id = a.event_id
+    left join asset_categories ec on ec.id = e.category_id
+    left join contributors p on p.id = a.contributor_id
     where ${publicAssetPredicate("a")}
-      and card.id is not null
-      and (
-        ac.name = ${PUBLIC_ROYALTY_FREE_CATEGORY_NAME}
-        or (a.category_id is null and ec.name = ${PUBLIC_ROYALTY_FREE_CATEGORY_NAME})
-      )
-    order by a.created_at desc, a.id asc
-    limit ${limit}
+    order by f.rank asc
   `);
   const query = Date.now() - queryStartedAt;
 
@@ -298,7 +329,7 @@ interface PublicAssetFiltersOptions {
 }
 
 export async function getPublicAssetFilters(db: DrizzleClient, options: PublicAssetFiltersOptions = {}) {
-  if (options.includeCounts === false) {
+  if (options.includeCounts !== true) {
     return getPublicAssetFiltersWithoutCounts(db);
   }
 

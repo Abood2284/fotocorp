@@ -38,4 +38,4 @@ ENV NODE_ENV=production
 
 # No HTTP port: outbound-only worker (Neon, R2, future queues).
 # Override for smoke/dry-run: see docker-compose.jobs.yml and runbook.
-CMD ["pnpm", "--dir", "apps/jobs", "run", "publish:worker"]
+CMD ["pnpm", "--dir", "apps/jobs", "run", "publish:drain"]

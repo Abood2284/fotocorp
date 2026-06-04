@@ -1,15 +1,15 @@
 import { ArrowRight } from "lucide-react"
 import Link from "next/link"
 
-import { getPublicAssetFilters } from "@/lib/api/fotocorp-api"
 import { PlaceholderPage } from "@/components/layout/placeholder-page"
+import { getPublicCatalogTaxonomy } from "@/lib/api/fotocorp-api"
 
 export const metadata = {
   title: "Categories — Fotocorp",
 }
 
 export default async function CategoriesPage() {
-  const categories = await getPublicAssetFilters()
+  const categories = await getPublicCatalogTaxonomy()
     .then((result) => result.categories)
     .catch(() => [])
 
@@ -45,7 +45,6 @@ export default async function CategoriesPage() {
             className="rounded-xl border border-border bg-background p-5 transition-colors hover:bg-muted/50"
           >
             <span className="block text-lg font-semibold text-foreground">{category.name}</span>
-            <span className="mt-2 block text-sm text-muted-foreground">{category.assetCount.toLocaleString()} public images</span>
           </Link>
         ))}
       </div>

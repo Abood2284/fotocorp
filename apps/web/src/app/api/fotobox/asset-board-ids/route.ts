@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
   try {
     const appUser = await getOrCreateAppUser(authUser)
-    const params = new URLSearchParams({ authUserId: appUser.authUserId, assetId })
+    const params = new URLSearchParams({ userId: appUser.authUserId, assetId })
     return Response.json(
       await internalApiJson<{ ok: true; boardIds: string[] }>({
         path: `${internalApiRoutes.fotoboxAssetBoardIds()}?${params.toString()}`,

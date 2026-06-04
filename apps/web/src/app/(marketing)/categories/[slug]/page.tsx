@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
-import { getPublicAssetFilters } from "@/lib/api/fotocorp-api"
 import { PlaceholderPage } from "@/components/layout/placeholder-page"
+import { getPublicCatalogTaxonomy } from "@/lib/api/fotocorp-api"
 
 interface CategoryDetailPageProps {
   params: Promise<{ slug: string }>
@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: CategoryDetailPageProps) {
 
 export default async function CategoryDetailPage({ params }: CategoryDetailPageProps) {
   const { slug } = await params
-  const categories = await getPublicAssetFilters()
+  const categories = await getPublicCatalogTaxonomy()
     .then((result) => result.categories)
     .catch(() => [])
 

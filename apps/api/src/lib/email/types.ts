@@ -8,6 +8,7 @@ export const EMAIL_TEMPLATE_KEYS = [
   "CONTRIBUTOR_APPLICATION_RECEIVED",
   "CONTRIBUTOR_APPLICATION_APPROVED_WITH_CREDENTIALS",
   "CONTRIBUTOR_APPLICATION_REJECTED",
+  "CUSTOMER_PASSWORD_RESET",
 ] as const
 
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number]
@@ -78,4 +79,6 @@ export interface EmailTemplateData {
   passwordChangeSupported?: boolean
   entitlements?: EntitlementEmailLine[]
   entitlementChanges?: EntitlementChangeLine[]
+  resetPasswordUrl?: string | null
+  resetLinkExpiresMinutes?: number | null
 }

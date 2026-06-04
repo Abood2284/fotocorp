@@ -31,3 +31,4 @@ export * from "./staff-members";
 export * from "./users";
 export * from "./staff-audit-logs";
 export * from "./email-delivery-logs";
+export * from "./password-reset-tokens";

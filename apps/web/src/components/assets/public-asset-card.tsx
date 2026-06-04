@@ -96,7 +96,13 @@ export function PublicAssetCard({
               </div>
             )}
             <div className="public-grid-card-overlay absolute right-3 top-3 z-30 opacity-0 transition-opacity duration-200">
-              <PublicAssetSaveButton assetId={asset.id} compact compactLabel="Save as" assetTitle={eventTitle ?? undefined} />
+              <PublicAssetSaveButton
+                assetId={asset.id}
+                compact
+                compactLabel="Save as"
+                assetTitle={eventTitle ?? undefined}
+                skipInitialSavedCheck
+              />
             </div>
           </>
         )}

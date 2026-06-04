@@ -18,7 +18,7 @@ const DEFAULT_FROM_NAME = "Fotocorp Subscriptions"
 const DEFAULT_FROM_ADDRESS = "subscription@fotocorp.com"
 const DEFAULT_REPLY_TO = "subscription@fotocorp.com"
 const DEFAULT_LOGIN_URL = "https://fotocorp.com"
-const DEFAULT_CONTRIBUTOR_LOGIN_PATH = "/sign-in?persona=contributor"
+const DEFAULT_CONTRIBUTOR_LOGIN_PATH = "/sign-in"
 
 export interface DeliverAccessEmailInput {
   templateKey: EmailTemplateKey
@@ -195,6 +195,12 @@ export function resolveLoginUrl(env: EmailEnv): string {
 export function resolveContributorLoginUrl(env: EmailEnv): string {
   const origin = env.PUBLIC_WEB_ORIGIN?.trim().replace(/\/+$/, "")
   return origin ? `${origin}${DEFAULT_CONTRIBUTOR_LOGIN_PATH}` : `${DEFAULT_LOGIN_URL}${DEFAULT_CONTRIBUTOR_LOGIN_PATH}`
+}
+
+export function resolvePasswordResetUrl(env: EmailEnv, rawToken: string): string {
+  const origin = env.PUBLIC_WEB_ORIGIN?.trim().replace(/\/+$/, "")
+  const base = origin || DEFAULT_LOGIN_URL.replace(/\/sign-in$/, "")
+  return `${base}/reset-password?token=${encodeURIComponent(rawToken)}`
 }
 
 export function buildEmailIdempotencyKey(input: {
