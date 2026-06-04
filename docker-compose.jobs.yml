@@ -1,8 +1,9 @@
 # Private Fotocorp jobs processor (Node + Sharp). No published ports.
 # Copy apps/jobs/.env.production.example → apps/jobs/.env.production on the VPS.
 #
-# Production: one-shot drain (no idle Neon polling). Typical invocation:
-#   docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs
+# Production:
+#   fotocorp-jobs-wake — long-lived HTTP trigger (no Neon polling); Cloudflare Tunnel → 127.0.0.1:18765
+#   fotocorp-jobs — one-shot drain (cron / manual): docker compose … run --rm fotocorp-jobs
 #
 # Dev-only continuous poller (profile):
 #   docker compose -f docker-compose.jobs.yml --profile dev-worker up -d fotocorp-jobs-worker
@@ -30,6 +31,34 @@ services:
       PUBLISH_DRAIN_MAX_JOBS: "25"
       PUBLISH_DRAIN_MAX_RUNTIME_SECONDS: "300"
       # PR-16G: set IMAGE_PUBLISH_PROCESSING_ENABLED=true on the VPS when Neon + R2 env is complete.
+      IMAGE_PUBLISH_PROCESSING_ENABLED: ${IMAGE_PUBLISH_PROCESSING_ENABLED:-false}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  fotocorp-jobs-wake:
+    build:
+      context: .
+      dockerfile: apps/jobs/Dockerfile
+    image: fotocorp-jobs:latest
+    container_name: fotocorp-jobs-wake
+    restart: unless-stopped
+    command: ["pnpm", "--dir", "apps/jobs", "run", "publish:wake"]
+    env_file:
+      - apps/jobs/.env.production
+    ports:
+      - "127.0.0.1:${JOBS_WAKE_PORT:-18765}:18765"
+    environment:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      NODE_ENV: production
+      JOBS_WAKE_BIND_HOST: "0.0.0.0"
+      JOBS_WAKE_PORT: "18765"
+      MALLOC_ARENA_MAX: "2"
+      UV_THREADPOOL_SIZE: "2"
+      PUBLISH_DRAIN_MAX_JOBS: "25"
+      PUBLISH_DRAIN_MAX_RUNTIME_SECONDS: "300"
       IMAGE_PUBLISH_PROCESSING_ENABLED: ${IMAGE_PUBLISH_PROCESSING_ENABLED:-false}
     logging:
       driver: json-file

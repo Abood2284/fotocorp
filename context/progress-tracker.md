@@ -8,7 +8,7 @@ Update this file after every meaningful implementation change.
 
 ## Current Goal
 
-- **Jobs publish drain (PR-1 done):** Production uses `publish:drain` (one-shot, structured logs, `PUBLISH_DRAIN_MAX_*` limits). `publish:worker` blocked in production unless `ALLOW_CONTINUOUS_JOB_WORKER=true`; compose `dev-worker` profile for local poller. **Next:** PR-2 VPS wake HTTP + tunnel; PR-3 API webhook on approve; PR-4 backup cron.
+- **Jobs publish (PR-1/2 done):** `publish:drain` one-shot + `publish:wake` HTTP (`POST /internal/publish/drain`, `x-jobs-wake-secret`, `fotocorp-jobs-wake` on `127.0.0.1:18765`). **Next:** PR-3 API webhook on approve; PR-4 backup cron on VPS.
 
 - **Account + password reset:** Plan [`docs/plans/account-and-password-reset.md`](../docs/plans/account-and-password-reset.md) — PR-1–3 complete. Forgot/reset: `0045_password_reset_tokens`, `POST/GET forgot + reset API`, `CUSTOMER_PASSWORD_RESET` email, `/forgot-password` + `/reset-password`, sign-in link.
 
@@ -19,6 +19,7 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Jobs PR-2 — wake HTTP:** `publish:wake`, `publishWakeServer.ts`, `JOBS_WAKE_SECRET`, compose service `fotocorp-jobs-wake` (loopback port 18765). Mutex: concurrent POST → `409`. Async default `202`; `?wait=1` for synchronous drain.
 - **Jobs PR-1 — one-shot `publish:drain`:** Added `apps/jobs/src/publishDrain.ts`, `--drain` CLI, production guard on `publish:worker`, Docker default CMD/compose drain (`restart: "no"`), `dev-worker` profile for poller. Docs: `apps/jobs/README.md`, `docs/db-revamp/media-pipeline-operations.md`, `context/architecture.md`.
 
 - **Password reset email flow (PR-3):** `password_reset_tokens` + forgot/reset API + `CUSTOMER_PASSWORD_RESET` email + web routes. Migration `0045` registered in `drizzle/meta/_journal.json`; apply via `pnpm db:migrate` or `pnpm --dir apps/api exec tsx scripts/db/apply-0045-password-reset-tokens.ts` if the table was missing (fixes forgot-password 500).

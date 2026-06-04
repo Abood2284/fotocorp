@@ -1,6 +1,6 @@
 import { loadJobsEnv } from "./config/env"
 import { closeJobsPool } from "./db/client"
-import { readPublishDrainMaxJobs, readPublishDrainMaxRuntimeMs, runPublishDrain } from "./publishDrain"
+import { executePublishDrain } from "./executePublishDrain"
 import { ImagePublishJobService } from "./services/imagePublishJobService"
 import { ImagePublishWorker } from "./workers/imagePublishWorker"
 
@@ -79,23 +79,9 @@ async function main() {
   const worker = new ImagePublishWorker(jobService)
 
   if (mode === "drain") {
-    try {
-      const summary = await runPublishDrain({
-        worker,
-        jobService,
-        skipDbAccess,
-        processingEnabled: env.imagePublishProcessingEnabled,
-        jobsEnv: env,
-        limits: {
-          maxJobs: readPublishDrainMaxJobs(),
-          maxRuntimeMs: readPublishDrainMaxRuntimeMs(),
-        },
-      })
-      if (summary.stopReason === "processing_disabled" && summary.pendingAtStart > 0) {
-        process.exitCode = 1
-      }
-    } finally {
-      await closeJobsPool()
+    const summary = await executePublishDrain()
+    if (summary.stopReason === "processing_disabled" && summary.pendingAtStart > 0) {
+      process.exitCode = 1
     }
     console.log("[fotocorp-jobs] done")
     return

@@ -163,7 +163,10 @@ Dry-run on Windows first: add `--dry-run --limit 20`.
 
 ### VPS jobs (one-shot drain — no idle Neon polling)
 
-Production uses **`publish:drain`**: process all `QUEUED` `image_publish_jobs` (up to `PUBLISH_DRAIN_MAX_JOBS` / `PUBLISH_DRAIN_MAX_RUNTIME_SECONDS`), then exit. Pending jobs stay in Neon until the next drain (cron backup or approve-time webhook in PR-2/3).
+Production uses two paths (no 24/7 Neon poll loop):
+
+1. **`fotocorp-jobs-wake`** — `publish:wake` HTTP on host `127.0.0.1:18765` (Cloudflare Tunnel for API trigger in PR-3).
+2. **`fotocorp-jobs`** one-shot **`publish:drain`** — cron backup.
 
 From repo root on VPS (e.g. `/opt/fotocorp/app`):
 
@@ -173,8 +176,26 @@ git pull
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production build fotocorp-jobs
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs pnpm --dir apps/jobs smoke:sharp
-docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production up -d --build fotocorp-jobs-wake
 ```
+
+Set in `apps/jobs/.env.production`:
+
+- `JOBS_WAKE_SECRET` — long random string; required for wake server.
+- `IMAGE_PUBLISH_PROCESSING_ENABLED=true` — before expecting real publishes.
+
+Smoke on the VPS (loopback only):
+
+```bash
+curl -sS http://127.0.0.1:18765/health
+curl -sS -X POST "http://127.0.0.1:18765/internal/publish/drain" \
+  -H "x-jobs-wake-secret: $JOBS_WAKE_SECRET"
+# Optional: wait for completion in one request (can take minutes)
+curl -sS -X POST "http://127.0.0.1:18765/internal/publish/drain?wait=1" \
+  -H "x-jobs-wake-secret: $JOBS_WAKE_SECRET"
+```
+
+**Cloudflare Tunnel (operator):** add a private hostname (e.g. `jobs-internal.yourdomain.com`) → `http://127.0.0.1:18765`, same host as Typesense tunnel. Restrict with Access or allow only Worker egress if needed. PR-3 will set `JOBS_DRAIN_WEBHOOK_URL` on the API to `https://<that-host>/internal/publish/drain`.
 
 Example backup cron (every 2 days — adjust path/schedule):
 

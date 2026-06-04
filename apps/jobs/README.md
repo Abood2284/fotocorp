@@ -9,7 +9,8 @@ Node CLI package for background image publish work. This is **not** a Cloudflare
 | `dev` | `tsx src/index.ts --dry-run` | Local developer convenience. |
 | `publish:dry-run` | `tsx src/index.ts --dry-run` | Safe read-only mode. Connects to Neon only if `DATABASE_URL` is set; if unset, the CLI warns and reports `pending publish jobs=unknown`. Never claims or mutates rows. |
 | `publish:once` | `tsx src/index.ts --once` | Validates required env, runs one poll iteration, then exits. Gated by `IMAGE_PUBLISH_PROCESSING_ENABLED` (see below). |
-| `publish:drain` | `tsx src/index.ts --drain` | **Production default.** Processes queued publish jobs until the queue is empty or `PUBLISH_DRAIN_MAX_JOBS` / `PUBLISH_DRAIN_MAX_RUNTIME_SECONDS` limits are hit, then exits. Emits structured `publish_drain_*` logs. No sleep loop. |
+| `publish:drain` | `tsx src/index.ts --drain` | **One-shot.** Processes queued publish jobs until empty or limits, then exits. Structured `publish_drain_*` logs. |
+| `publish:wake` | `tsx src/wakeIndex.ts` | **Production trigger.** Minimal HTTP server on `JOBS_WAKE_PORT` (default `18765`). `POST /internal/publish/drain` with header `x-jobs-wake-secret` starts a background drain; `409` if a drain is already running. `GET /health` for probes. |
 | `publish:worker` | `tsx src/index.ts --worker` | **Dev/manual only.** Continuous poll loop (`IMAGE_PUBLISH_POLL_INTERVAL_MS`). Blocked in production unless `ALLOW_CONTINUOUS_JOB_WORKER=true`. Use Docker profile `dev-worker` (`fotocorp-jobs-worker`). |
 | `smoke:sharp` | `tsx scripts/smoke/check-sharp-node.ts` | Proves Sharp loads and encodes a tiny in-memory image. |
 | `check` | `tsc -p tsconfig.json --noEmit` | Typecheck. |
@@ -58,7 +59,7 @@ Set `DATABASE_URL` first (e.g. in your shell) if you want the dry-run to count r
 
 ## Docker (private VPS, no public URL)
 
-Build context is the **monorepo root**. The container runs as user **`node`**, exposes **no HTTP port**, and loads secrets from **`apps/jobs/.env.production`** (gitignored; start from `.env.production.example`).
+Build context is the **monorepo root**. Containers run as user **`node`** and load secrets from **`apps/jobs/.env.production`** (gitignored; start from `.env.production.example`). The **wake** service binds HTTP inside the container; Compose publishes it only on **host loopback** (`127.0.0.1:18765`) for Cloudflare Tunnel — not on the public internet.
 
 The image **bakes in** `apps/jobs` at build time (`COPY` in `apps/jobs/Dockerfile`). **`docker compose restart` does not load new code** from `git pull`; you must **`build`** again (or use **`up -d --build`**). See **`§11`** in the runbook below.
 
@@ -71,7 +72,19 @@ docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production r
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs
 ```
 
-The default `fotocorp-jobs` service runs **`publish:drain`** once and exits (`restart: "no"`). Schedule it with VPS cron or invoke after staff approval (PR-2/3 webhook). Do **not** leave the old 15s poller running in production.
+**`fotocorp-jobs-wake`** (always-on trigger, no Neon polling):
+
+```bash
+# Set JOBS_WAKE_SECRET in apps/jobs/.env.production first
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production up -d --build fotocorp-jobs-wake
+curl -sS http://127.0.0.1:18765/health
+curl -sS -X POST http://127.0.0.1:18765/internal/publish/drain \
+  -H "x-jobs-wake-secret: YOUR_SECRET"
+```
+
+Point **cloudflared** at `http://127.0.0.1:18765` (same pattern as Typesense on the VPS). PR-3 will have the API Worker POST through that tunnel on staff approve.
+
+**`fotocorp-jobs`** (one-shot drain): `docker compose … run --rm fotocorp-jobs` for cron backup. Do **not** leave the old 15s poller running in production.
 
 ### Deploy or refresh after merging jobs code (VPS)
 
@@ -81,17 +94,20 @@ From the repo root (example path `/opt/fotocorp/app`):
 cd /opt/fotocorp/app
 git pull
 docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production build fotocorp-jobs
-docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production run --rm fotocorp-jobs
+docker compose -f docker-compose.jobs.yml --env-file apps/jobs/.env.production up -d --build fotocorp-jobs-wake
 ```
 
-Operator steps (cron backup drain, logs, dev poller profile) live in **[`docs/db-revamp/media-pipeline-operations.md`](../../docs/db-revamp/media-pipeline-operations.md)** (VPS jobs section).
+Operator steps (tunnel, cron, logs) live in **[`docs/db-revamp/media-pipeline-operations.md`](../../docs/db-revamp/media-pipeline-operations.md)** (VPS jobs section).
 
-**CapRover / DNS** are not required for this deployment path; they can be added later if you want a platform domain in front of other services. The jobs worker stays **off the public internet**.
+**CapRover / DNS** are not required for this path. The wake port is loopback-only; public access is only via your tunnel hostname if you configure one.
 
 ## Layout
 
 - `src/index.ts` — CLI entry (`--dry-run`, `--once`, `--drain`, `--worker`).
-- `src/publishDrain.ts` — one-shot drain loop and structured `publish_drain_*` logs.
+- `src/wakeIndex.ts` — `publish:wake` entry.
+- `src/publishWakeServer.ts` — HTTP trigger (`POST /internal/publish/drain`, mutex, `202`/`409`).
+- `src/executePublishDrain.ts` — shared drain runner for CLI + wake.
+- `src/publishDrain.ts` — drain loop and structured `publish_drain_*` logs.
 - `src/config/env.ts` — typed env loader; dry-run tolerates missing service env vars with warnings; parses `IMAGE_PUBLISH_PROCESSING_ENABLED`.
 - `src/db/client.ts` — Node-native `pg.Pool` singleton and `withJobsTransaction` helper.
 - `src/lib/r2Client.ts` — AWS4-signed GET/HEAD/PUT for R2 (originals + previews buckets).
