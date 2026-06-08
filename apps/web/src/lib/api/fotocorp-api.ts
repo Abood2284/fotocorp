@@ -433,7 +433,7 @@ async function getJson<T>(
       : options.cachePolicy === "public-royalty-free-long"
         ? 86_400
       : options.cachePolicy === "public-hero-set"
-        ? 300
+        ? null
       : options.cachePolicy === "public-category-browse-long"
         ? 86_400
       : options.cachePolicy === "public-filters-long"

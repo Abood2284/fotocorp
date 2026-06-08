@@ -6,6 +6,8 @@ function handleProtectedAccountRoutes(request: NextRequest): NextResponse | null
 
   if (!pathname.startsWith("/account")) return null
 
+  if (pathname === "/account/access-pending") return NextResponse.next()
+
   if (hasPlatformSessionCookie(request)) return NextResponse.next()
 
   const signInUrl = new URL("/sign-in", request.url)

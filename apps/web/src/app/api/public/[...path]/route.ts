@@ -31,7 +31,7 @@ const PUBLIC_SEARCH_CACHE_CONTROL =
 const PUBLIC_ROYALTY_FREE_FEATURED_CACHE_CONTROL =
   "public, max-age=86400, s-maxage=2592000, stale-while-revalidate=604800"
 const PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL =
-  "public, max-age=300, s-maxage=900, stale-while-revalidate=3600"
+  "public, max-age=0, s-maxage=30, stale-while-revalidate=60"
 const PUBLIC_ASSET_DETAIL_CACHE_CONTROL =
   "public, max-age=300, s-maxage=2592000, stale-while-revalidate=604800"
 

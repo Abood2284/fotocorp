@@ -59,6 +59,7 @@ const patchEntitlementBody = z.object({
 
 const activateEntitlementBody = z.object({
   validUntil: z.string().datetime().nullable().optional(),
+  entitlementIds: z.array(z.string().uuid()).min(1).optional(),
 }).partial();
 
 const listInquiriesQuery = z.object({
@@ -117,6 +118,8 @@ staffAccessInquiryRoutes.get("/api/v1/staff/access-inquiries", zValidator("query
         interestedAssetTypes: r.interestedAssetTypes,
         imageQuantityRange: r.imageQuantityRange,
         imageQualityPreference: r.imageQualityPreference,
+        royaltyFreeQuantityRange: r.royaltyFreeQuantityRange,
+        royaltyFreeQualityPreference: r.royaltyFreeQualityPreference,
         createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
         companyName: displayName,
         companyEmail: contactEmail,
@@ -239,6 +242,7 @@ staffAccessInquiryRoutes.post(
     const body = c.req.valid("json");
     const activated = await activateAllDraftEntitlementsForInquiry(db, inquiryId, staff, {
       validUntil: body.validUntil === undefined ? undefined : body.validUntil === null ? null : new Date(body.validUntil),
+      entitlementIds: body.entitlementIds,
     });
     const batchId = `${inquiryId}:${activated.map((row) => row.id).sort().join(",")}`;
     await sendEntitlementActivationEmail(c.env, db, inquiryId, activated, { batchId });

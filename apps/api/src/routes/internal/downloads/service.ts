@@ -9,6 +9,7 @@ import { downloadSizeToQualityRank } from "../../../lib/subscriber-download-qual
 import {
   assertSubscriberDownloadEntitlementForRequest,
   incrementEntitlementDownloadsUsed,
+  resolveEntitlementAssetTypeForDownload,
 } from "../../staff/access-inquiries/service"
 
 const downloadRequestSchema = z.object({
@@ -69,10 +70,14 @@ async function validateSubscriberDownloadRequest(env: Env, assetId: string, requ
 
   let entitlementId: string
   try {
+    const entitlementAssetType = await resolveEntitlementAssetTypeForDownload(db, asset.id)
+    if (!entitlementAssetType) {
+      throw new AppError(403, "ENTITLEMENT_REQUIRED", "entitlement_required")
+    }
     const granted = await assertSubscriberDownloadEntitlementForRequest(
       db,
       authUserId,
-      asset.media_type,
+      entitlementAssetType,
       downloadSizeToQualityRank(size),
     )
     entitlementId = granted.entitlementId

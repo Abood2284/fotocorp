@@ -155,24 +155,29 @@ async function selectCandidates(
     [CARD_LIGHT_PREVIEW_PROFILE, poolSize],
   )
 
-  return result.rows.map((row) => {
-    const previewUrl = resolvePublicStablePreviewUrl(cdn, {
-      storageKey: row.card_storage_key,
-      assetId: row.id,
-      variant: "CARD",
-    })
-    const title = row.event_name?.trim()
-      || row.headline?.trim()
-      || row.caption?.trim()
-      || row.fotokey?.trim()
-      || "Fotocorp image"
+  return result.rows.map((row) => mapPreparedCandidate(row, cdn))
+}
 
-    return {
-      ...row,
-      previewUrl,
-      title,
-    }
+function mapPreparedCandidate(
+  row: CandidateRow,
+  cdn: ReturnType<typeof parsePublicPreviewCdnConfig>,
+): PreparedCandidate {
+  const previewUrl = resolvePublicStablePreviewUrl(cdn, {
+    storageKey: row.card_storage_key,
+    assetId: row.id,
+    variant: "CARD",
   })
+  const title = row.event_name?.trim()
+    || row.headline?.trim()
+    || row.caption?.trim()
+    || row.fotokey?.trim()
+    || "Fotocorp image"
+
+  return {
+    ...row,
+    previewUrl,
+    title,
+  }
 }
 
 async function refreshDay(

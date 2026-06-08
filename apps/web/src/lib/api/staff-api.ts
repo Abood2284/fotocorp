@@ -80,6 +80,8 @@ export interface StaffAccessInquiryListItem {
   interestedAssetTypes: string[]
   imageQuantityRange: string | null
   imageQualityPreference: string | null
+  royaltyFreeQuantityRange: string | null
+  royaltyFreeQualityPreference: string | null
   createdAt: string
   companyName: string | null
   companyEmail: string | null
@@ -159,7 +161,7 @@ export async function postStaffAccessInquiryEntitlementDraft(inquiryId: string, 
 
 export async function postStaffAccessInquiryActivateAllEntitlements(
   inquiryId: string,
-  body: { validUntil?: string | null } = {},
+  body: { validUntil?: string | null; entitlementIds?: string[] } = {},
   options: { cookieHeader?: string } = {},
 ) {
   return staffJson<{ ok: true; entitlements: Record<string, unknown>[] }>(
@@ -200,6 +202,58 @@ export async function postStaffSubscriberEntitlementSuspend(entitlementId: strin
     `/subscriber-entitlements/${encodeURIComponent(entitlementId)}/suspend`,
     { method: "POST", body: {}, cookieHeader: options.cookieHeader },
   )
+}
+
+export interface StaffMemberListItem {
+  id: string
+  username: string
+  displayName: string
+  role: string
+  status: string
+  createdAt: string
+  lastLoginAt: string | null
+}
+
+export async function getStaffMembers(options: { cookieHeader?: string; role?: string } = {}) {
+  const params = new URLSearchParams()
+  if (options.role) params.set("role", options.role)
+  const query = params.toString() ? `?${params.toString()}` : ""
+  return staffJson<{ ok: true; items: StaffMemberListItem[] }>(`/members${query}`, {
+    method: "GET",
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function createStaffMemberAccount(
+  body: {
+    username: string
+    password: string
+    displayName?: string
+    role?: "CAPTION_WRITER"
+  },
+  options: { cookieHeader?: string } = {},
+) {
+  return staffJson<{ ok: true; member: StaffMemberListItem }>("/members", {
+    method: "POST",
+    body: { ...body, role: body.role ?? "CAPTION_WRITER" },
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function patchStaffMemberAccount(
+  memberId: string,
+  body: {
+    status?: "ACTIVE" | "DISABLED"
+    displayName?: string
+    password?: string
+  },
+  options: { cookieHeader?: string } = {},
+) {
+  return staffJson<{ ok: true; member: StaffMemberListItem }>(`/members/${encodeURIComponent(memberId)}`, {
+    method: "PATCH",
+    body,
+    cookieHeader: options.cookieHeader,
+  })
 }
 
 function resolveStaffUrl(path: string) {

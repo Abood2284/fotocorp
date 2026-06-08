@@ -27,6 +27,11 @@ export interface PlatformAuthResponse {
     username: string
     email?: string | null
   }
+  accessInquiry?: {
+    id: string
+    status: string
+    isApproved?: boolean
+  } | null
 }
 
 export type PlatformLoginScope = "USER" | "CONTRIBUTOR" | "ANY"

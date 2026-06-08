@@ -49,8 +49,11 @@ internalAdminContributorUploadRoutes.post(
   zValidator("json", adminContributorUploadApproveBodySchema),
   async (c) => {
     const body = c.req.valid("json");
-    const requestedByAdminUserId = c.req.header("x-admin-auth-user-id")?.trim() || null;
-    return await approveAdminContributorUploadsService(c.env, body, { requestedByAdminUserId });
+    const staffMemberId = c.req.header("x-admin-auth-user-id")?.trim() || null;
+    return await approveAdminContributorUploadsService(c.env, body, {
+      staffMemberId,
+      executionCtx: c.executionCtx,
+    });
   },
 );
 
@@ -59,7 +62,8 @@ internalAdminContributorUploadRoutes.post(
   zValidator("json", adminContributorUploadRejectBodySchema),
   async (c) => {
     const body = c.req.valid("json");
-    return await rejectAdminContributorUploadsService(c.env, body);
+    const staffMemberId = c.req.header("x-admin-auth-user-id")?.trim() || null;
+    return await rejectAdminContributorUploadsService(c.env, body, { staffMemberId });
   },
 );
 
@@ -70,7 +74,10 @@ internalAdminContributorUploadRoutes.patch(
   async (c) => {
     const { imageAssetId } = c.req.valid("param");
     const body = c.req.valid("json");
-    return await patchAdminContributorUploadMetadataService(c.env, imageAssetId, body);
+    const staffMemberId = c.req.header("x-admin-auth-user-id")?.trim() || null;
+    return await patchAdminContributorUploadMetadataService(c.env, imageAssetId, body, {
+      staffMemberId,
+    });
   },
 );
 
@@ -92,7 +99,10 @@ internalAdminContributorUploadRoutes.post(
   async (c) => {
     const { imageAssetId } = c.req.valid("param");
     const body = c.req.valid("json");
-    return await completeAdminContributorUploadReplaceService(c.env, imageAssetId, body);
+    const staffMemberId = c.req.header("x-admin-auth-user-id")?.trim() || null;
+    return await completeAdminContributorUploadReplaceService(c.env, imageAssetId, body, {
+      staffMemberId,
+    });
   },
 );
 

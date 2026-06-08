@@ -15,7 +15,6 @@ import {
   adminFiltersService,
   adminStatsService,
   adminDashboardSummaryService,
-  adminMediaPipelineStatusService,
   adminUserSubscriptionService,
   adminUserDetailService,
   adminUserRoleService,
@@ -156,12 +155,6 @@ internalAdminRoutes.get("/api/v1/internal/admin/dashboard/summary", async (c) =>
 });
 
 internalAdminRoutes.all("/api/v1/internal/admin/dashboard/summary", () => methodNotAllowed());
-
-internalAdminRoutes.get("/api/v1/internal/admin/media-pipeline/status", async (c) => {
-  return await adminMediaPipelineStatusService(c.env);
-});
-
-internalAdminRoutes.all("/api/v1/internal/admin/media-pipeline/status", () => methodNotAllowed());
 
 internalAdminRoutes.get("/api/v1/internal/admin/filters", async (c) => {
   return await adminFiltersService(c.env);

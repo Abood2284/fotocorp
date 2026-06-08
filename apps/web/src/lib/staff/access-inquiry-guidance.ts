@@ -74,8 +74,7 @@ export function getAccessInquiriesListGuidance(input: {
         : [
             "Open a row — status will move to In review when you generate entitlement drafts.",
             "Generate entitlement draft (one row per asset type they selected).",
-            "Set allowed downloads and quality per type, then Activate each draft (customer receives an email per activation).",
-            "Use Activate all drafts when every quota is ready — sends one combined email.",
+            "Set allowed downloads and quality per type, check the asset types to grant, then Activate selected (one email for the selection).",
           ],
     }
   }
@@ -90,8 +89,7 @@ export function getAccessInquiriesListGuidance(input: {
         ? ["Switch to Pending or All to work contributor applications."]
         : [
             "Open each row and check entitlements — Draft means not downloadable yet.",
-            "Activate every draft you intend to grant — each activation emails the customer their limits.",
-            "Use Activate all drafts on the detail page when all quotas are set.",
+            "Check the drafts to grant, set quotas, then Activate selected — one email lists every limit you approved.",
             "Close the inquiry if you are denying access entirely.",
           ],
     }
@@ -142,8 +140,8 @@ export function getAccessInquiriesListGuidance(input: {
           : [
               `Prioritize ${counts.pending} Pending — open row → Generate entitlement draft.`,
               counts.inReview > 0
-                ? `Then finish ${counts.inReview} In review — activate all required drafts.`
-                : "In review rows need Activate on each draft entitlement.",
+                ? `Then finish ${counts.inReview} In review — activate selected drafts (one email per activation).`
+                : "In review rows need Activate selected on the detail page.",
               "Entitlements are per asset type (Images/Video/Caricature), not a single account toggle.",
             ]
         : input.isContributor
@@ -168,10 +166,10 @@ export function getInquiryRowHint(input: {
   }
 
   if (s === "PENDING") {
-    return `${label}: customer registered. Open → Generate entitlement draft → Activate downloads.`
+    return `${label}: customer registered. Open → Generate entitlement draft → Activate selected downloads.`
   }
   if (s === "IN_REVIEW") {
-    return `${label}: drafts exist. Open → Activate each entitlement (or close to deny).`
+    return `${label}: drafts exist. Open → check types to grant → Activate selected (or close to deny).`
   }
   if (s === "ACCESS_GRANTED") {
     return `${label}: entitlements active. Open to adjust quotas or suspend per asset type.`
@@ -214,7 +212,7 @@ export function getCustomerAccessDetailGuidance(input: {
     {
       id: "activate",
       label: "Activate entitlements",
-      description: "Each activation turns on subscriber access for that asset type and emails the customer their limits.",
+      description: "Activate selected drafts to turn on access and email the customer one message with every approved limit.",
       state: "upcoming",
     },
   ]
@@ -254,7 +252,7 @@ export function getCustomerAccessDetailGuidance(input: {
         "Customer completed signup. Entitlements are separate per asset type — not a single approve button.",
       nextSteps: [
         "Click Generate entitlement draft (moves inquiry to In review).",
-        "Then set downloads/quality and Activate each type they need.",
+        "Then set downloads/quality, check the types to grant, and Activate selected.",
       ],
       steps,
       canClose,
@@ -269,7 +267,9 @@ export function getCustomerAccessDetailGuidance(input: {
       title: "Drafts in progress",
       summary: `${draftCount} draft(s), ${activeCount} active. Draft entitlements are not downloadable until activated.`,
       nextSteps: [
-        draftCount > 0 ? `Activate ${draftCount} remaining draft(s) when quotas look correct — each sends a confirmation email.` : "All drafts activated.",
+        draftCount > 0
+          ? `Check and activate ${draftCount} remaining draft(s) when quotas look correct — one email per activation.`
+          : "All drafts activated.",
         "Inquiry becomes Access granted when entitlements are active.",
         canClose ? "Close inquiry if you are denying access entirely." : "",
       ].filter(Boolean),

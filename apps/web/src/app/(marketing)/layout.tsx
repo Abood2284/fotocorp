@@ -2,8 +2,10 @@ import { headers } from "next/headers"
 import { Header, type HeaderUserProfile, type StaffBrief } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { createTimingTracker, logLatencyTrace, resolveRequestIdFromHeaders } from "@/lib/latency-trace"
+import { redirectWorkspaceOnlyStaffAwayFromPublicSite } from "@/lib/staff-session"
 
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
+  await redirectWorkspaceOnlyStaffAwayFromPublicSite()
   const shellStartedAt = Date.now()
   const requestId = resolveRequestIdFromHeaders(await headers()) ?? crypto.randomUUID()
   const shellTracker = createTimingTracker(shellStartedAt)

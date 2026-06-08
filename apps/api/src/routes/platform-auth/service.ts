@@ -10,6 +10,7 @@ import {
   validatePhotographerPortalPasswordStrength,
   verifyPhotographerPortalPassword,
 } from "../../lib/auth/contributor-password"
+import { assertPlatformUserMaySignIn } from "../../lib/access/platform-user-access"
 import { AppError } from "../../lib/errors"
 import { createPlatformUser } from "../../lib/users/platform-user"
 import type { ValidatedRegistrationProfile } from "../auth/services/fotocorp-registration-profile"
@@ -41,6 +42,11 @@ export interface PlatformLoginResult {
   cookieMaxAgeSeconds: number
   user: PlatformUserPayload | null
   contributor: PlatformContributorPayload | null
+}
+
+export interface PlatformSignUpResult {
+  ownerType: "USER"
+  user: PlatformUserPayload
 }
 
 export interface PlatformUserPayload {
@@ -100,6 +106,9 @@ export async function loginPlatformAuth(
   if (!passwordMatches) throw invalidCredentialsError()
 
   await assertOwnerCanLogin(db, credential.owner_type, credential.owner_id)
+  if (credential.owner_type === "USER") {
+    await assertPlatformUserMaySignIn(db, credential.owner_id)
+  }
 
   const session = await createAuthSession(db, credential, meta)
 
@@ -117,8 +126,7 @@ export async function loginPlatformAuth(
 export async function signUpPlatformUser(
   db: DrizzleClient,
   input: PlatformSignUpInput,
-  meta: RequestMeta,
-): Promise<PlatformLoginResult> {
+): Promise<PlatformSignUpResult> {
   const email = input.email.trim().toLowerCase()
   const passwordHash = await hashPhotographerPortalPassword(input.password)
 
@@ -157,18 +165,15 @@ export async function signUpPlatformUser(
     limit 1
   `)
 
-  const credential = credentialRows[0]
-  if (!credential) throw new AppError(500, "CREDENTIAL_CREATE_FAILED", "Account credentials could not be created.")
+  if (!credentialRows[0]) {
+    throw new AppError(500, "CREDENTIAL_CREATE_FAILED", "Account credentials could not be created.")
+  }
 
-  const session = await createAuthSession(db, credential, meta)
+  const userPayload = await loadUserPayload(db, user.id)
 
   return {
     ownerType: "USER",
-    rawSessionToken: session.rawSessionToken,
-    sessionExpiresAt: session.expiresAt,
-    cookieMaxAgeSeconds: FOTOCORP_SESSION_TTL_SECONDS,
-    user: await loadUserPayload(db, user.id),
-    contributor: null,
+    user: userPayload,
   }
 }
 

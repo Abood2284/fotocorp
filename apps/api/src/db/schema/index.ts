@@ -16,6 +16,7 @@ export * from "./public-event-feed-items";
 export * from "./public-royalty-free-featured-items";
 export * from "./public-homepage-hero-sets";
 export * from "./public-homepage-hero-set-items";
+export * from "./public-homepage-hero-pool-items";
 export * from "./image-assets";
 export * from "./image-derivatives";
 export * from "./image-access-logs";

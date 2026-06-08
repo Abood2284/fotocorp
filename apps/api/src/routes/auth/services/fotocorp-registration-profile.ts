@@ -1,8 +1,14 @@
 import { desc, eq } from "drizzle-orm";
 import type { DrizzleClient } from "../../../db";
 import { customerAccessInquiries, users } from "../../../db/schema";
+import {
+  type AccessInterestAssetType,
+  ACCESS_INTEREST_ASSET_TYPES,
+  normalizeAccessInterestAssetTypes,
+} from "../../../lib/access/access-interest-asset-types";
 import { createPlatformUser, getPlatformUserById } from "../../../lib/users/platform-user";
 import { isValidUsername, normalizeUsername } from "../../../auth/username";
+
 export const ALLOWED_COMPANY_TYPES = [
   "agency",
   "brand",
@@ -17,8 +23,9 @@ export const ALLOWED_COMPANY_TYPES = [
   "other",
 ] as const;
 
-export const INTEREST_ASSET_TYPES = ["IMAGE", "VIDEO", "CARICATURE"] as const;
-export type InterestAssetType = (typeof INTEREST_ASSET_TYPES)[number];
+/** @deprecated Use ACCESS_INTEREST_ASSET_TYPES from lib/access/access-interest-asset-types */
+export const INTEREST_ASSET_TYPES = ACCESS_INTEREST_ASSET_TYPES;
+export type InterestAssetType = AccessInterestAssetType;
 
 export const IMAGE_QUANTITY_RANGES = ["0_20", "20_50", "50_100", "100_250", "250_plus"] as const;
 export type ImageQuantityRange = (typeof IMAGE_QUANTITY_RANGES)[number];
@@ -41,9 +48,11 @@ export interface ValidatedRegistrationProfile {
   emailValidationDecision: string;
   phoneCountryCode: string;
   phoneNumber: string;
-  interestedAssetTypes: InterestAssetType[];
+  interestedAssetTypes: AccessInterestAssetType[];
   imageQuantityRange: ImageQuantityRange | null;
   imageQualityPreference: ImageQualityPreference | null;
+  royaltyFreeQuantityRange: ImageQuantityRange | null;
+  royaltyFreeQualityPreference: ImageQualityPreference | null;
 }
 
 export interface FotocorpUserProfileDto {
@@ -56,9 +65,11 @@ export interface FotocorpUserProfileDto {
   companyEmail: string;
   phoneCountryCode: string;
   phoneNumber: string;
-  interestedAssetTypes: InterestAssetType[];
+  interestedAssetTypes: AccessInterestAssetType[];
   imageQuantityRange: string | null;
   imageQualityPreference: string | null;
+  royaltyFreeQuantityRange: string | null;
+  royaltyFreeQualityPreference: string | null;
 }
 
 export class RegistrationProfileValidationError extends Error {
@@ -94,7 +105,7 @@ export async function validateRegistrationProfileBody(body: unknown): Promise<Va
     );
   }
   const companyType = normalizeCompanyType(readRequiredString(body, "companyType", "Company type is required."));
-  const interestedAssetTypes = readInterestAssetTypes(body);
+  const interestedAssetTypes = normalizeAccessInterestAssetTypes(body.interestedAssetTypes);
   if (!interestedAssetTypes.length) {
     throw new RegistrationProfileValidationError(
       "INTERESTED_ASSET_TYPES_REQUIRED",
@@ -103,15 +114,35 @@ export async function validateRegistrationProfileBody(body: unknown): Promise<Va
   }
   let imageQuantityRange: ImageQuantityRange | null = null;
   let imageQualityPreference: ImageQualityPreference | null = null;
-  if (interestedAssetTypes.includes("IMAGE")) {
-    const rangeRaw = readRequiredString(body, "imageQuantityRange", "Image quantity range is required when Images is selected.");
+  if (interestedAssetTypes.includes("EDITORIAL")) {
+    const rangeRaw = readRequiredString(
+      body,
+      "imageQuantityRange",
+      "Editorial quantity range is required when Editorial is selected.",
+    );
     imageQuantityRange = normalizeImageQuantityRange(rangeRaw);
     const qualityRaw = readRequiredString(
       body,
       "imageQualityPreference",
-      "Image quality preference is required when Images is selected.",
+      "Editorial quality preference is required when Editorial is selected.",
     );
     imageQualityPreference = normalizeImageQualityPreference(qualityRaw);
+  }
+  let royaltyFreeQuantityRange: ImageQuantityRange | null = null;
+  let royaltyFreeQualityPreference: ImageQualityPreference | null = null;
+  if (interestedAssetTypes.includes("ROYALTY_FREE")) {
+    const rangeRaw = readRequiredString(
+      body,
+      "royaltyFreeQuantityRange",
+      "Royalty Free quantity range is required when Royalty Free is selected.",
+    );
+    royaltyFreeQuantityRange = normalizeImageQuantityRange(rangeRaw);
+    const qualityRaw = readRequiredString(
+      body,
+      "royaltyFreeQualityPreference",
+      "Royalty Free quality preference is required when Royalty Free is selected.",
+    );
+    royaltyFreeQualityPreference = normalizeImageQualityPreference(qualityRaw);
   }
   return {
     firstName: readRequiredString(body, "firstName", "First name is required."),
@@ -129,6 +160,8 @@ export async function validateRegistrationProfileBody(body: unknown): Promise<Va
     interestedAssetTypes,
     imageQuantityRange,
     imageQualityPreference,
+    royaltyFreeQuantityRange,
+    royaltyFreeQualityPreference,
   };
 }
 
@@ -174,26 +207,12 @@ export function toFotocorpUserProfileDto(
     companyEmail: profile.companyEmail,
     phoneCountryCode: profile.phoneCountryCode,
     phoneNumber: profile.phoneNumber,
-    interestedAssetTypes: (profile.interestedAssetTypes ?? []) as InterestAssetType[],
+    interestedAssetTypes: normalizeAccessInterestAssetTypes(profile.interestedAssetTypes ?? []),
     imageQuantityRange: profile.imageQuantityRange ?? null,
     imageQualityPreference: profile.imageQualityPreference ?? null,
+    royaltyFreeQuantityRange: profile.royaltyFreeQuantityRange ?? null,
+    royaltyFreeQualityPreference: profile.royaltyFreeQualityPreference ?? null,
   };
-}
-
-function readInterestAssetTypes(body: Record<string, unknown>): InterestAssetType[] {
-  const raw = body.interestedAssetTypes;
-  const list: unknown[] = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(",").map((s) => s.trim()) : [];
-  const out: InterestAssetType[] = [];
-  for (const item of list) {
-    if (typeof item !== "string") continue;
-    const normalized = item.trim().toUpperCase();
-    if (isInterestAssetType(normalized) && !out.includes(normalized)) out.push(normalized);
-  }
-  return out;
-}
-
-function isInterestAssetType(value: string): value is InterestAssetType {
-  return (INTEREST_ASSET_TYPES as readonly string[]).includes(value);
 }
 
 function normalizeImageQuantityRange(value: string): ImageQuantityRange {
@@ -203,7 +222,7 @@ function normalizeImageQuantityRange(value: string): ImageQuantityRange {
       ? normalized
       : null;
   if (!mapped) {
-    throw new RegistrationProfileValidationError("INVALID_IMAGE_QUANTITY_RANGE", "Image quantity range is not valid.");
+    throw new RegistrationProfileValidationError("INVALID_IMAGE_QUANTITY_RANGE", "Quantity range is not valid.");
   }
   return mapped as ImageQuantityRange;
 }
@@ -211,7 +230,7 @@ function normalizeImageQuantityRange(value: string): ImageQuantityRange {
 function normalizeImageQualityPreference(value: string): ImageQualityPreference {
   const normalized = value.trim().toUpperCase();
   if (!isImageQualityPreference(normalized)) {
-    throw new RegistrationProfileValidationError("INVALID_IMAGE_QUALITY", "Image quality preference is not valid.");
+    throw new RegistrationProfileValidationError("INVALID_IMAGE_QUALITY", "Quality preference is not valid.");
   }
   return normalized;
 }

@@ -21,7 +21,7 @@ export default async function CategoryDetailPage({ params }: CategoryDetailPageP
 
   const category = categories.find((item) => toSlug(item.name) === slug)
   if (category) {
-    redirect(`/search?categoryId=${encodeURIComponent(category.id)}`)
+    redirect(`/search?mode=events&categoryId=${encodeURIComponent(category.id)}`)
   }
 
   return (

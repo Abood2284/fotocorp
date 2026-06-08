@@ -19,6 +19,10 @@ import {
 } from "../../../lib/r2-contributor-uploads";
 import { schedulePublishDrainWebhook } from "../../../lib/jobs/publish-drain-webhook";
 import { createContributorStagingPresignedPutUrl } from "../../../lib/r2-presigned-put";
+import {
+  CONTRIBUTOR_UPLOAD_AUDIT_ACTION,
+  insertStaffAuditLog,
+} from "../../../lib/staff/staff-audit-log";
 import type {
   AdminContributorUploadApproveBody,
   AdminContributorUploadListQuery,
@@ -280,8 +284,13 @@ export async function getAdminContributorUploadOriginalService(
   return new Response(object.body, { status: 200, headers });
 }
 
-export interface ApproveAdminContributorUploadsContext {
-  requestedByAdminUserId: string | null;
+export interface ContributorUploadStaffContext {
+  staffMemberId: string | null;
+}
+
+export interface ApproveAdminContributorUploadsContext extends ContributorUploadStaffContext {
+  /** Required on Cloudflare Workers so the outbound wake fetch survives after the approve response. */
+  executionCtx?: ExecutionContext;
 }
 
 export async function approveAdminContributorUploadsService(
@@ -473,7 +482,7 @@ export async function approveAdminContributorUploadsService(
         values (
           'CONTRIBUTOR_APPROVAL',
           'QUEUED',
-          ${context.requestedByAdminUserId ?? null},
+          ${context.staffMemberId ?? null},
           ${successful.length},
           0,
           0,
@@ -574,10 +583,27 @@ export async function approveAdminContributorUploadsService(
   }
 
   if (approvedItems.length > 0) {
-    schedulePublishDrainWebhook(env, {
-      publishJobId,
-      approvedCount: approvedItems.length,
-    })
+    schedulePublishDrainWebhook(
+      env,
+      {
+        publishJobId,
+        approvedCount: approvedItems.length,
+      },
+      context.executionCtx,
+    )
+
+    const auditDb = httpDb(env);
+    await insertStaffAuditLog(auditDb, {
+      staffMemberId: context.staffMemberId,
+      action: CONTRIBUTOR_UPLOAD_AUDIT_ACTION.APPROVED,
+      entityType: "image_publish_job",
+      entityId: publishJobId,
+      metadata: {
+        approvedCount: approvedItems.length,
+        imageAssetIds: approvedItems.map((item) => item.imageAssetId),
+        skippedCount: skipped.length,
+      },
+    }).catch(() => undefined);
   }
 
   return json({
@@ -783,6 +809,7 @@ export async function patchAdminContributorUploadMetadataService(
   env: Env,
   imageAssetId: string,
   body: AdminContributorUploadMetadataPatchBody,
+  context: ContributorUploadStaffContext = { staffMemberId: null },
 ): Promise<Response> {
   if (!env.DATABASE_URL) {
     throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.");
@@ -890,6 +917,34 @@ export async function patchAdminContributorUploadMetadataService(
       );
     }
 
+    const contributorRows = await executeRows<{ contributor_id: string; batch_id: string }>(
+      writeDb.db,
+      sql`
+        select contributor_id::text as contributor_id, batch_id::text as batch_id
+        from contributor_upload_items
+        where image_asset_id = ${imageAssetId}::uuid
+        limit 1
+      `,
+    );
+    const contributorRow = contributorRows[0];
+
+    const changedFields: string[] = [];
+    if (body.whoIsInPicture !== undefined) changedFields.push("whoIsInPicture");
+    if (body.caption !== undefined) changedFields.push("caption");
+    if (body.keywords !== undefined) changedFields.push("keywords");
+
+    await insertStaffAuditLog(httpDb(env), {
+      staffMemberId: context.staffMemberId,
+      action: CONTRIBUTOR_UPLOAD_AUDIT_ACTION.METADATA_SAVED,
+      entityType: "image_asset",
+      entityId: imageAssetId,
+      metadata: {
+        contributorId: contributorRow?.contributor_id ?? null,
+        batchId: contributorRow?.batch_id ?? null,
+        changedFields,
+      },
+    }).catch(() => undefined);
+
     return json({
       ok: true as const,
       whoIsInPicture: nextWhoIsInPicture,
@@ -918,6 +973,7 @@ interface RejectSkipped {
 export async function rejectAdminContributorUploadsService(
   env: Env,
   body: AdminContributorUploadRejectBody,
+  context: ContributorUploadStaffContext = { staffMemberId: null },
 ): Promise<Response> {
   if (!env.DATABASE_URL) {
     throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.");
@@ -997,6 +1053,20 @@ export async function rejectAdminContributorUploadsService(
     await writeDb.close().catch(() => undefined);
   }
 
+  if (rejectedItems.length > 0) {
+    await insertStaffAuditLog(httpDb(env), {
+      staffMemberId: context.staffMemberId,
+      action: CONTRIBUTOR_UPLOAD_AUDIT_ACTION.REJECTED,
+      entityType: "contributor_upload_reject_batch",
+      entityId: null,
+      metadata: {
+        rejectedCount: rejectedItems.length,
+        imageAssetIds: rejectedItems.map((item) => item.imageAssetId),
+        skippedCount: skipped.length,
+      },
+    }).catch(() => undefined);
+  }
+
   return json({
     ok: true as const,
     rejectedCount: rejectedItems.length,
@@ -1054,6 +1124,7 @@ export async function completeAdminContributorUploadReplaceService(
   env: Env,
   imageAssetId: string,
   body: AdminContributorUploadReplaceCompleteBody,
+  context: ContributorUploadStaffContext = { staffMemberId: null },
 ): Promise<Response> {
   if (!env.DATABASE_URL) {
     throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.");
@@ -1190,6 +1261,17 @@ export async function completeAdminContributorUploadReplaceService(
       `,
     );
     const pui = puiRows[0];
+
+    await insertStaffAuditLog(httpDb(env), {
+      staffMemberId: context.staffMemberId,
+      action: CONTRIBUTOR_UPLOAD_AUDIT_ACTION.FILE_REPLACED,
+      entityType: "image_asset",
+      entityId: imageAssetId,
+      metadata: {
+        originalFileName: u.original_file_name,
+        mimeType: pui?.mime_type ?? mimeType,
+      },
+    }).catch(() => undefined);
 
     return json({
       ok: true as const,

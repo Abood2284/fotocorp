@@ -39,7 +39,6 @@ export const internalApiRoutes = {
 
   adminCatalogStats: () => "/api/v1/internal/admin/catalog/stats",
   adminDashboardSummary: () => "/api/v1/internal/admin/dashboard/summary",
-  adminMediaPipelineStatus: () => "/api/v1/internal/admin/media-pipeline/status",
 
   adminFilters: () => "/api/v1/internal/admin/filters",
 
@@ -102,6 +101,10 @@ export const internalApiRoutes = {
 
   adminEventPurge: (eventId: string) =>
     `/api/v1/internal/admin/events/${encodeURIComponent(eventId)}/purge`,
+
+  adminHomepageHeroPool: () => "/api/v1/internal/admin/homepage-hero-pool",
+
+  adminHomepageHeroPoolCandidates: () => "/api/v1/internal/admin/homepage-hero-pool/candidates",
 } as const
 
 export function withQuery(path: string, params: URLSearchParams) {

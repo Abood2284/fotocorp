@@ -69,6 +69,8 @@ export async function createPlatformUser(
       interestedAssetTypes: profile.interestedAssetTypes,
       imageQuantityRange: profile.imageQuantityRange,
       imageQualityPreference: profile.imageQualityPreference,
+      royaltyFreeQuantityRange: profile.royaltyFreeQuantityRange,
+      royaltyFreeQualityPreference: profile.royaltyFreeQualityPreference,
       status: "ACTIVE",
       role: input.role ?? "USER",
     })
@@ -105,6 +107,8 @@ export async function createPlatformUser(
     interestedAssetTypes: profile.interestedAssetTypes,
     imageQuantityRange: profile.imageQuantityRange,
     imageQualityPreference: profile.imageQualityPreference,
+    royaltyFreeQuantityRange: profile.royaltyFreeQuantityRange,
+    royaltyFreeQualityPreference: profile.royaltyFreeQualityPreference,
   })
 
   return getPlatformUserById(db, userId)

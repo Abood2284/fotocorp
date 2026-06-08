@@ -126,6 +126,9 @@ async function fetchPlatformSessionLegacy(
   apiBaseUrl: string,
   headers: Headers,
 ): Promise<UnifiedAuthSession | null> {
+  const userSession = await fetchPlatformUserSession(apiBaseUrl, headers)
+  if (userSession) return userSession
+
   let contributorResponse: Response
   try {
     contributorResponse = await fetch(new URL("/api/v1/contributor/auth/me", apiBaseUrl), {
@@ -134,28 +137,33 @@ async function fetchPlatformSessionLegacy(
       cache: "no-store",
     })
   } catch {
-    contributorResponse = new Response(null, { status: 502 })
+    return null
   }
 
-  if (contributorResponse.ok) {
-    const payload = (await contributorResponse.json().catch(() => null)) as {
-      contributor?: { id: string; displayName: string; email?: string | null }
-      account?: { username: string }
-    } | null
+  if (!contributorResponse.ok) return null
 
-    if (payload?.contributor?.id && payload.account?.username) {
-      return buildUnifiedSessionFromPlatform({
-        ownerType: "CONTRIBUTOR",
-        contributor: {
-          id: payload.contributor.id,
-          displayName: payload.contributor.displayName,
-          username: payload.account.username,
-          email: payload.contributor.email ?? null,
-        },
-      })
-    }
-  }
+  const payload = (await contributorResponse.json().catch(() => null)) as {
+    contributor?: { id: string; displayName: string; email?: string | null }
+    account?: { username: string }
+  } | null
 
+  if (!payload?.contributor?.id || !payload.account?.username) return null
+
+  return buildUnifiedSessionFromPlatform({
+    ownerType: "CONTRIBUTOR",
+    contributor: {
+      id: payload.contributor.id,
+      displayName: payload.contributor.displayName,
+      username: payload.account.username,
+      email: payload.contributor.email ?? null,
+    },
+  })
+}
+
+async function fetchPlatformUserSession(
+  apiBaseUrl: string,
+  headers: Headers,
+): Promise<UnifiedAuthSession | null> {
   let userResponse: Response
   try {
     userResponse = await fetch(new URL("/api/v1/auth/me", apiBaseUrl), {

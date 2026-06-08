@@ -90,6 +90,7 @@ CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET=fotocorp-2026-contributor-uploads
 # STAFF_BOOTSTRAP_PASSWORD=
 # STAFF_BOOTSTRAP_DISPLAY_NAME=Super Admin
 # STAFF_BOOTSTRAP_ROLE=SUPER_ADMIN
+# Caption writers: create via Staff → Staff users (/staff/staff-users), not bootstrap.
 # Development: reset a platform USER password (P4 Better Auth hashes are not verifiable by P5 login)
 # PLATFORM_DEV_LOGIN_IDENTIFIER=abood
 # PLATFORM_DEV_PASSWORD=

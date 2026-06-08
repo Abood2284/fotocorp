@@ -2,11 +2,12 @@ import "server-only"
 
 import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
-import { getStaffMe, StaffApiError, type StaffMeResponse } from "@/lib/api/staff-api"
+import { FOTOCORP_STAFF_SESSION_COOKIE, getStaffMe, StaffApiError, type StaffMeResponse } from "@/lib/api/staff-api"
 import { buildSignInHref } from "@/lib/auth-sign-in-gateway"
 import {
   getDefaultStaffLandingPath,
   staffRoleCanAccessPath,
+  staffRoleIsWorkspaceOnly,
 } from "@/lib/staff/staff-route-access"
 import { traceHomepageSessionCall } from "@/lib/server/session-latency-trace"
 
@@ -19,6 +20,9 @@ export async function getStaffCookieHeader() {
 }
 
 export async function getOptionalStaffSession(): Promise<StaffMeResponse | null> {
+  const cookieStore = await cookies()
+  if (!cookieStore.get(FOTOCORP_STAFF_SESSION_COOKIE)?.value) return null
+
   return traceHomepageSessionCall("/api/v1/staff/auth/me", async () => {
     try {
       return await getStaffMe({ cookieHeader: await getStaffCookieHeader() })
@@ -67,4 +71,12 @@ export async function requireStaffRole(allowedRoles: string[]) {
   if (staff.role === "SUPER_ADMIN") return staff
   if (allowedRoles.includes(staff.role)) return staff
   redirect(getDefaultStaffLandingPath(staff.role))
+}
+
+/** Caption writers and other workspace-only roles cannot browse public client routes. */
+export async function redirectWorkspaceOnlyStaffAwayFromPublicSite() {
+  const session = await getOptionalStaffSession()
+  if (!session) return
+  if (!staffRoleIsWorkspaceOnly(session.staff.role)) return
+  redirect(getDefaultStaffLandingPath(session.staff.role))
 }

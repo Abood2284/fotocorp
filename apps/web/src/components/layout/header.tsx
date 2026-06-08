@@ -70,16 +70,16 @@ const BROWSE_NAV_TRIGGER_CLASS =
   "flex items-center gap-1 px-3 py-2 font-sans text-sm font-medium transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
 const EDITORIAL_LINKS: HeaderLink[] = [
-  { label: "Latest", href: "/search?mode=events" },
-  { label: "Entertainment", href: "/categories/entertainment" },
-  { label: "News", href: "/categories/news" },
-  { label: "Fashion", href: "/categories/fashion" },
-  { label: "Sports", href: "/categories/sports" },
-  { label: "Business", href: "/categories/business" },
-  { label: "Retro", href: "/categories/retro" },
+  { label: "Latest", href: editorialEventsHref() },
+  { label: "Entertainment", href: editorialEventsHref("Entertainment") },
+  { label: "News", href: editorialEventsHref("News") },
+  { label: "Fashion", href: editorialEventsHref("Fashion") },
+  { label: "Sports", href: editorialEventsHref("Sports") },
+  { label: "Business", href: editorialEventsHref("Business") },
+  { label: "Retro", href: editorialEventsHref("Retro") },
 ]
 
-type BrowseDropdownId = "editorial" | "video" | "caricature"
+type BrowseDropdownId = "editorial" | "video" | "caricature" | "royaltyFree"
 
 const HOVER_CLOSE_DELAY_MS = 150
 
@@ -209,7 +209,14 @@ function HeaderShell({
             onCloseSchedule={scheduleCloseDropdown}
             onCloseCancel={cancelCloseDropdown}
           />
-          <BrowseNavDisabled label="Royalty Free" />
+          <BrowseNavTrigger
+            label="Royalty Free"
+            active={false}
+            expanded={openDropdown === "royaltyFree"}
+            onOpen={() => openBrowseDropdown("royaltyFree")}
+            onCloseSchedule={scheduleCloseDropdown}
+            onCloseCancel={cancelCloseDropdown}
+          />
           <RoleMainLinks
             pathname={pathname}
             sortParam={sortParam}
@@ -276,6 +283,15 @@ function HeaderShell({
         </BrowseDropdownPanel>
       )}
 
+      {openDropdown === "royaltyFree" && (
+        <BrowseDropdownPanel onMouseEnter={cancelCloseDropdown} onMouseLeave={scheduleCloseDropdown}>
+          <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+            <h2 className="font-heading text-lg font-normal text-foreground">Royalty Free</h2>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">Royalty free licensing is coming soon.</p>
+          </div>
+        </BrowseDropdownPanel>
+      )}
+
       {/* Mobile panel */}
       <div
         id="mobile-nav-panel"
@@ -290,7 +306,12 @@ function HeaderShell({
           className="mx-auto grid max-w-[1600px] gap-6 px-4 py-5 sm:px-6"
           aria-label="Mobile navigation"
         >
-          <MobileBrowseNav pathname={pathname} sortParam={sortParam} modeParam={modeParam} />
+          <MobileBrowseNav
+            pathname={pathname}
+            sortParam={sortParam}
+            modeParam={modeParam}
+            categoryIdParam={categoryIdParam}
+          />
           <MobileRoleLinks
             pathname={pathname}
             sortParam={sortParam}
@@ -300,18 +321,6 @@ function HeaderShell({
         </nav>
       </div>
     </header>
-  )
-}
-
-function BrowseNavDisabled({ label }: { label: string }) {
-  return (
-    <span
-      className={cn(BROWSE_NAV_TRIGGER_CLASS, "cursor-not-allowed text-muted-foreground/50")}
-      aria-disabled="true"
-      title="Coming soon"
-    >
-      {label}
-    </span>
   )
 }
 
@@ -381,10 +390,12 @@ function MobileBrowseNav({
   pathname,
   sortParam,
   modeParam,
+  categoryIdParam,
 }: {
   pathname: string
   sortParam: string | null
   modeParam: string | null
+  categoryIdParam: string | null
 }) {
   return (
     <section>
@@ -400,6 +411,7 @@ function MobileBrowseNav({
                 pathname={pathname}
                 sortParam={sortParam}
                 modeParam={modeParam}
+                categoryIdParam={categoryIdParam}
               />
             ))}
           </div>
@@ -695,13 +707,15 @@ function MobileNavLink({
   pathname,
   sortParam,
   modeParam,
+  categoryIdParam,
 }: {
   link: HeaderLink
   pathname: string
   sortParam: string | null
   modeParam: string | null
+  categoryIdParam: string | null
 }) {
-  const active = isActivePath(pathname, link.href, sortParam, modeParam)
+  const active = isActivePath(pathname, link.href, sortParam, modeParam, categoryIdParam)
 
   return (
     <Link
@@ -736,17 +750,27 @@ function AccountMenuLink({ item, onNavigate }: { item: AccountLink; onNavigate: 
 function isEditorialNavActive(pathname: string, categoryIdParam: string | null, modeParam: string | null) {
   if (pathname === "/search" && categoryIdParam) return true
   if (pathname === "/search" && modeParam?.toLowerCase() === "events") return true
-  if (pathname.startsWith("/categories/")) return true
   return false
 }
 
-function isActivePath(pathname: string, href: string, sortParam: string | null, modeParam: string | null) {
+function isActivePath(
+  pathname: string,
+  href: string,
+  sortParam: string | null,
+  modeParam: string | null,
+  categoryIdParam: string | null = null,
+) {
   const normalizedSort = sortParam?.toLowerCase() ?? null
   const normalizedMode = modeParam?.toLowerCase() ?? null
 
   if (pathname === "/search") {
-    if (href === "/search?mode=events") {
-      return normalizedMode === "events" || normalizedSort === "latest"
+    const hrefParams = parseHrefSearchParams(href)
+    if (hrefParams?.get("mode") === "events") {
+      const hrefCategory = hrefParams.get("category") ?? hrefParams.get("categoryId")
+      const isEventsView = normalizedMode === "events" || normalizedSort === "latest"
+      if (!hrefCategory) return isEventsView && !categoryIdParam
+      if (!isEventsView || !categoryIdParam) return false
+      return categoryIdParam.toLowerCase() === hrefCategory.toLowerCase()
     }
     if (href === "/search") {
       return normalizedMode !== "events" && normalizedSort !== "latest"
@@ -756,6 +780,18 @@ function isActivePath(pathname: string, href: string, sortParam: string | null, 
   const path = href.split("?")[0]
   if (path === "/") return pathname === "/"
   return pathname === path || pathname.startsWith(`${path}/`)
+}
+
+function editorialEventsHref(categoryLabel?: string) {
+  const params = new URLSearchParams({ mode: "events" })
+  if (categoryLabel) params.set("category", categoryLabel)
+  return `/search?${params.toString()}`
+}
+
+function parseHrefSearchParams(href: string) {
+  const queryIndex = href.indexOf("?")
+  if (queryIndex === -1) return null
+  return new URLSearchParams(href.slice(queryIndex + 1))
 }
 
 function getUserInitial(displayName: string) {

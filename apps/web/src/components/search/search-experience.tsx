@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState, useTransition } from "react"
 
 import type {
   PublicAsset,
-  PublicAssetFiltersResponse,
   PublicAssetListResponse,
   PublicAssetSort,
   PublicSearchEventsResponse,
@@ -16,9 +15,11 @@ import { PublicAssetCard } from "@/components/assets/public-asset-card"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
 import { EmptyState } from "@/components/shared/empty-state"
 import {
-  SearchCategoryTabsSkeleton,
-  SearchFilterPanelSkeleton,
-} from "@/components/search/search-filter-skeletons"
+  CATALOG_MONTH_OPTIONS,
+  CatalogSearchActiveChips,
+  CatalogSearchFilterPanel,
+} from "@/components/search/catalog-search-filter-panel"
+import { SearchFilterPanelSkeleton } from "@/components/search/search-filter-skeletons"
 import { SearchEventResultsGrid } from "@/components/search/search-event-results-grid"
 import { useSearchFilters, hasPopulatedAssetFilters } from "@/components/search/search-filters-context"
 import { Button } from "@/components/ui/button"
@@ -26,7 +27,7 @@ import type { SearchSelectedEvent } from "@/components/search/search-experience-
 import { getPublicCatalogTaxonomy, isTypesenseSearchEnabled, searchPublicAssets, searchPublicEvents } from "@/lib/api/fotocorp-api"
 import { hasSearchIntent } from "@/lib/search/search-intent"
 import { cn, formatInteger } from "@/lib/utils"
-import { Calendars, ChevronDown, ChevronLeft, ChevronRight, Images, SlidersHorizontal, X, SearchIcon, ListFilterIcon } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, Images, SlidersHorizontal, X, SearchIcon } from "lucide-react"
 
 export type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 
@@ -58,27 +59,6 @@ interface SearchExperienceProps {
 type SearchViewMode = "grid" | "card"
 type SearchResultMode = "images" | "events"
 
-const SORT_OPTIONS: Array<{ label: string; value: PublicAssetSort }> = [
-  { label: "Best match", value: "relevance" },
-  { label: "Newest", value: "newest" },
-  { label: "Oldest", value: "oldest" },
-]
-
-const MONTH_OPTIONS = [
-  { value: 1, label: "January" },
-  { value: 2, label: "February" },
-  { value: 3, label: "March" },
-  { value: 4, label: "April" },
-  { value: 5, label: "May" },
-  { value: 6, label: "June" },
-  { value: 7, label: "July" },
-  { value: 8, label: "August" },
-  { value: 9, label: "September" },
-  { value: 10, label: "October" },
-  { value: 11, label: "November" },
-  { value: 12, label: "December" },
-]
-
 const PAGE_SIZE = 50
 const EVENT_PAGE_SIZE = 25
 
@@ -96,6 +76,7 @@ export function SearchExperience({
   const router = useRouter()
   const { filters, mergeFilters } = useSearchFilters()
   const searchActive = hasSearchIntent(initialParams)
+  const isBrowseLatest = !searchActive && (initialParams.mode ?? "images") === "images"
   const [filtersRequested, setFiltersRequested] = useState(searchActive)
   const [isPending, startTransition] = useTransition()
   const [showFilters, setShowFilters] = useState(false)
@@ -148,7 +129,7 @@ export function SearchExperience({
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    enabled: searchActive && resultMode === "images",
+    enabled: (searchActive || isBrowseLatest) && resultMode === "images",
   })
   const {
     data: filterSnapshot,
@@ -308,7 +289,6 @@ export function SearchExperience({
   const cityName = filters.cities?.find((item) => item.id === initialParams.city)?.name ?? initialParams.city
   const activeEventCount = eventCount
   const inactiveImageCount = imageCountSnapshot?.totalCount ?? initialImageCount ?? 0
-  const topCategories = filters.categories.slice(0, 5)
   const eventChipLabel = eventName
     ?? (initialParams.eventId
       ? showFiltersLoading || isFetching
@@ -325,7 +305,7 @@ export function SearchExperience({
     if (cityName) chips.push({ key: "city", label: cityName, remove: () => updateParams({ city: undefined }) })
     if (initialParams.year) chips.push({ key: "year", label: String(initialParams.year), remove: () => updateParams({ year: undefined }) })
     if (initialParams.month) {
-      const monthLabel = MONTH_OPTIONS.find((item) => item.value === initialParams.month)?.label ?? String(initialParams.month)
+      const monthLabel = CATALOG_MONTH_OPTIONS.find((item) => item.value === initialParams.month)?.label ?? String(initialParams.month)
       chips.push({ key: "month", label: monthLabel, remove: () => updateParams({ month: undefined }) })
     }
     return chips
@@ -471,40 +451,104 @@ export function SearchExperience({
 
   return (
     <>
-      <section className="order-2 bg-surface-warm px-3 py-6 sm:px-5 lg:px-6">
-        <div className="mb-6 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <ActiveChips chips={filterChips} onClearAll={clearAll} />
+      <div className="order-1 bg-background text-foreground">
+        <section className="sticky top-0 z-50 border-b border-foreground/80 bg-background shadow-sm">
+          <form
+            onSubmit={submitSearch}
+            className="grid min-h-[72px] grid-cols-[1fr_auto] items-stretch divide-x divide-border border-b border-border bg-background md:grid-cols-[1fr_260px_auto]"
+          >
+            <label className="flex min-w-0 items-center gap-3 bg-background px-4 transition-colors focus-within:bg-surface-warm focus-within:outline-none sm:px-6 lg:px-8">
+              <SearchIcon className="shrink-0 text-foreground" strokeWidth={2.1} size={24} />
+              <span className="sr-only">Search the Fotocorp archive</span>
+              <input
+                value={queryDraft}
+                onChange={(event) => setQueryDraft(event.target.value)}
+                onFocus={requestFilters}
+                placeholder="Search images, events, categories, Fotokey"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent text-lg font-medium text-foreground shadow-none outline-none ring-0 placeholder:text-lg placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus-visible:!outline-none focus-visible:ring-0 md:text-xl md:placeholder:text-xl"
+              />
+            </label>
 
-          {searchActive && (
-            <div className="ml-auto flex items-end gap-8">
-              <ResultMetric
-                active={!isEventsMode}
-                label="Images"
-                value={isEventsMode ? inactiveImageCount : displayCount}
-                suffix={!isEventsMode && exactTotalCount === undefined && hasMore ? "+" : undefined}
-                onClick={() => setResultMode("images")}
-              />
-              <ResultMetric
-                active={isEventsMode}
-                label="Events"
-                value={activeEventCount}
-                onClick={typesenseSearchEnabled ? () => setResultMode("events") : undefined}
-              />
+            <div className="hidden items-center justify-center bg-background px-6 text-base font-medium text-foreground md:flex">
+              Editorial images
+              <ChevronDown className="ml-3" size={16} />
             </div>
-          )}
-        </div>
 
+            <div className="flex items-center bg-background">
+              {queryDraft && (
+                <button
+                  type="button"
+                  onClick={() => setQueryDraft("")}
+                  className="flex h-full w-14 items-center justify-center text-foreground hover:bg-muted"
+                  aria-label="Clear search text"
+                >
+                  <X size={24} />
+                </button>
+              )}
+              <Button type="submit" className="m-3 h-12 rounded-none px-5" disabled={isPending} aria-busy={isPending || isFetching}>
+                {isPending ? "Searching…" : "Search"}
+              </Button>
+            </div>
+          </form>
+
+          <div className="grid border-b border-border bg-background md:grid-cols-[250px_1fr]">
+            <button
+              type="button"
+              onClick={toggleFiltersPanel}
+              className={cn(
+                "flex h-16 items-center justify-between border-b border-border px-5 text-left text-base font-semibold uppercase tracking-wide transition-colors md:border-b-0 md:border-r",
+                showFilters ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted",
+              )}
+              aria-expanded={showFilters}
+            >
+              <span className="inline-flex items-center gap-3">
+                <SlidersHorizontal size={20} />
+                Filters
+              </span>
+              <ChevronLeft className={cn("transition-transform", !showFilters && "rotate-180")} size={20} />
+            </button>
+
+            <div className="flex min-h-16 min-w-0 flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 overflow-x-auto">
+                <CatalogSearchActiveChips chips={filterChips} onClearAll={clearAll} />
+              </div>
+
+              {(searchActive || isBrowseLatest) && (
+                <div className="flex shrink-0 items-center gap-6 sm:border-l sm:border-border sm:pl-4">
+                  <ResultMetric
+                    compact
+                    active={!isEventsMode}
+                    label="Images"
+                    value={isEventsMode ? inactiveImageCount : displayCount}
+                    suffix={!isEventsMode && exactTotalCount === undefined && hasMore ? "+" : undefined}
+                    onClick={() => setResultMode("images")}
+                  />
+                  <ResultMetric
+                    compact
+                    active={isEventsMode}
+                    label="Events"
+                    value={activeEventCount}
+                    onClick={typesenseSearchEnabled ? () => setResultMode("events") : undefined}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section className="order-2 bg-surface-warm px-3 py-6 sm:px-5 lg:px-6">
         <div className={cn("grid gap-5", showFilters && "lg:grid-cols-[300px_minmax(0,1fr)]")}>
           {showFilters && (
             showFiltersLoading ? (
               <SearchFilterPanelSkeleton />
             ) : (
-              <FilterPanel
+              <CatalogSearchFilterPanel
                 categories={filters.categories}
                 events={filters.events}
                 params={initialParams}
                 disabled={isPending}
-                onUpdate={updateParams}
+                onUpdate={(next) => updateParams(next)}
                 onClearAll={clearAll}
               />
             )
@@ -517,15 +561,7 @@ export function SearchExperience({
                 aria-hidden="true"
               />
             )}
-            {!searchActive ? (
-              <div className="border border-border bg-background py-16">
-                <EmptyState
-                  icon={SearchIcon}
-                  title="Search the Fotocorp archive"
-                  description="Enter a keyword, Fotokey, or event name, or open filters to explore editorial images."
-                />
-              </div>
-            ) : isEventsMode ? (
+            {isEventsMode ? (
               hasEventResults ? (
                 <>
                   <SearchEventResultsGrid events={eventItems} />
@@ -603,84 +639,6 @@ export function SearchExperience({
           </main>
         </div>
       </section>
-
-      <div className="order-1 bg-background text-foreground">
-      <section
-        className="sticky top-0 z-50 border-b border-foreground/80 bg-background shadow-sm"
-      >
-        <form onSubmit={submitSearch} className="grid min-h-[72px] grid-cols-[1fr_auto] items-stretch border-b border-border bg-background focus-within:outline-none md:grid-cols-[1fr_260px_auto]">
-          <label className="flex min-w-0 items-center gap-3 px-4 sm:px-6 lg:px-8">
-            <SearchIcon className="shrink-0 text-foreground" strokeWidth={2.1} size={24} />
-            <span className="sr-only">Search the Fotocorp archive</span>
-            <input
-              value={queryDraft}
-              onChange={(event) => setQueryDraft(event.target.value)}
-              onFocus={requestFilters}
-              placeholder="Search images, events, categories, Fotokey"
-              className="h-full min-w-0 flex-1 border-0 bg-transparent text-lg font-medium text-foreground shadow-none outline-none ring-0 placeholder:text-lg placeholder:text-muted-foreground focus:border-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 md:text-xl md:placeholder:text-xl"
-            />
-          </label>
-
-          <div className="hidden items-center justify-center border-l border-border px-6 text-base font-medium text-foreground md:flex">
-            Editorial images
-            <ChevronDown className="ml-3" size={16} />
-          </div>
-
-          <div className="flex items-center border-l border-border">
-            {queryDraft && (
-              <button
-                type="button"
-                onClick={() => setQueryDraft("")}
-                className="flex h-full w-14 items-center justify-center text-foreground hover:bg-muted"
-                aria-label="Clear search text"
-              >
-                <X size={24} />
-              </button>
-            )}
-            <Button type="submit" className="m-3 h-12 rounded-none px-5" disabled={isPending} aria-busy={isPending || isFetching}>
-              {isPending ? "Searching…" : "Search"}
-            </Button>
-          </div>
-        </form>
-
-        <div className="grid border-b border-border bg-background md:grid-cols-[250px_1fr]">
-          <button
-            type="button"
-            onClick={toggleFiltersPanel}
-            className={cn(
-              "flex h-16 items-center justify-between border-b border-border px-5 text-left text-base font-semibold uppercase tracking-wide transition-colors md:border-b-0 md:border-r",
-              showFilters ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted",
-            )}
-            aria-expanded={showFilters}
-          >
-            <span className="inline-flex items-center gap-3">
-              <SlidersHorizontal size={20} />
-              Filters
-            </span>
-            <ChevronLeft className={cn(" transition-transform", !showFilters &&"rotate-180")} size={20} />
-          </button>
-
-          {showFiltersLoading ? (
-            <SearchCategoryTabsSkeleton />
-          ) : (
-            <div className="flex min-w-0 items-center gap-3 overflow-x-auto px-4 py-3 sm:px-6">
-              <FilterTab active={!initialParams.categoryId} onClick={() => updateParams({ categoryId: undefined })}>
-                All
-              </FilterTab>
-              {topCategories.map((category) => (
-                <FilterTab
-                  key={category.id}
-                  active={initialParams.categoryId === category.id}
-                  onClick={() => updateParams({ categoryId: category.id })}
-                >
-                  {category.name}
-                </FilterTab>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-      </div>
     </>
   )
 }
@@ -695,204 +653,33 @@ function SearchGridSkeleton() {
   )
 }
 
-function FilterPanel({
-  categories,
-  events,
-  params,
-  disabled,
-  onUpdate,
-  onClearAll,
-}: {
-  categories: PublicAssetFiltersResponse["categories"]
-  events: PublicAssetFiltersResponse["events"]
-  params: SearchExperienceProps["initialParams"]
-  disabled?: boolean
-  onUpdate: (next: Partial<SearchExperienceProps["initialParams"]>, forceSort?: boolean) => void
-  onClearAll: () => void
-}) {
-  return (
-    <aside className="border border-border bg-background">
-      <div className="flex items-center justify-between border-b border-border bg-primary px-4 py-4 text-primary-foreground">
-        <span className="inline-flex items-center gap-3 text-base font-semibold uppercase tracking-wide">
-          <ListFilterIcon className="h-5 w-5" />
-          Filters
-        </span>
-        <button type="button" onClick={onClearAll} className="text-sm font-medium underline underline-offset-4">
-          Reset
-        </button>
-      </div>
-
-      <section className="border-b border-border p-4">
-        <h2 className="mb-3 text-base font-semibold uppercase tracking-wide text-foreground">Sort by</h2>
-        <div className="overflow-hidden border border-border">
-          {SORT_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              disabled={disabled || (option.value === "relevance" && !params.q)}
-              onClick={() => onUpdate({ sort: option.value })}
-              className={cn(
-                "flex h-12 w-full items-center gap-3 border-b border-border px-4 text-left text-sm transition-colors last:border-b-0 disabled:cursor-not-allowed disabled:opacity-45",
-                params.sort === option.value ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted",
-              )}
-            >
-              <span className={cn("h-4 w-4 rounded-full border-2", params.sort === option.value ? "border-primary-foreground bg-primary-foreground shadow-[inset_0_0_0_3px_var(--primary)]" : "border-border-strong")} />
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="border-b border-border p-4">
-        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold uppercase tracking-wide text-foreground">
-          <Calendars size={20} />
-          Date range
-        </h2>
-        <div className="grid grid-cols-2 gap-3">
-          <LabeledSelect
-            label="Year"
-            value={params.year ? String(params.year) : ""}
-            onChange={(value) => onUpdate({ year: value ? Number(value) : undefined })}
-            disabled={disabled}
-          >
-            <option value="">Any year</option>
-            {yearOptions().map((year) => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </LabeledSelect>
-          <LabeledSelect
-            label="Month"
-            value={params.month ? String(params.month) : ""}
-            onChange={(value) => onUpdate({ month: value ? Number(value) : undefined })}
-            disabled={disabled}
-          >
-            <option value="">Any month</option>
-            {MONTH_OPTIONS.map((month) => (
-              <option key={month.value} value={month.value}>{month.label}</option>
-            ))}
-          </LabeledSelect>
-        </div>
-      </section>
-
-      <FilterList
-        title="Categories"
-        emptyLabel="No categories available"
-        showCounts={false}
-        items={categories.map((category) => ({ id: category.id, label: category.name, count: category.assetCount }))}
-        activeId={params.categoryId}
-        onSelect={(id) => onUpdate({ categoryId: id === params.categoryId ? undefined : id })}
-      />
-
-      <FilterList
-        title="Events"
-        emptyLabel="No events available"
-        showCounts={false}
-        items={events.slice(0, 24).map((event) => ({
-          id: event.id,
-          label: event.name ?? "Untitled event",
-          count: event.assetCount,
-          meta: formatShortDate(event.eventDate),
-        }))}
-        activeId={params.eventId}
-        onSelect={(id) => onUpdate({ eventId: id === params.eventId ? undefined : id })}
-      />
-    </aside>
-  )
-}
-
-function FilterList({
-  title,
-  items,
-  activeId,
-  emptyLabel,
-  showCounts = true,
-  onSelect,
-}: {
-  title: string
-  items: Array<{ id: string; label: string; count: number; meta?: string | null }>
-  activeId?: string
-  emptyLabel: string
-  showCounts?: boolean
-  onSelect: (id: string) => void
-}) {
-  return (
-    <section className="border-b border-border p-4 last:border-b-0">
-      <h2 className="mb-3 text-base font-semibold uppercase tracking-wide text-foreground">{title}</h2>
-      {items.length > 0 ? (
-        <div className="max-h-[360px] space-y-1 overflow-y-auto pr-1">
-          {items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelect(item.id)}
-              className={cn(
-                "flex w-full items-start justify-between gap-3 px-2 py-2 text-left text-sm transition-colors",
-                activeId === item.id ? "bg-accent-wash text-foreground ring-1 ring-accent" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <span className="min-w-0">
-                <span className="block truncate font-medium">{item.label}</span>
-                {item.meta && <span className="block text-xs text-muted-foreground">{item.meta}</span>}
-              </span>
-              {showCounts && (
-                <span className="shrink-0 text-xs text-muted-foreground">{formatInteger(item.count)}</span>
-              )}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">{emptyLabel}</p>
-      )}
-    </section>
-  )
-}
-
-function FilterTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "h-10 shrink-0 px-4 text-sm font-semibold transition-colors",
-        active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted",
-      )}
-    >
-      {children}
-    </button>
-  )
-}
-
 function ResultMetric({
   active = false,
+  compact = false,
   label,
   value,
   suffix,
   onClick,
 }: {
   active?: boolean
+  compact?: boolean
   label: string
   value: number
   suffix?: string
   onClick?: () => void
 }) {
+  const valueClass = compact ? "text-lg font-semibold" : "text-2xl font-medium"
+  const labelClass = compact ? "text-sm font-medium" : "text-2xl font-medium"
   const content = (
     <>
-      <span className="text-2xl font-medium text-foreground">{formatInteger(value)}{suffix}</span>
-      <span className="ml-2 text-2xl font-medium text-foreground">{label}</span>
+      <span className={cn(valueClass, "text-foreground")}>{formatInteger(value)}{suffix}</span>
+      <span className={cn(labelClass, "ml-1.5 text-foreground")}>{label}</span>
     </>
   )
 
   if (!onClick) {
     return (
-      <div className={cn("border-b-4 pb-1", active ? "border-accent" : "border-transparent")}>
+      <div className={cn(compact ? "border-b-2 pb-0.5" : "border-b-4 pb-1", active ? "border-accent" : "border-transparent")}>
         {content}
       </div>
     )
@@ -903,7 +690,8 @@ function ResultMetric({
       type="button"
       onClick={onClick}
       className={cn(
-        "-mx-2 cursor-pointer rounded-sm border-b-4 px-2 pb-1 text-left transition-colors",
+        "cursor-pointer rounded-sm text-left transition-colors",
+        compact ? "-mx-1 border-b-2 px-1 pb-0.5" : "-mx-2 border-b-4 px-2 pb-1",
         active
           ? "border-accent text-foreground hover:bg-muted/50"
           : "border-transparent text-muted-foreground hover:border-border-strong hover:bg-muted/70 hover:text-foreground",
@@ -966,89 +754,6 @@ function Pagination({
       )}
     </div>
   )
-}
-
-function LabeledSelect({
-  label,
-  value,
-  onChange,
-  children,
-  disabled,
-  compact = false,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  children: React.ReactNode
-  disabled?: boolean
-  compact?: boolean
-}) {
-  return (
-    <label className={cn("block text-sm", compact ? "flex items-center gap-2" : "space-y-1.5")}>
-      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={disabled}
-          className={cn(
-            "w-full appearance-none border border-border-strong bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50",
-            compact ? "h-9 min-w-[150px] pl-3 pr-8" : "h-11 pl-3 pr-8",
-          )}
-        >
-          {children}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2  -translate-y-1/2 text-muted-foreground" size={16} />
-      </div>
-    </label>
-  )
-}
-
-function ActiveChips({
-  chips,
-  onClearAll,
-  className,
-}: {
-  chips: Array<{ key: string; label: string; remove: () => void }>
-  onClearAll: () => void
-  className?: string
-}) {
-  if (chips.length === 0) return null
-  return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      {chips.map((chip) => (
-        <button
-          key={chip.key}
-          type="button"
-          onClick={chip.remove}
-          aria-label={`Remove filter ${chip.label}`}
-          className="inline-flex h-8 items-center gap-2 rounded-full border border-border bg-background px-3 text-xs font-medium text-foreground hover:bg-muted"
-        >
-          <span>{chip.label}</span>
-          <X size={14} />
-        </button>
-      ))}
-      <button
-        type="button"
-        onClick={onClearAll}
-        className="text-xs font-medium text-muted-foreground underline underline-offset-4"
-      >
-        Clear all
-      </button>
-    </div>
-  )
-}
-
-function formatShortDate(value: string | null | undefined) {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  return new Intl.DateTimeFormat("en", { year: "numeric", month: "short", day: "numeric" }).format(date)
-}
-
-function yearOptions() {
-  const current = new Date().getFullYear()
-  return Array.from({ length: 12 }, (_, index) => current - index)
 }
 
 function buildSearchAssetHref(asset: PublicAsset, params: SearchExperienceProps["initialParams"]) {

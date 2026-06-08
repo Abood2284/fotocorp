@@ -105,8 +105,10 @@ export interface PublicEvent {
   name: string
   eventDate: string | null
   assetCount: number
+  previewAssetId?: string | null
   preview: PublicPreview | null
   createdAt?: string | null
+  location?: string | null
 }
 
 export interface PublicEventListResponse {
@@ -148,6 +150,7 @@ export interface PublicHomepageEvent {
   location?: string | null
   categoryName?: string | null
   assetCount: number
+  previewAssetId?: string | null
   previewUrl: string
   previewWidth?: number | null
   previewHeight?: number | null

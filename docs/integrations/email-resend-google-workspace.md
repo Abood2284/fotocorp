@@ -82,7 +82,7 @@ pnpm --dir apps/api dev
 ```sh
 curl -i -X POST http://127.0.0.1:3000/api/auth/sign-up \
   -H 'Content-Type: application/json' \
-  --data '{"email":"user@example.com","password":"replace-with-valid-password","name":"Test User","firstName":"Test","lastName":"User","username":"test.user","companyType":"MEDIA","companyName":"Example Media","jobTitle":"Editor","companyEmail":"user@example.com","phoneCountryCode":"+91","phoneNumber":"9999999999","interestedAssetTypes":["IMAGE"],"imageQuantityRange":"20_50","imageQualityPreference":"MEDIUM"}'
+  --data '{"email":"user@example.com","password":"replace-with-valid-password","name":"Test User","firstName":"Test","lastName":"User","username":"test.user","companyType":"MEDIA","companyName":"Example Media","jobTitle":"Editor","companyEmail":"user@example.com","phoneCountryCode":"+91","phoneNumber":"9999999999","interestedAssetTypes":["EDITORIAL"],"imageQuantityRange":"20_50","imageQualityPreference":"MEDIUM"}'
 ```
 
 4. In the staff UI, open `/staff/access-inquiries/:inquiryId`, create/adjust draft entitlements, and activate one entitlement. This should send `CUSTOMER_ACCESS_APPROVED` with that asset type's limits. Activating a second asset type should send a separate approval email.

@@ -1,17 +1,12 @@
 import type { DrizzleClient } from "../../db"
 import type { subscriberEntitlements } from "../../db/schema"
 import type { Env } from "../../appTypes"
+import { formatAccessInterestAssetLabel } from "../access/access-interest-asset-types"
 import { safeSendAccessInquiryEmail } from "./email-service"
 import type { EntitlementChangeLine, EntitlementEmailLine, EmailTemplateData } from "./types"
 import { getAccessInquiryDetail } from "../../routes/staff/access-inquiries/service"
 
 type EntitlementRow = typeof subscriberEntitlements.$inferSelect
-
-const ASSET_LABELS: Record<string, string> = {
-  IMAGE: "Images",
-  VIDEO: "Video",
-  CARICATURE: "Caricature",
-}
 
 const QUALITY_LABELS: Record<string, string> = {
   LOW: "Low",
@@ -20,7 +15,7 @@ const QUALITY_LABELS: Record<string, string> = {
 }
 
 export function formatAssetLabel(assetType: string): string {
-  return ASSET_LABELS[String(assetType).toUpperCase()] ?? assetType
+  return formatAccessInterestAssetLabel(assetType)
 }
 
 export function formatQualityLabel(quality: string): string {

@@ -1,7 +1,12 @@
 import { and, desc, eq, gt, isNull, lte, or, sql } from "drizzle-orm";
 import type { DrizzleClient } from "../../../db";
-import { authIdentityClaims, contributors, customerAccessInquiries, subscriberEntitlements, users } from "../../../db/schema";
+import { authIdentityClaims, assetCategories, contributors, customerAccessInquiries, imageAssets, subscriberEntitlements, users } from "../../../db/schema";
+import {
+  type AccessInterestAssetType,
+  normalizeAccessInterestAssetType,
+} from "../../../lib/access/access-interest-asset-types";
 import { approveContributorApplication } from "../../../lib/access-inquiries/contributor-application";
+import { PUBLIC_ROYALTY_FREE_CATEGORY_NAME } from "../../../lib/assets/public-assets";
 import { AppError } from "../../../lib/errors";
 import { qualityRank } from "../../../lib/subscriber-download-quality";
 import type { StaffPublicProfile } from "../auth/service";
@@ -46,6 +51,8 @@ export async function listAccessInquiriesWithProfiles(
       interestedAssetTypes: customerAccessInquiries.interestedAssetTypes,
       imageQuantityRange: customerAccessInquiries.imageQuantityRange,
       imageQualityPreference: customerAccessInquiries.imageQualityPreference,
+      royaltyFreeQuantityRange: customerAccessInquiries.royaltyFreeQuantityRange,
+      royaltyFreeQualityPreference: customerAccessInquiries.royaltyFreeQualityPreference,
       proposedUsername: customerAccessInquiries.proposedUsername,
       createdAt: customerAccessInquiries.createdAt,
       companyName: users.companyName,
@@ -146,16 +153,20 @@ export async function approveContributorApplicationInquiry(
 function buildDraftEntitlementInsertRow(
   inquiry: typeof customerAccessInquiries.$inferSelect,
   userId: string,
-  assetType: "IMAGE" | "VIDEO" | "CARICATURE",
+  assetType: AccessInterestAssetType,
   staffId: string,
 ) {
-  if (assetType === "IMAGE") {
-    const allowed = suggestedImageDownloadsForRange(inquiry.imageQuantityRange ?? null);
-    const quality = (inquiry.imageQualityPreference ?? "MEDIUM").toUpperCase();
+  if (assetType === "EDITORIAL" || assetType === "ROYALTY_FREE") {
+    const quantityRange =
+      assetType === "EDITORIAL" ? inquiry.imageQuantityRange : inquiry.royaltyFreeQuantityRange;
+    const qualityPref =
+      assetType === "EDITORIAL" ? inquiry.imageQualityPreference : inquiry.royaltyFreeQualityPreference;
+    const allowed = suggestedImageDownloadsForRange(quantityRange ?? null);
+    const quality = (qualityPref ?? "MEDIUM").toUpperCase();
     return {
       userId,
       sourceInquiryId: inquiry.id,
-      assetType: "IMAGE" as const,
+      assetType,
       allowedDownloads: allowed,
       downloadsUsed: 0,
       qualityAccess: quality === "LOW" || quality === "MEDIUM" || quality === "HIGH" ? quality : "MEDIUM",
@@ -199,9 +210,13 @@ export async function ensureEntitlementDraftsForInquiry(
   }
   const inquiryUserId = inquiry.userId;
   const typesRaw = inquiry.interestedAssetTypes ?? [];
-  const uniqueAssetTypes = [...new Set(typesRaw.map((t) => String(t).toUpperCase()))].filter(
-    (t): t is "IMAGE" | "VIDEO" | "CARICATURE" => t === "IMAGE" || t === "VIDEO" || t === "CARICATURE",
-  );
+  const uniqueAssetTypes = [
+    ...new Set(
+      typesRaw
+        .map((t) => normalizeAccessInterestAssetType(String(t)))
+        .filter((t): t is AccessInterestAssetType => t !== null),
+    ),
+  ];
 
   if (!uniqueAssetTypes.length) throw new AppError(400, "INQUIRY_EMPTY", "Inquiry has no supported asset types.");
 
@@ -358,12 +373,12 @@ export async function activateSubscriberEntitlement(
   return db.select().from(subscriberEntitlements).where(eq(subscriberEntitlements.id, entitlementId)).limit(1).then((r) => r[0] ?? null);
 }
 
-/** Activate all DRAFT entitlements for an inquiry. All-or-nothing when any draft is missing a valid download cap. */
+/** Activate DRAFT entitlements for an inquiry (all drafts or a selected subset). */
 export async function activateAllDraftEntitlementsForInquiry(
   db: DrizzleClient,
   inquiryId: string,
   staff: StaffPublicProfile,
-  options: { validUntil?: Date | null } = {},
+  options: { validUntil?: Date | null; entitlementIds?: string[] } = {},
 ) {
   const detail = await getAccessInquiryDetail(db, inquiryId);
   if (!detail) throw new AppError(404, "INQUIRY_NOT_FOUND", "Access inquiry was not found.");
@@ -371,9 +386,26 @@ export async function activateAllDraftEntitlementsForInquiry(
     throw new AppError(400, "INQUIRY_TYPE_INVALID", "Entitlement activation applies only to customer access inquiries.");
   }
 
-  const drafts = detail.entitlements.filter((e) => String(e.status).toUpperCase() === "DRAFT");
-  if (!drafts.length) {
+  const allDrafts = detail.entitlements.filter((e) => String(e.status).toUpperCase() === "DRAFT");
+  if (!allDrafts.length) {
     throw new AppError(409, "NO_DRAFT_ENTITLEMENTS", "No draft entitlements are available to activate.");
+  }
+
+  let drafts = allDrafts;
+  if (options.entitlementIds !== undefined) {
+    if (!options.entitlementIds.length) {
+      throw new AppError(400, "ENTITLEMENT_IDS_EMPTY", "Select at least one draft entitlement to activate.");
+    }
+    const draftById = new Map(allDrafts.map((e) => [e.id, e]));
+    const missing = options.entitlementIds.filter((id) => !draftById.has(id));
+    if (missing.length) {
+      throw new AppError(
+        400,
+        "ENTITLEMENT_IDS_INVALID",
+        "One or more entitlements are not draft rows on this inquiry.",
+      );
+    }
+    drafts = options.entitlementIds.map((id) => draftById.get(id)!);
   }
 
   const invalid = drafts.filter((e) => e.allowedDownloads === null || e.allowedDownloads === undefined || e.allowedDownloads < 1);
@@ -382,7 +414,7 @@ export async function activateAllDraftEntitlementsForInquiry(
     throw new AppError(
       400,
       "ENTITLEMENT_DRAFTS_INCOMPLETE",
-      `Set a positive allowed download count on all draft entitlements before bulk activation (${labels}).`,
+      `Set a positive allowed download count on selected draft entitlements before activation (${labels}).`,
     );
   }
 
@@ -413,6 +445,28 @@ export async function suspendSubscriberEntitlement(db: DrizzleClient, entitlemen
     .where(eq(subscriberEntitlements.id, entitlementId));
 
   return db.select().from(subscriberEntitlements).where(eq(subscriberEntitlements.id, entitlementId)).limit(1).then((r) => r[0] ?? null);
+}
+
+/** Maps catalog asset to sales/access entitlement asset_type (not raw media_type). */
+export async function resolveEntitlementAssetTypeForDownload(
+  db: DrizzleClient,
+  assetId: string,
+): Promise<AccessInterestAssetType | null> {
+  const rows = await db
+    .select({
+      mediaType: imageAssets.mediaType,
+      categoryName: assetCategories.name,
+    })
+    .from(imageAssets)
+    .leftJoin(assetCategories, eq(imageAssets.categoryId, assetCategories.id))
+    .where(eq(imageAssets.id, assetId))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  if (row.categoryName === PUBLIC_ROYALTY_FREE_CATEGORY_NAME) return "ROYALTY_FREE";
+  const media = String(row.mediaType ?? "").toUpperCase();
+  if (media === "IMAGE") return "EDITORIAL";
+  return normalizeAccessInterestAssetType(media);
 }
 
 /** Authorize subscriber download: ACTIVE entitlement rows for asset type (no quota filter), then quality then quota. */

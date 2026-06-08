@@ -28,7 +28,7 @@ Set in `apps/api/.dev.vars` (do not commit real passwords):
 - `STAFF_BOOTSTRAP_USERNAME` — normalized to lowercase in script
 - `STAFF_BOOTSTRAP_PASSWORD` — minimum **8** characters
 - `STAFF_BOOTSTRAP_DISPLAY_NAME` — optional
-- `STAFF_BOOTSTRAP_ROLE` — optional; one of `SUPER_ADMIN`, `CATALOG_MANAGER`, `REVIEWER`, `FINANCE`, `SUPPORT` (defaults to `SUPER_ADMIN`)
+- `STAFF_BOOTSTRAP_ROLE` — optional; one of `SUPER_ADMIN`, `CATALOG_MANAGER`, `REVIEWER`, `CAPTION_MANAGER`, `FINANCE`, `SUPPORT` (defaults to `SUPER_ADMIN`). **Caption writers are not bootstrapped** — create them from **Staff → Staff users** (`/staff/staff-users`) as `SUPER_ADMIN`.
 
 Then:
 

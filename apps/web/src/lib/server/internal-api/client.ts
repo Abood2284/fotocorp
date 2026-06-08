@@ -2,7 +2,7 @@ import "server-only"
 
 import { readInternalApiError, type InternalApiErrorBody } from "@/lib/server/internal-api/errors"
 
-type InternalApiMethod = "GET" | "POST" | "PATCH" | "DELETE"
+type InternalApiMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE"
 
 interface InternalApiFetchInput {
   path: string

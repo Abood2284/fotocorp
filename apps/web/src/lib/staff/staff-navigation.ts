@@ -1,6 +1,7 @@
 
+
 import type { StaffRole } from "@/lib/staff/staff-route-access"
-import { Images, ClosedCaption, Database, Gauge, Calendar, LayoutDashboard, Inbox, MessageCircle, ShieldCheck, Users, ArrowRight } from "lucide-react"
+import { Images, ClosedCaption, Database, Calendar, LayoutDashboard, Inbox, MessageCircle, ShieldCheck, Users, ArrowRight, Sparkles } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 export interface StaffNavItem {
@@ -22,7 +23,7 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     label: "Uploads",
     href: "/staff/contributor-uploads",
         icon: Inbox,
-    roles: ["SUPER_ADMIN", "CATALOG_MANAGER", "REVIEWER"],
+    roles: ["SUPER_ADMIN", "CAPTION_WRITER"],
   },
   {
     label: "Inquiries",
@@ -37,6 +38,12 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     roles: ["SUPER_ADMIN", "CATALOG_MANAGER"],
   },
   {
+    label: "Homepage Hero",
+    href: "/staff/homepage-hero",
+    icon: Sparkles,
+    roles: ["SUPER_ADMIN", "CATALOG_MANAGER"],
+  },
+  {
     label: "Events",
     href: "/staff/events",
     icon: Calendar,
@@ -46,18 +53,12 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     label: "Captions",
     href: "/staff/captions",
     icon: ClosedCaption,
-    roles: ["SUPER_ADMIN", "CAPTION_MANAGER"],
+    roles: ["SUPER_ADMIN", "CAPTION_MANAGER", "CAPTION_WRITER"],
   },
   {
     label: "Users",
     href: "/staff/users",
     icon: Users,
-    roles: ["SUPER_ADMIN"],
-  },
-  {
-    label: "Pipeline",
-    href: "/staff/media-pipeline",
-    icon: Gauge,
     roles: ["SUPER_ADMIN"],
   },
   {

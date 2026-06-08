@@ -8,6 +8,8 @@ Update this file after every meaningful implementation change.
 
 ## Current Goal
 
+- **Homepage Hero curation:** Staff `/staff/homepage-hero` curates exactly 25 public-ready images in `public_homepage_hero_pool_items`; `GET /api/v1/public/homepage/hero-set` shuffles 9 from that pool on each request (no refresh job required).
+
 - **Jobs publish (PR-1/2/3):** `publish:drain` + `publish:wake` on VPS (`jobs-internal.fotocorp.com`); API `schedulePublishDrainWebhook` after staff contributor approve (`apps/api/src/lib/jobs/publish-drain-webhook.ts`). **Next:** PR-4 backup cron on VPS.
 
 - **Account + password reset:** Plan [`docs/plans/account-and-password-reset.md`](../docs/plans/account-and-password-reset.md) — PR-1–3 complete. Forgot/reset: `0045_password_reset_tokens`, `POST/GET forgot + reset API`, `CUSTOMER_PASSWORD_RESET` email, `/forgot-password` + `/reset-password`, sign-in link.
@@ -19,9 +21,27 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **CAPTION_WRITER staff role:** Migration `0048_staff_role_caption_writer.sql`; `CAPTION_WRITER` accesses `/staff/contributor-uploads` (full workflow) and `/staff/captions`. Only `SUPER_ADMIN` + `CAPTION_WRITER` may access contributor uploads (`CATALOG_MANAGER` / `REVIEWER` removed). Contributor upload review writes `staff_audit_logs` (`CONTRIBUTOR_UPLOAD_*` actions). **Provisioning:** `SUPER_ADMIN` creates/manages caption writers at `/staff/staff-users` via `GET|POST|PATCH /api/v1/staff/members` (not bootstrap). **Workspace-only:** caption writers cannot browse public client routes (`/` marketing, contributor portal, etc.) — redirected to `/staff/contributor-uploads`. Tests: `apps/web/test/staff-route-access.test.ts`, `apps/web/test/auth-post-login.test.ts`.
+
+- **Staff media pipeline page removed:** Deleted `/staff/media-pipeline` staff page, sidebar nav item, route access rule, web BFF client (`getAdminMediaPipelineStatus`), and internal admin API `GET /api/v1/internal/admin/media-pipeline/status`. Operator CLI `media:pipeline-status` unchanged.
+
+- **Event grid justified layout:** [`PublicEventsGrid`](../apps/web/src/components/assets/public-events-grid.tsx) uses the same justified-row algorithm as [`PublicAssetGrid`](../apps/web/src/components/assets/public-asset-grid.tsx) so portrait and landscape event previews keep natural proportions; slightly larger tiles than default (`targetRowHeight` 285, `minTileWidth` 210). Search event results reuse the shared grid.
+
+- **Homepage hero backdrop visibility:** Increased homepage hero height slightly, changed curated backdrop tiles to natural-width `object-contain` so images are not cropped at the top/bottom or separated by fixed-slot letterboxing, and reduced the white veil while raising backdrop image opacity for clearer visibility.
+
+- **Prod subscriber download preflight:** Web `POST /api/assets/:id/download/check` no longer calls `getOrCreateAppUser` (direct Neon `pg` on the **web** Worker). Production `web` had no `DATABASE_URL` secret while `fotocorp-api` did — session via `auth/me` succeeded but BFF profile lookup returned `500` / `PROFILE_LOOKUP_FAILED`. Preflight and attachment routes now pass `authUser.id` from API session into internal download routes only.
+
+- **Pending subscriber sign-in gate:** Platform `login` rejects users whose latest `customer_access_inquiries` row is not `ACCESS_GRANTED` (`ACCESS_PENDING_REVIEW`). Sign-up does **not** create `fotocorp_session`; post-register `/account/access-pending` is public. Redirects (sign-in page, post-login) send pending users to `/account/access-pending`. Session BFF legacy probe tries `auth/me` before `contributor/auth/me`; optional staff/contributor server probes skip API calls when cookies are absent.
+
+- **Registration asset interests (Editorial + Royalty Free):** Renamed access interest `IMAGE` → `EDITORIAL` (UI “Editorial”); added `ROYALTY_FREE` with separate quantity/quality columns on `users` and `customer_access_inquiries`. Migration `0046_access_interest_editorial_royalty_free.sql` (hand-written data migration — do **not** re-run `db:generate` on top; it produced a conflicting `0047` with wrong journal ordering). Register form ([`split-auth-page.tsx`](../apps/web/src/components/auth/split-auth-page.tsx)), staff labels, entitlement drafts, and subscriber download resolver (`resolveEntitlementAssetTypeForDownload` — Royalty Free category → `ROYALTY_FREE`, other images → `EDITORIAL`). Legacy signup `IMAGE` normalized at API parse.
+
+- **Search toolbar revamp:** Removed horizontal category tabs from sticky search bar; active filter chips + Images/Events counts live beside the Filters toggle. Results area is grid-only. Search input uses `divide-x` layout and warm `focus-within` fill (no broken partial focus ring).
+
+- **Homepage event cards → asset detail:** `GET /api/v1/public/events/latest` and category browse now return `previewAssetId`; [`PublicEventsGrid`](../apps/web/src/components/assets/public-events-grid.tsx) links to `/assets/[id]` (search fallback only when preview id is missing).
+
 - **Contributor staging R2 CORS (production uploads):** Production browser PUTs required `https://fotocorp.com` (and `www`) on bucket `fotocorp-2026-contributor-uploads`; example policy updated in [`apps/api/docs/r2-contributor-staging-cors.example.json`](../apps/api/docs/r2-contributor-staging-cors.example.json).
 
-- **Jobs PR-3 — approve webhook:** `JOBS_DRAIN_WEBHOOK_URL` + `JOBS_DRAIN_WEBHOOK_SECRET` on API Worker; non-blocking POST after `publishJobId` commit in `approveAdminContributorUploadsService`.
+- **Jobs PR-3 — approve webhook:** `JOBS_DRAIN_WEBHOOK_URL` + `JOBS_DRAIN_WEBHOOK_SECRET` on API Worker; POST after `publishJobId` commit via `executionCtx.waitUntil()` (Workers cancel bare `void fetch` after response). Route passes `c.executionCtx`; `index.ts` forwards `ExecutionContext` to Hono.
 - **Jobs PR-2 — wake HTTP:** `publish:wake`, `publishWakeServer.ts`, `JOBS_WAKE_SECRET`, compose service `fotocorp-jobs-wake` (loopback port 18765). Mutex: concurrent POST → `409`. Async default `202`; `?wait=1` for synchronous drain.
 - **Jobs PR-1 — one-shot `publish:drain`:** Added `apps/jobs/src/publishDrain.ts`, `--drain` CLI, production guard on `publish:worker`, Docker default CMD/compose drain (`restart: "no"`), `dev-worker` profile for poller. Docs: `apps/jobs/README.md`, `docs/db-revamp/media-pipeline-operations.md`, `context/architecture.md`.
 
@@ -33,7 +53,7 @@ Update this file after every meaningful implementation change.
 
 - **Account overview PR-1 (design.md):** Revamped [`/account`](../apps/web/src/app/(marketing)/account/page.tsx) with capability-focused copy (browse, Fotobox, downloads), profile fields without raw enums, square/hairline [`AccountShell`](../apps/web/src/components/account/account-shell.tsx), [`/account/security`](../apps/web/src/app/(marketing)/account/security/page.tsx) shell. Plan: [`docs/plans/account-and-password-reset.md`](../docs/plans/account-and-password-reset.md).
 
-- **Search lazy-load + robots.txt (Neon P2C / bot containment):** Added [`apps/web/public/robots.txt`](../apps/web/public/robots.txt) disallowing `/api/`, `/search`, staff/contributor paths, and query-string asset URLs. `/search` SSR is shell-only (no Typesense/Neon calls). [`search-intent.ts`](../apps/web/src/lib/search/search-intent.ts) gates client fetches; filters load on input focus, filter drawer open, or active search params; search/events queries run only when URL params indicate intent.
+- **Search lazy-load + robots.txt (Neon P2C / bot containment):** Added [`apps/web/public/robots.txt`](../apps/web/public/robots.txt) disallowing `/api/`, `/search`, staff/contributor paths, and query-string asset URLs. `/search` SSR is shell-only (no Typesense/Neon calls). [`search-intent.ts`](../apps/web/src/lib/search/search-intent.ts) gates client fetches; filters load on input focus, filter drawer open, or active search params; search/events queries run only when URL params indicate intent. Bare `/search` (no query or filters) now browses latest editorial images client-side instead of showing an empty prompt.
 
 - **Public filters P2A/B:** `GET /api/v1/assets/filters` now defaults to taxonomy-only (`includeCounts=true` opt-in). Web adds `getPublicCatalogTaxonomy()`. `/categories`, `/events`, slug redirect, event detail use taxonomy — no aggregate counts, no count labels on category/event browse cards (events show date when available). Event detail derives metadata from `listPublicAssets` results.
 
@@ -53,7 +73,9 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
-- **Entitlement activation UX + transactional emails:** Staff detail page adds per-asset activation confirmations, **Activate all drafts** bulk action, and partial-grant helper copy. API: `POST .../activate-entitlements`; individual/bulk activation sends `CUSTOMER_ACCESS_APPROVED` with download limits (per-entitlement or batch idempotency); active entitlement patches send `CUSTOMER_ENTITLEMENT_UPDATED` with before/after values. Branded HTML email layout in `apps/api/src/lib/email/templates.ts`. Docs: [`email-template-review.md`](../docs/integrations/email-template-review.md), [`api-routing-audit.md`](../apps/api/docs/api-routing-audit.md).
+- **Homepage Hero staff curation:** Added `public_homepage_hero_pool_items` (`apps/api/drizzle/0047_public_homepage_hero_pool_items.sql`) for a staff-managed 25-image pool. Internal admin routes `GET/PUT /api/v1/internal/admin/homepage-hero-pool` and `GET .../candidates`; staff UI at `/staff/homepage-hero` for `SUPER_ADMIN`/`CATALOG_MANAGER`. Public `GET /api/v1/public/homepage/hero-set` reads the pool directly and returns a random 9 on each request (no cron or refresh script). Staff candidate picker uses Typesense public search (`/api/public/search/assets`) with the same filter panel pattern as `/search`. Audit action `HOMEPAGE_HERO_POOL_REPLACED`.
+
+- **Entitlement activation UX + transactional emails:** Staff access inquiry detail uses checkbox selection + **Activate selected & send 1 email** (subset or all drafts in one action; quotas auto-save on activate). API: `POST .../activate-entitlements` accepts optional `entitlementIds`; sends `CUSTOMER_ACCESS_APPROVED` with batch idempotency per selection. Per-entitlement `POST .../activate` remains for other callers. Active patches send `CUSTOMER_ENTITLEMENT_UPDATED`. Docs: [`email-template-review.md`](../docs/integrations/email-template-review.md), [`api-routing-audit.md`](../apps/api/docs/api-routing-audit.md).
 
 - Sign-up UX: platform password minimum is 6 characters (API + client); register form shows inline hints/errors under fields, clears errors on edit, and maps API validation/duplicate responses to field messages.
 - Removed business-email domain blocking from subscriber registration: deleted API `business-email/validate` route and service, web BFF precheck, and register-tab debounced validation; signup now only requires basic email format.
@@ -74,6 +96,8 @@ One-time P1–P9 scripts and phase reports were removed from the repo after Deve
 - **P0 manifest (Development):** [`contributor_migration_manifest.csv`](../docs/db-revamp/manifests/contributor_migration_manifest.csv).
 
 ## Completed
+
+- **Editorial header links use events mode:** Header Editorial dropdown sub-links (Entertainment, News, Fashion, Sports, Business, Retro) now route to `/search?mode=events&category={name}` like Latest (`/search?mode=events`). Category slug redirect (`/categories/[slug]`) and categories index links also include `mode=events`. Mobile nav active-state matches `mode` + `category` params.
 
 - **Resend transactional access email:** Split access emails into customer and contributor template keys (`CUSTOMER_ACCESS_*`, `CONTRIBUTOR_APPLICATION_*`); contributor approval email includes generated username/password and links to the existing `/sign-in?persona=contributor` gateway. Delivery uses Resend `fetch` with a stable idempotency key when `EMAIL_PROVIDER=resend` and falls back to safe console/no-op behavior otherwise. Existing `email_delivery_logs` records provider/status/message id without storing bodies or temporary passwords. Docs: [`docs/integrations/email-resend-google-workspace.md`](../docs/integrations/email-resend-google-workspace.md), [`docs/integrations/email-template-review.md`](../docs/integrations/email-template-review.md).
 

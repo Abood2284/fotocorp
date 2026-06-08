@@ -34,7 +34,10 @@ export const subscriberEntitlements = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    check("subscriber_entitlements_asset_type_check", sql`${table.assetType} in ('IMAGE','VIDEO','CARICATURE')`),
+    check(
+      "subscriber_entitlements_asset_type_check",
+      sql`${table.assetType} in ('EDITORIAL','ROYALTY_FREE','VIDEO','CARICATURE')`,
+    ),
     check(
       "subscriber_entitlements_status_check",
       sql`${table.status} in ('DRAFT','ACTIVE','EXPIRED','SUSPENDED','CANCELLED')`,

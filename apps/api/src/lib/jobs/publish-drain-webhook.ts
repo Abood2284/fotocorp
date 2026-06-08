@@ -17,8 +17,14 @@ export interface NotifyPublishDrainWebhookParams {
 export function schedulePublishDrainWebhook(
   env: Env,
   params: NotifyPublishDrainWebhookParams,
+  executionCtx?: ExecutionContext,
 ): void {
-  void notifyPublishDrainWebhook(env, params)
+  const task = notifyPublishDrainWebhook(env, params)
+  if (executionCtx) {
+    executionCtx.waitUntil(task)
+    return
+  }
+  void task
 }
 
 async function notifyPublishDrainWebhook(

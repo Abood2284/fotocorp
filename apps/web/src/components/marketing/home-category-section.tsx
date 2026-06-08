@@ -80,6 +80,7 @@ function mapHomepageEventToPublicEvent(event: PublicHomepageEvent): PublicEvent 
     eventDate: displayDate,
     createdAt: event.createdAt,
     assetCount: event.assetCount,
+    previewAssetId: event.previewAssetId ?? null,
     preview: {
       url: event.previewUrl,
       width: event.previewWidth ?? 300,

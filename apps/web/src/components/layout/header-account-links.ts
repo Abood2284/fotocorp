@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   Archive,
   Camera,
+  ClosedCaption,
   CloudUpload,
   Download,
   Gauge,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react"
 
 import type { UnifiedAuthSession } from "@/lib/auth-session-types"
+import { staffRoleCanAccessPath } from "@/lib/staff/staff-route-access"
 
 interface HeaderUserProfileSubset {
   email: string
@@ -50,14 +52,16 @@ function getPrimaryAccountLink(session: UnifiedAuthSession): AccountLink {
   return { label: "Dashboard", href: session.primaryHref, icon: Gauge }
 }
 
-function getStaffToolAccountLinks(): AccountLink[] {
-  return [
+function getStaffToolAccountLinks(role: string): AccountLink[] {
+  const candidates: AccountLink[] = [
     { label: "Staff dashboard", href: "/staff/dashboard", icon: Gauge },
     { label: "Contributor uploads", href: "/staff/contributor-uploads", icon: Inbox },
+    { label: "Captions", href: "/staff/captions", icon: ClosedCaption },
     { label: "Catalog", href: "/staff/catalog", icon: Image },
     { label: "Users", href: "/staff/users", icon: Users },
     { label: "Audit", href: "/staff/audit", icon: Shield },
   ]
+  return candidates.filter((item) => staffRoleCanAccessPath(role, item.href))
 }
 
 function isActiveSubscriber(userProfile: HeaderUserProfileSubset) {
@@ -71,7 +75,8 @@ export function getAccountLinksFromSession(
   const primary = getPrimaryAccountLink(session)
 
   if (session.kind === "staff") {
-    const secondary = getStaffToolAccountLinks().filter((item) => item.href !== primary.href)
+    const role = session.staffRole ?? session.staff?.role ?? "SUPPORT"
+    const secondary = getStaffToolAccountLinks(role).filter((item) => item.href !== primary.href)
     return [primary, ...secondary]
   }
 
@@ -103,14 +108,14 @@ export function getMobileRoleLinksFromSession(session: UnifiedAuthSession | null
   if (!session) return null
 
   if (session.kind === "staff") {
-    return {
-      title: "Workspace",
-      links: [
-        { label: "Dashboard", href: session.primaryHref },
-        { label: "Contributor uploads", href: "/staff/contributor-uploads" },
-        { label: "Catalog", href: "/staff/catalog" },
-      ],
-    }
+    const role = session.staffRole ?? session.staff?.role ?? "SUPPORT"
+    const links = [
+      { label: "Dashboard", href: session.primaryHref },
+      { label: "Contributor uploads", href: "/staff/contributor-uploads" },
+      { label: "Captions", href: "/staff/captions" },
+      { label: "Catalog", href: "/staff/catalog" },
+    ].filter((item) => staffRoleCanAccessPath(role, item.href))
+    return { title: "Workspace", links }
   }
 
   if (session.kind === "contributor") {

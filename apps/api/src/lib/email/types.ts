@@ -58,7 +58,7 @@ export interface EmailRelatedEntity {
 }
 
 export interface EntitlementEmailLine {
-  assetType: "IMAGE" | "VIDEO" | "CARICATURE"
+  assetType: "EDITORIAL" | "ROYALTY_FREE" | "VIDEO" | "CARICATURE"
   assetLabel: string
   allowedDownloads: number
   qualityAccess: "LOW" | "MEDIUM" | "HIGH"

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { fetchSubscriberAssetDownloadCheck, type SubscriberDownloadSize } from "@/lib/api/subscriber-downloads-api"
-import { getCurrentAuthUser, getOrCreateAppUser } from "@/lib/app-user"
+import { getCurrentAuthUser } from "@/lib/app-user"
 
 interface AssetDownloadCheckRouteContext {
   params: Promise<{ assetId: string }>
@@ -32,21 +32,11 @@ export async function POST(request: Request, context: AssetDownloadCheckRouteCon
     )
   }
 
-  let appUser: Awaited<ReturnType<typeof getOrCreateAppUser>>
-  try {
-    appUser = await getOrCreateAppUser(authUser)
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: { code: "PROFILE_LOOKUP_FAILED", message: "Profile lookup failed." } },
-      { status: 500 },
-    )
-  }
-
   let upstream: Response
   try {
     upstream = await fetchSubscriberAssetDownloadCheck({
       assetId,
-      authUserId: appUser.authUserId,
+      authUserId: authUser.id,
       size,
       userAgent: request.headers.get("user-agent"),
       requestIp: getClientIp(request),

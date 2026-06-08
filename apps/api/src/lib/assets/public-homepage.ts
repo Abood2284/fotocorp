@@ -16,6 +16,7 @@ export interface PublicHomepageEventDto {
   assetCount: number
   location: string | null
   categoryName: string | null
+  previewAssetId: string | null
   previewUrl: string
   previewWidth: number | null
   previewHeight: number | null
@@ -274,6 +275,7 @@ function mapEventRow(row: HomepageEventRow, cdn: PublicPreviewCdnConfig): Public
     assetCount: Number(row.asset_count),
     location: row.event_location,
     categoryName: row.category_name,
+    previewAssetId: row.preview_asset_id,
     previewUrl,
     previewWidth: row.preview_width,
     previewHeight: row.preview_height,

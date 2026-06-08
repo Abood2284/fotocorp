@@ -20,9 +20,13 @@ export const platformSignUpSchema = z.object({
   companyEmail: z.string().trim().email("Enter a valid company email.").optional(),
   phoneCountryCode: z.string().trim().min(1),
   phoneNumber: z.string().trim().min(1),
-  interestedAssetTypes: z.array(z.enum(["IMAGE", "VIDEO", "CARICATURE"])).min(1),
+  interestedAssetTypes: z
+    .array(z.enum(["EDITORIAL", "ROYALTY_FREE", "VIDEO", "CARICATURE", "IMAGE"]))
+    .min(1),
   imageQuantityRange: z.string().trim().optional(),
   imageQualityPreference: z.string().trim().optional(),
+  royaltyFreeQuantityRange: z.string().trim().optional(),
+  royaltyFreeQualityPreference: z.string().trim().optional(),
   name: z.string().trim().optional(),
 })
 

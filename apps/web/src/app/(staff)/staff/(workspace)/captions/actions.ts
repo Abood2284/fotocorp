@@ -1,8 +1,10 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { updateAdminAsset } from "@/lib/api/admin-catalog-api"
+import { getAdminCatalogAsset, updateAdminAsset } from "@/lib/api/admin-catalog-api"
 import type { AdminCatalogEditorialUpdateInput } from "@/features/assets/admin-catalog-types"
+import { staffRoleCanAccessPath } from "@/lib/staff/staff-route-access"
+import { getOptionalStaffSession } from "@/lib/staff-session"
 
 function parseNullableString(value: FormDataEntryValue | null): string | null {
   const raw = value?.toString().trim()
@@ -17,15 +19,24 @@ function parseKeywords(value: FormDataEntryValue | null): string[] | null {
 }
 
 export async function updateCaptionDataAction(assetId: string, formData: FormData) {
+  const staffSession = await getOptionalStaffSession()
+  if (!staffSession || !staffRoleCanAccessPath(staffSession.staff.role, "/staff/captions")) {
+    return { error: "You do not have permission to edit captions." }
+  }
+
   try {
+    const existing = await getAdminCatalogAsset(assetId)
+    const lockedEventId = existing?.asset.event?.id ?? null
+    const lockedEventTitle = existing?.asset.event?.name?.trim() || null
+
     const payload: AdminCatalogEditorialUpdateInput = {
       whoIsInPicture: parseNullableString(formData.get("whoIsInPicture")),
-      headline: parseNullableString(formData.get("headline")),
+      headline: lockedEventTitle ?? parseNullableString(formData.get("headline")),
       caption: parseNullableString(formData.get("caption")),
       description: parseNullableString(formData.get("description")),
       keywords: parseKeywords(formData.get("keywords")),
       categoryId: parseNullableString(formData.get("categoryId")),
-      eventId: parseNullableString(formData.get("eventId")),
+      eventId: lockedEventId ?? parseNullableString(formData.get("eventId")),
       contributorId: parseNullableString(formData.get("contributorId")),
     }
 

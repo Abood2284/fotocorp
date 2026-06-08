@@ -31,6 +31,7 @@ import {
   platformSignUpSchema,
 } from "./validators"
 import { safeSendAccessInquiryEmail } from "../../lib/email/email-service"
+import { isSubscriberAccessInquiryApproved } from "../../lib/access/platform-user-access"
 import { findLatestInquiryForPlatformUser } from "../../lib/users/platform-user"
 
 export const platformAuthRoutes = new Hono<{ Bindings: Env; Variables: AppRequestVariables }>()
@@ -55,11 +56,23 @@ platformAuthRoutes.post(
 
   setSessionCookie(c, result.rawSessionToken, result.sessionExpiresAt, result.cookieMaxAgeSeconds)
 
+  const accessInquiry =
+    result.ownerType === "USER" && result.user?.id
+      ? await findLatestInquiryForPlatformUser(db(c.env), result.user.id)
+      : null
+
   return c.json({
     ok: true,
     ownerType: result.ownerType,
     user: result.user,
     contributor: result.contributor,
+    accessInquiry: accessInquiry
+      ? {
+          id: accessInquiry.id,
+          status: accessInquiry.status,
+          isApproved: isSubscriberAccessInquiryApproved(accessInquiry.status),
+        }
+      : null,
   })
 })
 
@@ -109,20 +122,14 @@ platformAuthRoutes.post(
   }
 
   const body = c.req.valid("json")
-  const result = await signUpPlatformUser(
-    database,
-    {
-      profile,
-      email: body.email,
-      password: body.password,
-      displayName: body.name ?? `${body.firstName} ${body.lastName}`.trim(),
-    },
-    requestMeta(c),
-  )
+  const result = await signUpPlatformUser(database, {
+    profile,
+    email: body.email,
+    password: body.password,
+    displayName: body.name ?? `${body.firstName} ${body.lastName}`.trim(),
+  })
 
-  setSessionCookie(c, result.rawSessionToken, result.sessionExpiresAt, result.cookieMaxAgeSeconds)
-
-  if (result.user?.id) {
+  if (result.user.id) {
     const inquiry = await findLatestInquiryForPlatformUser(database, result.user.id)
     if (inquiry) {
       await safeSendAccessInquiryEmail(database, c.env, {
@@ -141,7 +148,6 @@ platformAuthRoutes.post(
     ok: true,
     ownerType: result.ownerType,
     user: result.user,
-    contributor: result.contributor,
   })
 })
 

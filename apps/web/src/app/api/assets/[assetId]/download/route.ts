@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getCurrentAuthUser, getOrCreateAppUser } from "@/lib/app-user"
+import { getCurrentAuthUser } from "@/lib/app-user"
 import { fetchSubscriberAssetDownload, type SubscriberDownloadSize } from "@/lib/api/subscriber-downloads-api"
 
 interface AssetDownloadRouteContext {
@@ -31,37 +31,11 @@ export async function GET(request: Request, context: AssetDownloadRouteContext) 
     return NextResponse.redirect(signInUrl)
   }
 
-  let appUser: Awaited<ReturnType<typeof getOrCreateAppUser>>
-  try {
-    appUser = await getOrCreateAppUser(authUser)
-  } catch (error) {
-    logDownloadRouteError("app_user_lookup_failed", {
-      assetId,
-      size,
-      authUserId: authUser.id,
-      safeErrorCode: "PROFILE_LOOKUP_FAILED",
-      statusCode: 500,
-      detail: error instanceof Error ? error.message : "unknown",
-    })
-    return redirectToAsset(url, assetId, "profile-lookup-failed")
-  }
-
-  if (appUser.status !== "ACTIVE") {
-    logDownloadRouteError("profile_inactive", {
-      assetId,
-      size,
-      authUserId: appUser.authUserId,
-      safeErrorCode: "SUBSCRIPTION_REQUIRED",
-      statusCode: 403,
-    })
-    return redirectToAsset(url, assetId, "subscription-required")
-  }
-
   let upstream: Response | null = null
   try {
     upstream = await fetchSubscriberAssetDownload({
       assetId,
-      authUserId: appUser.authUserId,
+      authUserId: authUser.id,
       size,
       userAgent: request.headers.get("user-agent"),
       requestIp: getClientIp(request),
@@ -70,7 +44,7 @@ export async function GET(request: Request, context: AssetDownloadRouteContext) 
     logDownloadRouteError("internal_api_fetch_failed", {
       assetId,
       size,
-      authUserId: appUser.authUserId,
+      authUserId: authUser.id,
       safeErrorCode: "INTERNAL_API_FETCH_FAILED",
       statusCode: 502,
       detail: error instanceof Error ? error.message : "unknown",
@@ -86,7 +60,7 @@ export async function GET(request: Request, context: AssetDownloadRouteContext) 
     logDownloadRouteError("internal_api_non_ok", {
       assetId,
       size,
-      authUserId: appUser.authUserId,
+      authUserId: authUser.id,
       statusCode: upstream.status,
       safeErrorCode: upstreamErrorCode ?? "UNKNOWN_INTERNAL_API_ERROR",
     })
@@ -111,7 +85,7 @@ export async function GET(request: Request, context: AssetDownloadRouteContext) 
     logDownloadRouteError("stream_forwarding_failed", {
       assetId,
       size,
-      authUserId: appUser.authUserId,
+      authUserId: authUser.id,
       safeErrorCode: "DOWNLOAD_STREAM_FAILED",
       statusCode: 500,
       detail: error instanceof Error ? error.message : "unknown",

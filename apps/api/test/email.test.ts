@@ -58,8 +58,8 @@ describe("access email templates", () => {
       data: {
         entitlements: [
           {
-            assetType: "IMAGE",
-            assetLabel: "Images",
+            assetType: "EDITORIAL",
+            assetLabel: "Editorial",
             allowedDownloads: 100,
             qualityAccess: "HIGH",
             qualityLabel: "High",
@@ -76,7 +76,7 @@ describe("access email templates", () => {
     })
 
     assert.equal(rendered.subject, "Your Fotocorp access has been approved")
-    assert.match(rendered.text, /Images: 100 downloads · High quality/)
+    assert.match(rendered.text, /Editorial: 100 downloads · High quality/)
     assert.match(rendered.text, /Video: 50 downloads · Medium quality/)
     assert.match(rendered.html, /Your download limits/)
     assert.match(rendered.html, /Sign in to Fotocorp/)
@@ -91,8 +91,8 @@ describe("access email templates", () => {
       data: {
         entitlements: [
           {
-            assetType: "IMAGE",
-            assetLabel: "Images",
+            assetType: "EDITORIAL",
+            assetLabel: "Editorial",
             allowedDownloads: 100,
             qualityAccess: "HIGH",
             qualityLabel: "High",
@@ -101,8 +101,8 @@ describe("access email templates", () => {
       },
     })
 
-    assert.equal(rendered.subject, "Your Fotocorp Images access has been approved")
-    assert.match(rendered.text, /Your Fotocorp Images access has been approved/)
+    assert.equal(rendered.subject, "Your Fotocorp Editorial access has been approved")
+    assert.match(rendered.text, /Your Fotocorp Editorial access has been approved/)
   })
 
   it("renders CUSTOMER_ENTITLEMENT_UPDATED with before and after values", () => {
@@ -112,13 +112,13 @@ describe("access email templates", () => {
       data: {
         entitlementChanges: [
           {
-            assetLabel: "Images",
+            assetLabel: "Editorial",
             fieldLabel: "Download limit",
             previousValue: "100",
             newValue: "150",
           },
           {
-            assetLabel: "Images",
+            assetLabel: "Editorial",
             fieldLabel: "Quality cap",
             previousValue: "Medium",
             newValue: "High",
@@ -127,7 +127,7 @@ describe("access email templates", () => {
       },
     })
 
-    assert.equal(rendered.subject, "Your Fotocorp Images access has been updated")
+    assert.equal(rendered.subject, "Your Fotocorp Editorial access has been updated")
     assert.match(rendered.text, /Download limit: 100 → 150/)
     assert.match(rendered.text, /Quality cap: Medium → High/)
     assert.match(rendered.html, /150/)
@@ -328,8 +328,8 @@ describe("email delivery safety", () => {
       data: {
         entitlements: [
           {
-            assetType: "IMAGE" as const,
-            assetLabel: "Images",
+            assetType: "EDITORIAL" as const,
+            assetLabel: "Editorial",
             allowedDownloads: 100,
             qualityAccess: "HIGH" as const,
             qualityLabel: "High",

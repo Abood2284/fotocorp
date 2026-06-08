@@ -61,6 +61,7 @@ export function AssetDetailActions({
   const [selectedSize, setSelectedSize] = useState<AssetSizeOption["id"]>("large")
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [downloadStartedHint, setDownloadStartedHint] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [keywordsOpen, setKeywordsOpen] = useState(false)
   const downloadFrameRef = useRef<HTMLIFrameElement>(null)
@@ -85,6 +86,7 @@ export function AssetDetailActions({
     }
 
     setDownloadError(null)
+    setDownloadStartedHint(false)
     setDownloadBusy(true)
     const size = selectedOption?.id ?? "large"
 
@@ -106,6 +108,7 @@ export function AssetDetailActions({
         return
       }
 
+      setDownloadStartedHint(true)
       const frame = downloadFrameRef.current
       if (frame) {
         frame.src = `${downloadHref}?size=${encodeURIComponent(size)}`
@@ -325,6 +328,12 @@ export function AssetDetailActions({
           </Button>
         )}
 
+        {downloadStartedHint && !downloadError ? (
+          <p className="text-xs leading-relaxed text-muted-foreground" role="status" aria-live="polite">
+            {DOWNLOAD_STARTED_HINT}
+          </p>
+        ) : null}
+
         {downloadError ? (
           <div className="rounded-none border border-destructive/25 bg-destructive/10 p-3 text-sm leading-6 text-foreground">
             {downloadError}
@@ -384,6 +393,9 @@ export function AssetDetailActions({
     </section>
   )
 }
+
+const DOWNLOAD_STARTED_HINT =
+  "Your download should start automatically in a few seconds. If it does not, check your browser's downloads or try again."
 
 function ImageUsageHelp() {
   const [open, setOpen] = useState(false)

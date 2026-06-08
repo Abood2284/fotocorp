@@ -58,6 +58,7 @@ interface AdminAssetQuery {
 
 interface AdminAssetRow {
   id: string;
+  fotokey: string | null;
   legacy_imagecode: string | null;
   who_is_in_picture: string | null;
   caption: string | null;
@@ -726,6 +727,7 @@ function adminSelectSql(sort: AdminSort): SQL {
   return sql`
     select
       a.id,
+      a.fotokey,
       a.legacy_image_code as legacy_imagecode,
       a.who_is_in_picture,
       a.caption,
@@ -849,6 +851,7 @@ async function mapAdminAssetRow(row: AdminAssetRow, secret: string | undefined, 
   const previewState = previewReady ? "READY" : readyPreviewVariants.length > 0 ? "PARTIAL" : "MISSING";
   return {
     id: row.id,
+    fotokey: row.fotokey,
     legacyImageCode: row.legacy_imagecode,
     whoIsInPicture: row.who_is_in_picture,
     caption: row.caption,

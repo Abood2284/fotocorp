@@ -44,44 +44,6 @@ export async function getAdminCatalogStats() {
   })
 }
 
-export interface AdminMediaPipelineStatusResponse {
-  watermarkProfile: string
-  /** Expected `watermark_profile` strings per variant (all protected / watermarked). */
-  derivativeProfiles: {
-    thumbProfile: string
-    cardProfile: string
-    detailProfile: string
-  }
-  generatedAt: string
-  totalImageAssets: number
-  assetsWithOriginalStorageKey: number
-  assetsWithR2ExistsTrue: number
-  assetsWithR2ExistsFalse: number
-  assetsWithR2ExistsNull: number
-  assetsMissingOriginalOrR2Mapping: number
-  derivativeByVariant: Record<string, { ready: number; failed: number; missing: number }>
-  assetsReadyForPublicListing: number
-  assetsCurrentlyVisibleInPublicApi: number
-  assetsEligibleForPublicListing: number
-  assetsVisibleThroughCurrentPublicApiConditions: number
-  latestFailedDerivatives: Array<{
-    assetId: string
-    legacyImageCode: string | null
-    variant: string
-    generationStatus: string
-    watermarkProfile: string | null
-    updatedAt: string | null
-    storageKeyMasked: string | null
-    hasErrorData: boolean
-  }>
-}
-
-export async function getAdminMediaPipelineStatus() {
-  return adminJson<AdminMediaPipelineStatusResponse>({
-    path: internalApiRoutes.adminMediaPipelineStatus(),
-  })
-}
-
 export async function getAdminCatalogFilters() {
   return adminJson<AdminCatalogFilters>({
     path: internalApiRoutes.adminFilters(),

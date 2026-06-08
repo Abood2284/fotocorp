@@ -3,11 +3,18 @@ import {
   getDefaultStaffLandingPath,
   resolveStaffPostLoginRedirect,
   staffRoleCanAccessPath,
+  staffRoleIsWorkspaceOnly,
 } from "@/lib/staff/staff-route-access"
 
 export const CONTRIBUTOR_DASHBOARD_PATH = "/contributor/dashboard"
+export const ACCESS_PENDING_PATH = "/account/access-pending"
 
 export type PlatformOwnerType = "USER" | "CONTRIBUTOR"
+
+export function isSubscriberAccessInquiryApproved(status: string | null | undefined): boolean {
+  if (!status) return true
+  return status === "ACCESS_GRANTED"
+}
 
 function isSafeRelativePath(path: string | null | undefined): path is string {
   if (!path) return false
@@ -36,10 +43,18 @@ export function isSafeStaffCallback(path: string | null | undefined): path is st
 export function resolvePlatformPostLoginRedirect(
   ownerType: PlatformOwnerType,
   callbackUrl: string | null | undefined,
+  options?: { accessInquiryStatus?: string | null },
 ): string {
   if (ownerType === "CONTRIBUTOR") {
     if (isSafeContributorCallback(callbackUrl)) return callbackUrl
     return CONTRIBUTOR_DASHBOARD_PATH
+  }
+
+  if (!isSubscriberAccessInquiryApproved(options?.accessInquiryStatus)) {
+    if (isSafeSubscriberCallback(callbackUrl) && callbackUrl === ACCESS_PENDING_PATH) {
+      return callbackUrl
+    }
+    return ACCESS_PENDING_PATH
   }
 
   if (isSafeSubscriberCallback(callbackUrl)) return callbackUrl
@@ -51,6 +66,9 @@ export function resolveStaffPostLoginRedirectFromSignIn(
   role: string,
   callbackUrl: string | null | undefined,
 ): string {
+  if (staffRoleIsWorkspaceOnly(role)) {
+    return resolveStaffPostLoginRedirect(role, callbackUrl ?? null)
+  }
   if (isSafeStaffCallback(callbackUrl) && staffRoleCanAccessPath(role, callbackUrl)) {
     return callbackUrl
   }
@@ -69,6 +87,7 @@ export function resolveSignedInPageRedirect(input: {
   kind: "user" | "contributor" | "staff"
   staffRole?: string
   callbackUrl: string | null | undefined
+  accessInquiryStatus?: string | null
 }): string {
   if (input.kind === "contributor") {
     return resolvePlatformPostLoginRedirect("CONTRIBUTOR", input.callbackUrl)
@@ -76,11 +95,17 @@ export function resolveSignedInPageRedirect(input: {
   if (input.kind === "staff") {
     return resolveStaffPostLoginRedirectFromSignIn(input.staffRole ?? "", input.callbackUrl)
   }
-  return resolvePlatformPostLoginRedirect("USER", input.callbackUrl)
+  return resolvePlatformPostLoginRedirect("USER", input.callbackUrl, {
+    accessInquiryStatus: input.accessInquiryStatus,
+  })
 }
 
 export function isPlatformInvalidCredentials(error: { code?: string } | undefined): boolean {
   return error?.code === "INVALID_CREDENTIALS"
+}
+
+export function isPlatformAccessPendingReview(error: { code?: string } | undefined): boolean {
+  return error?.code === "ACCESS_PENDING_REVIEW"
 }
 
 export function staffPrimaryHref(role: string): string {

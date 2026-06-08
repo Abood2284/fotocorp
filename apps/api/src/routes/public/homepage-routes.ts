@@ -251,7 +251,8 @@ publicHomepageRoutes.get("/api/v1/public/homepage/hero-set", async (c) => {
       throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
     }
 
-    const response = await getPublicHomepageHeroSet(createHttpDb(c.env.DATABASE_URL))
+    const cdn = parsePublicPreviewCdnConfig(c.env)
+    const response = await getPublicHomepageHeroSet(createHttpDb(c.env.DATABASE_URL), cdn)
     const durationMs = Date.now() - startedAt
 
     console.info(

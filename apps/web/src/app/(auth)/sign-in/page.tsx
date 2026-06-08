@@ -21,7 +21,13 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 
   const authUser = await getCurrentAuthUser()
   if (authUser) {
-    redirect(resolveSignedInPageRedirect({ kind: "user", callbackUrl }))
+    redirect(
+      resolveSignedInPageRedirect({
+        kind: "user",
+        callbackUrl,
+        accessInquiryStatus: authUser.accessInquiryStatus,
+      }),
+    )
   }
 
   const contributorSession = await getOptionalContributorSession()

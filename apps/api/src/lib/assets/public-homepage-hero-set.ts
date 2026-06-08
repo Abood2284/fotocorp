@@ -1,8 +1,19 @@
-import { sql, type SQL } from "drizzle-orm"
+import { sql } from "drizzle-orm"
 import type { DrizzleClient } from "../../db"
+import {
+  heroPublicReadyJoinSql,
+  heroPublicReadyWhereSql,
+  HOMEPAGE_HERO_POOL_SIZE,
+} from "./homepage-hero-pool"
+import {
+  resolvePublicStablePreviewUrl,
+  type PublicPreviewCdnConfig,
+} from "../media/public-preview-cdn-url"
+
+export const PUBLIC_HOMEPAGE_HERO_DISPLAY_COUNT = 9
 
 export const PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL =
-  "public, max-age=300, s-maxage=900, stale-while-revalidate=3600"
+  "public, max-age=0, s-maxage=30, stale-while-revalidate=60"
 
 export interface PublicHomepageHeroSetItemDto {
   slot: number
@@ -21,105 +32,117 @@ export interface PublicHomepageHeroSetResponseDto {
   items: PublicHomepageHeroSetItemDto[]
 }
 
-interface HeroSetRow {
-  id: string
-  set_key: string
-  active_from: Date | string
-  active_until: Date | string
-}
-
-interface HeroSetItemRow {
-  slot: number | string
+interface PoolAssetRow {
+  position: number | string
   asset_id: string
   fotokey: string | null
-  title: string
+  headline: string | null
+  caption: string | null
   event_id: string | null
   event_name: string | null
-  preview_url: string
+  card_storage_key: string
 }
 
 export async function getPublicHomepageHeroSet(
   db: DrizzleClient,
+  cdn: PublicPreviewCdnConfig,
 ): Promise<PublicHomepageHeroSetResponseDto> {
-  const activeSet = await fetchHeroSetRow(db, sql`
-    select id, set_key, active_from, active_until
-    from public_homepage_hero_sets
-    where active_from <= now()
-      and active_until > now()
-    order by active_from desc
-    limit 1
-  `)
+  const rows = await fetchPoolAssetRows(db)
 
-  const setRow = activeSet ?? await fetchHeroSetRow(db, sql`
-    select id, set_key, active_from, active_until
-    from public_homepage_hero_sets
-    where active_from <= now()
-    order by active_from desc
-    limit 1
-  `)
-
-  if (!setRow) {
-    return {
-      setKey: null,
-      activeFrom: null,
-      activeUntil: null,
-      items: [],
-    }
+  if (rows.length !== HOMEPAGE_HERO_POOL_SIZE) {
+    return emptyHeroSetResponse()
   }
 
-  const items = await fetchHeroSetItems(db, setRow.id)
+  const items = rows.map((row) => mapPoolRowToItem(row, cdn))
+  const selected = shuffleArray(items).slice(0, PUBLIC_HOMEPAGE_HERO_DISPLAY_COUNT)
 
   return {
-    setKey: setRow.set_key,
-    activeFrom: toIso(setRow.active_from),
-    activeUntil: toIso(setRow.active_until),
-    items,
+    setKey: "curated_pool",
+    activeFrom: null,
+    activeUntil: null,
+    items: selected.map((item, index) => ({ ...item, slot: index + 1 })),
   }
 }
 
-async function fetchHeroSetRow(db: DrizzleClient, query: SQL): Promise<HeroSetRow | null> {
-  const rows = await executeRows<HeroSetRow>(db, query)
-  return rows[0] ?? null
+async function fetchPoolAssetRows(db: DrizzleClient): Promise<PoolAssetRow[]> {
+  return executeRows<PoolAssetRow>(db, sql`
+    select
+      p.position,
+      a.id as asset_id,
+      a.fotokey,
+      a.headline,
+      a.caption,
+      a.event_id,
+      e.name as event_name,
+      card.storage_key as card_storage_key
+    from public_homepage_hero_pool_items p
+    join image_assets a on a.id = p.asset_id
+    left join photo_events e on e.id = a.event_id
+    ${heroPublicReadyJoinSql()}
+    where ${heroPublicReadyWhereSql()}
+    order by p.position asc
+  `)
 }
 
-async function fetchHeroSetItems(db: DrizzleClient, setId: string): Promise<PublicHomepageHeroSetItemDto[]> {
-  const rows = await executeRows<HeroSetItemRow>(db, sql`
-    select
-      slot,
-      asset_id,
-      fotokey,
-      title,
-      event_id,
-      event_name,
-      preview_url
-    from public_homepage_hero_set_items
-    where set_id = ${setId}::uuid
-    order by slot asc
-  `)
-
-  return rows.map((row) => ({
-    slot: Number(row.slot),
+function mapPoolRowToItem(
+  row: PoolAssetRow,
+  cdn: PublicPreviewCdnConfig,
+): PublicHomepageHeroSetItemDto {
+  return {
+    slot: Number(row.position),
     assetId: row.asset_id,
     fotokey: row.fotokey,
-    title: row.title,
+    title: resolveTitle(row),
     eventId: row.event_id,
     eventName: row.event_name,
-    previewUrl: row.preview_url,
-  }))
+    previewUrl: resolvePublicStablePreviewUrl(cdn, {
+      storageKey: row.card_storage_key,
+      assetId: row.asset_id,
+      variant: "card",
+    }),
+  }
 }
 
-async function executeRows<T>(db: DrizzleClient, query: SQL): Promise<T[]> {
+function emptyHeroSetResponse(): PublicHomepageHeroSetResponseDto {
+  return {
+    setKey: null,
+    activeFrom: null,
+    activeUntil: null,
+    items: [],
+  }
+}
+
+function resolveTitle(row: {
+  event_name: string | null
+  headline: string | null
+  caption: string | null
+  fotokey?: string | null
+}): string {
+  return (
+    row.event_name?.trim()
+    || row.headline?.trim()
+    || row.caption?.trim()
+    || row.fotokey?.trim()
+    || "Fotocorp image"
+  )
+}
+
+function shuffleArray<T>(items: T[]): T[] {
+  const copy = [...items]
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1))
+    const current = copy[index]!
+    copy[index] = copy[swapIndex]!
+    copy[swapIndex] = current
+  }
+  return copy
+}
+
+async function executeRows<T>(db: DrizzleClient, query: ReturnType<typeof sql>): Promise<T[]> {
   const result = await db.execute(query)
   if (Array.isArray(result)) return result as T[]
   if (result && typeof result === "object" && "rows" in result && Array.isArray(result.rows)) {
     return result.rows as T[]
   }
   return []
-}
-
-function toIso(value: Date | string | null | undefined): string | null {
-  if (!value) return null
-  if (value instanceof Date) return value.toISOString()
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
 }

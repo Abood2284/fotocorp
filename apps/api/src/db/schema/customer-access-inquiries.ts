@@ -26,6 +26,8 @@ export const customerAccessInquiries = pgTable(
       .default(sql`ARRAY[]::text[]`),
     imageQuantityRange: text("image_quantity_range"),
     imageQualityPreference: text("image_quality_preference"),
+    royaltyFreeQuantityRange: text("royalty_free_quantity_range"),
+    royaltyFreeQualityPreference: text("royalty_free_quality_preference"),
     applicantFirstName: text("applicant_first_name"),
     applicantLastName: text("applicant_last_name"),
     applicantEmail: text("applicant_email"),

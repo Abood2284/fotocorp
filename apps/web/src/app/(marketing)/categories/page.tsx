@@ -41,7 +41,7 @@ export default async function CategoriesPage() {
         {categories.map((category) => (
           <Link
             key={category.id}
-            href={`/search?categoryId=${encodeURIComponent(category.id)}`}
+            href={`/search?mode=events&categoryId=${encodeURIComponent(category.id)}`}
             className="rounded-xl border border-border bg-background p-5 transition-colors hover:bg-muted/50"
           >
             <span className="block text-lg font-semibold text-foreground">{category.name}</span>

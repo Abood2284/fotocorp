@@ -9,6 +9,7 @@ export interface AdminCatalogDerivativeSummary {
 
 export interface AdminCatalogAssetItem {
   id: string
+  fotokey: string | null
   legacyImageCode: string | null
   whoIsInPicture: string | null
   caption: string | null
@@ -101,6 +102,8 @@ export interface FotocorpProfile {
   interestedAssetTypes: string[] | null
   imageQuantityRange: string | null
   imageQualityPreference: string | null
+  royaltyFreeQuantityRange: string | null
+  royaltyFreeQualityPreference: string | null
   createdAt: string | null
   updatedAt: string | null
 }

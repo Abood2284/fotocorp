@@ -8,7 +8,7 @@ interface HomeHeroProps {
 export function HomeHero({ items }: HomeHeroProps) {
   return (
     <section
-      className="relative flex min-h-72 w-full items-center justify-center overflow-hidden bg-white md:min-h-84"
+      className="relative flex min-h-[21.5rem] w-full items-center justify-center overflow-hidden bg-white md:min-h-[26rem]"
       aria-label="Fotocorp image archive search"
     >
       <HeroBackdropStrip items={items} />

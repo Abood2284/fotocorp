@@ -64,6 +64,8 @@ interface AdminUserWithProfileRow extends AdminUserRow {
   profile_interested_asset_types: string[] | null;
   profile_image_quantity_range: string | null;
   profile_image_quality_preference: string | null;
+  profile_royalty_free_quantity_range: string | null;
+  profile_royalty_free_quality_preference: string | null;
   profile_created_at: Date | string | null;
   profile_updated_at: Date | string | null;
 }
@@ -282,6 +284,8 @@ async function getUserWithProfileByAuthId(db: DrizzleClient, authUserId: string)
       u.interested_asset_types as profile_interested_asset_types,
       u.image_quantity_range as profile_image_quantity_range,
       u.image_quality_preference as profile_image_quality_preference,
+      u.royalty_free_quantity_range as profile_royalty_free_quantity_range,
+      u.royalty_free_quality_preference as profile_royalty_free_quality_preference,
       u.created_at as profile_created_at,
       u.updated_at as profile_updated_at
     from users u
@@ -565,6 +569,8 @@ function mapUserWithProfileRow(row: AdminUserWithProfileRow) {
           interestedAssetTypes: row.profile_interested_asset_types,
           imageQuantityRange: row.profile_image_quantity_range,
           imageQualityPreference: row.profile_image_quality_preference,
+          royaltyFreeQuantityRange: row.profile_royalty_free_quantity_range,
+          royaltyFreeQualityPreference: row.profile_royalty_free_quality_preference,
           createdAt: toIso(row.profile_created_at),
           updatedAt: toIso(row.profile_updated_at),
         }

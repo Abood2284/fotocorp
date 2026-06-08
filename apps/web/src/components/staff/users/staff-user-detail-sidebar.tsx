@@ -11,6 +11,7 @@ import {
   updateUserStatusAction,
 } from "@/app/(staff)/staff/(workspace)/users/actions"
 import { ConfirmDialog } from "@/components/staff/shared/confirm-dialog"
+import { formatAssetInterestType } from "@/lib/staff/access-inquiry-labels"
 
 interface StaffUserDetailSidebarProps {
   authUserId: string
@@ -235,9 +236,18 @@ export function StaffUserDetailSidebar({ authUserId, onClose, onUpdate }: StaffU
                   <Row label="Email domain" value={user.profile.companyEmailDomain ?? "—"} />
                   <Row label="Phone" value={user.profile.phoneCountryCode && user.profile.phoneNumber ? `${user.profile.phoneCountryCode} ${user.profile.phoneNumber}` : "—"} />
                   <Row label="Email validation" value={user.profile.emailValidationDecision ?? "—"} />
-                  <Row label="Asset types" value={user.profile.interestedAssetTypes?.length ? user.profile.interestedAssetTypes.join(", ") : "—"} />
-                  <Row label="Quality preference" value={user.profile.imageQualityPreference ?? "—"} />
-                  <Row label="Quantity range" value={user.profile.imageQuantityRange ?? "—"} />
+                  <Row
+                    label="Asset types"
+                    value={
+                      user.profile.interestedAssetTypes?.length
+                        ? user.profile.interestedAssetTypes.map((t) => formatAssetInterestType(t)).join(", ")
+                        : "—"
+                    }
+                  />
+                  <Row label="Editorial quality" value={user.profile.imageQualityPreference ?? "—"} />
+                  <Row label="Editorial quantity" value={user.profile.imageQuantityRange ?? "—"} />
+                  <Row label="Royalty Free quality" value={user.profile.royaltyFreeQualityPreference ?? "—"} />
+                  <Row label="Royalty Free quantity" value={user.profile.royaltyFreeQuantityRange ?? "—"} />
                 </dl>
               ) : (
                 <p className="text-xs text-muted-foreground">No registration profile.</p>

@@ -17,7 +17,8 @@ export function formatInquiryType(type: string | null | undefined): string {
 
 export function formatAssetInterestType(value: string | null | undefined): string {
   const u = (value ?? "").trim().toUpperCase()
-  if (u === "IMAGE") return "Images"
+  if (u === "EDITORIAL" || u === "IMAGE") return "Editorial"
+  if (u === "ROYALTY_FREE") return "Royalty Free"
   if (u === "VIDEO") return "Video"
   if (u === "CARICATURE") return "Caricature"
   return value ?? "—"

@@ -2,13 +2,12 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
   getStaffAccessInquiryDetail,
   patchStaffSubscriberEntitlement,
   postStaffAccessInquiryActivateAllEntitlements,
   postStaffAccessInquiryEntitlementDraft,
-  postStaffSubscriberEntitlementActivate,
   postStaffSubscriberEntitlementSuspend,
   StaffApiError,
 } from "@/lib/api/staff-api"
@@ -65,6 +64,43 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
   const entitlementRows = detail.entitlements as EntitlementRow[]
   const draftEntitlements = entitlementRows.filter((e) => String(e.status ?? "").toUpperCase() === "DRAFT")
   const draftCount = draftEntitlements.length
+  const draftIdKey = draftEntitlements.map((e) => String(e.id ?? "")).join("|")
+
+  const [selectedDraftIds, setSelectedDraftIds] = useState<Set<string>>(() => new Set())
+
+  useEffect(() => {
+    const draftIds = draftEntitlements.map((e) => String(e.id ?? "")).filter(Boolean)
+    setSelectedDraftIds((prev) => {
+      if (!draftIds.length) return new Set()
+      if (prev.size === 0) return new Set(draftIds)
+      const next = new Set<string>()
+      for (const id of draftIds) {
+        if (prev.has(id)) next.add(id)
+        else next.add(id)
+      }
+      return next.size > 0 ? next : new Set(draftIds)
+    })
+  }, [draftIdKey])
+
+  const selectedCount = draftEntitlements.filter((e) => selectedDraftIds.has(String(e.id ?? ""))).length
+  const allDraftsSelected = draftCount > 0 && selectedCount === draftCount
+
+  function toggleDraftSelection(id: string, checked: boolean) {
+    setSelectedDraftIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  function toggleAllDraftSelection() {
+    if (allDraftsSelected) {
+      setSelectedDraftIds(new Set())
+      return
+    }
+    setSelectedDraftIds(new Set(draftEntitlements.map((e) => String(e.id ?? "")).filter(Boolean)))
+  }
 
   const refetchDetail = useCallback(async () => {
     const next = await getStaffAccessInquiryDetail(inquiryId)
@@ -122,59 +158,54 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
     })
   }
 
-  async function handleActivate(entitlementId: string, form?: HTMLFormElement | null) {
-    setNotice("")
+  type ActivationLine = { assetLabel: string; allowedDownloads: number; qualityLabel: string }
+
+  function collectSelectedDraftActivation(): {
+    entitlementIds: string[]
+    forms: HTMLFormElement[]
+    lines: ActivationLine[]
+  } | null {
     setError("")
-    setSaving(true)
-    try {
-      if (form) await saveDraftFromForm(entitlementId, form)
-      await postStaffSubscriberEntitlementActivate(entitlementId, {})
-      setNotice("Entitlement activated. The customer has been emailed their new limits.")
-      setAdjustEntitlementId(null)
-      await refetchDetail()
-    } catch (caught) {
-      if (caught instanceof StaffApiError) setError(caught.message)
-      else setError("Activation failed.")
-    } finally {
-      setSaving(false)
-    }
-  }
 
-  function requestActivateEntitlement(row: EntitlementRow, form: HTMLFormElement) {
-    const id = String(row.id ?? "")
-    const assetLabel = formatAssetInterestType(String(row.assetType ?? ""))
-    const values = readDraftFormValues(form)
-
-    if (values.error) {
-      setError(`${assetLabel}: ${values.error}`)
-      return
+    if (selectedCount < 1) {
+      setError("Select at least one draft entitlement to activate.")
+      return null
     }
 
-    const quality = formatImageQualityPreference(values.qualityAccess)
+    const selectedRows = draftEntitlements.filter((row) => selectedDraftIds.has(String(row.id ?? "")))
+    const forms = selectedRows
+      .map((row) => document.querySelector<HTMLFormElement>(`form[data-draft-entitlement-form="${row.id}"]`))
+      .filter((form): form is HTMLFormElement => form !== null)
 
-    setPendingConfirm({
-      title: `Activate ${assetLabel} access`,
-      size: "md",
-      confirmLabel: "Activate & send email",
-      body: (
-        <EntitlementActivationConfirmBody
-          intro={`Grant download access for ${assetLabel} only. Other asset types stay as drafts until you activate them separately.`}
-          lines={[
-            {
-              assetLabel,
-              allowedDownloads: values.allowedDownloads!,
-              qualityLabel: quality,
-            },
-          ]}
-          emailNote="The customer will receive one email with these limits for this asset type."
-        />
-      ),
-      variant: "default",
-      action: () => handleActivate(id, form),
-    })
+    if (forms.length !== selectedRows.length) {
+      setError("Could not read draft forms. Refresh the page and try again.")
+      return null
+    }
+
+    const lines: ActivationLine[] = []
+    const entitlementIds: string[] = []
+
+    for (const form of forms) {
+      const entitlementId = form.dataset.entitlementId ?? ""
+      const assetType = form.dataset.assetType ?? ""
+      const assetLabel = formatAssetInterestType(assetType)
+      const values = readDraftFormValues(form)
+      if (values.error) {
+        setError(`${assetLabel}: ${values.error}`)
+        return null
+      }
+      entitlementIds.push(entitlementId)
+      lines.push({
+        assetLabel,
+        allowedDownloads: values.allowedDownloads!,
+        qualityLabel: formatImageQualityPreference(values.qualityAccess),
+      })
+    }
+
+    return { entitlementIds, forms, lines }
   }
 
-  async function handleActivateAllDrafts(forms: HTMLFormElement[]) {
+  async function handleActivateSelectedDrafts(entitlementIds: string[], forms: HTMLFormElement[]) {
     setNotice("")
     setError("")
     setSaving(true)
@@ -184,60 +215,47 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
         if (!entitlementId) continue
         await saveDraftFromForm(entitlementId, form)
       }
-      await postStaffAccessInquiryActivateAllEntitlements(inquiryId, {})
-      setNotice("All draft entitlements activated. The customer received one email with every approved limit.")
+      await postStaffAccessInquiryActivateAllEntitlements(inquiryId, { entitlementIds })
+      const count = entitlementIds.length
+      setNotice(
+        count === 1
+          ? "Entitlement activated. The customer received one email with their limits."
+          : `${count} entitlements activated. The customer received one email with every approved limit.`,
+      )
+      setSelectedDraftIds(new Set())
       await refetchDetail()
     } catch (caught) {
       if (caught instanceof StaffApiError) setError(caught.message)
-      else setError("Bulk activation failed.")
+      else setError("Activation failed.")
     } finally {
       setSaving(false)
     }
   }
 
-  function requestActivateAllDrafts() {
-    setError("")
+  function requestActivateSelectedDrafts() {
+    const payload = collectSelectedDraftActivation()
+    if (!payload) return
 
-    if (draftCount < 1) return
-
-    const forms = draftEntitlements
-      .map((row) => document.querySelector<HTMLFormElement>(`form[data-draft-entitlement-form="${row.id}"]`))
-      .filter((form): form is HTMLFormElement => form !== null)
-
-    if (forms.length !== draftEntitlements.length) {
-      setError("Could not read draft forms. Refresh the page and try again.")
-      return
-    }
-
-    const lines: Array<{ assetLabel: string; allowedDownloads: number; qualityLabel: string }> = []
-    for (const form of forms) {
-      const assetType = form.dataset.assetType ?? ""
-      const assetLabel = formatAssetInterestType(assetType)
-      const values = readDraftFormValues(form)
-      if (values.error) {
-        setError(`${assetLabel}: ${values.error}`)
-        return
-      }
-      lines.push({
-        assetLabel,
-        allowedDownloads: values.allowedDownloads!,
-        qualityLabel: formatImageQualityPreference(values.qualityAccess),
-      })
-    }
+    const { entitlementIds, forms, lines } = payload
+    const count = entitlementIds.length
 
     setPendingConfirm({
-      title: "Activate all & send one email",
+      title: count === 1 ? "Activate selected entitlement" : `Activate ${count} entitlements`,
       size: "md",
-      confirmLabel: "Activate all & send email",
+      confirmLabel: count === 1 ? "Activate & send email" : `Activate ${count} & send email`,
       body: (
         <EntitlementActivationConfirmBody
-          intro={`Save your quotas and activate all ${draftCount} draft entitlements below.`}
+          intro={
+            count === 1
+              ? "Grant download access for the selected asset type below."
+              : `Grant download access for ${count} selected asset types. Unselected drafts stay inactive.`
+          }
           lines={lines}
-          emailNote="The customer will receive one email listing every limit in the table above."
+          emailNote="The customer receives one email with these limits."
         />
       ),
       variant: "default",
-      action: () => handleActivateAllDrafts(forms),
+      action: () => handleActivateSelectedDrafts(entitlementIds, forms),
     })
   }
 
@@ -298,6 +316,8 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
     interestedAssetTypes?: string[]
     imageQuantityRange?: string | null
     imageQualityPreference?: string | null
+    royaltyFreeQuantityRange?: string | null
+    royaltyFreeQualityPreference?: string | null
   }
 
   const guidance = getCustomerAccessDetailGuidance({
@@ -388,12 +408,20 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
             <dd>{(inquiry.interestedAssetTypes ?? []).map((t) => formatAssetInterestType(t)).join(", ") || "—"}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Image quantity</dt>
+            <dt className="text-muted-foreground">Editorial quantity</dt>
             <dd>{formatImageQuantityRange(inquiry.imageQuantityRange)}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Image quality</dt>
+            <dt className="text-muted-foreground">Editorial quality</dt>
             <dd>{formatImageQualityPreference(inquiry.imageQualityPreference)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Royalty Free quantity</dt>
+            <dd>{formatImageQuantityRange(inquiry.royaltyFreeQuantityRange)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Royalty Free quality</dt>
+            <dd>{formatImageQualityPreference(inquiry.royaltyFreeQualityPreference)}</dd>
           </div>
         </dl>
       </section>
@@ -406,14 +434,25 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
           <div>
             <h3 className="text-sm font-semibold text-foreground">Entitlements</h3>
             <p className="mt-1 max-w-xl text-xs text-muted-foreground">
-              Each asset type is granted separately. <strong className="font-medium text-foreground">Activate entitlement</strong> grants one type and sends one email.{" "}
-              <strong className="font-medium text-foreground">Activate all &amp; send one email</strong> grants every draft and sends a single combined email. You do not need to click Save draft first.
+              Check the asset types to grant, set download limits, then activate — one email covers everything selected.
             </p>
           </div>
-          {draftCount >= 2 ? (
-            <Button type="button" size="sm" disabled={saving} onClick={() => requestActivateAllDrafts()}>
-              Activate all &amp; send one email
-            </Button>
+          {draftCount > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={toggleAllDraftSelection}>
+                {allDraftsSelected ? "Clear selection" : "Select all"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={saving || selectedCount < 1}
+                onClick={() => requestActivateSelectedDrafts()}
+              >
+                {selectedCount === 1
+                  ? "Activate selected & send 1 email"
+                  : `Activate ${selectedCount} selected & send 1 email`}
+              </Button>
+            </div>
           ) : null}
         </div>
         {!hasAnyEntitlement ? (
@@ -433,12 +472,27 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
               const updatedAt = String(e.updatedAt ?? e.createdAt ?? id)
               const isAdjusting = adjustEntitlementId === id
 
+              const isDraftSelected = status === "DRAFT" && selectedDraftIds.has(id)
+
               return (
-                <li key={id} className="rounded-lg border border-border bg-card p-4">
+                <li
+                  key={id}
+                  className={`rounded-lg border bg-card p-4 ${isDraftSelected ? "border-primary/40 ring-1 ring-primary/20" : "border-border"}`}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {status === "DRAFT" ? (
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-input"
+                          checked={isDraftSelected}
+                          disabled={saving}
+                          aria-label={`Include ${formatAssetInterestType(assetType)} in activation`}
+                          onChange={(ev) => toggleDraftSelection(id, ev.target.checked)}
+                        />
+                      ) : null}
                       <span className="font-medium">{formatAssetInterestType(assetType)}</span>
-                      <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
                         {formatEntitlementStatus(status)}
                       </span>
                     </div>
@@ -460,10 +514,7 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
                       data-entitlement-id={id}
                       data-asset-type={assetType}
                       className="mt-4 flex flex-wrap items-end gap-3"
-                      onSubmit={(ev) => {
-                        ev.preventDefault()
-                        void handleSaveEntitlement(id, "DRAFT", new FormData(ev.currentTarget))
-                      }}
+                      onSubmit={(ev) => ev.preventDefault()}
                     >
                       <label className="flex flex-col gap-1 text-xs">
                         <span className="text-muted-foreground">Allowed downloads</span>
@@ -482,20 +533,6 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
                           <option value="HIGH">High</option>
                         </select>
                       </label>
-                      <Button type="submit" variant="secondary" size="sm" disabled={saving}>
-                        Save draft
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={saving}
-                        onClick={(ev) => {
-                          const form = ev.currentTarget.closest("form")
-                          if (form) requestActivateEntitlement(e as EntitlementRow, form)
-                        }}
-                      >
-                        Activate entitlement
-                      </Button>
                     </form>
                   ) : null}
 
@@ -564,9 +601,20 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
                     </p>
                   ) : null}
 
-                  {assetType === "IMAGE" && inquiry.imageQuantityRange === "250_plus" && !allowed && status === "DRAFT" ? (
+                  {(assetType === "EDITORIAL" || assetType === "IMAGE") &&
+                  inquiry.imageQuantityRange === "250_plus" &&
+                  !allowed &&
+                  status === "DRAFT" ? (
                     <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-                      250+ range: enter an exact allowed download count before activating.
+                      250+ editorial range: enter an exact allowed download count before activating.
+                    </p>
+                  ) : null}
+                  {assetType === "ROYALTY_FREE" &&
+                  inquiry.royaltyFreeQuantityRange === "250_plus" &&
+                  !allowed &&
+                  status === "DRAFT" ? (
+                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                      250+ royalty-free range: enter an exact allowed download count before activating.
                     </p>
                   ) : null}
                 </li>

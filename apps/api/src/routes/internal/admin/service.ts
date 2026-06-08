@@ -19,16 +19,6 @@ import { json } from "../../../lib/http"
 import { parsePreviewTtl } from "../../../lib/assets/public-assets"
 import { invalidatePublicAssetCache } from "../../../lib/cache/public-cache-invalidation"
 import { listInternalAdminUsers, updateInternalAdminUserSubscription, updateInternalAdminUserSubscriptionDetail, getInternalAdminUser, updateInternalAdminUserRole, updateInternalAdminUserStatus } from "../../../lib/users/internal-admin-users"
-import {
-  getMediaPipelineStatus,
-  type DerivativeProfilePolicyInput,
-} from "../../../lib/media/pipeline-status"
-import {
-  CARD_LIGHT_PREVIEW_PROFILE,
-  DETAIL_PREVIEW_PROFILE,
-  THUMB_LIGHT_PREVIEW_PROFILE,
-} from "../../../lib/media/watermark"
-
 interface AdminActor { authUserId: string | null; email: string | null }
 
 export async function listAdminAssetsService(env: Env, request: Request) { return json(await listInternalAdminAssets(db(env), request, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env))) }
@@ -102,15 +92,6 @@ export async function adminUserDetailService(env: Env, authUserId: string) { ret
 export async function adminUserRoleService(env: Env, authUserId: string, role: "USER" | "PHOTOGRAPHER" | "ADMIN" | "SUPER_ADMIN", actor: AdminActor) { return json(await updateInternalAdminUserRole(db(env), authUserId, role, actor)) }
 export async function adminUserStatusService(env: Env, authUserId: string, status: "ACTIVE" | "SUSPENDED", actor: AdminActor) { return json(await updateInternalAdminUserStatus(db(env), authUserId, status, actor)) }
 export async function adminUserSubscriptionDetailService(env: Env, authUserId: string, payload: { subscriptionPlanId?: string | null; subscriptionEndsAt?: string | null; downloadQuotaLimit?: number | null }, actor: AdminActor) { return json(await updateInternalAdminUserSubscriptionDetail(db(env), authUserId, payload, actor)) }
-const DEFAULT_DERIVATIVE_PROFILE_POLICY: DerivativeProfilePolicyInput = {
-  thumbProfile: THUMB_LIGHT_PREVIEW_PROFILE,
-  cardProfile: CARD_LIGHT_PREVIEW_PROFILE,
-  detailProfile: DETAIL_PREVIEW_PROFILE,
-}
-
-export async function adminMediaPipelineStatusService(env: Env) {
-  return json(await getMediaPipelineStatus(db(env), DEFAULT_DERIVATIVE_PROFILE_POLICY, 20))
-}
 export function normalizeKeywords(input: string[] | null | undefined): string[] | null { if (!input) return null; const dedup = new Map<string, string>(); for (const keyword of input) { const normalized = keyword.trim(); if (!normalized) continue; const token = normalized.toLowerCase(); if (!dedup.has(token)) { dedup.set(token, normalized); if (dedup.size >= 50) break } } return dedup.size > 0 ? [...dedup.values()] : null }
 export function nullable(value: string | null | undefined) { if (value === null || value === undefined) return null; const trimmed = value.trim(); return trimmed ? trimmed : null }
 export function actorFromRequest(request: Request): AdminActor { return { authUserId: request.headers.get("x-admin-auth-user-id")?.trim() || null, email: request.headers.get("x-admin-email")?.trim() || null } }

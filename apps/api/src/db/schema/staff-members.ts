@@ -24,7 +24,7 @@ export const staffMembers = pgTable(
   (table) => [
     check(
       "staff_members_role_check",
-      sql`${table.role} in ('SUPER_ADMIN','CATALOG_MANAGER','REVIEWER','CAPTION_MANAGER','FINANCE','SUPPORT')`,
+      sql`${table.role} in ('SUPER_ADMIN','CATALOG_MANAGER','REVIEWER','CAPTION_MANAGER','CAPTION_WRITER','FINANCE','SUPPORT')`,
     ),
     check("staff_members_status_check", sql`${table.status} in ('ACTIVE','DISABLED')`),
     index("staff_members_status_idx").on(table.status),

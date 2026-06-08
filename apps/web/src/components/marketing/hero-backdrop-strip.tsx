@@ -39,19 +39,19 @@ export function HeroBackdropStrip({ items }: HeroBackdropStripProps) {
       aria-hidden="true"
     >
       <div
-        className="absolute inset-0 flex items-stretch justify-center opacity-[0.52] saturate-[0.95] contrast-[1.04] sm:opacity-50 md:opacity-[0.48]"
+        className="absolute inset-0 flex items-stretch justify-center opacity-[0.54] saturate-[0.98] contrast-[1.02] sm:opacity-[0.50] md:opacity-[0.46]"
         style={{
           maskImage:
-            "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%), linear-gradient(180deg, transparent 0%, black 8%, black 92%, transparent 100%)",
+            "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%), linear-gradient(180deg, transparent 0%, black 3%, black 97%, transparent 100%)",
           maskComposite: "intersect",
           WebkitMaskComposite: "source-in",
         }}
       >
-        <div className="flex h-full min-h-52 w-max max-w-none shrink-0 items-stretch gap-0.5 py-3 sm:min-h-56 sm:py-4 md:min-h-0 md:py-5">
+        <div className="flex h-full min-h-[21.5rem] w-max max-w-none shrink-0 items-stretch gap-0.5 sm:min-h-[22.5rem] md:min-h-[26rem]">
           {slots.map((item, i) => (
             <div
               key={`${item?.id ?? "fallback"}-${i}`}
-              className="relative aspect-[3/4] h-full w-auto shrink-0 overflow-hidden bg-muted"
+              className="relative flex h-full w-auto shrink-0 overflow-hidden bg-muted/40"
             >
               {item?.imageUrl ? (
                 <HeroImage
@@ -68,8 +68,8 @@ export function HeroBackdropStrip({ items }: HeroBackdropStripProps) {
         </div>
       </div>
 
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_52%_68%_at_50%_48%,rgba(255,255,255,0.86)_0%,rgba(255,255,255,0.54)_38%,rgba(255,255,255,0.18)_64%,transparent_94%)]" />
-      <div className="absolute inset-0 bg-linear-to-b from-white/50 via-transparent to-white/50" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_52%_68%_at_50%_48%,rgba(255,255,255,0.72)_0%,rgba(255,255,255,0.42)_38%,rgba(255,255,255,0.12)_64%,transparent_94%)]" />
+      <div className="absolute inset-0 bg-linear-to-b from-white/24 via-transparent to-white/24" />
     </div>
   )
 }
@@ -94,7 +94,7 @@ function HeroImage({
     <img
       src={src}
       alt={alt}
-      className="h-full w-full min-w-28 object-cover saturate-[0.75] contrast-[0.95] sm:min-w-32 md:min-w-36 lg:min-w-40"
+      className="h-full w-auto min-w-28 shrink-0 object-contain saturate-[0.85] contrast-[0.98] sm:min-w-32 md:min-w-36 lg:min-w-40"
       loading={loading}
       decoding="async"
       referrerPolicy="no-referrer"

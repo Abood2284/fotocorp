@@ -5,12 +5,14 @@ import { buildSignInHref } from "@/lib/auth-sign-in-gateway"
 import { getCurrentAuthUser, getOrCreateAppUser } from "@/lib/app-user"
 import { listFotoboxBoards } from "@/lib/api/account-api"
 import type { FotoboxBoard } from "@/lib/api/account-api"
+import { redirectWorkspaceOnlyStaffAwayFromPublicSite } from "@/lib/staff-session"
 
 export const metadata = {
   title: "Fotobox",
 }
 
 export default async function FotoboxPage() {
+  await redirectWorkspaceOnlyStaffAwayFromPublicSite()
   const authUser = await getCurrentAuthUser()
   if (!authUser) {
     redirect(buildSignInHref({ callbackUrl: "/account/fotobox" }))

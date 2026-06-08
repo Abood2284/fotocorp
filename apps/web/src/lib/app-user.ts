@@ -20,6 +20,7 @@ export interface AuthUser {
   email: string
   name?: string | null
   image?: string | null
+  accessInquiryStatus?: string | null
 }
 
 export async function getCurrentAuthUser() {
@@ -47,6 +48,7 @@ export async function getCurrentAuthUser() {
 
     const payload = (await response.json().catch(() => null)) as {
       user?: { id: string; email: string; name?: string | null }
+      accessInquiry?: { status?: string | null } | null
     } | null
 
     if (!payload?.user?.id) return null
@@ -56,6 +58,7 @@ export async function getCurrentAuthUser() {
       email: payload.user.email,
       name: payload.user.name ?? null,
       image: null,
+      accessInquiryStatus: payload.accessInquiry?.status ?? null,
     } satisfies AuthUser
   })
 }
