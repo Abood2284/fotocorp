@@ -8,7 +8,7 @@ const DashboardChart = dynamic(
     ssr: false,
     loading: () => (
       <div
-        className="mt-4 h-[250px] w-full animate-pulse rounded-md bg-staff-100"
+        className="mt-4 h-[250px] w-full min-h-[250px] min-w-0 animate-pulse rounded-md bg-staff-100"
         aria-hidden
       />
     ),

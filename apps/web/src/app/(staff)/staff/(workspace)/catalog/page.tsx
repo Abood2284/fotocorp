@@ -1,8 +1,9 @@
 
 import { AlertTriangle } from "lucide-react"
-import { getAdminAssetFilters, getAdminAssetStats, listAdminAssets } from "@/lib/api/admin-assets-api"
+import { listAdminAssets } from "@/lib/api/admin-assets-api"
 import { EmptyState } from "@/components/shared/empty-state"
 import { StaffCatalogClient } from "@/components/staff/catalog/staff-catalog-client"
+import type { AdminCatalogAssetsResponse, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
 
 interface StaffCatalogPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -16,18 +17,24 @@ export default async function StaffCatalogPage({ searchParams }: StaffCatalogPag
   const params = await searchParams
   const query = toQueryParams(params)
 
-  const [filters, response, stats] = await Promise.all([
-    getAdminAssetFilters().catch(() => null),
-    listAdminAssets(query).catch(() => null),
-    getAdminAssetStats().catch(() => null),
-  ])
+  let response: AdminCatalogAssetsResponse | null = null
+  try {
+    response = await timeStaffCatalogPageCall("listAdminAssets", () => listAdminAssets(query))
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "staff_catalog_page_data_call_failed",
+      operation: "listAdminAssets",
+      route: "/staff/catalog",
+      message: error instanceof Error ? error.message : String(error),
+    }))
+  }
 
-  if (!filters || !response || !stats) {
+  if (!response) {
     return (
       <EmptyState
         icon={AlertTriangle}
         title="Unable to load catalog"
-        description="Internal admin catalog request failed."
+        description="The asset list request failed."
       />
     )
   }
@@ -35,8 +42,8 @@ export default async function StaffCatalogPage({ searchParams }: StaffCatalogPag
   return (
     <StaffCatalogClient
       initialResponse={response}
-      filters={filters}
-      stats={stats}
+      filters={fallbackFilters}
+      filtersDeferred
       initialQuery={Object.fromEntries(query.entries())}
     />
   )
@@ -51,4 +58,45 @@ function toQueryParams(params: Record<string, string | string[] | undefined>) {
   }
   if (!query.has("limit")) query.set("limit", "50")
   return query
+}
+
+async function timeStaffCatalogPageCall<T>(operation: string, callback: () => Promise<T>) {
+  const startedAt = Date.now()
+  try {
+    const result = await callback()
+    console.info(JSON.stringify({
+      event: "staff_catalog_page_data_call",
+      operation,
+      route: "/staff/catalog",
+      status: "ok",
+      durationMs: Date.now() - startedAt,
+    }))
+    return result
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "staff_catalog_page_data_call",
+      operation,
+      route: "/staff/catalog",
+      status: "error",
+      durationMs: Date.now() - startedAt,
+      message: error instanceof Error ? error.message : String(error),
+    }))
+    throw error
+  }
+}
+
+const fallbackFilters: AdminCatalogFilters = {
+  statuses: [
+    { status: "DRAFT", assetCount: 0 },
+    { status: "SUBMITTED", assetCount: 0 },
+    { status: "APPROVED", assetCount: 0 },
+    { status: "ACTIVE", assetCount: 0 },
+    { status: "ARCHIVED", assetCount: 0 },
+    { status: "DELETED", assetCount: 0 },
+    { status: "MISSING_ORIGINAL", assetCount: 0 },
+    { status: "UNKNOWN", assetCount: 0 },
+  ],
+  categories: [],
+  events: [],
+  contributors: [],
 }

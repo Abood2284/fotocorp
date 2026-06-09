@@ -316,6 +316,7 @@ function HeaderShell({
             pathname={pathname}
             sortParam={sortParam}
             modeParam={modeParam}
+            categoryIdParam={categoryIdParam}
           />
           <MobileAccountMenu userProfile={userProfile} staffBrief={staffBrief} />
         </nav>
@@ -593,18 +594,27 @@ function MobileLinkGroup({
   pathname,
   sortParam,
   modeParam,
+  categoryIdParam,
 }: {
   group: { title: string; links: HeaderLink[] }
   pathname: string
   sortParam: string | null
   modeParam: string | null
+  categoryIdParam: string | null
 }) {
   return (
     <section>
       <h2 className="mb-2 font-sans text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{group.title}</h2>
       <div className="grid gap-1">
         {group.links.map((link) => (
-          <MobileNavLink key={link.href + link.label} link={link} pathname={pathname} sortParam={sortParam} modeParam={modeParam} />
+          <MobileNavLink
+            key={link.href + link.label}
+            link={link}
+            pathname={pathname}
+            sortParam={sortParam}
+            modeParam={modeParam}
+            categoryIdParam={categoryIdParam}
+          />
         ))}
       </div>
     </section>
@@ -615,10 +625,12 @@ function MobileRoleLinks({
   pathname,
   sortParam,
   modeParam,
+  categoryIdParam,
 }: {
   pathname: string
   sortParam: string | null
   modeParam: string | null
+  categoryIdParam: string | null
 }) {
   const { data: session } = useSharedAuthSession()
   const group = getMobileRoleLinksFromSession(session)
@@ -630,6 +642,7 @@ function MobileRoleLinks({
       pathname={pathname}
       sortParam={sortParam}
       modeParam={modeParam}
+      categoryIdParam={categoryIdParam}
     />
   )
 }

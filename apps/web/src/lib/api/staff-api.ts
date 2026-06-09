@@ -1,4 +1,5 @@
 export const FOTOCORP_STAFF_SESSION_COOKIE = "fotocorp_staff_session"
+const STAFF_API_TIMEOUT_MS = 8_000
 
 export interface StaffAuthStaff {
   id: string
@@ -50,17 +51,48 @@ async function staffJson<T>(
     cookieHeader?: string
   },
 ): Promise<T> {
-  const response = await fetch(resolveStaffUrl(path), {
+  const startedAt = Date.now()
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), STAFF_API_TIMEOUT_MS)
+  let response: Response
+
+  try {
+    response = await fetch(resolveStaffUrl(path), {
+      method: input.method,
+      cache: "no-store",
+      credentials: "include",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        ...(input.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(input.cookieHeader ? { Cookie: input.cookieHeader } : {}),
+      },
+      body: input.body !== undefined ? JSON.stringify(input.body) : undefined,
+    })
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "staff_api_fetch",
+      path,
+      method: input.method,
+      status: "error",
+      durationMs: Date.now() - startedAt,
+      timeoutMs: STAFF_API_TIMEOUT_MS,
+      timedOut: isAbortError(error),
+      message: error instanceof Error ? error.message : String(error),
+    }))
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+
+  console.info(JSON.stringify({
+    event: "staff_api_fetch",
+    path,
     method: input.method,
-    cache: "no-store",
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      ...(input.body !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...(input.cookieHeader ? { Cookie: input.cookieHeader } : {}),
-    },
-    body: input.body !== undefined ? JSON.stringify(input.body) : undefined,
-  })
+    status: response.status,
+    durationMs: Date.now() - startedAt,
+    timeoutMs: STAFF_API_TIMEOUT_MS,
+  }))
 
   if (!response.ok) {
     const error = await readStaffApiError(response)
@@ -68,6 +100,10 @@ async function staffJson<T>(
   }
 
   return response.json() as Promise<T>
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError"
 }
 
 export interface StaffAccessInquiryListItem {

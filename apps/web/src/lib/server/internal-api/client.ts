@@ -3,6 +3,7 @@ import "server-only"
 import { readInternalApiError, type InternalApiErrorBody } from "@/lib/server/internal-api/errors"
 
 type InternalApiMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE"
+const INTERNAL_API_TIMEOUT_MS = 12_000
 
 interface InternalApiFetchInput {
   path: string
@@ -47,6 +48,9 @@ export async function internalApiJson<TResponse>(input: InternalApiJsonInput): P
 
 export async function internalApiFetch(input: InternalApiFetchInput): Promise<Response> {
   const method = input.method ?? "GET"
+  const startedAt = Date.now()
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), INTERNAL_API_TIMEOUT_MS)
   const headers = new Headers(input.headers)
   headers.set("Accept", input.accept ?? headers.get("Accept") ?? "application/json")
   headers.set("x-internal-api-secret", getInternalApiSecret())
@@ -54,6 +58,7 @@ export async function internalApiFetch(input: InternalApiFetchInput): Promise<Re
   const init: RequestInit = {
     method,
     cache: "no-store",
+    signal: controller.signal,
     headers,
   }
 
@@ -62,7 +67,32 @@ export async function internalApiFetch(input: InternalApiFetchInput): Promise<Re
     init.body = JSON.stringify(input.body)
   }
 
-  return fetch(buildInternalApiUrl(input.path), init)
+  try {
+    const response = await fetch(buildInternalApiUrl(input.path), init)
+    console.info(JSON.stringify({
+      event: "internal_api_fetch",
+      path: input.path,
+      method,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
+      timeoutMs: INTERNAL_API_TIMEOUT_MS,
+    }))
+    return response
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "internal_api_fetch",
+      path: input.path,
+      method,
+      status: "error",
+      durationMs: Date.now() - startedAt,
+      timeoutMs: INTERNAL_API_TIMEOUT_MS,
+      timedOut: isAbortError(error),
+      message: error instanceof Error ? error.message : String(error),
+    }))
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 function buildInternalApiUrl(path: string) {
@@ -100,4 +130,8 @@ async function toRequestError(response: Response, path: string) {
 
 function safeErrorDetail(error: InternalApiErrorBody) {
   return error.detail ?? error.rawText
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError"
 }

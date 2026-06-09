@@ -20,9 +20,11 @@ import {
 } from "@/lib/server/internal-api"
 
 export async function listAdminCatalogAssets(searchParams: URLSearchParams) {
-  return adminJson<AdminCatalogAssetsResponse>({
-    path: withQuery(internalApiRoutes.adminAssets(), searchParams),
-  })
+  return timeAdminCatalogApiCall("listAdminAssets", () =>
+    adminJson<AdminCatalogAssetsResponse>({
+      path: withQuery(internalApiRoutes.adminAssets(), searchParams),
+    }),
+  )
 }
 
 export async function getAdminCatalogAsset(assetId: string) {
@@ -39,15 +41,19 @@ export async function getAdminCatalogAsset(assetId: string) {
 }
 
 export async function getAdminCatalogStats() {
-  return adminJson<AdminCatalogStats>({
-    path: internalApiRoutes.adminCatalogStats(),
-  })
+  return timeAdminCatalogApiCall("getAdminAssetStats", () =>
+    adminJson<AdminCatalogStats>({
+      path: internalApiRoutes.adminCatalogStats(),
+    }),
+  )
 }
 
 export async function getAdminCatalogFilters() {
-  return adminJson<AdminCatalogFilters>({
-    path: internalApiRoutes.adminFilters(),
-  })
+  return timeAdminCatalogApiCall("getAdminAssetFilters", () =>
+    adminJson<AdminCatalogFilters>({
+      path: internalApiRoutes.adminFilters(),
+    }),
+  )
 }
 
 export async function updateAdminAsset(assetId: string, payload: AdminCatalogEditorialUpdateInput) {
@@ -166,4 +172,27 @@ async function adminFetch(input: {
 
 async function adminActorHeaders(): Promise<HeadersInit> {
   return getStaffInternalAdminActorHeaders()
+}
+
+async function timeAdminCatalogApiCall<T>(operation: string, callback: () => Promise<T>) {
+  const startedAt = Date.now()
+  try {
+    const result = await callback()
+    console.info(JSON.stringify({
+      event: "staff_catalog_admin_api_call",
+      operation,
+      status: "ok",
+      durationMs: Date.now() - startedAt,
+    }))
+    return result
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "staff_catalog_admin_api_call",
+      operation,
+      status: "error",
+      durationMs: Date.now() - startedAt,
+      message: error instanceof Error ? error.message : String(error),
+    }))
+    throw error
+  }
 }

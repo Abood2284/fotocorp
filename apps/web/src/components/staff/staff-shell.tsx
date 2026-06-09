@@ -27,7 +27,7 @@ export function StaffShell({ children, staff }: StaffShellProps) {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar navItems={navItems} staff={staff} />
-      <main className="flex-1 overflow-y-auto bg-staff-50 p-6 lg:p-8">{children}</main>
+      <main className="min-w-0 flex-1 overflow-y-auto bg-staff-50 p-6 lg:p-8">{children}</main>
     </div>
   )
 }

@@ -78,8 +78,8 @@ export async function DashboardStats() {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="border-staff-200 shadow-sm">
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
+        <Card className="min-w-0 border-staff-200 shadow-sm">
           <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
             <div>
               <CardTitle className="inline-flex items-center gap-1.5 text-base font-semibold text-staff-900">
@@ -91,7 +91,7 @@ export async function DashboardStats() {
               </CardDescription>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="min-w-0">
             <DashboardChartLazy total={summary.totalAssets} approved={summary.approvedPublicAssets} />
           </CardContent>
         </Card>

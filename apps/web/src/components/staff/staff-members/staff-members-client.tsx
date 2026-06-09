@@ -42,10 +42,10 @@ export function StaffMembersClient({ initialItems }: StaffMembersClientProps) {
   const runAction = async (action: () => Promise<StaffMemberActionResult>, successMessage: string) => {
     const result = await action()
     if (!result.ok) {
-      toast({ title: "Request failed", description: result.message, variant: "destructive" })
+      toast({ message: result.message || "Request failed", variant: "error" })
       return
     }
-    toast({ title: successMessage })
+    toast({ message: successMessage, variant: "success" })
     refresh()
   }
 

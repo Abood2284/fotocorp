@@ -5,8 +5,8 @@ import { useState, useTransition, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
-import type { AdminCatalogAssetItem, AdminCatalogAssetsResponse, AdminCatalogFilters, AdminCatalogStats } from "@/features/assets/admin-catalog-types"
-import { updateAdminAssetStateBulkAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
+import type { AdminCatalogAssetItem, AdminCatalogAssetsResponse, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
+import { fetchAdminAssetFiltersAction, updateAdminAssetStateBulkAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { StaffCatalogDetailSidebar } from "./staff-catalog-detail-sidebar"
 import { ConfirmDialog } from "@/components/staff/shared/confirm-dialog"
@@ -15,16 +15,20 @@ import { cn } from "@/lib/utils"
 interface StaffCatalogClientProps {
   initialResponse: AdminCatalogAssetsResponse
   filters: AdminCatalogFilters
-  stats: AdminCatalogStats
+  filtersDeferred?: boolean
   initialQuery: Record<string, string>
 }
 
-export function StaffCatalogClient({ initialResponse, filters, stats, initialQuery }: StaffCatalogClientProps) {
+export function StaffCatalogClient({ initialResponse, filters, filtersDeferred = false, initialQuery }: StaffCatalogClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [inspectAssetId, setInspectAssetId] = useState<string | null>(null)
+  const [activeFilters, setActiveFilters] = useState(filters)
+  const [filterLoadState, setFilterLoadState] = useState<"idle" | "loading" | "ready" | "error">(
+    filtersDeferred ? "loading" : "ready",
+  )
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string
     description: string
@@ -82,6 +86,28 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
   }
 
   useEffect(() => {
+    if (!filtersDeferred) return
+    let cancelled = false
+
+    setFilterLoadState("loading")
+    fetchAdminAssetFiltersAction()
+      .then((nextFilters) => {
+        if (cancelled) return
+        setActiveFilters(nextFilters)
+        setFilterLoadState("ready")
+      })
+      .catch((error) => {
+        if (cancelled) return
+        console.error("Failed to load staff catalog filters", error)
+        setFilterLoadState("error")
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [filtersDeferred])
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!inspectAssetId) return
       if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA" || document.activeElement?.tagName === "SELECT") {
@@ -125,7 +151,7 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
         </div>
       </div>
 
-      <div className="flex w-full items-start gap-4">
+      <div className="flex w-full items-stretch gap-4">
         <div className={cn("space-y-5 transition-all duration-300", inspectAssetId ? "w-[60%]" : "w-full")}>
           {/* Bulk actions bar */}
           {selectedIds.size > 0 && (
@@ -143,7 +169,12 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
           )}
 
           {/* Filter Chips */}
-          <ActiveFilterChips query={queryParams} />
+          <ActiveFilterChips query={queryParams} filters={activeFilters} />
+          {filterLoadState !== "ready" && (
+            <p className="text-xs text-muted-foreground">
+              {filterLoadState === "error" ? "Filter options are temporarily unavailable." : "Loading filter options..."}
+            </p>
+          )}
 
           {/* Main Grid */}
           <div className="overflow-x-auto rounded-lg border border-border bg-card">
@@ -165,7 +196,7 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                 <HeaderSelectFilter 
                   query={queryParams} 
                   name="status" 
-                  options={[{value:"",label:"All"}, ...filters.statuses.map(s => ({value: s.status, label: s.status}))]} 
+                  options={[{value:"",label:"All"}, ...activeFilters.statuses.map(s => ({value: s.status, label: s.status}))]} 
                 />
               }>Status</Th>
               <Th filterControl={
@@ -179,14 +210,14 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                 <HeaderSelectFilter 
                   query={queryParams} 
                   name="categoryId" 
-                  options={[{value:"",label:"All"}, {value:"none",label:"No Category"}, ...filters.categories.map(c => ({value: c.id, label: c.name}))]} 
+                  options={[{value:"",label:"All"}, {value:"none",label:"No Category"}, ...activeFilters.categories.map(c => ({value: c.id, label: c.name}))]} 
                 />
               }>Category</Th>
               <Th filterControl={
                 <HeaderSelectFilter 
                   query={queryParams} 
                   name="eventId" 
-                  options={[{value:"",label:"All"}, {value:"none",label:"No Event"}, ...filters.events.map(e => ({value: e.id, label: e.name || "Untitled"}))]} 
+                  options={[{value:"",label:"All"}, {value:"none",label:"No Event"}, ...activeFilters.events.map(e => ({value: e.id, label: e.name || "Untitled"}))]} 
                 />
               }>Event</Th>
               <Th filterControl={
@@ -211,7 +242,11 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                 </td>
               </tr>
             ) : (
-              initialResponse.items.map(asset => (
+              initialResponse.items.map(asset => {
+                // Prefer the canonical business identifier in staff listings.
+                // Contributor uploads often carry PHUPLOAD-* as legacyImageCode before approval assigns a fotokey.
+                const assetIdentifier = asset.fotokey ?? asset.legacyImageCode ?? asset.id.split('-')[0]
+                return (
                 <tr 
                   key={asset.id} 
                   onClick={() => setInspectAssetId(prev => prev === asset.id ? null : asset.id)}
@@ -238,7 +273,7 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                     )}
                   </td>
                   <td className="px-3 py-2 max-w-[200px]">
-                    <p className="font-mono text-xs">{asset.legacyImageCode ?? asset.id.split('-')[0]}</p>
+                    <p className="font-mono text-xs">{assetIdentifier}</p>
                     <p className="mt-0.5 truncate font-medium" title={asset.whoIsInPicture || asset.event?.name || asset.headline || "Untitled"}>{asset.whoIsInPicture || asset.event?.name || asset.headline || "Untitled"}</p>
                     {!asset.whoIsInPicture && <span className="text-[10px] text-amber-600 font-medium">Missing who is in picture</span>}
                     {!asset.caption && <span className="text-[10px] text-amber-600 font-medium ml-2">Missing caption</span>}
@@ -249,7 +284,8 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
                   <td className="px-3 py-2 max-w-[150px] truncate" title={asset.event?.name || ""}>{asset.event?.name ?? "—"}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{toDate(asset.updatedAt ?? asset.createdAt)}</td>
                 </tr>
-              ))
+                )
+              })
             )}
           </tbody>
         </table>
@@ -273,12 +309,14 @@ export function StaffCatalogClient({ initialResponse, filters, stats, initialQue
 
         {inspectAssetId && (
           <div className="w-[40%] shrink-0">
-            <StaffCatalogDetailSidebar
-              assetId={inspectAssetId}
-              onClose={() => setInspectAssetId(null)}
-              onUpdate={refreshData}
-              filters={filters}
-            />
+            <div className="sticky top-6 lg:top-8">
+              <StaffCatalogDetailSidebar
+                assetId={inspectAssetId}
+                onClose={() => setInspectAssetId(null)}
+                onUpdate={refreshData}
+                filters={activeFilters}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -381,19 +419,8 @@ function HeaderSelectFilter({ query, name, options }: { query: URLSearchParams; 
   )
 }
 
-function ActiveFilterChips({ query }: { query: URLSearchParams }) {
-  const chips = [
-    chip("q", query.get("q"), "Search"),
-    chip("status", query.get("status"), "Status"),
-    chip("visibility", query.get("visibility"), "Visibility"),
-    chip("categoryId", query.get("categoryId"), "Category"),
-    chip("eventId", query.get("eventId"), "Event"),
-    chip("missingWhoIsInPicture", query.has("missingWhoIsInPicture") ? "true" : null, "Missing who is in picture"),
-    chip("missingCaption", query.has("missingCaption") ? "true" : null, "Missing Caption"),
-    chip("noEvent", query.has("noEvent") ? "true" : null, "No Event"),
-    chip("noCategory", query.has("noCategory") ? "true" : null, "No Category"),
-    chip("contributorUploads", query.has("contributorUploads") ? "true" : null, "Contributor Uploads"),
-  ].filter((item): item is NonNullable<typeof item> => item !== null)
+function ActiveFilterChips({ query, filters }: { query: URLSearchParams; filters: AdminCatalogFilters }) {
+  const chips = buildCatalogFilterChips(query, filters)
 
   if (!chips.length) return null
 
@@ -405,7 +432,12 @@ function ActiveFilterChips({ query }: { query: URLSearchParams }) {
           href={`/staff/catalog?${withoutParam(query, item.key)}`}
           className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-xs transition-colors hover:bg-muted"
         >
-          <span className="font-medium text-muted-foreground">{item.label}:</span> {item.value}
+          <span className="font-medium text-muted-foreground">{item.label}</span>
+          {item.value ? (
+            <>
+              <span className="text-muted-foreground">:</span> {item.value}
+            </>
+          ) : null}
           <X className="ml-1" size={12} />
         </Link>
       ))}
@@ -414,6 +446,80 @@ function ActiveFilterChips({ query }: { query: URLSearchParams }) {
       </Link>
     </div>
   )
+}
+
+function buildCatalogFilterChips(query: URLSearchParams, filters: AdminCatalogFilters) {
+  const chips: Array<{ key: string; label: string; value: string }> = []
+
+  const search = query.get("q")
+  if (search) chips.push({ key: "q", label: "Search", value: search })
+
+  const status = query.get("status")
+  if (status) chips.push({ key: "status", label: "Status", value: status })
+
+  const visibility = query.get("visibility")
+  if (visibility) chips.push({ key: "visibility", label: "Visibility", value: visibility })
+
+  const categoryId = query.get("categoryId")
+  if (categoryId) {
+    chips.push({
+      key: "categoryId",
+      label: "Category",
+      value: resolveCategoryLabel(categoryId, filters.categories),
+    })
+  }
+
+  const eventId = query.get("eventId")
+  if (eventId) {
+    chips.push({
+      key: "eventId",
+      label: "Event",
+      value: resolveEventLabel(eventId, filters.events),
+    })
+  }
+
+  const sort = query.get("sort")
+  if (sort && sort !== "newest") {
+    chips.push({ key: "sort", label: "Sort", value: resolveSortLabel(sort) })
+  }
+
+  if (query.has("missingWhoIsInPicture")) {
+    chips.push({ key: "missingWhoIsInPicture", label: "Missing who is in picture", value: "" })
+  }
+  if (query.has("missingCaption")) {
+    chips.push({ key: "missingCaption", label: "Missing Caption", value: "" })
+  }
+  if (query.has("noEvent")) {
+    chips.push({ key: "noEvent", label: "No Event", value: "" })
+  }
+  if (query.has("noCategory")) {
+    chips.push({ key: "noCategory", label: "No Category", value: "" })
+  }
+  if (query.has("contributorUploads")) {
+    chips.push({ key: "contributorUploads", label: "Contributor Uploads", value: "" })
+  }
+
+  return chips
+}
+
+function resolveCategoryLabel(categoryId: string, categories: AdminCatalogFilters["categories"]) {
+  if (categoryId === "none") return "No Category"
+  return categories.find((category) => category.id === categoryId)?.name ?? categoryId
+}
+
+function resolveEventLabel(eventId: string, events: AdminCatalogFilters["events"]) {
+  if (eventId === "none") return "No Event"
+  return events.find((event) => event.id === eventId)?.name || "Untitled"
+}
+
+function resolveSortLabel(sort: string) {
+  const labels: Record<string, string> = {
+    newest: "Newest",
+    oldest: "Oldest",
+    imageDateDesc: "Image date newest",
+    recentlyUpdated: "Recently updated",
+  }
+  return labels[sort] ?? sort
 }
 
 function PreserveQuery({ query, omit }: { query: URLSearchParams; omit: string[] }) {
@@ -435,7 +541,3 @@ function withoutParam(query: URLSearchParams, key: string) {
   return next.toString()
 }
 
-function chip(key: string, value: string | null, label: string) {
-  if (!value) return null
-  return { key, value, label }
-}

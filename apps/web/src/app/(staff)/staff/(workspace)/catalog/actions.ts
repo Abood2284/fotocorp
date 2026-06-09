@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import {
   getAdminAsset,
+  getAdminAssetFilters,
   updateAdminAssetEditorial,
   updateAdminAssetState,
   updateAdminAssetEditorialBulk,
@@ -17,9 +18,12 @@ export async function fetchAdminAssetAction(assetId: string) {
   return getAdminAsset(assetId)
 }
 
+export async function fetchAdminAssetFiltersAction() {
+  return getAdminAssetFilters()
+}
+
 export async function updateAdminAssetEditorialAction(assetId: string, payload: AdminCatalogEditorialUpdateInput) {
   const result = await updateAdminAssetEditorial(assetId, payload)
-  revalidatePath("/staff/catalog")
   return result
 }
 

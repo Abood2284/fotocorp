@@ -164,14 +164,22 @@ export async function listInternalAdminAssets(
   secret: string | undefined,
   ttlSeconds: number,
 ) {
-  const query = parseAdminAssetQuery(new URL(request.url).searchParams);
-  const rows = await executeRows<AdminAssetRow>(db, buildAdminAssetsSql(query));
-  const pageRows = rows.slice(0, query.limit);
-  const items = await Promise.all(pageRows.map((row) => mapAdminAssetRow(row, secret, ttlSeconds)));
-  const last = pageRows.at(-1);
-  const nextCursor = rows.length > query.limit && last ? encodeCursor(toCursor(last, query.sort)) : null;
-
-  return { items, nextCursor };
+  const startedAt = Date.now();
+  try {
+    const query = parseAdminAssetQuery(new URL(request.url).searchParams);
+    const rows = await executeRows<AdminAssetRow>(db, buildAdminAssetsSql(query));
+    const pageRows = rows.slice(0, query.limit);
+    const items = await Promise.all(pageRows.map((row) => mapAdminAssetRow(row, secret, ttlSeconds)));
+    const last = pageRows.at(-1);
+    const nextCursor = rows.length > query.limit && last ? encodeCursor(toCursor(last, query.sort)) : null;
+    logAdminCatalogTiming("listAdminAssets", startedAt, "ok", { rows: rows.length, returned: items.length });
+    return { items, nextCursor };
+  } catch (error) {
+    logAdminCatalogTiming("listAdminAssets", startedAt, "error", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 export async function getInternalAdminAssetPreview(
@@ -506,116 +514,138 @@ export async function getInternalAdminAssetOriginal(
 }
 
 export async function getInternalAdminCatalogStats(db: DrizzleClient) {
-  const statsRows = await executeRows<AdminStatsRow>(db, sql`
-    select
-      count(*)::bigint as total_assets,
-      count(*) filter (where a.status = 'ACTIVE' and a.visibility = 'PUBLIC')::bigint as approved_public_assets,
-      count(*) filter (where a.visibility = 'PRIVATE')::bigint as private_assets,
-      count(*) filter (where a.original_exists_in_storage = false)::bigint as missing_r2_count,
-      count(*) filter (
-        where card.generation_status = 'READY'
-          and card.is_watermarked = true
-      )::bigint as ready_card_preview_count,
-      count(*) filter (
-        where card.id is null
-          or card.generation_status <> 'READY'
-          or card.is_watermarked = true
-      )::bigint as missing_card_preview_count,
-      count(*) filter (
-        where thumb.generation_status = 'FAILED'
-           or card.generation_status = 'FAILED'
-           or detail.generation_status = 'FAILED'
-      )::bigint as failed_derivative_count,
-      count(*) filter (where a.created_at >= date_trunc('day', now()))::bigint as imported_today,
-      count(*) filter (where a.created_at >= date_trunc('month', now()))::bigint as imported_month
-    from image_assets a
-    left join image_derivatives thumb
-      on thumb.image_asset_id = a.id and thumb.variant = 'THUMB'
-    left join image_derivatives card
-      on card.image_asset_id = a.id and card.variant = 'CARD'
-    left join image_derivatives detail
-      on detail.image_asset_id = a.id and detail.variant = 'DETAIL'
-  `);
+  const startedAt = Date.now();
+  try {
+    const statsRows = await executeRows<AdminStatsRow>(db, sql`
+      select
+        count(*)::bigint as total_assets,
+        count(*) filter (where a.status = 'ACTIVE' and a.visibility = 'PUBLIC')::bigint as approved_public_assets,
+        count(*) filter (where a.visibility = 'PRIVATE')::bigint as private_assets,
+        count(*) filter (where a.original_exists_in_storage = false)::bigint as missing_r2_count,
+        count(*) filter (
+          where card.generation_status = 'READY'
+            and card.is_watermarked = true
+        )::bigint as ready_card_preview_count,
+        count(*) filter (
+          where card.id is null
+            or card.generation_status <> 'READY'
+            or card.is_watermarked = true
+        )::bigint as missing_card_preview_count,
+        count(*) filter (
+          where thumb.generation_status = 'FAILED'
+             or card.generation_status = 'FAILED'
+             or detail.generation_status = 'FAILED'
+        )::bigint as failed_derivative_count,
+        count(*) filter (where a.created_at >= date_trunc('day', now()))::bigint as imported_today,
+        count(*) filter (where a.created_at >= date_trunc('month', now()))::bigint as imported_month
+      from image_assets a
+      left join image_derivatives thumb
+        on thumb.image_asset_id = a.id and thumb.variant = 'THUMB'
+      left join image_derivatives card
+        on card.image_asset_id = a.id and card.variant = 'CARD'
+      left join image_derivatives detail
+        on detail.image_asset_id = a.id and detail.variant = 'DETAIL'
+    `);
 
-  const totalsRows = await executeRows<ScalarRow>(db, sql`
-    select
-      (select count(*)::bigint from asset_categories) as total_categories,
-      (select count(*)::bigint from photo_events) as total_events,
-      (select count(*)::bigint from contributors) as total_contributors
-  `);
+    const totalsRows = await executeRows<ScalarRow>(db, sql`
+      select
+        (select count(*)::bigint from asset_categories) as total_categories,
+        (select count(*)::bigint from photo_events) as total_events,
+        (select count(*)::bigint from contributors) as total_contributors
+    `);
 
-  const stats = statsRows[0];
-  const totals = totalsRows[0];
+    const stats = statsRows[0];
+    const totals = totalsRows[0];
 
-  return {
-    totalAssets: Number(stats?.total_assets ?? 0),
-    approvedPublicAssets: Number(stats?.approved_public_assets ?? 0),
-    privateAssets: Number(stats?.private_assets ?? 0),
-    missingR2Count: Number(stats?.missing_r2_count ?? 0),
-    readyCardPreviewCount: Number(stats?.ready_card_preview_count ?? 0),
-    missingCardPreviewCount: Number(stats?.missing_card_preview_count ?? 0),
-    failedDerivativeCount: Number(stats?.failed_derivative_count ?? 0),
-    totalCategories: Number(totals?.total_categories ?? 0),
-    totalEvents: Number(totals?.total_events ?? 0),
-    totalContributors: Number(totals?.total_contributors ?? 0),
-    importedToday: Number(stats?.imported_today ?? 0),
-    importedMonth: Number(stats?.imported_month ?? 0),
-  };
+    logAdminCatalogTiming("getAdminAssetStats", startedAt, "ok");
+    return {
+      totalAssets: Number(stats?.total_assets ?? 0),
+      approvedPublicAssets: Number(stats?.approved_public_assets ?? 0),
+      privateAssets: Number(stats?.private_assets ?? 0),
+      missingR2Count: Number(stats?.missing_r2_count ?? 0),
+      readyCardPreviewCount: Number(stats?.ready_card_preview_count ?? 0),
+      missingCardPreviewCount: Number(stats?.missing_card_preview_count ?? 0),
+      failedDerivativeCount: Number(stats?.failed_derivative_count ?? 0),
+      totalCategories: Number(totals?.total_categories ?? 0),
+      totalEvents: Number(totals?.total_events ?? 0),
+      totalContributors: Number(totals?.total_contributors ?? 0),
+      importedToday: Number(stats?.imported_today ?? 0),
+      importedMonth: Number(stats?.imported_month ?? 0),
+    };
+  } catch (error) {
+    logAdminCatalogTiming("getAdminAssetStats", startedAt, "error", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 export async function getInternalAdminFilters(db: DrizzleClient) {
-  const [statuses, categories, events, contributors] = await Promise.all([
-    executeRows<{ status: string; asset_count: number | string }>(db, sql`
-      select a.status, count(*)::bigint as asset_count
-      from image_assets a
-      group by a.status
-      order by asset_count desc, a.status asc
-    `),
-    executeRows<FilterRow>(db, sql`
-      select c.id, c.name, count(*)::bigint as asset_count
-      from image_assets a
-      join asset_categories c on c.id = a.category_id
-      group by c.id, c.name
-      order by asset_count desc, c.name asc
-      limit 200
-    `),
-    executeRows<FilterRow>(db, sql`
-      select e.id, e.name, e.event_date, count(*)::bigint as asset_count
-      from image_assets a
-      join photo_events e on e.id = a.event_id
-      group by e.id, e.name, e.event_date
-      order by asset_count desc, e.event_date desc nulls last
-      limit 200
-    `),
-    executeRows<FilterRow>(db, sql`
-      select p.id, p.display_name as name, count(*)::bigint as asset_count
-      from image_assets a
-      join contributors p on p.id = a.contributor_id
-      group by p.id, p.display_name
-      order by asset_count desc, p.display_name asc
-      limit 200
-    `),
-  ]);
+  const startedAt = Date.now();
+  try {
+    const statuses = [
+      { status: "DRAFT", assetCount: 0 },
+      { status: "SUBMITTED", assetCount: 0 },
+      { status: "APPROVED", assetCount: 0 },
+      { status: "ACTIVE", assetCount: 0 },
+      { status: "ARCHIVED", assetCount: 0 },
+      { status: "DELETED", assetCount: 0 },
+      { status: "MISSING_ORIGINAL", assetCount: 0 },
+      { status: "UNKNOWN", assetCount: 0 },
+    ];
+    const [categories, events, contributors] = await Promise.all([
+      executeRows<FilterRow>(db, sql`
+        select id, name, 0::bigint as asset_count
+        from asset_categories
+        order by name asc, id asc
+        limit 500
+      `),
+      executeRows<FilterRow>(db, sql`
+        select id, name, event_date, 0::bigint as asset_count
+        from photo_events
+        where status <> 'DELETED'
+        order by event_date desc nulls last, updated_at desc, id desc
+        limit 50
+      `),
+      executeRows<FilterRow>(db, sql`
+        select id, display_name as name, 0::bigint as asset_count
+        from contributors
+        where status <> 'DELETED'
+        order by display_name asc, id asc
+        limit 500
+      `),
+    ]);
 
-  return {
-    statuses: statuses.map((row) => ({ status: row.status, assetCount: Number(row.asset_count) })),
-    categories: categories.map((row) => ({
-      id: row.id,
-      name: row.name ?? "Untitled category",
-      assetCount: Number(row.asset_count),
-    })),
-    events: events.map((row) => ({
-      id: row.id,
-      name: row.name,
-      eventDate: toIso(row.event_date),
-      assetCount: Number(row.asset_count),
-    })),
-    contributors: contributors.map((row) => ({
-      id: row.id,
-      displayName: row.name ?? "Unnamed contributor",
-      assetCount: Number(row.asset_count),
-    })),
-  };
+    logAdminCatalogTiming("getAdminAssetFilters", startedAt, "ok", {
+      categories: categories.length,
+      events: events.length,
+      contributors: contributors.length,
+    });
+    return {
+      statuses,
+      categories: categories.map((row) => ({
+        id: row.id,
+        name: row.name ?? "Untitled category",
+        assetCount: 0,
+      })),
+      events: events.map((row) => ({
+        id: row.id,
+        name: row.name,
+        eventDate: toIso(row.event_date),
+        assetCount: 0,
+      })),
+      contributors: contributors.map((row) => ({
+        id: row.id,
+        displayName: row.name ?? "Unnamed contributor",
+        assetCount: 0,
+      })),
+    };
+  } catch (error) {
+    logAdminCatalogTiming("getAdminAssetFilters", startedAt, "error", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 function parseAdminAssetQuery(params: URLSearchParams): AdminAssetQuery {
@@ -1104,6 +1134,21 @@ function decodeCursor(value: string): CursorPayload {
 function toIso(value: Date | string | null | undefined) {
   if (!value) return null;
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function logAdminCatalogTiming(operation: string, startedAt: number, status: "ok" | "error", detail: Record<string, unknown> = {}) {
+  const event = {
+    event: "internal_admin_catalog_call",
+    operation,
+    status,
+    durationMs: Date.now() - startedAt,
+    ...detail,
+  };
+  if (status === "error") {
+    console.error(JSON.stringify(event));
+    return;
+  }
+  console.info(JSON.stringify(event));
 }
 
 async function executeRows<T>(db: DrizzleClient, query: SQL): Promise<T[]> {

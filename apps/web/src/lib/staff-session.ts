@@ -1,5 +1,6 @@
 import "server-only"
 
+import { cache } from "react"
 import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { FOTOCORP_STAFF_SESSION_COOKIE, getStaffMe, StaffApiError, type StaffMeResponse } from "@/lib/api/staff-api"
@@ -19,7 +20,7 @@ export async function getStaffCookieHeader() {
     .join("; ")
 }
 
-export async function getOptionalStaffSession(): Promise<StaffMeResponse | null> {
+export const getOptionalStaffSession = cache(async (): Promise<StaffMeResponse | null> => {
   const cookieStore = await cookies()
   if (!cookieStore.get(FOTOCORP_STAFF_SESSION_COOKIE)?.value) return null
 
@@ -31,7 +32,7 @@ export async function getOptionalStaffSession(): Promise<StaffMeResponse | null>
       throw caught
     }
   })
-}
+})
 
 function buildStaffSignInRedirect(callbackPath?: string) {
   return buildSignInHref({

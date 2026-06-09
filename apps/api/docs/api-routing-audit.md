@@ -162,7 +162,7 @@ This makes route behavior hard to reason about and slows root-cause analysis whe
 | `GET` | `/api/v1/internal/admin/assets/:assetId/original` | `internalAdminAssetOriginalRoute` | `apps/api/src/routes/internalAdminCatalog.ts` | Explicit method guard in `index.ts`. |
 | `GET` | `/api/v1/internal/admin/assets/:assetId/preview` | `internalAdminAssetPreviewRoute` | `apps/api/src/routes/internalAdminCatalog.ts` | Explicit method guard in `index.ts`. |
 | `GET` | `/api/v1/internal/admin/catalog/stats` | `internalAdminStatsRoute` | `apps/api/src/routes/internalAdminCatalog.ts` | No explicit method guard in `index.ts`; handler enforces auth. |
-| `GET` | `/api/v1/internal/admin/filters` | `internalAdminFiltersRoute` | `apps/api/src/routes/internalAdminCatalog.ts` | No explicit method guard in `index.ts`; handler enforces auth. |
+| `GET` | `/api/v1/internal/admin/filters` | `internalAdminFiltersRoute` | `apps/api/src/routes/internalAdminCatalog.ts` | No explicit method guard in `index.ts`; handler enforces auth. Returns cheap taxonomy options for staff catalog filters without global `image_assets` count aggregation. |
 | `GET` | `/api/v1/internal/admin/users` | `internalAdminUsersRoute` | `apps/api/src/routes/internalAdminCatalog.ts` | Explicit method guard in `index.ts`. |
 | `PATCH` | `/api/v1/internal/admin/users/:authUserId/subscription` | `internalAdminUserSubscriptionRoute` | `apps/api/src/routes/internalAdminCatalog.ts` | Explicit method guard in `index.ts`. |
 | `GET` | `/api/v1/internal/admin/homepage-hero-pool` | `getHomepageHeroPoolService` | `apps/api/src/routes/internal/admin-homepage-hero-pool/route.ts` | Curated 25-image homepage hero pool from `public_homepage_hero_pool_items`. |

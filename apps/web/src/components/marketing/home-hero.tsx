@@ -27,7 +27,7 @@ export function HomeHero({ items }: HomeHeroProps) {
             size="lg"
             variant="sharp"
             navigate
-            placeholder="Search 1M+ licensed images…"
+            placeholder="AI search across 1M+ licensed images…"
             className="border border-border bg-background shadow-[0_2px_12px_rgba(26,37,64,0.08)] focus-within:shadow-[0_4px_20px_rgba(26,37,64,0.11)] transition-shadow"
           />
         </div>

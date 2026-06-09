@@ -80,6 +80,20 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
   }
 
   const previewAlt = asset?.whoIsInPicture || asset?.caption || "Preview"
+  const eventOptions = (() => {
+    if (!asset?.event?.id) return filters.events
+    const hasCurrentEvent = filters.events.some((eventOption) => eventOption.id === asset.event?.id)
+    if (hasCurrentEvent) return filters.events
+    return [
+      {
+        id: asset.event.id,
+        name: asset.event.name,
+        eventDate: asset.event.eventDate,
+        assetCount: 0,
+      },
+      ...filters.events,
+    ]
+  })()
 
   return (
     <>
@@ -96,7 +110,7 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
           />
         </div>
       )}
-      <div className="sticky top-0 h-screen w-full overflow-y-auto border-l border-border bg-card p-5">
+      <div className="max-h-[calc(100vh-3rem)] w-full overflow-y-auto border-l border-border bg-card p-5 lg:max-h-[calc(100vh-4rem)]">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold tracking-tight">Edit Asset</h3>
           <button onClick={onClose} className="rounded-full p-1.5 hover:bg-muted text-muted-foreground transition-colors">
@@ -186,7 +200,7 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     <option value="">None</option>
-                    {filters.events.map(e => <option key={e.id} value={e.id}>{e.name || "Untitled"}</option>)}
+                    {eventOptions.map(e => <option key={e.id} value={e.id}>{e.name || "Untitled"}</option>)}
                   </select>
                 </div>
               </div>

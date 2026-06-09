@@ -21,6 +21,14 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Staff dashboard TS strict-null build fix:** `dashboard-chart.tsx` now guards `updateReady()` against a nullable observed element before reading `getBoundingClientRect()`, resolving `npm --prefix apps/web run build` typecheck failure (`'element' is possibly 'null'`) without changing chart behavior.
+
+- **Staff catalog detail event select fallback:** Fixed Event dropdown showing `None` for assets whose linked event falls outside the top-200 admin filter list. `StaffCatalogDetailSidebar` now prepends the asset's current event into select options when missing, so existing event links render correctly while keeping the capped filter query size.
+
+- **Staff catalog asset identifier clarity:** Updated `StaffCatalogClient` asset-column identifier rendering to prefer canonical `fotokey` first, then fall back to `legacyImageCode` and short UUID. This prevents contributor-upload placeholders like `PHUPLOAD-*` from masking assigned Fotokey values in staff operations.
+
+- **Staff dashboard chart sizing:** Fixed Recharts `width(-1)/height(-1)` console warnings on `/staff/dashboard`. Root cause: `ResponsiveContainer` mounted before flex/grid parents had valid dimensions (dynamic import + `%` height). `dashboard-chart.tsx` now gates chart render behind a `ResizeObserver` dimension guard, uses explicit `height={250}` + `minWidth={0}`, and adds `min-w-0` on chart card/grid wrappers (`dashboard-stats.tsx`) and staff shell main (`staff-shell.tsx`). Loading skeleton matches final chart constraints.
+
 - **CAPTION_WRITER staff role:** Migration `0048_staff_role_caption_writer.sql`; `CAPTION_WRITER` accesses `/staff/contributor-uploads` (full workflow) and `/staff/captions`. Only `SUPER_ADMIN` + `CAPTION_WRITER` may access contributor uploads (`CATALOG_MANAGER` / `REVIEWER` removed). Contributor upload review writes `staff_audit_logs` (`CONTRIBUTOR_UPLOAD_*` actions). **Provisioning:** `SUPER_ADMIN` creates/manages caption writers at `/staff/staff-users` via `GET|POST|PATCH /api/v1/staff/members` (not bootstrap). **Workspace-only:** caption writers cannot browse public client routes (`/` marketing, contributor portal, etc.) — redirected to `/staff/contributor-uploads`. Tests: `apps/web/test/staff-route-access.test.ts`, `apps/web/test/auth-post-login.test.ts`.
 
 - **Staff media pipeline page removed:** Deleted `/staff/media-pipeline` staff page, sidebar nav item, route access rule, web BFF client (`getAdminMediaPipelineStatus`), and internal admin API `GET /api/v1/internal/admin/media-pipeline/status`. Operator CLI `media:pipeline-status` unchanged.
@@ -398,6 +406,7 @@ One-time P1–P9 scripts and phase reports were removed from the repo after Deve
 ## Session Notes
 
 - Context files live in `context/`.
+- Staff catalog GET performance pass: `/staff/catalog` SSR now blocks only on the visible asset list, defers filter options to the client, removes global stats from the initial page render, and makes internal staff/admin fetches timeout with timing logs. `GET /api/v1/internal/admin/filters` now returns cheap taxonomy options without `image_assets` count aggregation.
 - Root `AGENTS.md` tells Codex to read all six context files before implementation.
 - Use `apps/api/docs/api-routing-audit.md` as the active route inventory before API routing work.
 - Use `apps/api/docs/runtime-smoke-tests.md` for the repeatable route smoke checklist after routing changes.
