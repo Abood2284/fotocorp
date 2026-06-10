@@ -1,5 +1,5 @@
 import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { assets } from "./legacy";
+import { imageAssets } from "./image-assets";
 
 export const ASSET_ADMIN_AUDIT_ACTIONS = [
   "ASSET_METADATA_UPDATED",
@@ -10,7 +10,7 @@ export const assetAdminAuditLogs = pgTable("asset_admin_audit_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
   assetId: uuid("asset_id")
     .notNull()
-    .references(() => assets.id, { onDelete: "cascade" }),
+    .references(() => imageAssets.id, { onDelete: "cascade" }),
   action: text("action").notNull(),
   actorAuthUserId: text("actor_auth_user_id"),
   actorEmail: text("actor_email"),

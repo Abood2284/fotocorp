@@ -56,6 +56,14 @@ Dry run:
 pnpm --dir apps/api run media:generate-derivatives -- --dry-run --limit 10 --variants thumb,card,detail
 ```
 
+Original technical metadata scan (dry-run only; no DB writes):
+
+```bash
+pnpm --dir apps/api run media:scan-original-metadata -- --dry-run --limit 10
+```
+
+Reads `image_assets.original_storage_key` from the R2 originals bucket, extracts Sharp metadata, and logs the `image_assets_metadata` row that would be written.
+
 ## R2 safety
 
 Originals: `FC0101072.jpg` at bucket root. Derivatives:

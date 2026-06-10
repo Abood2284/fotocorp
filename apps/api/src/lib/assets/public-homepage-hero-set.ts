@@ -53,8 +53,9 @@ export async function getPublicHomepageHeroSet(
     return emptyHeroSetResponse()
   }
 
-  const items = rows.map((row) => mapPoolRowToItem(row, cdn))
-  const selected = shuffleArray(items).slice(0, PUBLIC_HOMEPAGE_HERO_DISPLAY_COUNT)
+  const selected = rows
+    .slice(0, PUBLIC_HOMEPAGE_HERO_DISPLAY_COUNT)
+    .map((row) => mapPoolRowToItem(row, cdn))
 
   return {
     setKey: "curated_pool",
@@ -125,17 +126,6 @@ function resolveTitle(row: {
     || row.fotokey?.trim()
     || "Fotocorp image"
   )
-}
-
-function shuffleArray<T>(items: T[]): T[] {
-  const copy = [...items]
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1))
-    const current = copy[index]!
-    copy[index] = copy[swapIndex]!
-    copy[swapIndex] = current
-  }
-  return copy
 }
 
 async function executeRows<T>(db: DrizzleClient, query: ReturnType<typeof sql>): Promise<T[]> {

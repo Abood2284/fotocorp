@@ -15,6 +15,22 @@ import {
 dotenv.config({ path: ".dev.vars" })
 
 const { Pool } = pg
+const RETIRED_LEGACY_COMMAND_OVERRIDE = "ALLOW_RETIRED_LEGACY_IMPORT"
+const RETIRED_LEGACY_COMMAND_VALUE = "I_UNDERSTAND_THIS_SCHEMA_IS_RETIRED"
+
+function assertRetiredLegacyCommandOverride() {
+  if (process.env[RETIRED_LEGACY_COMMAND_OVERRIDE] === RETIRED_LEGACY_COMMAND_VALUE) return
+
+  console.error(
+    [
+      "FAIL: legacy clean-schema sync is retired for the production schema.",
+      "The legacy mirror tables were removed after clean-schema cutover.",
+      `To run this archive-only script against a restored pre-retirement branch, set ${RETIRED_LEGACY_COMMAND_OVERRIDE}=${RETIRED_LEGACY_COMMAND_VALUE}.`,
+      "See docs/db-revamp/legacy-table-retirement-runbook.md.",
+    ].join("\n"),
+  )
+  process.exit(1)
+}
 
 function parseArgs(argv: string[]) {
   let batchId: string | undefined
@@ -448,6 +464,7 @@ WHERE NOT (
 `
 
 async function main() {
+  assertRetiredLegacyCommandOverride()
   const { batchId } = parseArgs(process.argv.slice(2))
   if (batchId) {
     console.log("batch-specific sync deferred because old tables do not carry enough batch ownership metadata")

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import {
   getStaffAccessInquiryDetail,
+  patchStaffAccessInquiryNotes,
   patchStaffSubscriberEntitlement,
   postStaffAccessInquiryActivateAllEntitlements,
   postStaffAccessInquiryEntitlementDraft,
@@ -19,14 +20,15 @@ import { AccessInquiryGuidancePanel } from "@/components/staff/access-inquiry-gu
 import { InquiryStatusBadge } from "@/components/staff/inquiry-status-badge"
 import { getCustomerAccessDetailGuidance } from "@/lib/staff/access-inquiry-guidance"
 import {
+  buildAccessInquiryDetailGroups,
+  type AccessInquiryDetailField,
   formatAssetInterestType,
   formatEntitlementStatus,
   formatImageQualityPreference,
-  formatImageQuantityRange,
-  formatInquiryStatus,
   formatSubscriberAccessLine,
   summarizeEntitlementsForHeader,
 } from "@/lib/staff/access-inquiry-labels"
+import { cn } from "@/lib/utils"
 
 interface StaffAccessInquiryDetailProps {
   inquiryId: string
@@ -40,6 +42,8 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const [adjustEntitlementId, setAdjustEntitlementId] = useState<string | null>(null)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesDraft, setNotesDraft] = useState("")
   const [pendingConfirm, setPendingConfirm] = useState<{
     title: string
     description?: string
@@ -313,12 +317,64 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
   const inquiry = detail.inquiry as {
     id?: string
     status?: string
+    userId?: string | null
+    createdAt?: string | null
+    updatedAt?: string | null
+    staffNotes?: string | null
     interestedAssetTypes?: string[]
     imageQuantityRange?: string | null
     imageQualityPreference?: string | null
     royaltyFreeQuantityRange?: string | null
     royaltyFreeQualityPreference?: string | null
   }
+
+  const inquiryDetailGroups = buildAccessInquiryDetailGroups({
+    inquiry,
+    profile: {
+      companyType: detail.companyType,
+      jobTitle: detail.jobTitle,
+      customJobTitle: detail.customJobTitle,
+      companyEmail: detail.companyEmail,
+      email: detail.email,
+      companyEmailDomain: detail.companyEmailDomain,
+      phoneCountryCode: detail.phoneCountryCode,
+      phoneNumber: detail.phoneNumber,
+      emailValidationDecision: detail.emailValidationDecision,
+      username: detail.username,
+    },
+  })
+
+  const staffNotes = String(inquiry.staffNotes ?? "").trim()
+
+  function startEditingNotes() {
+    setNotesDraft(staffNotes)
+    setEditingNotes(true)
+  }
+
+  async function handleSaveNotes() {
+    setNotice("")
+    setError("")
+    setSaving(true)
+    try {
+      const trimmed = notesDraft.trim()
+      await patchStaffAccessInquiryNotes(inquiryId, { staffNotes: trimmed || null })
+      setEditingNotes(false)
+      setNotice("Staff notes saved.")
+      await refetchDetail()
+    } catch (caught) {
+      if (caught instanceof StaffApiError) setError(caught.message)
+      else setError("Could not save staff notes.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const userLookupHref =
+    detail.companyEmail?.trim()
+      ? `/staff/users?q=${encodeURIComponent(detail.companyEmail.trim())}`
+      : inquiry.userId
+        ? `/staff/users?q=${encodeURIComponent(inquiry.userId)}`
+        : null
 
   const guidance = getCustomerAccessDetailGuidance({
     inquiryStatus: String(inquiry.status ?? "PENDING"),
@@ -389,41 +445,85 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
       </section>
 
       <section className="rounded-lg border border-border bg-card p-4">
-        <h3 className="text-sm font-semibold text-foreground">Inquiry details</h3>
-        <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-muted-foreground">Workflow status</dt>
-            <dd>{formatInquiryStatus(inquiry.status)}</dd>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-foreground">Inquiry details</h3>
+          {userLookupHref ? (
+            <Link href={userLookupHref} className="text-xs text-muted-foreground hover:text-foreground">
+              View user account →
+            </Link>
+          ) : null}
+        </div>
+        {inquiryDetailGroups.length > 0 ? (
+          <div className="mt-3 space-y-5">
+            {inquiryDetailGroups.map((group) => (
+              <div key={group.id}>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
+                <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                  {group.fields.map((field) => (
+                    <div key={`${group.id}-${field.label}`}>
+                      <dt className="text-muted-foreground">{field.label}</dt>
+                      <dd className="wrap-break-word">
+                        <InquiryDetailFieldValue field={field} />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ))}
           </div>
-          <div>
-            <dt className="text-muted-foreground">Job title</dt>
-            <dd>{detail.jobTitle}</dd>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">No additional inquiry details on file.</p>
+        )}
+
+        <div className="mt-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Staff notes</p>
+            {!editingNotes ? (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:text-foreground"
+                disabled={saving}
+                onClick={startEditingNotes}
+              >
+                {staffNotes ? "Edit" : "Add note"}
+              </button>
+            ) : null}
           </div>
-          <div>
-            <dt className="text-muted-foreground">Company type</dt>
-            <dd>{detail.companyType}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Asset interests</dt>
-            <dd>{(inquiry.interestedAssetTypes ?? []).map((t) => formatAssetInterestType(t)).join(", ") || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Editorial quantity</dt>
-            <dd>{formatImageQuantityRange(inquiry.imageQuantityRange)}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Editorial quality</dt>
-            <dd>{formatImageQualityPreference(inquiry.imageQualityPreference)}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Royalty Free quantity</dt>
-            <dd>{formatImageQuantityRange(inquiry.royaltyFreeQuantityRange)}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Royalty Free quality</dt>
-            <dd>{formatImageQualityPreference(inquiry.royaltyFreeQualityPreference)}</dd>
-          </div>
-        </dl>
+
+          {editingNotes ? (
+            <div className="mt-2 space-y-2">
+              <textarea
+                value={notesDraft}
+                onChange={(event) => setNotesDraft(event.target.value)}
+                rows={3}
+                maxLength={2000}
+                placeholder="Internal notes for staff review…"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" disabled={saving} onClick={() => void handleSaveNotes()}>
+                  Save notes
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => {
+                    setEditingNotes(false)
+                    setNotesDraft(staffNotes)
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : staffNotes ? (
+            <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{staffNotes}</p>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">No notes yet.</p>
+          )}
+        </div>
       </section>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
@@ -538,16 +638,40 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
 
                   {status === "ACTIVE" && !isAdjusting ? (
                     <div className="mt-4 space-y-3">
-                      <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                      {limitNum !== null ? (
                         <div>
-                          <dt className="text-muted-foreground">Allowed downloads</dt>
-                          <dd className="font-medium">{limitNum ?? "—"}</dd>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">
+                              {used} used of {limitNum}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+                                {formatImageQualityPreference(quality)} cap
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {Math.min(100, Math.round((used / limitNum) * 100))}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="mt-1 h-1.5 rounded-full bg-muted">
+                            <div
+                              className="h-1.5 rounded-full bg-primary"
+                              style={{ width: `${Math.min(100, Math.round((used / limitNum) * 100))}%` }}
+                            />
+                          </div>
                         </div>
-                        <div>
-                          <dt className="text-muted-foreground">Quality cap</dt>
-                          <dd className="font-medium">{formatImageQualityPreference(quality)}</dd>
-                        </div>
-                      </dl>
+                      ) : (
+                        <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                          <div>
+                            <dt className="text-muted-foreground">Allowed downloads</dt>
+                            <dd className="font-medium">—</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">Quality cap</dt>
+                            <dd className="font-medium">{formatImageQualityPreference(quality)}</dd>
+                          </div>
+                        </dl>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         <Button type="button" variant="secondary" size="sm" disabled={saving} onClick={() => setAdjustEntitlementId(id)}>
                           Adjust entitlement
@@ -624,5 +748,53 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
         )}
       </section>
     </div>
+  )
+}
+
+function InquiryDetailFieldValue({ field }: { field: AccessInquiryDetailField }) {
+  if (field.kind === "assetChips" && field.chipValues?.length) {
+    return (
+      <div className="mt-0.5 flex flex-wrap gap-1.5">
+        {field.chipValues.map((chip) => (
+          <span
+            key={chip}
+            className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground"
+          >
+            {chip}
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  if (field.kind === "emailValidation") {
+    const decision = field.value.trim().toUpperCase()
+    const tone =
+      decision === "ALLOW"
+        ? "text-green-700 dark:text-green-400"
+        : decision === "DENY"
+          ? "text-destructive"
+          : "text-amber-700 dark:text-amber-400"
+
+    return (
+      <span className={cn("inline-flex items-center gap-1.5 font-medium", tone)}>
+        <span aria-hidden="true">●</span>
+        {field.value}
+      </span>
+    )
+  }
+
+  if (field.href) {
+    return (
+      <Link href={field.href} className="text-foreground hover:text-muted-foreground">
+        {field.value}
+      </Link>
+    )
+  }
+
+  return (
+    <span title={field.kind === "datetime" ? field.title : undefined} className="cursor-default">
+      {field.value}
+    </span>
   )
 }

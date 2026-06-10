@@ -534,6 +534,21 @@ export async function approveAdminContributorUploadsService(
           continue;
         }
 
+        // Backfill event category from asset when the event's category is null.
+        // This prevents events from being invisible on the homepage category browse,
+        // which joins through photo_events.category_id.
+        await tx.execute(sql`
+          update photo_events
+          set
+            category_id = coalesce(
+              photo_events.category_id,
+              (select ia.category_id from image_assets ia where ia.id = ${item.imageAssetId}::uuid limit 1)
+            ),
+            updated_at = now()
+          where id = (select ia.event_id from image_assets ia where ia.id = ${item.imageAssetId}::uuid limit 1)
+            and photo_events.category_id is null
+        `);
+
         await tx.execute(sql`
           insert into image_publish_job_items (
             job_id,

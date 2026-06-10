@@ -3,6 +3,7 @@ import Link from "next/link"
 
 import { PlaceholderPage } from "@/components/layout/placeholder-page"
 import { getPublicCatalogTaxonomy } from "@/lib/api/fotocorp-api"
+import { filterVisibleCatalogCategories } from "@/lib/catalog/visible-categories"
 
 export const metadata = {
   title: "Categories — Fotocorp",
@@ -10,7 +11,7 @@ export const metadata = {
 
 export default async function CategoriesPage() {
   const categories = await getPublicCatalogTaxonomy()
-    .then((result) => result.categories)
+    .then((result) => filterVisibleCatalogCategories(result.categories))
     .catch(() => [])
 
   if (categories.length === 0) {

@@ -27,6 +27,7 @@ import {
   patchSubscriberEntitlement,
   suspendSubscriberEntitlement,
   closeAccessInquiry,
+  updateInquiryNotes,
 } from "./service";
 
 const ACCESS_INQUIRY_ROLES = new Set(["SUPER_ADMIN", "SUPPORT", "FINANCE"]);
@@ -153,7 +154,14 @@ staffAccessInquiryRoutes.get("/api/v1/staff/access-inquiries/:inquiryId", zValid
     firstName: isContributor ? inquiry.applicantFirstName : detail.firstName,
     lastName: isContributor ? inquiry.applicantLastName : detail.lastName,
     jobTitle: isContributor ? null : detail.jobTitle,
+    customJobTitle: isContributor ? null : detail.customJobTitle,
     companyType: isContributor ? null : detail.companyType,
+    email: isContributor ? null : detail.email,
+    username: isContributor ? null : detail.username,
+    phoneCountryCode: isContributor ? null : detail.phoneCountryCode,
+    phoneNumber: isContributor ? null : detail.phoneNumber,
+    companyEmailDomain: isContributor ? null : detail.companyEmailDomain,
+    emailValidationDecision: isContributor ? null : detail.emailValidationDecision,
     subscriberAccess: detail.subscriberAccess,
     contributorProfile: detail.contributorProfile,
     pendingClaims: detail.pendingClaims,
@@ -187,6 +195,26 @@ staffAccessInquiryRoutes.post(
       username: result.username,
       temporaryPassword: result.temporaryPassword,
       inquiryId: result.inquiryId,
+    });
+  },
+);
+
+staffAccessInquiryRoutes.patch(
+  "/api/v1/staff/access-inquiries/:inquiryId/notes",
+  zValidator("param", inquiryIdParam),
+  zValidator("json", closeInquiryBody),
+  async (c) => {
+    const { db } = await requireAccessInquiryStaff(c);
+    const { inquiryId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const inquiry = await updateInquiryNotes(db, inquiryId, { staffNotes: body.staffNotes ?? null });
+    return json({
+      ok: true as const,
+      inquiry: {
+        ...inquiry,
+        createdAt: inquiry.createdAt?.toISOString?.() ?? inquiry.createdAt,
+        updatedAt: inquiry.updatedAt?.toISOString?.() ?? inquiry.updatedAt,
+      },
     });
   },
 );

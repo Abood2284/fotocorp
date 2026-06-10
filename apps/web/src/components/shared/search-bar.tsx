@@ -199,7 +199,7 @@ export function SearchBar({
             }}
             className={cn(
               "absolute top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground",
-              isCompact ? "right-10" : "right-12",
+              isLarge ? "right-5" : isCompact ? "right-3.5" : "right-4",
             )}
             aria-label="Clear search"
           >
@@ -207,17 +207,6 @@ export function SearchBar({
           </button>
         )}
       </div>
-      
-      <button
-        type="submit"
-        className={cn(
-          "flex h-full shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground",
-          isCompact ? "pl-2 pr-3.5" : "pl-2 pr-5",
-        )}
-        aria-label="Submit search"
-      >
-        <Search className={isCompact ?"h-[1.125rem] w-[1.125rem]" :""} strokeWidth={2} size={20} />
-      </button>
     </form>
   )
 }

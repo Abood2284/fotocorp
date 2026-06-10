@@ -19,9 +19,9 @@ import { SHARED_AUTH_SESSION_QUERY_KEY, useSharedAuthSession } from "@/lib/use-s
 import { cn } from "@/lib/utils"
 import { ChevronDown, LogOut, Menu, X } from "lucide-react"
 
-/** Editorial masthead: seamless white canvas, no shadow (design.md). */
+/** Editorial masthead: white canvas with a subtle hairline and soft backdrop. */
 const HEADER_SHELL_CLASS =
-  "sticky top-0 z-50 w-full bg-background text-foreground"
+  "sticky top-0 z-50 w-full border-b border-border/70 bg-background/95 text-foreground backdrop-blur-sm"
 
 /** Apercu-role label = Monument Grotesk, uppercase, structural. */
 const NAV_LABEL_CLASS = "font-sans text-[11px] font-semibold uppercase tracking-[0.1em]"
@@ -527,7 +527,7 @@ function AccountMenu({
   }
 
   if (isPending) {
-    return <div className="h-10 w-32 bg-muted" aria-hidden />
+    return <div className={cn(PRIMARY_BTN_CLASS, "h-10 w-28 animate-pulse opacity-35")} aria-hidden />
   }
 
   if (!session?.kind) {

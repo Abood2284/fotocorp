@@ -1,5 +1,4 @@
-import { index, integer, pgTable, timestamp, unique, uuid, text, foreignKey } from "drizzle-orm/pg-core";
-import { assets } from "./legacy";
+import { index, integer, pgTable, timestamp, uuid, text } from "drizzle-orm/pg-core";
 
 export const fotoboxBoards = pgTable(
   "fotobox_boards",
@@ -16,22 +15,3 @@ export const fotoboxBoards = pgTable(
   ],
 );
 
-export const assetFotoboxItems = pgTable(
-  "asset_fotobox_items",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    userId: uuid("user_id").notNull(),
-    boardId: uuid("board_id").notNull(),
-    assetId: uuid("asset_id")
-      .notNull()
-      .references(() => assets.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    unique("asset_fotobox_items_board_asset_unique").on(table.boardId, table.assetId),
-    index("asset_fotobox_items_board_id_created_at_idx").on(table.boardId, table.createdAt),
-    index("asset_fotobox_items_user_id_idx").on(table.userId),
-    index("asset_fotobox_items_asset_id_idx").on(table.assetId),
-  ],
-);

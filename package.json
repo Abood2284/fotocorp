@@ -10,9 +10,7 @@
     "db:generate": "pnpm --dir apps/api db:generate",
     "db:migrate": "pnpm --dir apps/api db:migrate",
     "db:studio": "pnpm --dir apps/api db:studio",
-    "media:generate-derivatives": "pnpm --dir apps/api media:generate-derivatives",
-    "legacy:import": "pnpm --dir apps/api legacy:import",
-    "legacy:import:chunks": "pnpm --dir apps/api legacy:import:chunks"
+    "media:generate-derivatives": "pnpm --dir apps/api media:generate-derivatives"
   },
   "devDependencies": {
     "@types/node": "^20.19.39",

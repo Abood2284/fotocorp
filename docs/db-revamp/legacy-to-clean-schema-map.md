@@ -1,36 +1,37 @@
 # Legacy to Clean Schema Map
 
-Maps legacy catalog tables used by import scripts to the **clean** tables used by current runtime and admin.
+Maps retired legacy catalog/import tables to the canonical tables used by current runtime and admin.
 
 **Related docs**
 
-- Import mechanics and sync: [Import / clean sync runbook](./import-sync-runbook.md)
+- Historical import mechanics and sync: [Import / clean sync runbook](./import-sync-runbook.md)
 - Missing event links / `event_id` backfill: [Legacy event linking repair runbook](./legacy-event-linking-repair-runbook.md)
-- Legacy table drop plan (later): [schema legacy duplication audit — §8 phased deprecation](./reports/schema-legacy-duplication-audit-report.md#8-phased-deprecation-plan)
+- Legacy table retirement: [Legacy table retirement runbook](./legacy-table-retirement-runbook.md)
 - PR history: [reports/](./reports/)
 
 ## Lifecycle
 
 ```txt
-legacy CSV → legacy:import (writes old tables) → legacy:sync-clean-schema → clean runtime tables
+retired legacy CSV/import mirrors → canonical runtime tables already cut over
 ```
 
-Runtime, public catalog, staff admin, Typesense indexer, and contributor flows read **clean** tables only. Legacy tables remain for import compatibility until explicitly retired (see deprecation plan above — **do not drop yet**).
+Runtime, public catalog, staff admin, Typesense indexer, and contributor flows read canonical tables only. The legacy mirror tables (`assets`, `asset_events`, `asset_media_derivatives`, legacy log tables, and stale import issue data) have been retired from the production command path.
 
 ## Legacy tables
 
 | Legacy table | Clean table | Status | Notes |
 | --- | --- | --- | --- |
-| `photographer_profiles` | `contributors` | Import + sync | Clean rows keyed by `legacy_photographer_id`; legacy table retained for import compatibility. |
-| `asset_events` | `photo_events` | Import + sync | UUIDs preserved from legacy `asset_events.id`. |
-| `assets` | `image_assets` | Import + sync | UUIDs preserved from legacy `assets.id`; runtime catalog uses clean table. |
-| `asset_media_derivatives` | `image_derivatives` | Import + sync | UUIDs preserved; variants normalized to `THUMB` / `CARD` / `DETAIL`. |
-| (legacy access logs) | `image_access_logs` | Migrated | Runtime writes target clean table. |
-| (legacy download logs) | `image_download_logs` | Migrated | Runtime writes target clean table; see [download completion report](./reports/download-completion-logging-report.md). |
+| `photographer_profiles` | `contributors` | Historical import reference | Clean rows keyed by `legacy_photographer_id`; not part of this retirement. |
+| `asset_events` | `photo_events` | Retired mirror | UUIDs/legacy ids were preserved in `photo_events`. |
+| `assets` | `image_assets` | Retired mirror | UUIDs were preserved in `image_assets`; runtime catalog uses clean table. |
+| — | `image_assets_metadata` | New (schema only) | One-to-one original **technical** metadata per `image_assets.id` (pixels, DPI, format, file size, orientation, quality buckets). Not catalog/search metadata; populated later by Sharp scanner; drives future Medium/Low download generation. |
+| `asset_media_derivatives` | `image_derivatives` | Retired mirror | Runtime previews use canonical `image_derivatives`. |
+| `asset_media_access_logs` | `image_access_logs` | Retired legacy logs | Runtime writes target clean table. |
+| `asset_download_logs` | `image_download_logs` | Retired legacy logs | Runtime writes target clean table; see [download completion report](./reports/download-completion-logging-report.md). |
 
 ## Legacy export → column mapping (assets / image_assets)
 
-These mappings come from `apps/api/scripts/legacy/import-legacy-fotocorp.ts` and `legacy:sync-clean-schema`. **Do not swap** `title` and `eventhead` — a common source of admin/public confusion.
+These mappings come from archived legacy import/sync behavior. **Do not swap** `title` and `eventhead` — a common source of admin/public confusion.
 
 | Legacy export column | Legacy `assets` column | Clean `image_assets` column | Product meaning |
 | --- | --- | --- | --- |
@@ -60,7 +61,7 @@ These mappings come from `apps/api/scripts/legacy/import-legacy-fotocorp.ts` and
 | Legacy image / Fotokey code | `image_assets.legacy_image_code`; public API `fotokey` when assigned | Business identifier; not the same as internal UUID. |
 | `asset_media_derivatives.storage_key` | `image_derivatives.storage_key` | Provider-neutral key string on clean rows. |
 
-## Sync behavior (`legacy:sync-clean-schema`)
+## Historical sync behavior (`legacy:sync-clean-schema`)
 
 | Step | What it does |
 | --- | --- |
@@ -69,7 +70,9 @@ These mappings come from `apps/api/scripts/legacy/import-legacy-fotocorp.ts` and
 | Image assets upsert | `assets` → `image_assets` (same UUID; copies `title` → `who_is_in_picture`, `headline`, `event_id`, etc.) |
 | Image derivatives upsert | `asset_media_derivatives` → `image_derivatives` |
 
-**Event linking gap:** Import resolves `assets.event_id` only when the target row already exists in `asset_events`. A partial events import (e.g. connection drop after ~50k rows) leaves ~66k assets with `legacy_event_id` set but `event_id` NULL. Fix: re-import missing `eventtb` rows, `UPDATE assets SET event_id … FROM asset_events`, then re-run sync. Details: [event linking repair runbook](./legacy-event-linking-repair-runbook.md).
+This behavior is archive-only after legacy table retirement. Do not re-enable or run the old import/sync commands against production without a new schema/import design.
+
+**Historical event linking gap:** Import resolved `assets.event_id` only when the target row already existed in `asset_events`. A partial events import (e.g. connection drop after ~50k rows) left assets with `legacy_event_id` set but `event_id` NULL. Details remain in [event linking repair runbook](./legacy-event-linking-repair-runbook.md) for audit context.
 
 **Post-sync search:** Bulk `event_id` changes require Typesense reindex (`pnpm --dir apps/api typesense:index-public-assets`). No VPS redeploy — only document upserts.
 
@@ -84,11 +87,7 @@ These mappings come from `apps/api/scripts/legacy/import-legacy-fotocorp.ts` and
   - `contributor_id`
   - `event_id`
 
-## When legacy tables can be dropped
+## Legacy table retirement status
 
-Not until all of the following (see [schema audit §8](./reports/schema-legacy-duplication-audit-report.md#8-phased-deprecation-plan)):
+Legacy mirror table retirement is covered by [Legacy table retirement runbook](./legacy-table-retirement-runbook.md). Before applying on any production branch, operators must complete backup/export, Neon PITR confirmation, production-branch clone testing, validation queries, app smoke checks, and rollback planning.
 
-- Legacy import pipeline retired or run-only on demand with a restore path
-- Production event linking repair applied (if the 2026-04-28 partial import occurred there)
-- `db:validate:*` gates pass on the target branch
-- FKs repointed off legacy tables (e.g. fotobox items still reference `assets.id` today)

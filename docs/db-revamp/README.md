@@ -1,6 +1,6 @@
 # Fotocorp DB Revamp Documentation
 
-Entry point for the database revamp: clean catalog tables, photographer flows, import/sync, and related validation.
+Entry point for the database revamp: canonical catalog tables, photographer flows, retired legacy import mirrors, and related validation.
 
 ## Current clean-schema status
 
@@ -10,7 +10,9 @@ Entry point for the database revamp: clean catalog tables, photographer flows, i
 | Photo events | Clean `photo_events`; portal CRUD writes here with provenance columns. |
 | Image assets | Clean `image_assets`; public catalog and admin catalog use clean reads/writes. |
 | Image derivatives | Clean `image_derivatives`; uppercase variants (`THUMB`, `CARD`, `DETAIL`). |
-| Access / download logs | Runtime writes target `image_access_logs` and `image_download_logs`. Legacy log tables are not the write target. |
+| Original technical metadata | `image_assets_metadata` (one row per `image_assets.id`); stores Sharp-scanned original file technical metadata — pixels, DPI, format, file size, orientation, computed quality fields — separate from catalog/search metadata on `image_assets`. Populated later by a metadata scanner; drives future dynamic Medium/Low download generation. Pixel dimensions are the primary quality basis; DPI is stored as supporting metadata. |
+| Access / download logs | Runtime writes target `image_access_logs` and `image_download_logs`. |
+| Legacy import mirrors | Retired from the production schema; old import/sync package commands are no longer supported. |
 | Photographer accounts / sessions | `photographer_accounts` + `photographer_sessions`; portal auth isolated from Better Auth. |
 | Photographer uploads | `photographer_upload_batches` / `photographer_upload_items`; staging R2; `image_assets` rows `SUBMITTED` + `PRIVATE` + `FOTOCORP` until approval pipeline advances them. |
 | Admin review queue | Internal admin photographer-upload routes list/review/approve; approval allocates Fotokey and queues publish jobs. |
@@ -24,7 +26,8 @@ Entry point for the database revamp: clean catalog tables, photographer flows, i
 | [README](./README.md) (this file) | Orientation, invariants, doc rules | First stop for DB revamp context |
 | [Legacy → clean schema map](./legacy-to-clean-schema-map.md) | Old vs new table/field mapping | Import debugging, migrations, data reasoning |
 | [Validation runbook](./validation-runbook.md) | `pnpm --dir apps/api db:validate:*` commands | After migrations, import, sync, upload, or publish changes |
-| [Import / clean sync runbook](./import-sync-runbook.md) | Legacy import + `legacy:sync-clean-schema` | After CSV/chunk imports or when clean tables drift |
+| [Import / clean sync runbook](./import-sync-runbook.md) | Historical legacy import + sync behavior | Archive reference only after legacy table retirement |
+| [Legacy table retirement runbook](./legacy-table-retirement-runbook.md) | Backup/export, clone validation, migration, rollback | Before applying or auditing legacy table retirement |
 | [Legacy event linking repair runbook](./legacy-event-linking-repair-runbook.md) | Re-import failed `eventtb` rows, backfill `event_id`, sync, reindex | Missing events on public/admin catalog; post–2020 grouping broken |
 | [Photographer auth runbook](./photographer-auth-runbook.md) | Accounts, sessions, portal auth boundary | Auth/session work, credential CSV handling |
 | [Staff auth runbook](./staff-auth-runbook.md) | Staff accounts/sessions, internal dashboard cookie, bootstrap | Internal `/admin` access, staff login/logout |
@@ -65,10 +68,10 @@ Detailed PR write-ups live under [`reports/`](./reports/). They are kept for aud
 
 ## Current lifecycle summary
 
-**Legacy import**
+**Legacy import mirrors (retired)**
 
 ```txt
-legacy tables (import scripts) → legacy:sync-clean-schema → clean runtime tables
+retired legacy mirror tables → canonical runtime tables already cut over
 ```
 
 **Photographer upload**
@@ -99,6 +102,7 @@ derivatives generated (THUMB, CARD, DETAIL) → image becomes ACTIVE + PUBLIC
 - **Categories (PR-16I):** `photo_events.category_id` = event default; `image_assets.category_id` = canonical asset category. Staff approve + publish completion may copy event → asset when `image_assets.category_id` is null. Public catalog uses asset category first, else event category, for list/detail/filters/collections.
 - Hard delete is blocked once `image_assets.fotokey` is non-null (`ASSET_HAS_FOTOKEY`).
 - Runtime reads/writes should use **clean** tables, not legacy fixture tables, for production paths.
+- `image_assets`, `photo_events`, and `image_derivatives` are canonical. Re-running old legacy import/sync commands against production is not supported after legacy table retirement.
 
 ## Documentation rule for future PRs
 

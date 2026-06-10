@@ -79,7 +79,14 @@ export async function getAccessInquiryDetail(db: DrizzleClient, inquiryId: strin
       firstName: users.firstName,
       lastName: users.lastName,
       jobTitle: users.jobTitle,
+      customJobTitle: users.customJobTitle,
       companyType: users.companyType,
+      email: users.email,
+      username: users.username,
+      phoneCountryCode: users.phoneCountryCode,
+      phoneNumber: users.phoneNumber,
+      companyEmailDomain: users.companyEmailDomain,
+      emailValidationDecision: users.emailValidationDecision,
       subscriberIsSubscriber: users.isSubscriber,
       subscriberSubscriptionStatus: users.subscriptionStatus,
       contributorDisplayName: contributors.displayName,
@@ -124,7 +131,14 @@ export async function getAccessInquiryDetail(db: DrizzleClient, inquiryId: strin
     firstName: row.firstName,
     lastName: row.lastName,
     jobTitle: row.jobTitle,
+    customJobTitle: row.customJobTitle,
     companyType: row.companyType,
+    email: row.email,
+    username: row.username,
+    phoneCountryCode: row.phoneCountryCode,
+    phoneNumber: row.phoneNumber,
+    companyEmailDomain: row.companyEmailDomain,
+    emailValidationDecision: row.emailValidationDecision,
     subscriberAccess: {
       isSubscriber: Boolean(row.subscriberIsSubscriber),
       subscriptionStatus: row.subscriberSubscriptionStatus ?? "NONE",
@@ -572,6 +586,36 @@ export async function closeAccessInquiry(
     .update(customerAccessInquiries)
     .set({
       status: "CLOSED",
+      staffNotes: input.staffNotes?.trim() ? input.staffNotes.trim() : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(customerAccessInquiries.id, inquiryId))
+
+  const updated = await db
+    .select()
+    .from(customerAccessInquiries)
+    .where(eq(customerAccessInquiries.id, inquiryId))
+    .limit(1)
+  return updated[0] ?? null
+}
+
+/** Update staff notes on an inquiry without changing status. */
+export async function updateInquiryNotes(
+  db: DrizzleClient,
+  inquiryId: string,
+  input: { staffNotes?: string | null } = {},
+) {
+  const rows = await db
+    .select({ id: customerAccessInquiries.id })
+    .from(customerAccessInquiries)
+    .where(eq(customerAccessInquiries.id, inquiryId))
+    .limit(1)
+  const row = rows[0]
+  if (!row) throw new AppError(404, "INQUIRY_NOT_FOUND", "Access inquiry was not found.")
+
+  await db
+    .update(customerAccessInquiries)
+    .set({
       staffNotes: input.staffNotes?.trim() ? input.staffNotes.trim() : null,
       updatedAt: new Date(),
     })

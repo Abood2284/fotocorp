@@ -60,6 +60,12 @@
   --radius-sm: 0px;
   --radius-lg: 0px;
   --radius-xl: 0px;
+
+  /* Auth glass (sign-in page only) — intentional deviation from the
+     square B&W system. Teal matches the logo mark (#19A8B9 family). */
+  --auth-teal: #00a8b5;
+  --auth-teal-deep: #001014;
+  --auth-glass-border: rgba(255, 255, 255, 0.28);
 }
 
 .contributor-dark-theme {
@@ -487,4 +493,13 @@ a.button-outline-square {
 }
 .link-inline-blue:hover {
   color: #046699;
+}
+
+@keyframes staff-nav-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
 }

@@ -23,6 +23,7 @@ import { isValidUsername, normalizeUsername } from "@/lib/username"
 import { migrateAnonBoardsToServer } from "@/lib/storage/fotobox-anon-store"
 
 type AuthTab = "sign-in" | "register"
+type RegisterView = "choice" | "client-form"
 type RegisterStep = 1 | 2 | 3
 type FormErrors = Record<string, string>
 
@@ -210,6 +211,7 @@ export function SplitAuthPage() {
     const tab = searchParams.get("tab")
     return tab === "register" ? "register" : "sign-in"
   })
+  const [registerView, setRegisterView] = useState<RegisterView>("choice")
   const [errors, setErrors] = useState<FormErrors>({})
   const [jobTitle, setJobTitle] = useState("")
   const [interest, setInterest] = useState({
@@ -242,7 +244,15 @@ export function SplitAuthPage() {
     setErrors({})
     setNotice("")
     setRegisterStep(1)
+    setRegisterView("choice")
     if (tab === "sign-in") setInterest({ EDITORIAL: false, ROYALTY_FREE: false, VIDEO: false, CARICATURE: false })
+  }
+
+  function backToRegisterChoice() {
+    setRegisterView("choice")
+    setRegisterStep(1)
+    setErrors({})
+    setNotice("")
   }
 
   function clearFieldError(fieldName: string) {
@@ -544,100 +554,139 @@ export function SplitAuthPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-foreground lg:grid lg:h-screen lg:grid-cols-[minmax(0,1.3fr)_minmax(420px,0.7fr)] lg:overflow-hidden xl:grid-cols-[minmax(0,1.45fr)_minmax(460px,0.65fr)]">
-      {/* Left panel — visual showcase */}
-      <section className="relative hidden min-h-screen overflow-hidden bg-primary lg:block lg:h-screen">
+    <main className="relative min-h-screen text-white">
+      {/* Background — full-viewport image, calmed + darkened */}
+      <div aria-hidden="true" className="fixed inset-0 overflow-hidden bg-black">
         <Image
           src="/images/auth_stock.jpg"
           alt=""
           fill
           priority
-          sizes="(min-width: 1280px) 69vw, (min-width: 1024px) 65vw, 100vw"
-          className="object-cover"
+          sizes="100vw"
+          className="scale-[1.02] object-cover filter-[brightness(0.45)_contrast(0.95)_saturate(0.85)_blur(1px)]"
         />
-        {/* Bottom-only gradient — lets the mosaic breathe */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-80 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
-        {/* Tagline anchored to bottom-left */}
-        <div className="absolute bottom-10 left-9 right-9 z-10">
-          <p className="mb-2 text-[10px] uppercase tracking-[0.22em] text-white/50">
-            India&apos;s Premier Visual Archive
-          </p>
-          <p className="text-2xl font-semibold leading-snug text-white">
-            Exceptional imagery.<br />Exclusively licensed.
-          </p>
-          <p className="mt-2 text-sm text-white/55">
-            Editorial, royalty-free, and video content.
-          </p>
-        </div>
-      </section>
+        <div className="absolute inset-0 bg-black/35" />
+        {/* Radial teal glow behind the card */}
+        <div className="absolute inset-0 [background:radial-gradient(circle_at_50%_45%,rgba(0,170,185,0.18),transparent_45%)] lg:[background:radial-gradient(circle_at_72%_50%,rgba(0,170,185,0.18),transparent_45%)]" />
+      </div>
 
-      {/* Right panel — functional form */}
-      <section className="flex min-h-screen flex-col bg-surface-warm lg:h-screen lg:overflow-y-auto lg:bg-white">
-        {/* Mobile header */}
-        <div className="flex items-center justify-between px-5 py-5 lg:hidden">
-          <FotocorpLogoLink priority />
-        </div>
+      {/* Trust layer — bottom-left over the image, desktop only */}
+      <div className="pointer-events-none fixed bottom-10 left-10 z-0 hidden max-w-md select-none lg:block">
+        <p className="mb-3 text-[10px] uppercase tracking-[0.22em] text-white/50!">
+          1M+ editorial images · News • Entertainment • Sports • Archives
+        </p>
+        <p className="text-3xl font-semibold leading-snug text-white!">
+          Exceptional imagery.<br />Exclusively licensed.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-white/60!">
+          India&apos;s editorial archive for news, entertainment, sports,
+          royalty-free and historical coverage.
+        </p>
+      </div>
 
-        <div className="flex min-h-0 flex-1 flex-col px-5 pb-8 sm:px-8 lg:px-10 xl:px-12">
-          <div className="mx-auto flex w-full max-w-[520px] flex-1 flex-col pt-4 sm:pt-8 lg:max-w-none lg:pt-10">
-            {/* Logo — desktop only, above tabs */}
-            <div className="mb-7 hidden lg:block">
-              <FotocorpLogoLink imageClassName="h-8" priority />
+      {/* Glass auth card — centered on mobile, slightly right of center on desktop */}
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 lg:justify-end lg:pr-[10vw]">
+        <section
+          className="w-full max-w-[460px] rounded-[28px] border border-(--auth-glass-border) p-7 shadow-[0_30px_80px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.28)] backdrop-blur-[22px] backdrop-saturate-[1.35] [background:linear-gradient(145deg,rgba(14,18,22,0.78),rgba(8,10,13,0.62))] scheme-dark sm:min-h-[560px] sm:p-[42px]"
+        >
+          <div className="mb-7">
+            <FotocorpLogoLink imageClassName="h-8 brightness-0 invert" priority />
+          </div>
+
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold text-white">
+              {activeTab === "sign-in" ? "Welcome back" : "Create access request"}
+            </h1>
+            <p className="mt-1.5 text-sm text-white/60!">
+              {activeTab === "sign-in"
+                ? "Access India\u2019s editorial photo archive."
+                : "Apply as a contributor or request buyer access."}
+            </p>
+          </div>
+
+          <div className="mb-6 flex rounded-full border border-white/14 bg-white/8 p-1">
+            <TabButton active={activeTab === "sign-in"} onClick={() => switchTab("sign-in")}>
+              Sign In
+            </TabButton>
+            <TabButton active={activeTab === "register"} onClick={() => switchTab("register")}>
+              Register
+            </TabButton>
+          </div>
+
+          {activeTab === "sign-in" ? (
+            <form data-auth-form="sign-in" onSubmit={handleSignIn} noValidate className="space-y-5">
+              <TextField
+                label="Email or username"
+                name="identifier"
+                autoComplete="username"
+                error={errors.identifier}
+                required
+              />
+              <TextField
+                label="Password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                error={errors.password}
+                required
+              />
+
+              <div className="flex items-center justify-between gap-4 pt-1">
+                <Link
+                  href="/forgot-password"
+                  className="fc-label text-xs text-white/60 underline-offset-4 transition-colors hover:text-white hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
+              <SubmitButton disabled={isPending}>
+                {isPending ? "Signing In..." : "Sign In"}
+              </SubmitButton>
+              <p className="text-center text-sm text-white/55!">
+                New to Fotocorp?{" "}
+                <Link href="/apply-contributor" className="font-medium text-white underline-offset-4 hover:underline">
+                  Apply as a contributor
+                </Link>
+              </p>
+              <FormNotice isError>{notice}</FormNotice>
+            </form>
+          ) : registerView === "choice" ? (
+            <div className="space-y-4">
+              <Link href="/apply-contributor" className={registerChoiceCardClassName}>
+                <span className="block text-base font-semibold text-white">
+                  I want to contribute photos
+                </span>
+                <span className="mt-1 block text-sm text-white/55">
+                  Apply as Contributor →
+                </span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setRegisterView("client-form")}
+                className={registerChoiceCardClassName}
+              >
+                <span className="block text-base font-semibold text-white">
+                  I want to license/download photos
+                </span>
+                <span className="mt-1 block text-sm text-white/55">
+                  Request Client Access →
+                </span>
+              </button>
             </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={backToRegisterChoice}
+                className="mb-5 text-sm text-white/60 transition-colors hover:text-white"
+              >
+                ← Back to options
+              </button>
 
-            <div className="mb-6 flex border-b border-border-subtle">
-              <TabButton active={activeTab === "sign-in"} onClick={() => switchTab("sign-in")}>
-                SIGN IN
-              </TabButton>
-              <TabButton active={activeTab === "register"} onClick={() => switchTab("register")}>
-                REGISTER
-              </TabButton>
-            </div>
+              <RegisterStepIndicator currentStep={registerStep} />
 
-            <div className="min-h-0 flex-1 lg:pr-1">
-              {activeTab === "sign-in" ? (
-                <form data-auth-form="sign-in" onSubmit={handleSignIn} noValidate className="space-y-5">
-                  <TextField
-                    label="Email or username"
-                    name="identifier"
-                    autoComplete="username"
-                    error={errors.identifier}
-                    required
-                  />
-                  <TextField
-                    label="Password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    error={errors.password}
-                    required
-                  />
-
-                  <div className="flex items-center justify-between gap-4 pt-1">
-                    <Link
-                      href="/forgot-password"
-                      className="fc-label text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                    >
-                      Forgot password?
-                    </Link>
-                  </div>
-
-                  <SubmitButton disabled={isPending}>
-                    {isPending ? "Signing In..." : "Sign In"}
-                  </SubmitButton>
-                  <p className="text-center text-sm text-muted-foreground">
-                    New to Fotocorp?{" "}
-                    <Link href="/apply-contributor" className="font-medium text-foreground underline-offset-4 hover:underline">
-                      Apply to contribute
-                    </Link>
-                  </p>
-                  <FormNotice isError>{notice}</FormNotice>
-                </form>
-              ) : (
-                <>
-                  <RegisterStepIndicator currentStep={registerStep} />
-
-                  <form
+              <form
                     ref={registerFormRef}
                     data-auth-form="register"
                     onSubmit={handleRegisterFormSubmit}
@@ -760,7 +809,7 @@ export function SplitAuthPage() {
                     <div className={registerStep !== 3 ? "hidden" : "space-y-4 pb-2"}>
                       <fieldset
                         data-auth-field="interestedAssetTypes"
-                        className="@container/interest space-y-3 rounded-md border border-border-subtle p-3"
+                        className="@container/interest space-y-3 rounded-[14px] border border-white/14 p-4"
                       >
                         <legend className={`${labelClassName} px-0.5`}>Tell us what you need *</legend>
                         <div className="flex flex-col gap-2 text-sm">
@@ -772,7 +821,7 @@ export function SplitAuthPage() {
                                 setInterest((s) => ({ ...s, EDITORIAL: e.target.checked }))
                                 clearFieldError("interestedAssetTypes")
                               }}
-                              className="h-4 w-4 rounded border-input"
+                              className="h-4 w-4 rounded accent-(--auth-teal)"
                             />
                             Editorial
                           </label>
@@ -784,7 +833,7 @@ export function SplitAuthPage() {
                                 setInterest((s) => ({ ...s, ROYALTY_FREE: e.target.checked }))
                                 clearFieldError("interestedAssetTypes")
                               }}
-                              className="h-4 w-4 rounded border-input"
+                              className="h-4 w-4 rounded accent-(--auth-teal)"
                             />
                             Royalty Free
                           </label>
@@ -796,7 +845,7 @@ export function SplitAuthPage() {
                                 setInterest((s) => ({ ...s, VIDEO: e.target.checked }))
                                 clearFieldError("interestedAssetTypes")
                               }}
-                              className="h-4 w-4 rounded border-input"
+                              className="h-4 w-4 rounded accent-(--auth-teal)"
                             />
                             Videos
                           </label>
@@ -808,7 +857,7 @@ export function SplitAuthPage() {
                                 setInterest((s) => ({ ...s, CARICATURE: e.target.checked }))
                                 clearFieldError("interestedAssetTypes")
                               }}
-                              className="h-4 w-4 rounded border-input"
+                              className="h-4 w-4 rounded accent-(--auth-teal)"
                             />
                             Caricatures
                           </label>
@@ -840,7 +889,7 @@ export function SplitAuthPage() {
                       {registerStep < 3 ? (
                         <button
                           type="submit"
-                          className="h-12 w-full bg-primary px-5 text-sm font-semibold uppercase tracking-[0.12em] text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                          className={primaryButtonClassName}
                         >
                           Continue
                         </button>
@@ -853,7 +902,7 @@ export function SplitAuthPage() {
                         <button
                           type="button"
                           onClick={handlePrevStep}
-                          className="w-full py-1 text-center text-sm text-muted-foreground transition-colors hover:text-foreground"
+                          className="w-full py-1 text-center text-sm text-white/60 transition-colors hover:text-white"
                         >
                           ← Back
                         </button>
@@ -862,12 +911,10 @@ export function SplitAuthPage() {
 
                     <FormNotice isError>{notice}</FormNotice>
                   </form>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
+            </>
+          )}
+        </section>
+      </div>
     </main>
   )
 }
@@ -896,17 +943,17 @@ function RegisterStepIndicator({ currentStep }: { currentStep: RegisterStep }) {
               <div
                 className={`flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition-colors ${
                   currentStep > step.n
-                    ? "border-primary bg-primary text-primary-foreground"
+                    ? "border-(--auth-teal) bg-(--auth-teal) text-(--auth-teal-deep)"
                     : currentStep === step.n
-                      ? "border-primary text-primary"
-                      : "border-border text-muted-foreground"
+                      ? "border-(--auth-teal) text-(--auth-teal)"
+                      : "border-white/30 text-white/50"
                 }`}
               >
                 {currentStep > step.n ? <CheckIcon /> : step.n}
               </div>
               <span
                 className={`text-[10px] uppercase tracking-[0.12em] ${
-                  currentStep === step.n ? "font-semibold text-foreground" : "text-muted-foreground"
+                  currentStep === step.n ? "font-semibold text-white" : "text-white/50"
                 }`}
               >
                 {step.label}
@@ -915,7 +962,7 @@ function RegisterStepIndicator({ currentStep }: { currentStep: RegisterStep }) {
             {i < REGISTER_STEPS.length - 1 ? (
               <div
                 className={`mt-3.5 mx-1.5 h-px flex-1 transition-colors ${
-                  currentStep > step.n ? "bg-primary" : "bg-border-subtle"
+                  currentStep > step.n ? "bg-(--auth-teal)" : "bg-white/15"
                 }`}
               />
             ) : null}
@@ -931,16 +978,14 @@ function TabButton({ active, children, onClick }: { active: boolean; children: s
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex-1 px-2 pb-4 text-center text-xs font-semibold uppercase tracking-[0.16em] transition-colors ${
-        active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+      aria-pressed={active}
+      className={`flex-1 rounded-full px-2 py-2.5 text-center text-sm font-semibold transition-all ${
+        active
+          ? "bg-white/16 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_0_18px_rgba(0,168,181,0.28)]"
+          : "text-white/55 hover:text-white/80"
       }`}
     >
       {children}
-      <span
-        className={`absolute -bottom-px left-0 h-px bg-foreground transition-all ${
-          active ? "w-full opacity-100" : "w-0 opacity-0"
-        }`}
-      />
     </button>
   )
 }
@@ -997,7 +1042,7 @@ function TextField({
         onBlur={onBlur}
       />
       {hint ? (
-        <p id={hintId} className="text-xs text-muted-foreground">
+        <p id={hintId} className="text-xs text-white/50!">
           {hint}
         </p>
       ) : null}
@@ -1063,7 +1108,7 @@ function SelectField({
 function FieldError({ children, id }: { children?: string; id?: string }) {
   if (!children) return null
   return (
-    <p id={id} role="alert" className="text-xs leading-snug text-red-600">
+    <p id={id} role="alert" className="text-xs leading-snug text-red-300!">
       {children}
     </p>
   )
@@ -1078,9 +1123,9 @@ function FormNotice({
 }) {
   if (!children) return null
   const className = isError
-    ? "border-red-200 bg-red-50 text-red-600"
-    : "border-border bg-surface-warm text-muted-foreground"
-  return <p className={`border px-3 py-2 text-xs font-medium ${className}`}>{children}</p>
+    ? "border-red-400/40 bg-red-500/15 text-red-200!"
+    : "border-white/20 bg-white/8 text-white/70!"
+  return <p className={`rounded-[14px] border px-4 py-3 text-xs font-medium ${className}`}>{children}</p>
 }
 
 function SubmitButton({
@@ -1091,11 +1136,7 @@ function SubmitButton({
   disabled?: boolean
 }) {
   return (
-    <button
-      type="submit"
-      disabled={disabled}
-      className="mt-2 h-12 w-full bg-primary px-5 text-sm font-semibold uppercase tracking-[0.12em] text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-70"
-    >
+    <button type="submit" disabled={disabled} className={`mt-2 ${primaryButtonClassName}`}>
       {children}
     </button>
   )
@@ -1512,27 +1553,37 @@ function getNestedValue(target: unknown, path: string) {
   return cursor
 }
 
+/** Dark-glass select option styling — native dropdown panels render dark. */
+const darkSelectOptionsClassName =
+  "[&_option]:bg-[#0e1216] [&_option]:text-white [&_optgroup]:bg-[#0e1216] [&_optgroup]:text-white"
+
 const inputClassName =
-  "h-11 w-full min-w-0 border border-border bg-white px-3 text-sm text-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-0"
+  `h-[52px] w-full min-w-0 rounded-[14px] border border-white/18 bg-white/8 px-4 text-sm text-white shadow-none outline-none transition-[border-color,box-shadow] placeholder:text-white/40 focus:border-[rgba(0,180,190,0.8)] focus:shadow-[0_0_0_4px_rgba(0,180,190,0.12)] focus:ring-0 ${darkSelectOptionsClassName}`
 
 const inputErrorClassName =
-  "h-11 w-full min-w-0 border border-red-500 bg-red-50/40 px-3 text-sm text-foreground shadow-none outline-none transition-colors placeholder:text-muted-foreground focus:border-red-600 focus:ring-0"
+  `h-[52px] w-full min-w-0 rounded-[14px] border border-red-400/80 bg-red-500/10 px-4 text-sm text-white shadow-none outline-none transition-[border-color,box-shadow] placeholder:text-white/40 focus:border-red-400 focus:shadow-[0_0_0_4px_rgba(248,113,113,0.15)] focus:ring-0 ${darkSelectOptionsClassName}`
 
-const labelClassName = "fc-label text-xs uppercase tracking-[0.11em] text-foreground"
+const labelClassName = "fc-label text-xs uppercase tracking-[0.11em] text-white/70"
+
+const primaryButtonClassName =
+  "h-[54px] w-full rounded-[14px] bg-(--auth-teal) px-5 text-sm font-bold text-(--auth-teal-deep) transition-all hover:-translate-y-px hover:shadow-[0_14px_32px_rgba(0,168,181,0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--auth-teal) disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+
+const registerChoiceCardClassName =
+  "block w-full rounded-[14px] border border-white/18 bg-white/6 p-5 text-left transition-colors hover:border-[rgba(0,180,190,0.6)] hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--auth-teal)"
 
 /** Compact labels inside the interest fieldset — fluid size, sentence case, no wrap breaks on asterisk. */
 const interestSubfieldLabelClassName =
-  "fc-label block min-w-0 font-medium leading-snug text-foreground normal-case tracking-normal text-[clamp(0.6875rem,3.25cqi,0.8125rem)]"
+  "fc-label block min-w-0 font-medium leading-snug text-white/80 normal-case tracking-normal text-[clamp(0.6875rem,3.25cqi,0.8125rem)]"
 
 const interestPreferenceGridClassName =
-  "grid min-w-0 grid-cols-1 gap-3 border-t border-border-subtle pt-3 @min-[22rem]/interest:grid-cols-2 @min-[22rem]/interest:gap-4"
+  "grid min-w-0 grid-cols-1 gap-3 border-t border-white/14 pt-3 @min-[22rem]/interest:grid-cols-2 @min-[22rem]/interest:gap-4"
 
 function InterestSubfieldLabel({ text }: { text: string }) {
   return (
     <span className={interestSubfieldLabelClassName}>
       <span className="inline-flex max-w-full min-w-0 flex-wrap items-baseline gap-x-1">
         <span className="min-w-0">{text}</span>
-        <span className="shrink-0 text-destructive" aria-hidden="true">
+        <span className="shrink-0 text-red-300" aria-hidden="true">
           *
         </span>
       </span>

@@ -1,6 +1,10 @@
 # Legacy Fotocorp Import Tools
 
-These scripts import exported SQL Server data into the flexible Fotocorp skeleton tables owned by `apps/api/src/db/schema`.
+These scripts are **archive-only** after legacy table retirement. The production schema no longer has the legacy mirror tables required by these tools (`assets`, `asset_events`, legacy derivative/log tables, and import issue rows), and the package commands have been removed from the normal command surface.
+
+Do not run these scripts against production. Direct `tsx` execution is guarded and requires `ALLOW_RETIRED_LEGACY_IMPORT=I_UNDERSTAND_THIS_SCHEMA_IS_RETIRED`, intended only for a restored pre-retirement Neon branch. See `docs/db-revamp/legacy-table-retirement-runbook.md`.
+
+Historically, these scripts imported exported SQL Server data into the flexible Fotocorp skeleton tables owned by `apps/api/src/db/schema`.
 
 `apps/api` owns the asset catalog, photographer profile, import batch, import issue, and R2 reconciliation schema. Better Auth tables and `app_user_profiles` are still owned by the current web auth setup and are intentionally not part of the API Drizzle migration yet.
 

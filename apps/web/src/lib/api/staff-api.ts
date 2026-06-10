@@ -151,7 +151,14 @@ export async function getStaffAccessInquiryDetail(inquiryId: string, options: { 
     firstName: string | null
     lastName: string | null
     jobTitle: string | null
+    customJobTitle: string | null
     companyType: string | null
+    email: string | null
+    username: string | null
+    phoneCountryCode: string | null
+    phoneNumber: string | null
+    companyEmailDomain: string | null
+    emailValidationDecision: string | null
     subscriberAccess: { isSubscriber: boolean; subscriptionStatus: string }
     contributorProfile: { id: string; displayName: string | null; status: string | null; email: string | null } | null
     pendingClaims: Array<{ claimType: string; normalizedValue: string; status: string }>
@@ -185,6 +192,17 @@ export async function postStaffCloseAccessInquiry(
   return staffJson<{ ok: true; inquiry: Record<string, unknown> }>(
     `/access-inquiries/${encodeURIComponent(inquiryId)}/close`,
     { method: "POST", body, cookieHeader: options.cookieHeader },
+  )
+}
+
+export async function patchStaffAccessInquiryNotes(
+  inquiryId: string,
+  body: { staffNotes?: string | null } = {},
+  options: { cookieHeader?: string } = {},
+) {
+  return staffJson<{ ok: true; inquiry: Record<string, unknown> }>(
+    `/access-inquiries/${encodeURIComponent(inquiryId)}/notes`,
+    { method: "PATCH", body, cookieHeader: options.cookieHeader },
   )
 }
 

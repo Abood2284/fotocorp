@@ -128,20 +128,6 @@ export function ContributorUploadMetadataItem({ row, onSave }: ContributorUpload
 
         <div className="mt-8 w-full max-w-xl space-y-5 sm:mt-10 sm:space-y-6">
           <label className="block space-y-2 text-left">
-            <span className={uploadFieldLabelClass}>Who is in the picture</span>
-            <Input
-              value={whoIsInPicture}
-              onChange={(e) => patchDraft({ whoIsInPicture: e.target.value })}
-              placeholder="e.g. Rahul Sharma, Priya Patel"
-              className={uploadInputClass}
-              autoComplete="off"
-            />
-            <span className="block text-xs text-muted-foreground sm:text-sm">
-              One name or several, separated by commas. Spaces are allowed.
-            </span>
-          </label>
-
-          <label className="block space-y-2 text-left">
             <span className={uploadFieldLabelClass}>Caption</span>
             <textarea
               className={cn(
@@ -163,6 +149,20 @@ export function ContributorUploadMetadataItem({ row, onSave }: ContributorUpload
               className={uploadInputClass}
               autoComplete="off"
             />
+          </label>
+
+          <label className="block space-y-2 text-left">
+            <span className={uploadFieldLabelClass}>Who is in the picture</span>
+            <Input
+              value={whoIsInPicture}
+              onChange={(e) => patchDraft({ whoIsInPicture: e.target.value })}
+              placeholder="e.g. Rahul Sharma, Priya Patel"
+              className={uploadInputClass}
+              autoComplete="off"
+            />
+            <span className="block text-xs text-muted-foreground sm:text-sm">
+              One name or several, separated by commas. Spaces are allowed.
+            </span>
           </label>
         </div>
       </div>

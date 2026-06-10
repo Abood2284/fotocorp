@@ -81,11 +81,14 @@ const __dirname = dirname(__filename)
 const apiRoot = resolve(__dirname, "../..")
 const repoRoot = resolve(apiRoot, "../..")
 const runsRoot = join(repoRoot, "data/legacy/import-runs")
+const RETIRED_LEGACY_COMMAND_OVERRIDE = "ALLOW_RETIRED_LEGACY_IMPORT"
+const RETIRED_LEGACY_COMMAND_VALUE = "I_UNDERSTAND_THIS_SCHEMA_IS_RETIRED"
 
 let currentChild: ChildProcessWithoutNullStreams | null = null
 let interrupted = false
 
 async function main() {
+  assertRetiredLegacyCommandOverride()
   const options = parseArgs(process.argv.slice(2))
   const runDir = join(runsRoot, options.runName)
   const statePath = join(runDir, "state.json")
@@ -197,6 +200,20 @@ async function main() {
     console.log(`Run stopped. Resume with: ${resumeCommand(state.runName)}`)
     process.exitCode = 1
   }
+}
+
+function assertRetiredLegacyCommandOverride() {
+  if (process.env[RETIRED_LEGACY_COMMAND_OVERRIDE] === RETIRED_LEGACY_COMMAND_VALUE) return
+
+  console.error(
+    [
+      "FAIL: legacy chunked import is retired for the production schema.",
+      "The legacy mirror tables were removed after clean-schema cutover.",
+      `To run this archive-only script against a restored pre-retirement branch, set ${RETIRED_LEGACY_COMMAND_OVERRIDE}=${RETIRED_LEGACY_COMMAND_VALUE}.`,
+      "See docs/db-revamp/legacy-table-retirement-runbook.md.",
+    ].join("\n"),
+  )
+  process.exit(1)
 }
 
 async function runChunk(state: RunState, offset: number, limit: number): Promise<ChunkReport> {

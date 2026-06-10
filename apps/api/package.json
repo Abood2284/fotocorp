@@ -28,10 +28,6 @@
     "royalty-free:refresh-featured": "tsx scripts/public/refresh-royalty-free-featured.ts",
     "creative:refresh-featured": "tsx scripts/public/refresh-royalty-free-featured.ts",
     "homepage:refresh-hero-sets": "tsx scripts/public/refresh-homepage-hero-sets.ts",
-    "legacy:import": "tsx scripts/legacy/import-legacy-fotocorp.ts",
-    "legacy:import:chunks": "tsx scripts/legacy/run-legacy-import-chunks.ts",
-    "legacy:sync-clean-schema": "tsx scripts/legacy/sync-clean-schema-after-import.ts",
-    "db:validate:clean-sync": "tsx scripts/db/validate-clean-schema-sync.ts",
     "photographers:generate-accounts": "tsx scripts/photographers/generate-photographer-accounts.ts",
     "db:validate:photographer-accounts": "tsx scripts/db/validate-photographer-accounts.ts",
     "db:validate:photographer-auth": "tsx scripts/db/validate-photographer-auth.ts",
@@ -54,6 +50,7 @@
     "staff:bootstrap": "tsx scripts/staff/bootstrap-staff-account.ts",
     "media:pipeline-status": "tsx scripts/media/pipeline-status.ts",
     "media:verify-r2-originals": "tsx scripts/media/verify-r2-originals.ts",
+    "media:scan-original-metadata": "tsx scripts/media/scan-original-image-metadata.ts",
     "typesense:index-public-assets": "tsx scripts/search/index-public-assets-typesense.ts",
     "search:smoke-typesense": "tsx scripts/search/smoke-typesense.ts"
   },

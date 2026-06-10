@@ -18,6 +18,7 @@ export * from "./public-homepage-hero-sets";
 export * from "./public-homepage-hero-set-items";
 export * from "./public-homepage-hero-pool-items";
 export * from "./image-assets";
+export * from "./image-assets-metadata";
 export * from "./image-derivatives";
 export * from "./image-access-logs";
 export * from "./image-download-logs";

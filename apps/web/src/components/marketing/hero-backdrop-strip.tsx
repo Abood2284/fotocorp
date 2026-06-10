@@ -21,7 +21,7 @@ const FALLBACK_GRADIENTS = [
   "linear-gradient(155deg,#151515 0%,#313131 50%,#6e6e6e 100%)",
 ]
 
-const STRIP_SLOT_COUNT = 9
+const STRIP_SLOT_COUNT = 15
 
 interface HeroBackdropStripProps {
   items: HeroBackdropItem[]
@@ -39,7 +39,7 @@ export function HeroBackdropStrip({ items }: HeroBackdropStripProps) {
       aria-hidden="true"
     >
       <div
-        className="absolute inset-0 flex items-stretch justify-center opacity-[0.54] saturate-[0.98] contrast-[1.02] sm:opacity-[0.50] md:opacity-[0.46]"
+        className="absolute inset-0 flex items-stretch justify-center opacity-[0.48] sm:opacity-[0.44] md:opacity-[0.40]"
         style={{
           maskImage:
             "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%), linear-gradient(180deg, transparent 0%, black 3%, black 97%, transparent 100%)",
@@ -47,17 +47,17 @@ export function HeroBackdropStrip({ items }: HeroBackdropStripProps) {
           WebkitMaskComposite: "source-in",
         }}
       >
-        <div className="flex h-full min-h-[21.5rem] w-max max-w-none shrink-0 items-stretch gap-0.5 sm:min-h-[22.5rem] md:min-h-[26rem]">
+        <div className="flex h-full min-h-[clamp(26rem,55vh,35rem)] w-max max-w-none shrink-0 items-stretch">
           {slots.map((item, i) => (
             <div
               key={`${item?.id ?? "fallback"}-${i}`}
-              className="relative flex h-full w-auto shrink-0 overflow-hidden bg-muted/40"
+              className="relative h-full w-28 shrink-0 overflow-hidden sm:w-32 md:w-36 lg:w-40"
             >
               {item?.imageUrl ? (
                 <HeroImage
                   src={item.imageUrl}
                   alt=""
-                  loading={i < 3 ? "eager" : "lazy"}
+                  loading={i < 5 ? "eager" : "lazy"}
                   fallbackIndex={i}
                 />
               ) : (
@@ -68,8 +68,7 @@ export function HeroBackdropStrip({ items }: HeroBackdropStripProps) {
         </div>
       </div>
 
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_52%_68%_at_50%_48%,rgba(255,255,255,0.72)_0%,rgba(255,255,255,0.42)_38%,rgba(255,255,255,0.12)_64%,transparent_94%)]" />
-      <div className="absolute inset-0 bg-linear-to-b from-white/24 via-transparent to-white/24" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_42%,rgba(255,255,255,0.62)_0%,rgba(255,255,255,0.28)_45%,transparent_100%),linear-gradient(180deg,rgba(255,255,255,0.32)_0%,transparent_30%,transparent_70%,rgba(255,255,255,0.22)_100%)]" />
     </div>
   )
 }
@@ -94,7 +93,7 @@ function HeroImage({
     <img
       src={src}
       alt={alt}
-      className="h-full w-auto min-w-28 shrink-0 object-contain saturate-[0.85] contrast-[0.98] sm:min-w-32 md:min-w-36 lg:min-w-40"
+      className="h-full w-full object-cover brightness-[1.02] saturate-[1.02] contrast-[1.02]"
       loading={loading}
       decoding="async"
       referrerPolicy="no-referrer"
@@ -106,7 +105,7 @@ function HeroImage({
 function HeroFallback({ index }: { index: number }) {
   return (
     <div
-      className="h-full min-w-28 sm:min-w-32 md:min-w-36 lg:min-w-40"
+      className="h-full w-full"
       style={{ background: FALLBACK_GRADIENTS[index % FALLBACK_GRADIENTS.length] }}
     />
   )

@@ -102,6 +102,20 @@ The accent communicates premium licensing, download CTAs, subscription actions, 
 
 ---
 
+### Auth Glass Exception (sign-in page only)
+
+The `/sign-in` page (`apps/web/src/components/auth/split-auth-page.tsx`) intentionally deviates from the square B&W system: it uses a full-screen photographic background with a dark glass card, rounded geometry (`28px` card, `14px` controls), and a teal accent matching the logo mark (`#19A8B9` family). Scoped tokens in `globals.css`:
+
+| Role | CSS Variable | Value |
+|---|---|---|
+| Auth teal accent | `--auth-teal` | `#00a8b5` |
+| Teal button text | `--auth-teal-deep` | `#001014` |
+| Glass card border | `--auth-glass-border` | `rgba(255, 255, 255, 0.28)` |
+
+Do not use these tokens outside the auth surface.
+
+---
+
 ### Usage Rules
 
 1. Use these semantic tokens before introducing any new raw hex value. New hex values require a documented token.

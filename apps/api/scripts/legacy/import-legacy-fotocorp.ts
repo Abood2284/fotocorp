@@ -29,6 +29,8 @@ const repoRoot = resolve(apiRoot, "../..")
 
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".JPG", ".JPEG", ".PNG", ".WEBP"]
 const LEGACY_IMAGE_SOURCE = "fotocorp_images"
+const RETIRED_LEGACY_COMMAND_OVERRIDE = "ALLOW_RETIRED_LEGACY_IMPORT"
+const RETIRED_LEGACY_COMMAND_VALUE = "I_UNDERSTAND_THIS_SCHEMA_IS_RETIRED"
 const EXPECTED_EXPORT_FILES = [
   "CategoryMaster.csv",
   "eventtb.csv",
@@ -101,6 +103,7 @@ interface ImportIssue {
 loadLocalEnv()
 
 async function main() {
+  assertRetiredLegacyCommandOverride()
   const options = parseArgs(process.argv.slice(2))
   const startedAtMs = Date.now()
   const shouldCheckR2 = !options.skipR2Check && (options.only === "all" || options.only === "assets")
@@ -140,6 +143,20 @@ async function main() {
   }
 
   if (status === "FAILED") process.exitCode = 1
+}
+
+function assertRetiredLegacyCommandOverride() {
+  if (process.env[RETIRED_LEGACY_COMMAND_OVERRIDE] === RETIRED_LEGACY_COMMAND_VALUE) return
+
+  console.error(
+    [
+      "FAIL: legacy import is retired for the production schema.",
+      "The legacy mirror tables were removed after clean-schema cutover.",
+      `To run this archive-only script against a restored pre-retirement branch, set ${RETIRED_LEGACY_COMMAND_OVERRIDE}=${RETIRED_LEGACY_COMMAND_VALUE}.`,
+      "See docs/db-revamp/legacy-table-retirement-runbook.md.",
+    ].join("\n"),
+  )
+  process.exit(1)
 }
 
 async function importCategories(pool: import("pg").Pool | null, options: CliOptions, counters: Counters) {

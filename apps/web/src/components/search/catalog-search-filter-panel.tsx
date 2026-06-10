@@ -4,6 +4,7 @@ import { Calendars, ChevronDown, ListFilterIcon, X } from "lucide-react"
 import type React from "react"
 
 import type { PublicAssetFiltersResponse, PublicAssetSort } from "@/features/assets/types"
+import { filterVisibleCatalogCategories } from "@/lib/catalog/visible-categories"
 import { cn, formatInteger } from "@/lib/utils"
 
 export interface CatalogSearchParams {
@@ -135,7 +136,11 @@ export function CatalogSearchFilterPanel({
         title="Categories"
         emptyLabel="No categories available"
         showCounts={false}
-        items={categories.map((category) => ({ id: category.id, label: category.name, count: category.assetCount }))}
+        items={filterVisibleCatalogCategories(categories).map((category) => ({
+          id: category.id,
+          label: category.name,
+          count: category.assetCount,
+        }))}
         activeId={params.categoryId}
         onSelect={(id) => onUpdate({ categoryId: id === params.categoryId ? undefined : id, page: 1 })}
       />

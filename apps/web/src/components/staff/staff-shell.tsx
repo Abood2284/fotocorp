@@ -1,9 +1,9 @@
 "use client"
 
-import Link from "next/link"
+import Link, { useLinkStatus } from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { ChevronUp, ChevronLeft, ChevronRight, LayoutDashboard, LogOut } from "lucide-react"
+import { ChevronUp, ChevronLeft, ChevronRight, LayoutDashboard, Loader2, LogOut } from "lucide-react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { buildSignInHref } from "@/lib/auth-sign-in-gateway"
 import { cn } from "@/lib/utils"
@@ -27,7 +27,10 @@ export function StaffShell({ children, staff }: StaffShellProps) {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar navItems={navItems} staff={staff} />
-      <main className="min-w-0 flex-1 overflow-y-auto bg-staff-50 p-6 lg:p-8">{children}</main>
+      <main className="relative min-w-0 flex-1 overflow-y-auto bg-staff-50 p-6 lg:p-8">
+        <StaffNavigationProgress />
+        {children}
+      </main>
     </div>
   )
 }
@@ -67,21 +70,14 @@ function Sidebar({
         {navItems.map(({ label, href, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(`${href}/`)
           return (
-            <Link
+            <StaffNavLink
               key={href}
               href={href}
-              title={label}
-              className={cn(
-                "flex items-center rounded-md text-sm font-medium transition-all duration-200",
-                collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2",
-                isActive
-                  ? "bg-staff-200 text-staff-950"
-                  : "text-staff-600 hover:bg-staff-200/50 hover:text-staff-950"
-              )}
-            >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden />
-              {!collapsed && <span className="min-w-0 truncate">{label}</span>}
-            </Link>
+              label={label}
+              icon={Icon}
+              collapsed={collapsed}
+              isActive={isActive}
+            />
           )
         })}
       </nav>
@@ -185,6 +181,88 @@ function StaffProfileMenu({ staff, collapsed }: { staff: StaffShellStaff, collap
           </>
         )}
       </button>
+    </div>
+  )
+}
+
+function StaffNavLink({
+  href,
+  label,
+  icon: Icon,
+  collapsed,
+  isActive,
+}: {
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  collapsed: boolean
+  isActive: boolean
+}) {
+  return (
+    <Link
+      href={href}
+      title={label}
+      className={cn(
+        "flex items-center rounded-md text-sm font-medium transition-all duration-200",
+        collapsed ? "relative justify-center p-2.5" : "gap-3 px-3 py-2",
+        isActive
+          ? "bg-staff-200 text-staff-950"
+          : "text-staff-600 hover:bg-staff-200/50 hover:text-staff-950"
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" aria-hidden />
+      {!collapsed ? <span className="min-w-0 truncate">{label}</span> : null}
+      <StaffNavLinkPendingIndicator collapsed={collapsed} />
+    </Link>
+  )
+}
+
+function StaffNavLinkPendingIndicator({ collapsed }: { collapsed: boolean }) {
+  const { pending } = useLinkStatus()
+  if (!pending) return null
+
+  return (
+    <Loader2
+      className={cn("h-3.5 w-3.5 shrink-0 animate-spin text-primary", collapsed ? "absolute bottom-1 right-1" : "ml-auto")}
+      aria-hidden
+    />
+  )
+}
+
+function StaffNavigationProgress() {
+  const pathname = usePathname()
+  const [isNavigating, setIsNavigating] = useState(false)
+  const previousPathRef = useRef(pathname)
+
+  useEffect(() => {
+    function handleDocumentClick(event: MouseEvent) {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      const anchor = target.closest("a[href]")
+      if (!(anchor instanceof HTMLAnchorElement)) return
+      if (anchor.target === "_blank" || anchor.hasAttribute("download")) return
+      const href = anchor.getAttribute("href")
+      if (!href || !href.startsWith("/staff")) return
+      if (href === pathname || href === `${pathname}/`) return
+      setIsNavigating(true)
+    }
+
+    document.addEventListener("click", handleDocumentClick, true)
+    return () => document.removeEventListener("click", handleDocumentClick, true)
+  }, [pathname])
+
+  useEffect(() => {
+    if (pathname !== previousPathRef.current) {
+      previousPathRef.current = pathname
+      setIsNavigating(false)
+    }
+  }, [pathname])
+
+  if (!isNavigating) return null
+
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden bg-primary/10">
+      <div className="h-full w-1/3 animate-[staff-nav-progress_1.1s_ease-in-out_infinite] bg-primary" />
     </div>
   )
 }

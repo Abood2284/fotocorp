@@ -5,6 +5,20 @@ import pg from "pg"
 dotenv.config({ path: ".dev.vars" })
 
 const { Pool } = pg
+const RETIRED_LEGACY_COMMAND_OVERRIDE = "ALLOW_RETIRED_LEGACY_IMPORT"
+const RETIRED_LEGACY_COMMAND_VALUE = "I_UNDERSTAND_THIS_SCHEMA_IS_RETIRED"
+
+if (process.env[RETIRED_LEGACY_COMMAND_OVERRIDE] !== RETIRED_LEGACY_COMMAND_VALUE) {
+  console.error(
+    [
+      "FAIL: db:validate:clean-sync is retired for the production schema.",
+      "The legacy mirror tables were removed after clean-schema cutover.",
+      `To run this archive-only validation against a restored pre-retirement branch, set ${RETIRED_LEGACY_COMMAND_OVERRIDE}=${RETIRED_LEGACY_COMMAND_VALUE}.`,
+      "See docs/db-revamp/legacy-table-retirement-runbook.md.",
+    ].join("\n"),
+  )
+  process.exit(1)
+}
 
 const databaseUrl = process.env.DATABASE_URL
 if (!databaseUrl) {

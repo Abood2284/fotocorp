@@ -67,7 +67,9 @@ from image_assets
 where original_exists_in_storage is null;
 ```
 
-## Import/map legacy assets
+## Import/map legacy assets (archived)
+
+The legacy import command surface was retired with the legacy table cleanup. The examples below are historical references only and must not be run against production after `assets`, `asset_events`, and legacy derivative/log tables are dropped. Use [Legacy Table Retirement Runbook](./legacy-table-retirement-runbook.md) for the production cleanup procedure.
 
 Fast 10k test (no R2 HEAD during import):
 
@@ -266,8 +268,7 @@ pnpm --dir apps/api media:generate-derivatives -- \
 
 ## Notes
 
-- `legacy:import` remains offset-compatible, but chunk runner + state removes manual offset counting for long runs.
-- Import/map is idempotent (`on conflict` upsert keyed by legacy identifiers).
+- Legacy import/map commands are archived and no longer supported against production after legacy table retirement.
 - R2 verification is idempotent and updates `original_exists_in_storage` + `original_storage_checked_at`.
 - Derivative generator scopes:
   - `public-ready`: only `APPROVED + PUBLIC` assets with verified originals.

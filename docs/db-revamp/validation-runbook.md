@@ -2,14 +2,15 @@
 
 One place for database validation scripts (`apps/api`). These scripts assume appropriate `DATABASE_URL` / Worker env for the target Neon branch.
 
-## Core catalog + sync
+## Core catalog
 
 ```bash
 pnpm --dir apps/api db:validate:photographers
 pnpm --dir apps/api db:validate:image-assets
 pnpm --dir apps/api db:validate:image-derivatives
-pnpm --dir apps/api db:validate:clean-sync
 ```
+
+`db:validate:clean-sync` was retired with the legacy import mirror tables. Do not run it against production after legacy table retirement; use the explicit validation queries in [Legacy table retirement runbook](./legacy-table-retirement-runbook.md) for that migration.
 
 ## Photographer + admin + publish
 
@@ -32,8 +33,6 @@ pnpm --dir apps/api db:validate:fotokey-publish
 ## When to run
 
 - After **migration** on a branch.
-- After **legacy import** or chunk import completes.
-- After **`legacy:sync-clean-schema`** (or when investigating clean vs legacy drift).
 - After **photographer upload** flow changes (API, DB, or R2 staging).
 - After **admin approval** or **Fotokey / publish pipeline** changes.
 

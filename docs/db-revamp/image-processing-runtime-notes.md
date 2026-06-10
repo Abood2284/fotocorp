@@ -32,3 +32,13 @@ Derivative generation for production-like processing today runs in **Node-capabl
 ## Current recommendation status
 
 **Investigation pending.** No final platform decision is documented here until an option is implemented end-to-end for the Worker + storage pipeline.
+
+## Original technical metadata (`image_assets_metadata`)
+
+Schema-only support (Drizzle table `image_assets_metadata`, FK → `image_assets.id`, unique `image_asset_id`):
+
+- Stores **original file technical metadata** (pixel dimensions, DPI, format, file size, orientation, color space, embedded profile flags, scan status, computed quality fields).
+- **Separate from catalog/search metadata** on `image_assets` (`who_is_in_picture`, `caption`, `keywords`, etc.).
+- Will be populated later by a **Sharp-based metadata scanner** (Node/`apps/jobs` context — not Worker request path).
+- Will later drive **dynamic Medium/Low download generation** via `source_quality_bucket`, `download_quality_ceiling`, `can_generate_medium`, and `can_generate_low`.
+- **Pixel dimensions** (`original_width` / `original_height`, long/short edge, megapixels) are the primary quality basis for bucket/ceiling computation; **DPI is stored** (`original_dpi`, `original_resolution_unit`) as supporting metadata.

@@ -19,11 +19,9 @@ export async function listBoardsService(env: Env, userId: string): Promise<Respo
       b.name,
       b.sort_order AS "sortOrder",
       b.created_at AS "createdAt",
-      COUNT(fi.id)::int AS "itemCount"
+      0::int AS "itemCount"
     FROM fotobox_boards b
-    LEFT JOIN asset_fotobox_items fi ON fi.board_id = b.id
     WHERE b.user_id = ${userId}::uuid
-    GROUP BY b.id, b.name, b.sort_order, b.created_at
     ORDER BY b.sort_order, b.created_at
   `)
   return safeJson({ ok: true, boards: rows })
@@ -59,48 +57,22 @@ export async function deleteBoardService(env: Env, boardId: string, userId: stri
 
 export async function migrateAnonService(env: Env, input: { userId: string; boards: Array<{ name: string; items: string[] }> }): Promise<Response> {
   const db = dbFor(env)
-  let totalItems = 0
 
   for (const board of input.boards) {
-    const boardRows = await executeRows<{ id: string }>(db, sql`
+    await executeRows<{ id: string }>(db, sql`
       INSERT INTO fotobox_boards (user_id, name)
       VALUES (${input.userId}::uuid, ${board.name})
       RETURNING id
     `)
-    const boardId = boardRows[0]?.id
-    if (!boardId) continue
-
-    for (const assetId of board.items) {
-      const isValid = await executeRows<{ exists: boolean }>(db, sql`
-        SELECT EXISTS(
-          SELECT 1 FROM image_assets
-          WHERE id = ${assetId}::uuid
-            AND status = 'ACTIVE'
-            AND visibility = 'PUBLIC'
-            AND media_type = 'IMAGE'
-            AND original_exists_in_storage = true
-        ) AS "exists"
-      `)
-      if (!isValid[0]?.exists) continue
-      await db.execute(sql`
-        INSERT INTO asset_fotobox_items (user_id, board_id, asset_id)
-        VALUES (${input.userId}::uuid, ${boardId}::uuid, ${assetId}::uuid)
-        ON CONFLICT (board_id, asset_id) DO NOTHING
-      `)
-      totalItems++
-    }
   }
 
-  return safeJson({ ok: true, migrated: input.boards.length, totalItems })
+  return safeJson({ ok: true, migrated: input.boards.length, totalItems: 0 })
 }
 
 export async function getAssetBoardIdsService(env: Env, userId: string, assetId: string): Promise<Response> {
-  const db = dbFor(env)
-  const rows = await executeRows<{ board_id: string }>(db, sql`
-    SELECT board_id FROM asset_fotobox_items
-    WHERE user_id = ${userId}::uuid AND asset_id = ${assetId}::uuid
-  `)
-  return safeJson({ ok: true, boardIds: rows.map((r) => r.board_id) })
+  normalizeRequired(userId, "USER_ID_REQUIRED")
+  normalizeRequired(assetId, "ASSET_ID_REQUIRED")
+  return safeJson({ ok: true, boardIds: [] })
 }
 
 export async function getAnonAssetBoardIds(assetId: string): Promise<string[]> {
@@ -123,4 +95,10 @@ function dbFor(env: Env) {
 
 function safeJson(body: unknown, status = 200) {
   return Response.json(body, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } })
+}
+
+function normalizeRequired(value: string | null | undefined, code: string) {
+  const normalized = value?.trim()
+  if (!normalized) throw new AppError(400, code, "Required value is missing.")
+  return normalized
 }

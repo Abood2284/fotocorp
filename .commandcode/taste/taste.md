@@ -17,6 +17,16 @@
 - The "legacy_image_code" column should be renamed to "fotokey" and all API reads should use fotokey. Confidence: 0.80
 - The "headline" column in image_assets is redundant (same as event name) and should be removed. Confidence: 0.75
 
+# db-migrations
+- Do NOT manually create or edit raw .sql migration files. Update Drizzle .ts schema files first, then run `pnpm run db:generate` to generate the SQL migration, then `pnpm run db:migrate` to apply it. Only the Drizzle-generated migration is allowed. Confidence: 0.85
+
+# performance
+- Homepage (GET /) SSR must not block on /api/v1/assets or any DB-heavy aggregate query. Use precomputed projection tables (e.g., public_homepage_hero_sets) or client-loaded endpoints instead. Confidence: 0.80
+- Filter/facets endpoints should default to includeCounts=false. Expensive COUNT(*) / GROUP BY aggregation over image_assets must not run during SSR or eagerly on page load. Confidence: 0.75
+
+# infrastructure
+- Use Cloudflare Tunnel (cloudflared) with ingress rules to expose internal VPS services (jobs worker, Typesense) securely via custom hostnames instead of opening ports directly. Confidence: 0.70
+
 # workflow
 See [workflow/taste.md](workflow/taste.md)
 # code-style
@@ -63,5 +73,10 @@ See [workflow/taste.md](workflow/taste.md)
 - Staff/internal dashboard pages use a blue-tinted palette (staff-50 through staff-950) derived from the brand navy (#1a2540), replacing the warm-gray jumbo-* scale. Lighter shades for surfaces/backgrounds, darker shades (staff-900/950, primary navy) for text, active states, and CTAs. Confidence: 0.70
 
 # nextjs
-- When using createPortal in Next.js \"use client\" components, guard against SSR by checking for document existence or using a mounted state before referencing document.body, since document is undefined during server-side rendering. Confidence: 0.70
+- When using createPortal in Next.js "use client" components, guard against SSR by checking for document existence or using a mounted state before referencing document.body, since document is undefined during server-side rendering. Confidence: 0.70
 
+# client-data
+- Use TanStack Query for client-side data fetching with staleTime: 60_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false, and placeholderData: keepPreviousData for paginated queries. Auth/session queries use staleTime: 5 * 60_000, gcTime: 10 * 60_000, retry: false. Confidence: 0.70
+
+# migrations
+- Never manually create or edit raw .sql migration files. Always update Drizzle .ts schema files first, then run pnpm run db:generate to generate the SQL migration, then pnpm run db:migrate to apply it. Confidence: 0.85
