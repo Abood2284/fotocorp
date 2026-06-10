@@ -1,6 +1,6 @@
 
 import { AlertTriangle } from "lucide-react"
-import { listStaffContributorUploads } from "@/lib/api/staff-contributor-uploads-api"
+import { listStaffContributorUploadBatches } from "@/lib/api/staff-contributor-uploads-api"
 import { getAdminAssetFilters } from "@/lib/api/admin-assets-api"
 import { EmptyState } from "@/components/shared/empty-state"
 import { StaffContributorUploadsClient } from "@/components/staff/contributor-uploads/staff-contributor-uploads-client"
@@ -34,7 +34,7 @@ export default async function StaffContributorUploadsPage({ searchParams }: Staf
   const offset = parsePositiveInt(takeOne(sp.offset), 0, 100000)
 
   const [uploads, filters] = await Promise.all([
-    listStaffContributorUploads({
+    listStaffContributorUploadBatches({
       status,
       eventId,
       contributorId,

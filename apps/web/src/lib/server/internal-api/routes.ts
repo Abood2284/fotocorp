@@ -61,6 +61,9 @@ export const internalApiRoutes = {
 
   adminContributorUploads: () => "/api/v1/internal/admin/contributor-uploads",
 
+  adminContributorUploadBatches: () =>
+    "/api/v1/internal/admin/contributor-uploads/batches",
+
   adminContributorUploadOriginal: (imageAssetId: string) =>
     `/api/v1/internal/admin/contributor-uploads/${encodeURIComponent(imageAssetId)}/original`,
 

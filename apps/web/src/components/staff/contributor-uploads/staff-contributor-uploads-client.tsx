@@ -1,7 +1,7 @@
 "use client"
 
 import { ArrowDown, ArrowUp, CheckCircle, ChevronLeft, ChevronRight, Download, CircleHelp, ImageOff, Loader2, Upload, X, XCircle } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type {
   StaffContributorUploadDto,
-  StaffContributorUploadsListResponse,
+  StaffContributorUploadBatchGroupDto,
+  StaffContributorUploadBatchesListResponse,
 } from "@/lib/api/staff-contributor-uploads-api"
 import type { AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
 
 interface StaffContributorUploadsClientProps {
-  initialResponse: StaffContributorUploadsListResponse
+  initialResponse: StaffContributorUploadBatchesListResponse
   filters: AdminCatalogFilters | null
   currentParams: {
     status: "SUBMITTED" | "APPROVED" | "ACTIVE" | "all"
@@ -58,17 +59,28 @@ export function StaffContributorUploadsClient({
   const saveGenRef = useRef(0)
   const replaceInputRef = useRef<HTMLInputElement | null>(null)
 
-  const uploads = useMemo(
-    () => initialResponse.uploads.map((u) => ({ ...u, ...localPatch[u.imageAssetId] })),
-    [initialResponse.uploads, localPatch],
+  const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>({})
+
+  const batches = useMemo(
+    () =>
+      initialResponse.batches.map((batch) => ({
+        ...batch,
+        items: batch.items.map((item) => ({ ...item, ...localPatch[item.imageAssetId] })),
+      })),
+    [initialResponse.batches, localPatch],
   )
 
-  const uploadsRef = useRef(uploads)
-  uploadsRef.current = uploads
+  const allItems = useMemo(
+    () => batches.flatMap((b) => b.items),
+    [batches],
+  )
+
+  const allItemsRef = useRef(allItems)
+  allItemsRef.current = allItems
 
   const selectedUpload = useMemo(
-    () => (selectedId ? uploads.find((u) => u.imageAssetId === selectedId) ?? null : null),
-    [uploads, selectedId],
+    () => (selectedId ? allItems.find((u) => u.imageAssetId === selectedId) ?? null : null),
+    [allItems, selectedId],
   )
 
   useEffect(() => {
@@ -102,8 +114,8 @@ export function StaffContributorUploadsClient({
       return
     }
     const next: Record<string, boolean> = {}
-    for (const upload of uploads) {
-      if (upload.canApprove) next[upload.imageAssetId] = true
+    for (const item of allItems) {
+      if (item.canApprove) next[item.imageAssetId] = true
     }
     setSelected(next)
   }
@@ -211,6 +223,45 @@ export function StaffContributorUploadsClient({
     } finally {
       setIsRejecting(false)
     }
+  }
+
+  function toggleBatch(batchId: string) {
+    setExpandedBatches((prev) => ({ ...prev, [batchId]: !prev[batchId] }))
+  }
+
+  function approveBatch(batchId: string) {
+    const batch = batches.find((b) => b.batchId === batchId)
+    if (!batch) return
+    const ids = batch.items.filter((item) => item.canApprove).map((item) => item.imageAssetId)
+    if (ids.length === 0) return
+    void approveIds(ids)
+  }
+
+  function rejectBatch(batchId: string) {
+    const batch = batches.find((b) => b.batchId === batchId)
+    if (!batch) return
+    const ids = batch.items.filter((item) => item.canApprove).map((item) => item.imageAssetId)
+    if (ids.length === 0) return
+    void rejectIds(ids)
+  }
+
+  function toggleSelectBatch(batchId: string) {
+    const batch = batches.find((b) => b.batchId === batchId)
+    if (!batch) return
+    const batchItems = batch.items
+    const allSelected = batchItems.filter((i) => i.canApprove).every((i) => selected[i.imageAssetId])
+    setSelected((prev) => {
+      const next = { ...prev }
+      for (const item of batchItems) {
+        if (!item.canApprove) continue
+        if (allSelected) {
+          delete next[item.imageAssetId]
+        } else {
+          next[item.imageAssetId] = true
+        }
+      }
+      return next
+    })
   }
 
   function buildQuery(overrides: Partial<ContributorUploadsQueryParams> = {}) {
@@ -368,11 +419,11 @@ export function StaffContributorUploadsClient({
   ])
 
   const approvableSelected = useMemo(
-    () => uploads.filter((upload) => selected[upload.imageAssetId] && upload.canApprove),
-    [uploads, selected],
+    () => allItems.filter((item) => selected[item.imageAssetId] && item.canApprove),
+    [allItems, selected],
   )
 
-  const visibleSelectableCount = uploads.filter((upload) => upload.canApprove).length
+  const visibleSelectableCount = allItems.filter((item) => item.canApprove).length
   const allSelectableSelected = visibleSelectableCount > 0 && approvableSelected.length === visibleSelectableCount
 
   const pagination = initialResponse.pagination
@@ -383,7 +434,7 @@ export function StaffContributorUploadsClient({
   const hasPrev = pagination.offset > 0
 
   function moveSelection(delta: number) {
-    const list = uploadsRef.current
+    const list = allItemsRef.current
     if (list.length === 0) return
     setSelectedId((prev) => {
       const idx = prev ? list.findIndex((u) => u.imageAssetId === prev) : -1
@@ -567,7 +618,7 @@ export function StaffContributorUploadsClient({
 
       <ActiveFilterChips currentParams={currentParams} buildQuery={buildQuery} />
 
-      {uploads.length === 0 ? (
+      {batches.length === 0 ? (
         <div className="rounded-lg border border-border bg-card px-6 py-16 text-center">
           <ImageOff className="mx-auto  text-muted-foreground" size={32} />
           <h3 className="mt-3 text-base font-semibold">No contributor uploads to review</h3>
@@ -589,14 +640,7 @@ export function StaffContributorUploadsClient({
                       onChange={(event) => toggleSelectAll(event.target.checked)}
                     />
                   </th>
-                  <Th>
-                    <SortLink
-                      label="Filename"
-                      href={hrefForSort("submitted")}
-                      active={effectiveSort === "submitted"}
-                      order={effectiveOrder}
-                    />
-                  </Th>
+                  <Th>Batch</Th>
                   <Th>
                     <SortLink
                       label="Contributor"
@@ -613,96 +657,254 @@ export function StaffContributorUploadsClient({
                       order={effectiveOrder}
                     />
                   </Th>
-                  <Th>Asset Type</Th>
-                  <Th>Submitted</Th>
-                  <Th>Fotokey</Th>
-                  <Th>Status</Th>
-                  <Th>Visibility</Th>
-                  <Th className="text-right">Batch</Th>
+                  <Th>Assets</Th>
+                  <Th>
+                    <SortLink
+                      label="Submitted"
+                      href={hrefForSort("submitted")}
+                      active={effectiveSort === "submitted"}
+                      order={effectiveOrder}
+                    />
+                  </Th>
+                  <Th>Type</Th>
+                  <Th className="text-right">Actions</Th>
                 </tr>
               </thead>
               <tbody>
-                {uploads.map((upload) => {
-                  const isChecked = Boolean(selected[upload.imageAssetId])
-                  const isRowSelected = selectedId === upload.imageAssetId
+                {batches.map((batch) => {
+                  const isExpanded = Boolean(expandedBatches[batch.batchId])
+                  const batchItems = batch.items
+                  const approvableInBatch = batchItems.filter((i) => i.canApprove)
+                  const allInBatchSelected =
+                    approvableInBatch.length > 0 &&
+                    approvableInBatch.every((i) => selected[i.imageAssetId])
+                  const someInBatchSelected = approvableInBatch.some(
+                    (i) => selected[i.imageAssetId],
+                  )
+
                   return (
-                    <tr
-                      key={upload.imageAssetId}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelectedId(upload.imageAssetId)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault()
-                          setSelectedId(upload.imageAssetId)
-                        }
-                      }}
-                      className={`cursor-pointer border-t border-border align-top outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring ${
-                        isRowSelected ? "bg-muted/50" : ""
-                      } ${isChecked ? "bg-accent-wash/30" : ""}`}
-                    >
-                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${upload.originalFileName}`}
-                          checked={isChecked}
-                          disabled={!upload.canApprove}
-                          onChange={() => toggleSelect(upload.imageAssetId, upload.canApprove)}
-                        />
-                      </td>
-                      <td className="max-w-[11rem] px-3 py-2">
-                        <p
-                          className="truncate text-sm font-medium text-foreground"
-                          title={upload.originalFileName}
-                        >
-                          {upload.originalFileName}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{formatSize(upload.sizeBytes)}</p>
-                      </td>
-                      <td className="px-3 py-2">
-                        <p>{upload.contributor.displayName}</p>
-                        {upload.contributor.legacyPhotographerId !== null ? (
-                          <p className="text-xs text-muted-foreground">
-                            Legacy ID #{upload.contributor.legacyPhotographerId}
-                          </p>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-2">
-                        <p>{upload.event?.name ?? "—"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(upload.event?.eventDate ?? null)}
-                          {upload.event?.city ? ` · ${upload.event.city}` : ""}
-                        </p>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {upload.assetType ?? "IMAGE"}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
-                        {formatDateTime(upload.batch.submittedAt ?? upload.createdAt)}
-                      </td>
-                      <td className="px-3 py-2 text-xs">
-                        {upload.fotokey ? (
-                          <span className="font-mono text-foreground">{upload.fotokey}</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <Badge tone="neutral">{upload.status}</Badge>
-                      </td>
-                      <td className="px-3 py-2">
-                        <Badge tone={upload.visibility === "PUBLIC" ? "ok" : "warn"}>{upload.visibility}</Badge>
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <Link
-                          href={`/staff/contributor-uploads/batches/${upload.batchId}`}
-                          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium hover:bg-muted"
+                    <Fragment key={batch.batchId}>
+                      {/* Batch header row */}
+                      <tr
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
+                        aria-label={`${isExpanded ? "Collapse" : "Expand"} batch ${batch.batchId.slice(0, 8)}`}
+                        className="cursor-pointer border-t border-border align-top bg-muted/30 outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                        onClick={() => toggleBatch(batch.batchId)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            toggleBatch(batch.batchId)
+                          }
+                        }}
+                      >
+                        <td
+                          className="px-3 py-2"
                           onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
                         >
-                          Open
-                        </Link>
-                      </td>
-                    </tr>
+                          <input
+                            type="checkbox"
+                            aria-label={`Select all in batch ${batch.batchId.slice(0, 8)}`}
+                            checked={allInBatchSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = !allInBatchSelected && someInBatchSelected
+                            }}
+                            disabled={approvableInBatch.length === 0}
+                            onChange={() => toggleSelectBatch(batch.batchId)}
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex items-center gap-1.5 text-left">
+                            <span
+                              className="text-xs text-muted-foreground transition-transform"
+                              aria-hidden="true"
+                            >
+                              {isExpanded ? "▼" : "▶"}
+                            </span>
+                            <span
+                              className="truncate font-mono text-xs font-medium text-foreground"
+                              title={batch.batchId}
+                            >
+                              {batch.batchId.slice(0, 8)}…
+                            </span>
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <p className="text-sm">{batch.contributor.displayName}</p>
+                          {batch.contributor.legacyPhotographerId !== null ? (
+                            <p className="text-xs text-muted-foreground">
+                              Legacy ID #{batch.contributor.legacyPhotographerId}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2">
+                          <p className="text-sm">{batch.event?.name ?? "—"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(batch.event?.eventDate ?? null)}
+                            {batch.event?.city ? ` · ${batch.event.city}` : ""}
+                          </p>
+                        </td>
+                        <td className="px-3 py-2 text-sm tabular-nums">
+                          {batch.assetCount}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                          {formatDateTime(batch.submittedAt ?? batch.createdAt)}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                          {batch.assetType ?? "IMAGE"}
+                        </td>
+                        <td
+                          className="px-3 py-2 text-right"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={
+                                approvableInBatch.length === 0 || isApproving
+                              }
+                              onClick={() => approveBatch(batch.batchId)}
+                            >
+                              <CheckCircle className="mr-1" size={14} />
+                              Approve {approvableInBatch.length > 0 ? approvableInBatch.length : ""}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={
+                                approvableInBatch.length === 0 || isRejecting
+                              }
+                              onClick={() => rejectBatch(batch.batchId)}
+                            >
+                              <XCircle className="mr-1" size={14} />
+                              Reject
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expanded item rows */}
+                      {isExpanded ? (
+                        <tr key={`${batch.batchId}-items`}>
+                          <td colSpan={8} className="border-t border-border/50 bg-background p-0">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="border-b border-border bg-muted/20">
+                                  <th className="w-10 px-3 py-1.5" />
+                                  <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Filename
+                                  </th>
+                                  <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Type
+                                  </th>
+                                  <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Fotokey
+                                  </th>
+                                  <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Status
+                                  </th>
+                                  <th className="px-3 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Visibility
+                                  </th>
+                                  <th className="px-3 py-1.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Batch
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {batchItems.map((item) => {
+                                  const isChecked = Boolean(selected[item.imageAssetId])
+                                  const isRowSelected = selectedId === item.imageAssetId
+                                  return (
+                                    <tr
+                                      key={item.imageAssetId}
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={() => setSelectedId(item.imageAssetId)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                          e.preventDefault()
+                                          setSelectedId(item.imageAssetId)
+                                        }
+                                      }}
+                                      className={`cursor-pointer border-t border-border/40 align-top outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring ${
+                                        isRowSelected ? "bg-muted/50" : ""
+                                      } ${isChecked ? "bg-accent-wash/30" : ""}`}
+                                    >
+                                      <td
+                                        className="px-3 py-2"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          aria-label={`Select ${item.originalFileName}`}
+                                          checked={isChecked}
+                                          disabled={!item.canApprove}
+                                          onChange={() =>
+                                            toggleSelect(item.imageAssetId, item.canApprove)
+                                          }
+                                        />
+                                      </td>
+                                      <td className="max-w-[14rem] px-3 py-2">
+                                        <p
+                                          className="truncate text-sm font-medium text-foreground"
+                                          title={item.originalFileName}
+                                        >
+                                          {item.originalFileName}
+                                        </p>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                          {formatSize(item.sizeBytes)}
+                                        </p>
+                                      </td>
+                                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                                        {item.assetType ?? "IMAGE"}
+                                      </td>
+                                      <td className="px-3 py-2 text-xs">
+                                        {item.fotokey ? (
+                                          <span className="font-mono text-foreground">
+                                            {item.fotokey}
+                                          </span>
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <Badge tone="neutral">{item.status}</Badge>
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <Badge
+                                          tone={
+                                            item.visibility === "PUBLIC" ? "ok" : "warn"
+                                          }
+                                        >
+                                          {item.visibility}
+                                        </Badge>
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        <Link
+                                          href={`/staff/contributor-uploads/batches/${item.batchId}`}
+                                          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs font-medium hover:bg-muted"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          Open
+                                        </Link>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   )
                 })}
               </tbody>
@@ -929,8 +1131,8 @@ export function StaffContributorUploadsClient({
 
       <footer className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          Showing {uploads.length} of {total.toLocaleString()} ({pagination.offset + 1}-
-          {Math.min(pagination.offset + uploads.length, total)})
+          Showing {batches.length} batches of {total.toLocaleString()} ({pagination.offset + 1}-
+          {Math.min(pagination.offset + batches.length, total)})
         </p>
         <div className="flex items-center gap-2">
           <Link

@@ -8,6 +8,7 @@ import {
   completeAdminContributorUploadReplaceService,
   getAdminContributorUploadOriginalService,
   getAdminContributorUploadBatchService,
+  listAdminContributorUploadBatchesService,
   listAdminContributorUploadsService,
   patchAdminContributorUploadMetadataService,
   presignAdminContributorUploadReplaceService,
@@ -116,6 +117,15 @@ internalAdminContributorUploadRoutes.get(
 );
 
 internalAdminContributorUploadRoutes.get(
+  "/api/v1/internal/admin/contributor-uploads/batches",
+  zValidator("query", adminContributorUploadListQuerySchema),
+  async (c) => {
+    const query = c.req.valid("query");
+    return await listAdminContributorUploadBatchesService(c.env, query);
+  },
+);
+
+internalAdminContributorUploadRoutes.get(
   "/api/v1/internal/admin/contributor-uploads/batches/:batchId",
   zValidator("param", adminContributorUploadBatchParamSchema),
   async (c) => {
@@ -150,6 +160,10 @@ internalAdminContributorUploadRoutes.all(
 );
 internalAdminContributorUploadRoutes.all(
   "/api/v1/internal/admin/contributor-uploads/:imageAssetId/original",
+  () => methodNotAllowed(),
+);
+internalAdminContributorUploadRoutes.all(
+  "/api/v1/internal/admin/contributor-uploads/batches",
   () => methodNotAllowed(),
 );
 internalAdminContributorUploadRoutes.all(

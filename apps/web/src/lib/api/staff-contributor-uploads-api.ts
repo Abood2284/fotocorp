@@ -57,6 +57,34 @@ export interface StaffContributorUploadsListResponse {
   pagination: { limit: number; offset: number; total: number }
 }
 
+export interface StaffContributorUploadBatchGroupDto {
+  batchId: string
+  batchStatus: string
+  assetType: string | null
+  submittedAt: string | null
+  createdAt: string
+  contributor: {
+    id: string
+    legacyPhotographerId: number | null
+    displayName: string
+  }
+  event: {
+    id: string
+    name: string
+    eventDate: string | null
+    city: string | null
+    location: string | null
+  } | null
+  assetCount: number
+  items: StaffContributorUploadDto[]
+}
+
+export interface StaffContributorUploadBatchesListResponse {
+  ok: true
+  batches: StaffContributorUploadBatchGroupDto[]
+  pagination: { limit: number; offset: number; total: number }
+}
+
 export interface StaffContributorUploadsApproveResponse {
   ok: true
   approvedCount: number
@@ -97,6 +125,29 @@ export async function listStaffContributorUploads(params: StaffContributorUpload
 
   return internalApiJson<StaffContributorUploadsListResponse>({
     path: withQuery(internalApiRoutes.adminContributorUploads(), search),
+    headers: await staffActorHeaders(),
+  })
+}
+
+export async function listStaffContributorUploadBatches(
+  params: StaffContributorUploadsListParams = {},
+) {
+  const search = new URLSearchParams()
+  if (params.status) search.set("status", params.status)
+  if (params.assetType && params.assetType !== "all") search.set("assetType", params.assetType)
+  if (params.eventId) search.set("eventId", params.eventId)
+  if (params.contributorId) search.set("contributorId", params.contributorId)
+  if (params.batchId) search.set("batchId", params.batchId)
+  if (params.q) search.set("q", params.q)
+  if (params.from) search.set("from", params.from)
+  if (params.to) search.set("to", params.to)
+  if (params.sort) search.set("sort", params.sort)
+  if (params.order) search.set("order", params.order)
+  if (params.limit !== undefined) search.set("limit", String(params.limit))
+  if (params.offset !== undefined) search.set("offset", String(params.offset))
+
+  return internalApiJson<StaffContributorUploadBatchesListResponse>({
+    path: withQuery(internalApiRoutes.adminContributorUploadBatches(), search),
     headers: await staffActorHeaders(),
   })
 }

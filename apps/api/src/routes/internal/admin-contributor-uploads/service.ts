@@ -201,6 +201,269 @@ export async function listAdminContributorUploadsService(
   });
 }
 
+interface BatchListRow {
+  batch_id: string;
+  batch_status: string;
+  asset_type: string | null;
+  batch_submitted_at: Date | string | null;
+  batch_created_at: Date | string;
+  contributor_id: string;
+  contributor_legacy_id: number | string | null;
+  contributor_display_name: string | null;
+  event_id: string | null;
+  event_name: string | null;
+  event_date: Date | string | null;
+  event_city: string | null;
+  event_location: string | null;
+  asset_count: number | string;
+}
+
+export async function listAdminContributorUploadBatchesService(
+  env: Env,
+  query: AdminContributorUploadListQuery,
+): Promise<Response> {
+  const database = httpDb(env);
+  const limit = query.limit ?? DEFAULT_LIMIT;
+  const offset = query.offset ?? 0;
+  const status = query.status ?? DEFAULT_STATUS;
+
+  const filters = buildBatchListFilters({ ...query, status, limit, offset });
+  const filterSql = filters.length > 0 ? sql.join(filters, sql` and `) : sql`true`;
+  const sort = query.sort ?? "submitted";
+  const order = query.order ?? "desc";
+  const orderBySql = buildBatchListOrderBy(sort, order);
+
+  const batchRows = await executeRows<BatchListRow>(
+    database,
+    sql`
+      select
+        b.id as batch_id,
+        b.status as batch_status,
+        b.asset_type as asset_type,
+        b.submitted_at as batch_submitted_at,
+        b.created_at as batch_created_at,
+        ph.id as contributor_id,
+        ph.legacy_photographer_id as contributor_legacy_id,
+        ph.display_name as contributor_display_name,
+        ev.id as event_id,
+        ev.name as event_name,
+        ev.event_date as event_date,
+        ev.city as event_city,
+        ev.location as event_location,
+        count(pui.id)::int as asset_count
+      from contributor_upload_batches b
+      join contributor_upload_items pui on pui.batch_id = b.id
+      join image_assets ia on ia.id = pui.image_asset_id
+      join contributors ph on ph.id = b.contributor_id
+      left join photo_events ev on ev.id = b.event_id
+      where ${filterSql}
+      group by b.id, ph.id, ev.id
+      ${orderBySql}
+      limit ${limit}
+      offset ${offset}
+    `,
+  );
+
+  const totalRows = await executeRows<{ total: string }>(
+    database,
+    sql`
+      select count(*)::text as total
+      from (
+        select b.id
+        from contributor_upload_batches b
+        join contributor_upload_items pui on pui.batch_id = b.id
+        join image_assets ia on ia.id = pui.image_asset_id
+        join contributors ph on ph.id = b.contributor_id
+        left join photo_events ev on ev.id = b.event_id
+        where ${filterSql}
+        group by b.id
+      ) sub
+    `,
+  );
+  const total = Number(totalRows[0]?.total ?? 0) || 0;
+
+  if (batchRows.length === 0) {
+    return json({
+      ok: true as const,
+      batches: [],
+      pagination: { limit, offset, total },
+    });
+  }
+
+  // Step 2: Fetch all items for the returned batches (no pagination within a batch)
+  const batchIds = batchRows.map((r) => r.batch_id);
+  const itemsFilters = buildListFilters({ ...query, status, limit, offset });
+  itemsFilters.push(
+    sql`pui.batch_id in (${sql.join(batchIds.map((id) => sql`${id}::uuid`), sql`, `)})`,
+  );
+  const itemsFilterSql =
+    itemsFilters.length > 0 ? sql.join(itemsFilters, sql` and `) : sql`true`;
+
+  const itemsRows = await executeRows<AdminUploadListRow>(
+    database,
+    sql`
+      select
+        ia.id as image_asset_id,
+        pui.id as upload_item_id,
+        pui.batch_id as batch_id,
+        coalesce(ia.original_file_name, pui.original_file_name) as original_file_name,
+        coalesce(ia.original_file_extension, pui.original_file_extension) as original_file_extension,
+        pui.mime_type as mime_type,
+        pui.size_bytes as size_bytes,
+        ia.status as status,
+        ia.visibility as visibility,
+        ia.source as source,
+        ia.fotokey as fotokey,
+        ph.id as contributor_id,
+        ph.legacy_photographer_id as contributor_legacy_id,
+        ph.display_name as contributor_display_name,
+        ev.id as event_id,
+        ev.name as event_name,
+        ev.event_date as event_date,
+        ev.city as event_city,
+        ev.location as event_location,
+        ac_cat.name as asset_category_name,
+        ev_cat.name as event_default_category_name,
+        b.status as batch_status,
+        b.asset_type as asset_type,
+        b.submitted_at as batch_submitted_at,
+        ia.created_at as created_at,
+        ia.updated_at as updated_at,
+        ia.who_is_in_picture as who_is_in_picture,
+        ia.caption as caption,
+        ia.keywords as keywords
+      from contributor_upload_items pui
+      join image_assets ia on ia.id = pui.image_asset_id
+      join contributor_upload_batches b on b.id = pui.batch_id
+      join contributors ph on ph.id = pui.contributor_id
+      left join photo_events ev on ev.id = ia.event_id
+      left join asset_categories ac_cat on ac_cat.id = ia.category_id
+      left join asset_categories ev_cat on ev_cat.id = ev.category_id
+      where ${itemsFilterSql}
+      order by ia.created_at desc, ia.id desc
+    `,
+  );
+
+  // Group items by batch_id
+  const itemsByBatch = new Map<string, AdminUploadListRow[]>();
+  for (const row of itemsRows) {
+    const bid = row.batch_id;
+    if (!itemsByBatch.has(bid)) itemsByBatch.set(bid, []);
+    itemsByBatch.get(bid)!.push(row);
+  }
+
+  // Preserve batch order from the paginated batch query
+  const batches = batchRows.map((batch) => ({
+    batchId: batch.batch_id,
+    batchStatus: batch.batch_status,
+    assetType: batch.asset_type,
+    submittedAt: toIso(batch.batch_submitted_at),
+    createdAt: toIso(batch.batch_created_at) ?? new Date(0).toISOString(),
+    contributor: {
+      id: batch.contributor_id,
+      legacyPhotographerId:
+        batch.contributor_legacy_id === null || batch.contributor_legacy_id === undefined
+          ? null
+          : Number(batch.contributor_legacy_id),
+      displayName: batch.contributor_display_name ?? "Unnamed contributor",
+    },
+    event: batch.event_id
+      ? {
+          id: batch.event_id,
+          name: batch.event_name ?? "Untitled event",
+          eventDate: toIso(batch.event_date),
+          city: batch.event_city ?? null,
+          location: batch.event_location ?? null,
+        }
+      : null,
+    assetCount: Number(batch.asset_count) || 0,
+    items: (itemsByBatch.get(batch.batch_id) ?? []).map(toUploadDto),
+  }));
+
+  return json({
+    ok: true as const,
+    batches,
+    pagination: { limit, offset, total },
+  });
+}
+
+function buildBatchListFilters(
+  query: AdminContributorUploadListQuery & {
+    status: "SUBMITTED" | "APPROVED" | "ACTIVE" | "all";
+    limit: number;
+    offset: number;
+  },
+): SQL[] {
+  const filters: SQL[] = [
+    sql`ia.media_type = 'IMAGE'`,
+    sql`ia.source = 'FOTOCORP'`,
+    sql`b.status = 'SUBMITTED'`,
+  ];
+
+  if (query.status === "SUBMITTED") {
+    filters.push(sql`ia.status = 'SUBMITTED' and ia.visibility = 'PRIVATE'`);
+  } else if (query.status === "APPROVED") {
+    filters.push(sql`ia.status = 'APPROVED' and ia.visibility = 'PRIVATE'`);
+  } else if (query.status === "ACTIVE") {
+    filters.push(sql`ia.status = 'ACTIVE' and ia.visibility = 'PUBLIC'`);
+  } else {
+    filters.push(sql`ia.status in ('SUBMITTED', 'APPROVED', 'ACTIVE')`);
+  }
+
+  if (query.assetType && query.assetType !== "all") {
+    filters.push(sql`b.asset_type = ${query.assetType}`);
+  }
+
+  if (query.eventId) filters.push(sql`b.event_id = ${query.eventId}::uuid`);
+  if (query.contributorId)
+    filters.push(sql`b.contributor_id = ${query.contributorId}::uuid`);
+  if (query.batchId) filters.push(sql`b.id = ${query.batchId}::uuid`);
+
+  if (query.q) {
+    const like = `%${query.q}%`;
+    filters.push(sql`(
+      coalesce(ia.original_file_name, '') ilike ${like}
+      or coalesce(pui.original_file_name, '') ilike ${like}
+      or coalesce(ia.headline, '') ilike ${like}
+      or coalesce(ia.caption, '') ilike ${like}
+      or coalesce(ia.keywords, '') ilike ${like}
+      or coalesce(ev.name, '') ilike ${like}
+      or coalesce(ph.display_name, '') ilike ${like}
+      or coalesce(ia.fotokey, '') ilike ${like}
+    )`);
+  }
+
+  if (query.from) {
+    filters.push(
+      sql`ia.created_at >= ${`${query.from}T00:00:00Z`}::timestamptz`,
+    );
+  }
+  if (query.to) {
+    filters.push(
+      sql`ia.created_at < (${`${query.to}T00:00:00Z`}::timestamptz + interval '1 day')`,
+    );
+  }
+
+  return filters;
+}
+
+function buildBatchListOrderBy(sort: string, order: "asc" | "desc"): SQL {
+  if (sort === "contributor") {
+    return order === "asc"
+      ? sql`order by lower(coalesce(ph.display_name, '')) asc, b.submitted_at desc nulls last, b.id desc`
+      : sql`order by lower(coalesce(ph.display_name, '')) desc, b.submitted_at desc nulls last, b.id desc`;
+  }
+  if (sort === "event") {
+    return order === "asc"
+      ? sql`order by lower(coalesce(ev.name, '')) asc nulls last, b.submitted_at desc nulls last, b.id desc`
+      : sql`order by lower(coalesce(ev.name, '')) desc nulls last, b.submitted_at desc nulls last, b.id desc`;
+  }
+  // Default: sort by batch submitted_at
+  return order === "asc"
+    ? sql`order by b.submitted_at asc nulls last, b.id asc`
+    : sql`order by b.submitted_at desc nulls last, b.id desc`;
+}
+
 export async function getAdminContributorUploadOriginalService(
   env: Env,
   imageAssetId: string,
