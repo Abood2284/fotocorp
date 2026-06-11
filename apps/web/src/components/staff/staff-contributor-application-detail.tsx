@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { AccessInquiryCloseButton } from "@/components/staff/access-inquiry-close-button"
 import { AccessInquiryGuidancePanel } from "@/components/staff/access-inquiry-guidance-panel"
 import { InquiryStatusBadge } from "@/components/staff/inquiry-status-badge"
+import { SubmissionAuditSection } from "@/components/staff/submission-audit-section"
 import { formatInquiryStatus } from "@/lib/staff/access-inquiry-labels"
 import { getContributorApplicationDetailGuidance } from "@/lib/staff/access-inquiry-guidance"
 
@@ -119,6 +120,8 @@ export function StaffContributorApplicationDetail({ inquiryId, initial }: StaffC
           <p className="mt-4 text-sm leading-relaxed text-foreground">{inquiry.applicationNotes}</p>
         ) : null}
       </section>
+
+      <SubmissionAuditSection submissionAudit={detail.submissionAudit} />
 
       {detail.pendingClaims.length > 0 ? (
         <section className="rounded-lg border border-border bg-card p-4">

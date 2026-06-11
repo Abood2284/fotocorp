@@ -66,6 +66,8 @@ interface AdminUserWithProfileRow extends AdminUserRow {
   profile_image_quality_preference: string | null;
   profile_royalty_free_quantity_range: string | null;
   profile_royalty_free_quality_preference: string | null;
+  profile_video_quantity_range: string | null;
+  profile_caricature_quantity_range: string | null;
   profile_created_at: Date | string | null;
   profile_updated_at: Date | string | null;
 }
@@ -286,6 +288,8 @@ async function getUserWithProfileByAuthId(db: DrizzleClient, authUserId: string)
       u.image_quality_preference as profile_image_quality_preference,
       u.royalty_free_quantity_range as profile_royalty_free_quantity_range,
       u.royalty_free_quality_preference as profile_royalty_free_quality_preference,
+      u.video_quantity_range as profile_video_quantity_range,
+      u.caricature_quantity_range as profile_caricature_quantity_range,
       u.created_at as profile_created_at,
       u.updated_at as profile_updated_at
     from users u
@@ -571,6 +575,8 @@ function mapUserWithProfileRow(row: AdminUserWithProfileRow) {
           imageQualityPreference: row.profile_image_quality_preference,
           royaltyFreeQuantityRange: row.profile_royalty_free_quantity_range,
           royaltyFreeQualityPreference: row.profile_royalty_free_quality_preference,
+          videoQuantityRange: row.profile_video_quantity_range,
+          caricatureQuantityRange: row.profile_caricature_quantity_range,
           createdAt: toIso(row.profile_created_at),
           updatedAt: toIso(row.profile_updated_at),
         }

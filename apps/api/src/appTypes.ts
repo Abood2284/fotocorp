@@ -40,6 +40,8 @@ export interface Env {
   JOBS_DRAIN_WEBHOOK_URL?: string;
   /** Shared secret; must match `JOBS_WAKE_SECRET` on the jobs VPS container. */
   JOBS_DRAIN_WEBHOOK_SECRET?: string;
+  /** Optional secret for hashing raw request IP addresses in audit logs. */
+  IP_HASH_SECRET?: string;
   LEGACY_FIXTURE_ROUTES_ENABLED?: string;
   /**
    * R2 S3 API — optional; required for contributor direct (presigned PUT) uploads, staging verification,

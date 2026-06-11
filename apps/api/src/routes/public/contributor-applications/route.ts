@@ -5,6 +5,7 @@ import type { Env } from "../../../appTypes"
 import type { AppRequestVariables } from "../../../db"
 import { createHttpDb } from "../../../db"
 import { submitContributorApplication } from "../../../lib/access-inquiries/contributor-application"
+import { getRequestAuditContext } from "../../../lib/request-audit-context"
 import { safeSendAccessInquiryEmail } from "../../../lib/email/email-service"
 import { AppError } from "../../../lib/errors"
 import { json } from "../../../lib/http"
@@ -32,6 +33,9 @@ publicContributorApplicationRoutes.post(
   zValidator("json", submitBodySchema),
   async (c) => {
     const body = c.req.valid("json")
+    const requestAudit = getRequestAuditContext(c.req.raw, {
+      ipHashSecret: c.env.IP_HASH_SECRET ?? null,
+    })
     const db = database(c.env)
     const result = await submitContributorApplication(db, {
       firstName: body.firstName,
@@ -41,6 +45,7 @@ publicContributorApplicationRoutes.post(
       phoneCountryCode: body.phoneCountryCode ?? null,
       phoneNumber: body.phoneNumber ?? null,
       applicationNotes: body.applicationNotes ?? null,
+      requestAudit,
     })
     if (body.email) {
       await safeSendAccessInquiryEmail(db, c.env, {

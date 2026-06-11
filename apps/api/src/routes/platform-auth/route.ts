@@ -11,6 +11,7 @@ import { AppError } from "../../lib/errors"
 import { zodValidationHook } from "../../lib/zod-validation-hook"
 import { methodNotAllowed } from "../../lib/route-errors"
 import { FOTOCORP_SESSION_COOKIE, isSecureAuthCookie } from "../../lib/auth/platform-session"
+import { getRequestAuditContext } from "../../lib/request-audit-context"
 import {
   changePlatformUserPassword,
   getPlatformSession,
@@ -122,11 +123,15 @@ platformAuthRoutes.post(
   }
 
   const body = c.req.valid("json")
+  const requestAudit = getRequestAuditContext(c.req.raw, {
+    ipHashSecret: c.env.IP_HASH_SECRET ?? null,
+  })
   const result = await signUpPlatformUser(database, {
     profile,
     email: body.email,
     password: body.password,
     displayName: body.name ?? `${body.firstName} ${body.lastName}`.trim(),
+    requestAudit,
   })
 
   if (result.user.id) {

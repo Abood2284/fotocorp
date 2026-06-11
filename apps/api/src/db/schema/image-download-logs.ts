@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigint, check, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, check, index, integer, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { imageAssets } from "./image-assets";
 
 export const IMAGE_DOWNLOAD_SIZES = ["WEB", "MEDIUM", "LARGE"] as const;
@@ -21,6 +21,12 @@ export const imageDownloadLogs = pgTable(
     failureCode: text("failure_code"),
     userAgent: text("user_agent"),
     ipHash: text("ip_hash"),
+    ipAddress: text("ip_address"),
+    ipCountry: varchar("ip_country", { length: 2 }),
+    ipCity: text("ip_city"),
+    ipRegion: text("ip_region"),
+    ipRegionCode: varchar("ip_region_code", { length: 32 }),
+    cfRay: text("cf_ray"),
     source: text("source").default("LEGACY_MIGRATION").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -34,5 +40,7 @@ export const imageDownloadLogs = pgTable(
     index("image_download_logs_download_status_idx").on(table.downloadStatus),
     index("image_download_logs_created_at_idx").on(table.createdAt),
     index("image_download_logs_failure_code_idx").on(table.failureCode),
+    index("image_download_logs_ip_hash_created_at_idx").on(table.ipHash, table.createdAt),
+    index("image_download_logs_ip_country_created_at_idx").on(table.ipCountry, table.createdAt),
   ],
 );

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { fetchSubscriberAssetDownloadCheck, type SubscriberDownloadSize } from "@/lib/api/subscriber-downloads-api"
 import { getCurrentAuthUser } from "@/lib/app-user"
+import { getRequestAuditContext } from "@/lib/server/request-audit-context"
 
 interface AssetDownloadCheckRouteContext {
   params: Promise<{ assetId: string }>
@@ -33,13 +34,15 @@ export async function POST(request: Request, context: AssetDownloadCheckRouteCon
   }
 
   let upstream: Response
+  const requestAudit = getRequestAuditContext(request, {
+    ipHashSecret: process.env.IP_HASH_SECRET ?? null,
+  })
   try {
     upstream = await fetchSubscriberAssetDownloadCheck({
       assetId,
       authUserId: authUser.id,
       size,
-      userAgent: request.headers.get("user-agent"),
-      requestIp: getClientIp(request),
+      requestAudit,
     })
   } catch {
     return NextResponse.json(
@@ -63,12 +66,4 @@ export async function POST(request: Request, context: AssetDownloadCheckRouteCon
   }
 
   return NextResponse.json({ ok: true as const })
-}
-
-function getClientIp(request: Request) {
-  return (
-    request.headers.get("cf-connecting-ip")
-    ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    ?? null
-  )
 }

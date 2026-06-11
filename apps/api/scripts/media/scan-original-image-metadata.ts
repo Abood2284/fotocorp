@@ -16,6 +16,7 @@ import type {
 
 interface CliOptions {
   dryRun: boolean
+  write: boolean
   limit?: number
   batchSize: number
   offset: number
@@ -99,6 +100,8 @@ interface Summary {
   sharpMetadataFailures: number
   dbRowsWouldInsert: number
   dbRowsWouldUpdate: number
+  dbRowsInserted: number
+  dbRowsUpdated: number
   dbWritesPerformed: number
   distributions: DistributionCounts
   failedAssetSamples: FailedAssetSample[]
@@ -166,9 +169,6 @@ loadLocalEnv()
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
-  if (!options.dryRun) {
-    throw new Error("This script currently supports --dry-run only. Database writes are not implemented yet.")
-  }
 
   const databaseUrl = requiredEnv("DATABASE_URL")
   const r2Config = getR2Config()
@@ -182,6 +182,8 @@ async function main() {
     sharpMetadataFailures: 0,
     dbRowsWouldInsert: 0,
     dbRowsWouldUpdate: 0,
+    dbRowsInserted: 0,
+    dbRowsUpdated: 0,
     dbWritesPerformed: 0,
     distributions: createEmptyDistributionCounts(),
     failedAssetSamples: [],
@@ -197,7 +199,7 @@ async function main() {
     const batches = chunk(candidates, options.batchSize)
     for (const [batchIndex, batch] of batches.entries()) {
       for (const row of batch) {
-        await processCandidate(row, r2Config, options, summary)
+        await processCandidate(pool, row, r2Config, options, summary)
       }
 
       console.log(
@@ -212,6 +214,7 @@ async function main() {
         {
           event: "scan-original-image-metadata.summary",
           dryRun: options.dryRun,
+          write: options.write,
           durationMs,
           summary,
         },
@@ -223,6 +226,7 @@ async function main() {
 }
 
 async function processCandidate(
+  pool: PgPool,
   row: CandidateRow,
   r2Config: R2Config,
   options: CliOptions,
@@ -232,6 +236,7 @@ async function processCandidate(
   if (!storageKey) {
     summary.assetsSkipped += 1
     summary.missingOriginalStorageKey += 1
+    await maybeWriteFailedMetadata(pool, row, options, summary, "missing_original_storage_key")
     recordFailedAssetSample(summary, {
       imageAssetId: row.id,
       fotokey: row.fotokey,
@@ -254,6 +259,7 @@ async function processCandidate(
     if (isR2NotFoundError(error)) {
       summary.assetsSkipped += 1
       summary.r2ObjectMissing += 1
+      await maybeWriteFailedMetadata(pool, row, options, summary, "r2_object_missing")
       recordFailedAssetSample(summary, {
         imageAssetId: row.id,
         fotokey: row.fotokey,
@@ -271,6 +277,7 @@ async function processCandidate(
 
     summary.assetsSkipped += 1
     summary.sharpMetadataFailures += 1
+    await maybeWriteFailedMetadata(pool, row, options, summary, `r2_read_failed: ${conciseError(error)}`)
     recordFailedAssetSample(summary, {
       imageAssetId: row.id,
       fotokey: row.fotokey,
@@ -293,6 +300,7 @@ async function processCandidate(
   } catch (error) {
     summary.assetsSkipped += 1
     summary.sharpMetadataFailures += 1
+    await maybeWriteFailedMetadata(pool, row, options, summary, `sharp_metadata_failed: ${conciseError(error)}`)
     recordFailedAssetSample(summary, {
       imageAssetId: row.id,
       fotokey: row.fotokey,
@@ -320,12 +328,195 @@ async function processCandidate(
     originalStorageKey: storageKey,
     status: computed.metadataScanStatus,
     computed,
-    writeAction: row.metadata_id ? "would-update" : "would-insert",
+    writeAction: options.write
+      ? row.metadata_id
+        ? "update"
+        : "insert"
+      : row.metadata_id
+        ? "would-update"
+        : "would-insert",
   })
 
-  if (!options.dryRun) {
-    throw new Error("Database writes are not implemented.")
+  if (options.write) {
+    await writeSuccessMetadata(pool, row, computed, summary)
   }
+}
+
+async function maybeWriteFailedMetadata(
+  pool: PgPool,
+  row: CandidateRow,
+  options: CliOptions,
+  summary: Summary,
+  error: string,
+) {
+  if (row.metadata_id) summary.dbRowsWouldUpdate += 1
+  else summary.dbRowsWouldInsert += 1
+
+  if (!options.write) return
+
+  await withDbRetry("writeFailedMetadata", () =>
+    pool.query(
+      `
+        insert into image_assets_metadata (
+          image_asset_id,
+          technical_metadata_scanned_at,
+          metadata_scan_status,
+          metadata_scan_error,
+          updated_at
+        )
+        values ($1::uuid, now(), 'FAILED', $2, now())
+        on conflict (image_asset_id) do update set
+          technical_metadata_scanned_at = excluded.technical_metadata_scanned_at,
+          metadata_scan_status = excluded.metadata_scan_status,
+          metadata_scan_error = excluded.metadata_scan_error,
+          updated_at = now()
+      `,
+      [row.id, truncateMetadataScanError(error)],
+    ),
+  )
+
+  recordDbWrite(summary, row.metadata_id)
+}
+
+async function writeSuccessMetadata(
+  pool: PgPool,
+  row: CandidateRow,
+  computed: ComputedMetadataRow,
+  summary: Summary,
+) {
+  await withDbRetry("writeSuccessMetadata", () =>
+    pool.query(
+      `
+        insert into image_assets_metadata (
+          image_asset_id,
+          original_width,
+          original_height,
+          display_width,
+          display_height,
+          original_long_edge,
+          original_short_edge,
+          original_megapixels,
+          original_dpi,
+          original_resolution_unit,
+          original_format,
+          original_size_bytes,
+          original_color_space,
+          original_channels,
+          original_bit_depth,
+          original_has_alpha,
+          original_orientation,
+          original_has_profile,
+          original_has_exif,
+          original_has_iptc,
+          original_has_xmp,
+          source_quality_bucket,
+          download_quality_ceiling,
+          can_generate_medium,
+          can_generate_low,
+          technical_metadata_scanned_at,
+          metadata_scan_status,
+          metadata_scan_error,
+          updated_at
+        )
+        values (
+          $1::uuid,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8::numeric,
+          $9,
+          $10,
+          $11,
+          $12,
+          $13,
+          $14,
+          $15,
+          $16,
+          $17,
+          $18,
+          $19,
+          $20,
+          $21,
+          $22,
+          $23,
+          $24,
+          $25,
+          $26::timestamptz,
+          'SUCCESS',
+          null,
+          now()
+        )
+        on conflict (image_asset_id) do update set
+          original_width = excluded.original_width,
+          original_height = excluded.original_height,
+          display_width = excluded.display_width,
+          display_height = excluded.display_height,
+          original_long_edge = excluded.original_long_edge,
+          original_short_edge = excluded.original_short_edge,
+          original_megapixels = excluded.original_megapixels,
+          original_dpi = excluded.original_dpi,
+          original_resolution_unit = excluded.original_resolution_unit,
+          original_format = excluded.original_format,
+          original_size_bytes = excluded.original_size_bytes,
+          original_color_space = excluded.original_color_space,
+          original_channels = excluded.original_channels,
+          original_bit_depth = excluded.original_bit_depth,
+          original_has_alpha = excluded.original_has_alpha,
+          original_orientation = excluded.original_orientation,
+          original_has_profile = excluded.original_has_profile,
+          original_has_exif = excluded.original_has_exif,
+          original_has_iptc = excluded.original_has_iptc,
+          original_has_xmp = excluded.original_has_xmp,
+          source_quality_bucket = excluded.source_quality_bucket,
+          download_quality_ceiling = excluded.download_quality_ceiling,
+          can_generate_medium = excluded.can_generate_medium,
+          can_generate_low = excluded.can_generate_low,
+          technical_metadata_scanned_at = excluded.technical_metadata_scanned_at,
+          metadata_scan_status = excluded.metadata_scan_status,
+          metadata_scan_error = excluded.metadata_scan_error,
+          updated_at = now()
+      `,
+      [
+        computed.imageAssetId,
+        computed.originalWidth,
+        computed.originalHeight,
+        computed.displayWidth,
+        computed.displayHeight,
+        computed.originalLongEdge,
+        computed.originalShortEdge,
+        computed.originalMegapixels,
+        computed.originalDpi,
+        computed.originalResolutionUnit,
+        computed.originalFormat,
+        computed.originalSizeBytes,
+        computed.originalColorSpace,
+        computed.originalChannels,
+        computed.originalBitDepth,
+        computed.originalHasAlpha,
+        computed.originalOrientation,
+        computed.originalHasProfile,
+        computed.originalHasExif,
+        computed.originalHasIptc,
+        computed.originalHasXmp,
+        computed.sourceQualityBucket,
+        computed.downloadQualityCeiling,
+        computed.canGenerateMedium,
+        computed.canGenerateLow,
+        computed.technicalMetadataScannedAt,
+      ],
+    ),
+  )
+
+  recordDbWrite(summary, row.metadata_id)
+}
+
+function recordDbWrite(summary: Summary, hadExistingRow: string | null) {
+  if (hadExistingRow) summary.dbRowsUpdated += 1
+  else summary.dbRowsInserted += 1
+  summary.dbWritesPerformed += 1
 }
 
 async function computeMetadataFromBuffer(imageAssetId: string, buffer: Buffer): Promise<ComputedMetadataRow> {
@@ -457,7 +648,8 @@ function toPositiveInt(value: number | undefined): number | null {
 }
 
 async function selectCandidates(pool: PgPool, options: CliOptions): Promise<CandidateRow[]> {
-  const params: unknown[] = [options.onlyMissing]
+  const shouldOnlySelectMissing = options.onlyMissing && !options.assetId
+  const params: unknown[] = [shouldOnlySelectMissing]
   const filters = [
     "ia.media_type = 'IMAGE'",
     "($1::boolean = false or iam.id is null)",
@@ -505,6 +697,7 @@ function printStartup(options: CliOptions, selected: number) {
       {
         event: "scan-original-image-metadata.start",
         dryRun: options.dryRun,
+        write: options.write,
         selected,
         limit: options.limit ?? "all",
         offset: options.offset,
@@ -526,7 +719,7 @@ function printAssetResult(input: {
   status: MetadataScanStatus | "SKIPPED"
   error?: string
   computed?: ComputedMetadataRow
-  writeAction?: "would-insert" | "would-update"
+  writeAction?: "would-insert" | "would-update" | "insert" | "update"
 }) {
   const payload: Record<string, unknown> = {
     event: "scan-original-image-metadata.asset",
@@ -561,6 +754,7 @@ function parseArgs(args: string[]): CliOptions {
 
   const options: CliOptions = {
     dryRun: false,
+    write: false,
     batchSize: 25,
     offset: 0,
     onlyMissing: true,
@@ -579,6 +773,7 @@ function parseArgs(args: string[]): CliOptions {
     }
 
     if (arg === "--dry-run") options.dryRun = true
+    else if (arg === "--write") options.write = true
     else if (arg === "--limit") options.limit = parsePositiveInteger(next(), "limit")
     else if (arg === "--batch-size") options.batchSize = parsePositiveInteger(next(), "batch-size")
     else if (arg === "--offset") options.offset = parseNonNegativeInteger(next(), "offset")
@@ -596,8 +791,14 @@ function parseArgs(args: string[]): CliOptions {
     }
   }
 
-  if (!options.dryRun) {
-    throw new Error("--dry-run is required for now.")
+  if (!options.dryRun && !options.write) {
+    throw new Error("Choose an explicit mode: pass --dry-run for no DB writes or --write for controlled DB writes.")
+  }
+  if (options.dryRun && options.write) {
+    throw new Error("Choose only one mode: --dry-run and --write cannot be combined.")
+  }
+  if (options.write && options.limit === undefined && !options.assetId) {
+    throw new Error("--write requires --limit or --asset-id to prevent accidental full-corpus writes.")
   }
   if (options.batchSize > 500) throw new Error("--batch-size must be 500 or lower.")
   if (options.r2RetryAttempts > 20) throw new Error("--r2-retry-attempts must be 20 or lower.")
@@ -608,13 +809,15 @@ function parseArgs(args: string[]): CliOptions {
 
 function printHelp() {
   console.log(`
-Scan original image technical metadata with Sharp (dry-run only; no DB writes).
+Scan original image technical metadata with Sharp.
 
 Usage:
   pnpm --dir apps/api run media:scan-original-metadata -- --dry-run --limit 10
+  pnpm --dir apps/api run media:scan-original-metadata -- --write --limit 25
 
 Options:
-  --dry-run                 Required for now
+  --dry-run                 Print rows that would be written without DB writes
+  --write                   Write controlled image_assets_metadata upserts
   --limit <n>
   --batch-size <n>          Default: 25
   --offset <n>              Default: 0
@@ -950,6 +1153,10 @@ function r2ErrorInfo(error: unknown) {
 function conciseError(error: unknown) {
   const message = errorMessage(error)
   return message.length > 240 ? `${message.slice(0, 237)}...` : message
+}
+
+function truncateMetadataScanError(error: string) {
+  return error.length > 500 ? `${error.slice(0, 497)}...` : error
 }
 
 function errorMessage(error: unknown) {

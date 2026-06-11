@@ -32,6 +32,12 @@ export default function PrivacyPage() {
             <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed">
               We collect information to authenticate users, manage licensing inquiries, and enforce download quotas. Better Auth manages core credentials and sessions (emails, passwords, and lowercase usernames). Registration details, such as interested asset types and organization profiles, are stored separately in user profiles.
             </p>
+            <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed">
+              We collect technical request information such as IP address, approximate location derived from IP or network metadata (for example country, city, or region where available), browser or user-agent information, Cloudflare request identifiers, registration and application submission activity, and download activity. We use this information for account security, fraud prevention, entitlement enforcement, licensing compliance, abuse investigation, platform audit, and service reliability.
+            </p>
+            <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed">
+              Approximate location data is derived from network or request metadata and may not reflect an applicant&apos;s submitted address or physical location. It is not GPS-level tracking and may be incomplete or imprecise.
+            </p>
           </section>
 
           {/* Section 2 */}
@@ -40,7 +46,10 @@ export default function PrivacyPage() {
               2. Download and Download Logs
             </h2>
             <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed">
-              To support license verification and quota management, we maintain detailed download logs containing timestamp records and associated download size parameters. This activity logging is essential to verify subscriber compliance with quality caps and entitlement quotas.
+              When you download licensed content, we may log the account, asset, selected download size or quality, timestamp, entitlement or quota result, and related technical request metadata. These logs help us enforce subscription terms, investigate abuse, and maintain licensing records.
+            </p>
+            <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed">
+              Download activity logging also supports license verification and quota management, including quality caps and entitlement limits for subscribers.
             </p>
           </section>
 
@@ -52,6 +61,9 @@ export default function PrivacyPage() {
             <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed">
               Fotocorp secures original high-resolution assets within Cloudflare R2 object storage. Original file storage keys, bucket names, and direct URLs are kept strictly confidential behind our server-side proxy tunnels and are never exposed to browser-visible payloads.
             </p>
+            <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed">
+              Access to sensitive technical metadata is restricted based on internal role permissions. Authorized staff may access account, application, and download records for support, review, abuse investigation, and licensing enforcement.
+            </p>
           </section>
 
           {/* Section 4 */}
@@ -60,7 +72,7 @@ export default function PrivacyPage() {
               4. Contributor Information
             </h2>
             <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed">
-              For photographers and contributors, session and upload activity are managed securely under separate contributor boundaries. We collect upload batches and associate event metadata with numeric photographer IDs to preserve catalog integrity.
+              For photographers and contributors, session and upload activity are managed securely under separate contributor boundaries. We collect upload batches and associate event metadata with numeric photographer IDs to preserve catalog integrity. Contributor application submissions may also record technical request metadata associated with the submission event.
             </p>
           </section>
         </div>
@@ -71,7 +83,7 @@ export default function PrivacyPage() {
               Security
             </h3>
             <p className="fc-body-serif-md text-sm text-[#757575] leading-relaxed">
-              Your credentials are encrypted using industry-standard hashing algorithms. We restrict internal staff access to subscriber entitlements through hashed sessions and staff audit logs.
+              Your credentials are encrypted using industry-standard hashing algorithms. We restrict internal staff access to subscriber entitlements, inquiry records, and audit logs based on role permissions.
             </p>
           </div>
         </div>

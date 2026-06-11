@@ -71,6 +71,22 @@ export interface ContributorTopDownloadedImage {
   cardPreviewAvailable: boolean
 }
 
+export interface ContributorDownloadRow {
+  imageAssetId: string
+  legacyImageCode: string | null
+  whoIsInPicture: string | null
+  headline: string | null
+  eventName: string | null
+  downloadCount: number
+  lastDownloadedAt: string | null
+}
+
+export interface ContributorDownloadsResponse {
+  ok: true
+  downloads: ContributorDownloadRow[]
+  pagination: { limit: number; offset: number; total: number }
+}
+
 export interface ContributorRecentUpload {
   imageAssetId: string
   legacyImageCode: string | null
@@ -348,6 +364,31 @@ export async function getContributorImages(
 
 export async function getContributorAnalyticsSummary(options: ContributorRequestOptions = {}) {
   return contributorJson<ContributorAnalyticsSummaryResponse>("/analytics/summary", {
+    method: "GET",
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export interface ContributorDownloadsParams {
+  limit?: number
+  offset?: number
+  sort?: "top" | "recent"
+  from?: string
+  to?: string
+}
+
+export async function getContributorDownloads(
+  params: ContributorDownloadsParams = {},
+  options: ContributorRequestOptions = {},
+) {
+  const search = new URLSearchParams()
+  if (params.limit !== undefined) search.set("limit", String(params.limit))
+  if (params.offset !== undefined) search.set("offset", String(params.offset))
+  if (params.sort) search.set("sort", params.sort)
+  if (params.from) search.set("from", params.from)
+  if (params.to) search.set("to", params.to)
+  const query = search.toString()
+  return contributorJson<ContributorDownloadsResponse>(`/downloads${query ? `?${query}` : ""}`, {
     method: "GET",
     cookieHeader: options.cookieHeader,
   })

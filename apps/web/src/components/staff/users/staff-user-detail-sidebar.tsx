@@ -218,7 +218,7 @@ export function StaffUserDetailSidebar({ authUserId, onClose, onUpdate }: StaffU
                 <ChevronRight size={12} className="transition-transform group-open:rotate-90" />
                 Registration
                 <span className="ml-auto text-[10px] font-normal normal-case text-muted-foreground">
-                  {user.profile ? "14 fields" : "No data"}
+                  {user.profile ? "16 fields" : "No data"}
                 </span>
               </summary>
               {user.profile ? (
@@ -248,6 +248,8 @@ export function StaffUserDetailSidebar({ authUserId, onClose, onUpdate }: StaffU
                   <Row label="Editorial quantity" value={user.profile.imageQuantityRange ?? "—"} />
                   <Row label="Royalty Free quality" value={user.profile.royaltyFreeQualityPreference ?? "—"} />
                   <Row label="Royalty Free quantity" value={user.profile.royaltyFreeQuantityRange ?? "—"} />
+                  <Row label="Video quantity" value={user.profile.videoQuantityRange ?? "—"} />
+                  <Row label="Caricature quantity" value={user.profile.caricatureQuantityRange ?? "—"} />
                 </dl>
               ) : (
                 <p className="text-xs text-muted-foreground">No registration profile.</p>

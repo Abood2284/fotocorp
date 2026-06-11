@@ -1,5 +1,12 @@
 import { sql, type SQL } from "drizzle-orm";
+import type { Env } from "../../../appTypes";
 import type { DrizzleClient } from "../../../db";
+import { toDerivativeVariant } from "../../../lib/assets/public-catalog-sql";
+import { getR2Object } from "../../../lib/r2";
+import {
+  parseMediaPreviewVariant,
+  type MediaPreviewVariant,
+} from "../../../lib/media/preview-token";
 import type { ContributorSessionResult } from "../auth/service";
 
 const DEFAULT_LIMIT = 24;
@@ -77,6 +84,89 @@ export async function listPhotographerImages(
   };
 }
 
+export async function streamContributorImagePreview(
+  db: DrizzleClient,
+  session: ContributorSessionResult,
+  env: Env,
+  imageAssetId: string,
+  variantParam: string,
+): Promise<Response> {
+  if (!isUuid(imageAssetId)) {
+    return previewErrorResponse(400, "INVALID_ASSET_ID", "Asset id is invalid.");
+  }
+
+  let variant: MediaPreviewVariant;
+  try {
+    variant = parseMediaPreviewVariant(variantParam);
+  } catch {
+    return previewErrorResponse(400, "INVALID_VARIANT", "Unsupported preview variant.");
+  }
+
+  const assetRows = await executeRows<{
+    id: string;
+    contributor_id: string;
+    original_exists_in_storage: boolean | null;
+  }>(db, sql`
+    select id, contributor_id, original_exists_in_storage
+    from image_assets
+    where id = ${imageAssetId}::uuid
+    limit 1
+  `);
+  const asset = assetRows[0];
+  if (!asset) {
+    return previewErrorResponse(404, "ASSET_NOT_FOUND", "Asset was not found.");
+  }
+
+  if (asset.contributor_id !== session.contributor.id) {
+    return previewErrorResponse(403, "FORBIDDEN", "You do not have access to this image.");
+  }
+
+  const derivativeRows = await executeRows<{
+    id: string;
+    mime_type: string;
+    storage_key: string;
+    generation_status: string;
+  }>(db, sql`
+    select id, mime_type, storage_key, generation_status
+    from image_derivatives
+    where image_asset_id = ${imageAssetId}::uuid
+      and variant = ${toDerivativeVariant(variant)}
+      and generation_status = 'READY'
+    limit 1
+  `);
+  const derivative = derivativeRows[0];
+  if (!derivative) {
+    return previewErrorResponse(404, "DERIVATIVE_NOT_READY", "Preview is not available yet.");
+  }
+
+  if (!env.MEDIA_PREVIEWS_BUCKET) {
+    return previewErrorResponse(500, "PREVIEW_BUCKET_NOT_CONFIGURED", "Preview service is not configured.");
+  }
+
+  try {
+    const object = await getR2Object(env.MEDIA_PREVIEWS_BUCKET, derivative.storage_key);
+    if (!object?.body) {
+      return previewErrorResponse(404, "DERIVATIVE_OBJECT_NOT_FOUND", "Preview file is not available yet.");
+    }
+
+    const headers = new Headers();
+    headers.set("Content-Type", derivative.mime_type ?? object.contentType ?? "image/webp");
+    headers.set("Content-Disposition", "inline");
+    headers.set("Cache-Control", "private, no-store");
+    headers.set("X-Content-Type-Options", "nosniff");
+    headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    if (object.etag) headers.set("ETag", object.etag);
+    if (object.contentLength !== null && object.contentLength !== undefined) {
+      headers.set("Content-Length", String(object.contentLength));
+    }
+    if (object.uploaded) headers.set("Last-Modified", object.uploaded.toUTCString());
+
+    return new Response(object.body, { status: 200, headers });
+  } catch {
+    return previewErrorResponse(502, "R2_ERROR", "Preview storage is temporarily unavailable.");
+  }
+}
+
 function mapImageRow(row: PhotographerImageRow) {
   return {
     id: row.id,
@@ -125,4 +215,21 @@ async function executeRows<T>(db: DrizzleClient, query: SQL): Promise<T[]> {
   if (Array.isArray(result)) return result as T[];
   if (result && typeof result === "object" && "rows" in result && Array.isArray(result.rows)) return result.rows as T[];
   return [];
+}
+
+function previewErrorResponse(status: number, code: string, message: string): Response {
+  return Response.json(
+    { error: { code, message } },
+    {
+      status,
+      headers: {
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+      },
+    },
+  );
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

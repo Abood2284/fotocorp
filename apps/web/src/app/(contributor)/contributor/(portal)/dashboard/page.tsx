@@ -1,64 +1,68 @@
+import Link from "next/link"
 
 import { getContributorAnalyticsSummary } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
 import {
+  ArrowUpRight,
   BarChart3,
+  Calendar,
+  CloudUpload,
   Download,
   ImagePlus,
   Layers,
   TrendingUp,
   type LucideIcon,
-} from "lucide-react";
+} from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 export const metadata = {
-  title: "Contributor Dashboard",
+  title: "Dashboard — Contributor",
 }
 
 function StatCard({
   title,
-  primaryValue,
-  primaryLabel,
-  secondaryStats,
-  icon: Icon
+  value,
+  subtitle,
+  icon: Icon,
+  href,
 }: {
   title: string
-  primaryValue: number
-  primaryLabel: string
-  secondaryStats: { label: string; value: number }[]
+  value: number
+  subtitle: string
   icon: LucideIcon
+  href?: string
 }) {
-  return (
-    <div className="group flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-6 md:p-8 transition-all hover:bg-muted/30">
-      <div className="flex items-center justify-between text-muted-foreground">
-        <span className="text-xs font-semibold uppercase tracking-[0.15em]">
+  const content = (
+    <div className="group relative flex flex-col rounded-xl border border-border bg-card p-5 transition-all hover:border-border/80 hover:shadow-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           {title}
         </span>
-        <Icon className="h-4 w-4" />
-      </div>
-
-      <div className="mt-8 md:mt-12">
-        <p className="text-4xl md:text-5xl font-light tabular-nums tracking-tighter text-foreground">
-          {primaryValue}
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">{primaryLabel}</p>
-      </div>
-
-      {secondaryStats.length > 0 && (
-        <div className="mt-6 flex items-center gap-6 border-t border-border pt-4">
-          {secondaryStats.map((stat) => (
-            <div key={stat.label}>
-              <p className="text-lg md:text-xl font-medium tabular-nums text-foreground">
-                {stat.value}
-              </p>
-              <p className="mt-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                {stat.label}
-              </p>
-            </div>
-          ))}
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground group-hover:bg-muted">
+          <Icon className="h-4 w-4" />
         </div>
-      )}
+      </div>
+      <p className="mt-4 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+        {value.toLocaleString()}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      {href ? (
+        <ArrowUpRight className="absolute right-4 top-4 h-4 w-4 text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100" />
+      ) : null}
     </div>
-  );
+  )
+
+  if (href) {
+    return <Link href={href}>{content}</Link>
+  }
+  return content
+}
+
+function formatDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(date)
 }
 
 export default async function ContributorDashboardPage() {
@@ -68,128 +72,175 @@ export default async function ContributorDashboardPage() {
   const analyticsResult = await getContributorAnalyticsSummary({ cookieHeader }).catch(() => null)
   const summary = analyticsResult?.summary
   const topDownloaded = analyticsResult?.topDownloadedImages ?? []
+  const recentUploads = analyticsResult?.recentUploads ?? []
   const analyticsFailed = !analyticsResult
 
   return (
-    <div className="space-y-8 lg:space-y-12">
-      <div className="flex flex-col gap-12 lg:gap-16">
-        {/* Header */}
-        <header className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-3">
-            <h1 className="text-3xl font-medium tracking-tight text-foreground md:text-4xl">
-              Welcome, {session.contributor.displayName}
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground max-w-xl">
-              Overview of your portfolio performance, subscriber downloads, and recent uploads.
-            </p>
-            {analyticsFailed && (
-              <p className="mt-2 text-sm text-destructive">
-                Analytics could not be loaded at this time.
-              </p>
-            )}
-          </div>
-          
-        </header>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Contributor Dashboard</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            Welcome, {session.contributor.displayName}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Portfolio performance, subscriber downloads, and recent activity.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm">
+            <Link href="/contributor/uploads/new">
+              <CloudUpload className="mr-1.5" size={16} />
+              New upload
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/contributor/uploads">View uploads</Link>
+          </Button>
+        </div>
+      </div>
 
-        {summary ? (
-          <div className="grid gap-4 md:gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {/* Published Portfolio */}
-            <div className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-6 md:p-8 transition-all hover:bg-muted/30">
-               <div className="relative z-10 flex items-center justify-between text-muted-foreground">
-                 <span className="text-xs font-semibold uppercase tracking-[0.15em]">Published</span>
-                 <BarChart3 size={16} />
-               </div>
-               <div className="relative z-10 mt-12 md:mt-16">
-                 <p className="text-4xl md:text-5xl font-light tracking-tighter tabular-nums text-foreground">{summary.approvedImages}</p>
-                 <p className="mt-1 text-sm text-muted-foreground">Live on public catalog</p>
-               </div>
-            </div>
-
+      {analyticsFailed ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-8 text-center">
+          <p className="text-sm text-destructive">Analytics could not be loaded at this time.</p>
+        </div>
+      ) : !summary ? (
+        <div className="rounded-xl border border-border bg-card p-12 text-center">
+          <p className="text-muted-foreground">No summary analytics available.</p>
+        </div>
+      ) : (
+        <>
+          {/* Stat cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              title="Published"
+              value={summary.approvedImages}
+              subtitle="Live on public catalog"
+              icon={BarChart3}
+              href="/contributor/images"
+            />
             <StatCard
               title="Downloads"
-              primaryValue={summary.downloadsThisMonth}
-              primaryLabel="This month"
-              secondaryStats={[
-                { label: "Today", value: summary.downloadsToday },
-                { label: "All time", value: summary.downloadsAllTime },
-              ]}
+              value={summary.downloadsThisMonth}
+              subtitle={`${summary.downloadsToday} today · ${summary.downloadsAllTime} all time`}
               icon={Download}
             />
-
             <StatCard
               title="Uploads"
-              primaryValue={summary.uploadsThisMonth}
-              primaryLabel="This month"
-              secondaryStats={[
-                { label: "This wk", value: summary.uploadsThisWeek },
-                { label: "Total", value: summary.totalUploads },
-              ]}
+              value={summary.uploadsThisMonth}
+              subtitle={`${summary.uploadsThisWeek} this week · ${summary.totalUploads} total`}
               icon={ImagePlus}
+              href="/contributor/uploads"
             />
-
             <StatCard
               title="In Review"
-              primaryValue={summary.submittedImages}
-              primaryLabel="Right now"
-              secondaryStats={[
-                { label: "This wk", value: summary.submissionsThisWeek },
-                { label: "This mo", value: summary.submissionsThisMonth },
-              ]}
+              value={summary.submittedImages}
+              subtitle={`${summary.submissionsThisWeek} this week · ${summary.submissionsThisMonth} this month`}
               icon={Layers}
             />
           </div>
-        ) : (
-          <div className="rounded-xl border border-border bg-card p-12 text-center">
-            <p className="text-muted-foreground">No summary analytics available.</p>
-          </div>
-        )}
 
-        {/* Top Downloads Table */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-foreground flex items-center gap-2">
-              <TrendingUp className="text-muted-foreground" size={20} />
-              Top Downloaded Images
-            </h2>
-          </div>
+          {/* Recent Uploads + Top Downloads — side by side on wide screens */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Recent Uploads */}
+            <section className="space-y-4">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <CloudUpload className="text-muted-foreground" size={20} />
+                Recent Uploads
+              </h2>
+              {recentUploads.length === 0 ? (
+                <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                  No uploads yet.{" "}
+                  <Link href="/contributor/uploads/new" className="text-primary hover:underline">
+                    Start your first upload
+                  </Link>
+                  .
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                  <ul className="divide-y divide-border">
+                    {recentUploads.map((row) => (
+                      <li
+                        key={row.imageAssetId}
+                        className="flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-muted/30"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {row.whoIsInPicture ?? row.headline ?? row.legacyImageCode ?? "Untitled"}
+                          </p>
+                          <p className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                            <Calendar size={12} />
+                            <span>{row.eventName ?? "Event TBD"}</span>
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Badge variant={row.status === "ACTIVE" ? "success" : "muted"}>
+                            {row.status}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            {formatDate(row.createdAt)}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
 
-          {!summary ? null : topDownloaded.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
-              No downloads yet.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-border bg-card">
-              <ul className="divide-y divide-border">
-                {topDownloaded.map((row) => (
-                  <li key={row.imageAssetId} className="group flex flex-col gap-3 px-6 py-5 sm:flex-row sm:items-center sm:justify-between transition-colors hover:bg-muted/20">
-                    <div>
-                      <p className="font-medium text-foreground md:text-base">{row.whoIsInPicture ?? row.headline ?? row.legacyImageCode ?? "Untitled"}</p>
-                      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span>{row.eventName || "Event TBD"}</span>
-                        {row.legacyImageCode && (
-                          <>
-                            <span className="h-1 w-1 rounded-full bg-border" />
-                            <span className="font-mono">{row.legacyImageCode}</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-4">
-                      {!row.cardPreviewAvailable && (
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground">Preview pending</span>
-                      )}
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-4 py-1.5 text-sm font-medium tabular-nums text-foreground transition-colors group-hover:bg-muted">
-                        <Download className="text-muted-foreground" size={14} />
-                        {row.downloadCount}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
-      </div>
+            {/* Top Downloaded Images */}
+            <section className="space-y-4">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <TrendingUp className="text-muted-foreground" size={20} />
+                Top Downloaded
+              </h2>
+              {topDownloaded.length === 0 ? (
+                <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                  No downloads yet.
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                  <ul className="divide-y divide-border">
+                    {topDownloaded.map((row) => (
+                      <li
+                        key={row.imageAssetId}
+                        className="flex items-center justify-between gap-3 px-5 py-3.5 transition-colors hover:bg-muted/30"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {row.whoIsInPicture ?? row.headline ?? row.legacyImageCode ?? "Untitled"}
+                          </p>
+                          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>{row.eventName ?? "Event TBD"}</span>
+                            {row.legacyImageCode ? (
+                              <>
+                                <span className="h-1 w-1 rounded-full bg-border" />
+                                <span className="font-mono">{row.legacyImageCode}</span>
+                              </>
+                            ) : null}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          {!row.cardPreviewAvailable ? (
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[0.6rem] font-medium uppercase tracking-wider text-muted-foreground">
+                              Preview pending
+                            </span>
+                          ) : null}
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-sm font-medium tabular-nums text-foreground">
+                            <Download className="text-muted-foreground" size={14} />
+                            {row.downloadCount}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -2,12 +2,18 @@
 import "server-only"
 
 import {
+  buildSubscriberDownloadRequestBody,
+  type SubscriberDownloadRequestAudit,
+  type SubscriberDownloadSize,
+} from "@/lib/api/subscriber-download-request-body"
+import {
   internalApiFetch,
   internalApiRoutes,
   readInternalApiError,
 } from "@/lib/server/internal-api"
 
-export type SubscriberDownloadSize = "web" | "medium" | "large"
+export type { SubscriberDownloadRequestAudit, SubscriberDownloadSize }
+export { buildSubscriberDownloadRequestBody }
 
 async function readSafeErrorCode(response: Response): Promise<string | undefined> {
   const error = await readInternalApiError(response)
@@ -33,18 +39,14 @@ export async function fetchSubscriberAssetDownload(input: {
   size: SubscriberDownloadSize
   userAgent?: string | null
   requestIp?: string | null
+  requestAudit?: SubscriberDownloadRequestAudit | null
 }) {
   const pathname = internalApiRoutes.subscriberAssetDownload(input.assetId)
   const response = await internalApiFetch({
     path: pathname,
     method: "POST",
     accept: "application/octet-stream, application/json",
-    body: {
-      authUserId: input.authUserId,
-      size: input.size,
-      userAgent: input.userAgent ?? undefined,
-      requestIp: input.requestIp ?? undefined,
-    },
+    body: buildSubscriberDownloadRequestBody(input),
   })
 
   if (!response.ok) {
@@ -70,18 +72,14 @@ export async function fetchSubscriberAssetDownloadCheck(input: {
   size: SubscriberDownloadSize
   userAgent?: string | null
   requestIp?: string | null
+  requestAudit?: SubscriberDownloadRequestAudit | null
 }) {
   const pathname = internalApiRoutes.subscriberAssetDownloadCheck(input.assetId)
   const response = await internalApiFetch({
     path: pathname,
     method: "POST",
     accept: "application/json",
-    body: {
-      authUserId: input.authUserId,
-      size: input.size,
-      userAgent: input.userAgent ?? undefined,
-      requestIp: input.requestIp ?? undefined,
-    },
+    body: buildSubscriberDownloadRequestBody(input),
   })
 
   if (!response.ok) {

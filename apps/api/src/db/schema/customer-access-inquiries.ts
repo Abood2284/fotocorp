@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { check, index, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import { contributors } from "./contributors";
 import { users } from "./users";
 
@@ -28,6 +28,8 @@ export const customerAccessInquiries = pgTable(
     imageQualityPreference: text("image_quality_preference"),
     royaltyFreeQuantityRange: text("royalty_free_quantity_range"),
     royaltyFreeQualityPreference: text("royalty_free_quality_preference"),
+    videoQuantityRange: text("video_quantity_range"),
+    caricatureQuantityRange: text("caricature_quantity_range"),
     applicantFirstName: text("applicant_first_name"),
     applicantLastName: text("applicant_last_name"),
     applicantEmail: text("applicant_email"),
@@ -36,6 +38,14 @@ export const customerAccessInquiries = pgTable(
     proposedUsername: text("proposed_username"),
     applicationNotes: text("application_notes"),
     staffNotes: text("staff_notes"),
+    submissionIpAddress: text("submission_ip_address"),
+    submissionIpHash: text("submission_ip_hash"),
+    submissionIpCountry: varchar("submission_ip_country", { length: 2 }),
+    submissionIpCity: text("submission_ip_city"),
+    submissionIpRegion: text("submission_ip_region"),
+    submissionIpRegionCode: varchar("submission_ip_region_code", { length: 32 }),
+    submissionCfRay: text("submission_cf_ray"),
+    submissionUserAgent: text("submission_user_agent"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -58,5 +68,13 @@ export const customerAccessInquiries = pgTable(
     index("customer_access_inquiries_user_id_idx").on(table.userId),
     index("customer_access_inquiries_status_created_idx").on(table.status, table.createdAt),
     index("customer_access_inquiries_inquiry_type_created_idx").on(table.inquiryType, table.createdAt),
+    index("customer_access_inquiries_submission_ip_hash_created_at_idx").on(
+      table.submissionIpHash,
+      table.createdAt,
+    ),
+    index("customer_access_inquiries_submission_ip_country_created_at_idx").on(
+      table.submissionIpCountry,
+      table.createdAt,
+    ),
   ],
 );

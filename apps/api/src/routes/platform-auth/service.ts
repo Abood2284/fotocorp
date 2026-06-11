@@ -13,6 +13,7 @@ import {
 import { assertPlatformUserMaySignIn } from "../../lib/access/platform-user-access"
 import { AppError } from "../../lib/errors"
 import { createPlatformUser } from "../../lib/users/platform-user"
+import type { RequestAuditContext } from "../../lib/request-audit-context"
 import type { ValidatedRegistrationProfile } from "../auth/services/fotocorp-registration-profile"
 
 export type PlatformOwnerType = "USER" | "CONTRIBUTOR"
@@ -28,6 +29,7 @@ export interface PlatformSignUpInput {
   password: string
   displayName?: string | null
   avatarUrl?: string | null
+  requestAudit?: RequestAuditContext | null
 }
 
 export interface RequestMeta {
@@ -144,6 +146,7 @@ export async function signUpPlatformUser(
     email,
     displayName: input.displayName,
     avatarUrl: input.avatarUrl,
+    requestAudit: input.requestAudit,
   })
 
   if (!user) throw new AppError(500, "USER_CREATE_FAILED", "Account could not be created.")

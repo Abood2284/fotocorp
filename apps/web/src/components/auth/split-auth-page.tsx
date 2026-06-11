@@ -491,6 +491,22 @@ export function SplitAuthPage() {
         "Royalty Free quality preference is required when Royalty Free is selected.",
       )
     }
+    if (interestedAssetTypes.includes("VIDEO")) {
+      requireField(
+        formData,
+        nextErrors,
+        "videoQuantityRange",
+        "Video quantity range is required when Video is selected.",
+      )
+    }
+    if (interestedAssetTypes.includes("CARICATURE")) {
+      requireField(
+        formData,
+        nextErrors,
+        "caricatureQuantityRange",
+        "Caricature quantity range is required when Caricature is selected.",
+      )
+    }
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length) {
@@ -532,6 +548,12 @@ export function SplitAuthPage() {
         signUpPayload.royaltyFreeQualityPreference = String(
           formData.get("royaltyFreeQualityPreference") ?? "",
         ).trim()
+      }
+      if (interestedAssetTypes.includes("VIDEO")) {
+        signUpPayload.videoQuantityRange = String(formData.get("videoQuantityRange") ?? "").trim()
+      }
+      if (interestedAssetTypes.includes("CARICATURE")) {
+        signUpPayload.caricatureQuantityRange = String(formData.get("caricatureQuantityRange") ?? "").trim()
       }
 
       try {
@@ -881,6 +903,20 @@ export function SplitAuthPage() {
                             qualityError={errors.royaltyFreeQualityPreference}
                           />
                         ) : null}
+                        {interest.VIDEO ? (
+                          <InterestQuantityField
+                            assetLabel="Video"
+                            quantityName="videoQuantityRange"
+                            quantityError={errors.videoQuantityRange}
+                          />
+                        ) : null}
+                        {interest.CARICATURE ? (
+                          <InterestQuantityField
+                            assetLabel="Caricature"
+                            quantityName="caricatureQuantityRange"
+                            quantityError={errors.caricatureQuantityRange}
+                          />
+                        ) : null}
                       </fieldset>
                     </div>
 
@@ -908,6 +944,22 @@ export function SplitAuthPage() {
                         </button>
                       ) : null}
                     </div>
+
+                    <p className="mt-4 text-center text-xs leading-relaxed text-white!">
+                      By registering with Fotocorp, you accept our{" "}
+                      <Link href="/legal/license" className={registerLegalLinkClassName}>
+                        License agreements
+                      </Link>
+                      ,{" "}
+                      <Link href="/legal/privacy" className={registerLegalLinkClassName}>
+                        Privacy policy
+                      </Link>{" "}
+                      and{" "}
+                      <Link href="/legal/terms" className={registerLegalLinkClassName}>
+                        Terms of use
+                      </Link>
+                      .
+                    </p>
 
                     <FormNotice isError>{notice}</FormNotice>
                   </form>
@@ -1571,6 +1623,9 @@ const primaryButtonClassName =
 const registerChoiceCardClassName =
   "block w-full rounded-[14px] border border-white/18 bg-white/6 p-5 text-left transition-colors hover:border-[rgba(0,180,190,0.6)] hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--auth-teal)"
 
+const registerLegalLinkClassName =
+  "font-medium text-[#4db8d8] underline underline-offset-4 transition-colors hover:text-(--auth-teal)"
+
 /** Compact labels inside the interest fieldset — fluid size, sentence case, no wrap breaks on asterisk. */
 const interestSubfieldLabelClassName =
   "fc-label block min-w-0 font-medium leading-snug text-white/80 normal-case tracking-normal text-[clamp(0.6875rem,3.25cqi,0.8125rem)]"
@@ -1606,20 +1661,11 @@ function InterestPreferenceFields({
 }) {
   return (
     <div className={interestPreferenceGridClassName}>
-      <label data-auth-field={quantityName} className="block min-w-0 space-y-1.5">
-        <InterestSubfieldLabel text={`${assetLabel} quantity`} />
-        <select name={quantityName} className={inputClassName} defaultValue="">
-          <option value="" disabled>
-            Select range
-          </option>
-          <option value="0_20">0–20</option>
-          <option value="20_50">20–50</option>
-          <option value="50_100">50–100</option>
-          <option value="100_250">100–250</option>
-          <option value="250_plus">250+</option>
-        </select>
-        <FieldError>{quantityError}</FieldError>
-      </label>
+      <InterestQuantityField
+        assetLabel={assetLabel}
+        quantityName={quantityName}
+        quantityError={quantityError}
+      />
       <label data-auth-field={qualityName} className="block min-w-0 space-y-1.5">
         <InterestSubfieldLabel text={`${assetLabel} quality`} />
         <select name={qualityName} className={inputClassName} defaultValue="">
@@ -1633,5 +1679,32 @@ function InterestPreferenceFields({
         <FieldError>{qualityError}</FieldError>
       </label>
     </div>
+  )
+}
+
+function InterestQuantityField({
+  assetLabel,
+  quantityName,
+  quantityError,
+}: {
+  assetLabel: string
+  quantityName: string
+  quantityError?: string
+}) {
+  return (
+    <label data-auth-field={quantityName} className="block min-w-0 space-y-1.5">
+      <InterestSubfieldLabel text={`${assetLabel} quantity`} />
+      <select name={quantityName} className={inputClassName} defaultValue="">
+        <option value="" disabled>
+          Select range
+        </option>
+        <option value="0_20">0–20</option>
+        <option value="20_50">20–50</option>
+        <option value="50_100">50–100</option>
+        <option value="100_250">100–250</option>
+        <option value="250_plus">250+</option>
+      </select>
+      <FieldError>{quantityError}</FieldError>
+    </label>
   )
 }

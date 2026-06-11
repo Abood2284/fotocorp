@@ -7,6 +7,8 @@ import {
   hashPhotographerPortalPassword,
 } from "../auth/contributor-password"
 import { AppError } from "../errors"
+import { buildCustomerAccessInquirySubmissionAuditFields } from "./submission-audit-fields"
+import type { RequestAuditContext } from "../request-audit-context"
 
 const PLACEHOLDER_EMAIL = "contact@fotocorp.com"
 
@@ -18,6 +20,7 @@ export interface SubmitContributorApplicationInput {
   phoneCountryCode?: string | null
   phoneNumber?: string | null
   applicationNotes?: string | null
+  requestAudit?: RequestAuditContext | null
 }
 
 export interface ApproveContributorApplicationInput {
@@ -141,6 +144,7 @@ export async function submitContributorApplication(db: DrizzleClient, input: Sub
       proposedUsername: username,
       applicationNotes: input.applicationNotes?.trim() || null,
       interestedAssetTypes: [],
+      ...buildCustomerAccessInquirySubmissionAuditFields(input.requestAudit),
     })
     .returning({
       id: customerAccessInquiries.id,

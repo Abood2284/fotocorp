@@ -18,6 +18,7 @@ import { EntitlementActivationConfirmBody } from "@/components/staff/entitlement
 import { AccessInquiryCloseButton } from "@/components/staff/access-inquiry-close-button"
 import { AccessInquiryGuidancePanel } from "@/components/staff/access-inquiry-guidance-panel"
 import { InquiryStatusBadge } from "@/components/staff/inquiry-status-badge"
+import { SubmissionAuditSection } from "@/components/staff/submission-audit-section"
 import { getCustomerAccessDetailGuidance } from "@/lib/staff/access-inquiry-guidance"
 import {
   buildAccessInquiryDetailGroups,
@@ -326,6 +327,8 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
     imageQualityPreference?: string | null
     royaltyFreeQuantityRange?: string | null
     royaltyFreeQualityPreference?: string | null
+    videoQuantityRange?: string | null
+    caricatureQuantityRange?: string | null
   }
 
   const inquiryDetailGroups = buildAccessInquiryDetailGroups({
@@ -526,6 +529,8 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
         </div>
       </section>
 
+      <SubmissionAuditSection submissionAudit={detail.submissionAudit} />
+
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {notice ? <p className="text-sm text-green-700 dark:text-green-400">{notice}</p> : null}
 
@@ -571,6 +576,7 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
                 e.allowedDownloads === null || e.allowedDownloads === undefined ? null : Number(e.allowedDownloads)
               const updatedAt = String(e.updatedAt ?? e.createdAt ?? id)
               const isAdjusting = adjustEntitlementId === id
+              const isQuantityOnlyAssetType = assetType === "VIDEO" || assetType === "CARICATURE"
 
               const isDraftSelected = status === "DRAFT" && selectedDraftIds.has(id)
 
@@ -625,14 +631,24 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
                           placeholder="e.g. 20"
                         />
                       </label>
-                      <label className="flex flex-col gap-1 text-xs">
-                        <span className="text-muted-foreground">Quality cap</span>
-                        <select name="qualityAccess" defaultValue={quality} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
-                          <option value="LOW">Low</option>
-                          <option value="MEDIUM">Medium</option>
-                          <option value="HIGH">High</option>
-                        </select>
-                      </label>
+                      {isQuantityOnlyAssetType ? (
+                        <label className="flex flex-col gap-1 text-xs">
+                          <span className="text-muted-foreground">Quality cap</span>
+                          <input type="hidden" name="qualityAccess" value="HIGH" />
+                          <span className="flex h-9 items-center rounded-md border border-input bg-muted px-2 text-sm">
+                            High (default)
+                          </span>
+                        </label>
+                      ) : (
+                        <label className="flex flex-col gap-1 text-xs">
+                          <span className="text-muted-foreground">Quality cap</span>
+                          <select name="qualityAccess" defaultValue={quality} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                          </select>
+                        </label>
+                      )}
                     </form>
                   ) : null}
 
@@ -702,14 +718,24 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
                           className="h-9 w-32 rounded-md border border-input bg-background px-2 text-sm"
                         />
                       </label>
-                      <label className="flex flex-col gap-1 text-xs">
-                        <span className="text-muted-foreground">Quality cap</span>
-                        <select name="qualityAccess" defaultValue={quality} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
-                          <option value="LOW">Low</option>
-                          <option value="MEDIUM">Medium</option>
-                          <option value="HIGH">High</option>
-                        </select>
-                      </label>
+                      {isQuantityOnlyAssetType ? (
+                        <label className="flex flex-col gap-1 text-xs">
+                          <span className="text-muted-foreground">Quality cap</span>
+                          <input type="hidden" name="qualityAccess" value="HIGH" />
+                          <span className="flex h-9 items-center rounded-md border border-input bg-muted px-2 text-sm">
+                            High (default)
+                          </span>
+                        </label>
+                      ) : (
+                        <label className="flex flex-col gap-1 text-xs">
+                          <span className="text-muted-foreground">Quality cap</span>
+                          <select name="qualityAccess" defaultValue={quality} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                          </select>
+                        </label>
+                      )}
                       <Button type="submit" variant="secondary" size="sm" disabled={saving}>
                         Save changes
                       </Button>
@@ -739,6 +765,22 @@ export function StaffAccessInquiryDetail({ inquiryId, initial }: StaffAccessInqu
                   status === "DRAFT" ? (
                     <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
                       250+ royalty-free range: enter an exact allowed download count before activating.
+                    </p>
+                  ) : null}
+                  {assetType === "VIDEO" &&
+                  inquiry.videoQuantityRange === "250_plus" &&
+                  !allowed &&
+                  status === "DRAFT" ? (
+                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                      250+ video range: enter an exact allowed download count before activating.
+                    </p>
+                  ) : null}
+                  {assetType === "CARICATURE" &&
+                  inquiry.caricatureQuantityRange === "250_plus" &&
+                  !allowed &&
+                  status === "DRAFT" ? (
+                    <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                      250+ caricature range: enter an exact allowed download count before activating.
                     </p>
                   ) : null}
                 </li>

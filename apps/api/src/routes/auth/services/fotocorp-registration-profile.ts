@@ -53,6 +53,8 @@ export interface ValidatedRegistrationProfile {
   imageQualityPreference: ImageQualityPreference | null;
   royaltyFreeQuantityRange: ImageQuantityRange | null;
   royaltyFreeQualityPreference: ImageQualityPreference | null;
+  videoQuantityRange: ImageQuantityRange | null;
+  caricatureQuantityRange: ImageQuantityRange | null;
 }
 
 export interface FotocorpUserProfileDto {
@@ -70,6 +72,8 @@ export interface FotocorpUserProfileDto {
   imageQualityPreference: string | null;
   royaltyFreeQuantityRange: string | null;
   royaltyFreeQualityPreference: string | null;
+  videoQuantityRange: string | null;
+  caricatureQuantityRange: string | null;
 }
 
 export class RegistrationProfileValidationError extends Error {
@@ -144,6 +148,24 @@ export async function validateRegistrationProfileBody(body: unknown): Promise<Va
     );
     royaltyFreeQualityPreference = normalizeImageQualityPreference(qualityRaw);
   }
+  let videoQuantityRange: ImageQuantityRange | null = null;
+  if (interestedAssetTypes.includes("VIDEO")) {
+    const rangeRaw = readRequiredString(
+      body,
+      "videoQuantityRange",
+      "Video quantity range is required when Video is selected.",
+    );
+    videoQuantityRange = normalizeImageQuantityRange(rangeRaw);
+  }
+  let caricatureQuantityRange: ImageQuantityRange | null = null;
+  if (interestedAssetTypes.includes("CARICATURE")) {
+    const rangeRaw = readRequiredString(
+      body,
+      "caricatureQuantityRange",
+      "Caricature quantity range is required when Caricature is selected.",
+    );
+    caricatureQuantityRange = normalizeImageQuantityRange(rangeRaw);
+  }
   return {
     firstName: readRequiredString(body, "firstName", "First name is required."),
     lastName: readRequiredString(body, "lastName", "Last name is required."),
@@ -162,6 +184,8 @@ export async function validateRegistrationProfileBody(body: unknown): Promise<Va
     imageQualityPreference,
     royaltyFreeQuantityRange,
     royaltyFreeQualityPreference,
+    videoQuantityRange,
+    caricatureQuantityRange,
   };
 }
 
@@ -212,6 +236,8 @@ export function toFotocorpUserProfileDto(
     imageQualityPreference: profile.imageQualityPreference ?? null,
     royaltyFreeQuantityRange: profile.royaltyFreeQuantityRange ?? null,
     royaltyFreeQualityPreference: profile.royaltyFreeQualityPreference ?? null,
+    videoQuantityRange: profile.videoQuantityRange ?? null,
+    caricatureQuantityRange: profile.caricatureQuantityRange ?? null,
   };
 }
 

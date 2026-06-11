@@ -104,6 +104,8 @@ export interface FotocorpProfile {
   imageQualityPreference: string | null
   royaltyFreeQuantityRange: string | null
   royaltyFreeQualityPreference: string | null
+  videoQuantityRange: string | null
+  caricatureQuantityRange: string | null
   createdAt: string | null
   updatedAt: string | null
 }

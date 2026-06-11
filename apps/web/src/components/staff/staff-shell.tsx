@@ -7,7 +7,7 @@ import { ChevronUp, ChevronLeft, ChevronRight, LayoutDashboard, Loader2, LogOut 
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { buildSignInHref } from "@/lib/auth-sign-in-gateway"
 import { cn } from "@/lib/utils"
-import { staffNavItemsForRole } from "@/lib/staff/staff-navigation"
+import { STAFF_ACCESS_INQUIRIES_HREF, staffNavItemsForRole } from "@/lib/staff/staff-navigation"
 
 interface StaffShellStaff {
   displayName: string
@@ -19,14 +19,15 @@ interface StaffShellStaff {
 interface StaffShellProps {
   children: ReactNode
   staff: StaffShellStaff
+  pendingInquiriesCount?: number
 }
 
-export function StaffShell({ children, staff }: StaffShellProps) {
+export function StaffShell({ children, staff, pendingInquiriesCount = 0 }: StaffShellProps) {
   const navItems = staffNavItemsForRole(staff.role)
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar navItems={navItems} staff={staff} />
+      <Sidebar navItems={navItems} staff={staff} pendingInquiriesCount={pendingInquiriesCount} />
       <main className="relative min-w-0 flex-1 overflow-y-auto bg-staff-50 p-6 lg:p-8">
         <StaffNavigationProgress />
         {children}
@@ -38,9 +39,11 @@ export function StaffShell({ children, staff }: StaffShellProps) {
 function Sidebar({
   navItems,
   staff,
+  pendingInquiriesCount,
 }: {
   navItems: ReturnType<typeof staffNavItemsForRole>
   staff: StaffShellStaff
+  pendingInquiriesCount: number
 }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
@@ -77,6 +80,7 @@ function Sidebar({
               icon={Icon}
               collapsed={collapsed}
               isActive={isActive}
+              pendingInquiriesCount={href === STAFF_ACCESS_INQUIRIES_HREF ? pendingInquiriesCount : 0}
             />
           )
         })}
@@ -191,12 +195,14 @@ function StaffNavLink({
   icon: Icon,
   collapsed,
   isActive,
+  pendingInquiriesCount,
 }: {
   href: string
   label: string
   icon: React.ComponentType<{ className?: string }>
   collapsed: boolean
   isActive: boolean
+  pendingInquiriesCount: number
 }) {
   return (
     <Link
@@ -212,8 +218,29 @@ function StaffNavLink({
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
       {!collapsed ? <span className="min-w-0 truncate">{label}</span> : null}
+      <StaffNavInquiryBadge count={pendingInquiriesCount} collapsed={collapsed} />
       <StaffNavLinkPendingIndicator collapsed={collapsed} />
     </Link>
+  )
+}
+
+function StaffNavInquiryBadge({ count, collapsed }: { count: number; collapsed: boolean }) {
+  if (count <= 0) return null
+
+  const label = count > 99 ? "99+" : String(count)
+
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-full bg-amber-600 font-semibold leading-none text-white tabular-nums",
+        collapsed
+          ? "absolute -right-0.5 -top-0.5 h-4 min-w-4 px-1 text-[10px]"
+          : "ml-auto h-5 min-w-5 px-1.5 text-xs",
+      )}
+      aria-label={`${count} pending ${count === 1 ? "inquiry" : "inquiries"}`}
+    >
+      {label}
+    </span>
   )
 }
 

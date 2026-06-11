@@ -8,6 +8,12 @@
 - [Public route cache audit](../../docs/db-revamp/reports/public-route-cache-audit.md) — public route caller inventory, cache behavior, search back-navigation behavior, and verification commands.
 - [Resend + Google Workspace email integration](../../docs/integrations/email-resend-google-workspace.md) — access-flow transactional email sender, reply handling, env vars, delivery logs, and manual test steps.
 
+## Incremental update (2026-06-11)
+
+- **Video/Caricature access-request quantities:** `POST /api/v1/auth/sign-up` now accepts and requires `videoQuantityRange` for `VIDEO` and `caricatureQuantityRange` for `CARICATURE`; no quality preference is collected for those asset types. `GET /api/v1/staff/access-inquiries*` surfaces the quantity fields, and `POST /api/v1/staff/access-inquiries/:inquiryId/entitlement-draft` uses them to prefill allowed downloads while defaulting Video/Caricature `quality_access` to `HIGH`. Migration: `0053_access_interest_video_caricature_quantity.sql`.
+- **`SUPER_ADMIN` staff audit read:** `GET /api/v1/staff/audit-logs` — unified cursor-paginated feed across `staff_audit_logs`, `asset_admin_audit_logs`, and `admin_user_audit_logs`; query params `source`, `action`, `entityType`, `from`, `to`, `limit`, `cursor`. Route ownership: `apps/api/src/routes/staff/audit-logs/route.ts`. Web BFF proxies via `/api/staff/audit-logs`; staff UI at `/staff/audit`.
+- **Request audit metadata:** Registration and contributor submissions store submission metadata on `customer_access_inquiries`; downloads store metadata on `image_download_logs`. Web BFF captures download audit before forwarding to internal API. Staff inquiry detail returns `submissionAudit` (raw IP `SUPER_ADMIN`-only); mutation inquiry payloads are sanitized. See `context/architecture.md` § Request Audit Metadata.
+
 ## Incremental update (2026-06-07)
 
 - Staff role **`CAPTION_WRITER`** added (`0048_staff_role_caption_writer.sql`). Contributor upload review actions now write `staff_audit_logs` rows (`CONTRIBUTOR_UPLOAD_METADATA_SAVED`, `CONTRIBUTOR_UPLOAD_APPROVED`, `CONTRIBUTOR_UPLOAD_REJECTED`, `CONTRIBUTOR_UPLOAD_FILE_REPLACED`) from `apps/api/src/routes/internal/admin-contributor-uploads/service.ts` using `x-admin-auth-user-id` from the web BFF.
@@ -181,7 +187,8 @@ This makes route behavior hard to reason about and slows root-cause analysis whe
 
 | Method | Path | Handler | Source file | Notes |
 |---|---|---|---|---|
-| `POST` | `/api/v1/internal/assets/:assetId/download` | `internalSubscriberAssetDownloadRoute` | `apps/api/src/routes/internalDownloads.ts` | Internal secret required; UUID validation + subscriber/quota logic. |
+| `POST` | `/api/v1/internal/assets/:assetId/download/check` | preflight check | `apps/api/src/routes/internal/downloads/` | No quota decrement; no `image_download_logs` writes. |
+| `POST` | `/api/v1/internal/assets/:assetId/download` | `internalSubscriberAssetDownloadRoute` | `apps/api/src/routes/internalDownloads.ts` | Internal secret required; UUID validation + subscriber/quota logic. Accepts `requestAudit` (web BFF) or legacy `requestIp`/`userAgent`; persists audit fields on `image_download_logs` for `STARTED` and relevant `FAILED` rows only. Web BFF captures audit via `getRequestAuditContext()` before proxying. |
 
 ## Risks Found
 
@@ -321,7 +328,7 @@ Next recommended migration group:
 | Method | Path | Notes |
 | --- | --- | --- |
 | `GET` | `/api/v1/staff/access-inquiries` | Staff session; roles `SUPER_ADMIN`, `SUPPORT`, `FINANCE`. Query: `type`, `status`. |
-| `GET` | `/api/v1/staff/access-inquiries/:inquiryId` | Detail + `subscriberAccess` + linked entitlement rows. |
+| `GET` | `/api/v1/staff/access-inquiries/:inquiryId` | Detail + `subscriberAccess` + linked entitlement rows + `submissionAudit` (raw IP SUPER_ADMIN-only; inquiry object strips raw submission columns). |
 | `POST` | `/api/v1/staff/access-inquiries/:inquiryId/close` | **PENDING** / **IN_REVIEW** → **CLOSED** (deny without granting access). Optional `staffNotes`. |
 | `POST` | `/api/v1/staff/access-inquiries/:inquiryId/entitlement-draft` | Non-destructive: creates missing **DRAFT** rows per inquiry asset type; never overwrites existing rows. |
 | `POST` | `/api/v1/staff/access-inquiries/:inquiryId/activate-entitlements` | **DRAFT** → **ACTIVE** for all or selected draft rows (`entitlementIds` optional); validates caps on selection; sends consolidated approval email. |
@@ -337,8 +344,10 @@ Implementation: `apps/api/src/routes/staff/auth/route.ts`, `apps/api/src/routes/
 | --- | --- | --- |
 | `GET` | `/api/v1/contributor/catalog/asset-categories` | Authenticated contributor session; read-only list for event category picker. |
 | `GET` | `/api/v1/contributor/contributors` | `PORTAL_ADMIN` contributor accounts only; optional `q`, `limit` for photographer search. |
+| `GET` | `/api/v1/contributor/images` | Cursor-paginated images for the signed-in contributor (`limit`, `cursor`). |
+| `GET` | `/api/v1/contributor/images/:imageAssetId/preview/:variant` | Contributor session + asset ownership; streams READY `thumb`/`card`/`detail` preview bytes from previews bucket (not limited to `ACTIVE+PUBLIC`). |
 
-Implementation: `apps/api/src/routes/contributor/catalog/route.ts`, `apps/api/src/routes/contributor/contributors/route.ts` (mounted from `apps/api/src/honoApp.ts`). Same-origin web BFF: `apps/web/src/app/api/contributor/[...path]/route.ts` (GET/POST/PATCH).
+Implementation: `apps/api/src/routes/contributor/catalog/route.ts`, `apps/api/src/routes/contributor/contributors/route.ts`, `apps/api/src/routes/contributor/images/route.ts` (mounted from `apps/api/src/honoApp.ts`). Same-origin web BFF: `apps/web/src/app/api/contributor/[...path]/route.ts` (GET/POST/PATCH).
 
 ## Contributor portal — direct R2 upload batches (PR-16H)
 

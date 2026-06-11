@@ -118,6 +118,8 @@ export interface StaffAccessInquiryListItem {
   imageQualityPreference: string | null
   royaltyFreeQuantityRange: string | null
   royaltyFreeQualityPreference: string | null
+  videoQuantityRange: string | null
+  caricatureQuantityRange: string | null
   createdAt: string
   companyName: string | null
   companyEmail: string | null
@@ -142,10 +144,22 @@ export async function getStaffAccessInquiries(
   })
 }
 
+export interface StaffSubmissionAudit {
+  ipAddress: string | null
+  ipHash: string | null
+  country: string | null
+  city: string | null
+  region: string | null
+  regionCode: string | null
+  cfRay: string | null
+  userAgent: string | null
+}
+
 export async function getStaffAccessInquiryDetail(inquiryId: string, options: { cookieHeader?: string } = {}) {
   return staffJson<{
     ok: true
     inquiry: Record<string, unknown>
+    submissionAudit: StaffSubmissionAudit
     companyName: string | null
     companyEmail: string | null
     firstName: string | null
@@ -290,6 +304,50 @@ export async function createStaffMemberAccount(
   return staffJson<{ ok: true; member: StaffMemberListItem }>("/members", {
     method: "POST",
     body: { ...body, role: body.role ?? "CAPTION_WRITER" },
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export type StaffAuditLogSource = "staff" | "asset" | "user"
+
+export interface StaffAuditLogItem {
+  id: string
+  source: StaffAuditLogSource
+  createdAt: string
+  action: string
+  entityType: string | null
+  entityId: string | null
+  actorLabel: string | null
+  actorId: string | null
+  targetLabel: string | null
+  summary: string
+  metadata: Record<string, unknown> | null
+  entityHref: string | null
+}
+
+export async function getStaffAuditLogs(
+  options: {
+    cookieHeader?: string
+    source?: StaffAuditLogSource
+    action?: string
+    entityType?: string
+    from?: string
+    to?: string
+    limit?: number
+    cursor?: string
+  } = {},
+) {
+  const params = new URLSearchParams()
+  if (options.source) params.set("source", options.source)
+  if (options.action) params.set("action", options.action)
+  if (options.entityType) params.set("entityType", options.entityType)
+  if (options.from) params.set("from", options.from)
+  if (options.to) params.set("to", options.to)
+  if (options.limit) params.set("limit", String(options.limit))
+  if (options.cursor) params.set("cursor", options.cursor)
+  const query = params.toString() ? `?${params.toString()}` : ""
+  return staffJson<{ ok: true; items: StaffAuditLogItem[]; nextCursor: string | null }>(`/audit-logs${query}`, {
+    method: "GET",
     cookieHeader: options.cookieHeader,
   })
 }

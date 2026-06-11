@@ -11,6 +11,8 @@ export interface StaffNavItem {
   roles: readonly StaffRole[]
 }
 
+export const STAFF_ACCESS_INQUIRIES_HREF = "/staff/access-inquiries"
+
 /** Sidebar navigation definitions; filter by `roles.includes(staffRole)`. */
 export const STAFF_NAV_ITEMS: StaffNavItem[] = [
   {
@@ -27,7 +29,7 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
   },
   {
     label: "Inquiries",
-    href: "/staff/access-inquiries",
+    href: STAFF_ACCESS_INQUIRIES_HREF,
     icon: MessageCircle,
     roles: ["SUPER_ADMIN", "SUPPORT", "FINANCE"],
   },

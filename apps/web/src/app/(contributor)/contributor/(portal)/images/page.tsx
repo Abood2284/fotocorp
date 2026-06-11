@@ -1,9 +1,10 @@
 import Link from "next/link"
 
+import { PreviewImage } from "@/components/assets/preview-image"
 import { Badge } from "@/components/ui/badge"
 import { getContributorImages, type ContributorImageItem } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
-import { Calendar, Image, MapPin } from "lucide-react";
+import { Calendar, Image, MapPin } from "lucide-react"
 
 export const metadata = {
   title: "Contributor Images",
@@ -27,9 +28,6 @@ export default async function ContributorImagesPage({ searchParams }: Contributo
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Your image archive</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Images</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Only images linked to your contributor account are shown here. Original files and storage details are never exposed.
-          </p>
         </div>
       </header>
 
@@ -74,13 +72,24 @@ export default async function ContributorImagesPage({ searchParams }: Contributo
 
 function ContributorImageCard({ item }: { item: ContributorImageItem }) {
   const title = item.headline || item.whoIsInPicture || item.legacyImageCode || "Untitled image"
+  const previewSrc = contributorImagePreviewSrc(item)
+  const previewAlt = item.whoIsInPicture ?? item.headline ?? item.legacyImageCode ?? "Contributor image preview"
   return (
     <article className="overflow-hidden rounded-3xl border border-border bg-background shadow-sm">
-      <div className="flex aspect-[4/3] items-center justify-center bg-muted/40">
-        <div className="flex flex-col items-center text-muted-foreground">
-          <Image size={32} />
-          <span className="mt-2 text-xs">Preview not exposed</span>
-        </div>
+      <div className="relative aspect-[4/3] bg-muted/40">
+        {previewSrc ? (
+          <PreviewImage
+            src={previewSrc}
+            alt={previewAlt}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+            <Image size={32} aria-hidden />
+            <span className="mt-2 text-xs">Preview pending</span>
+          </div>
+        )}
       </div>
       <div className="space-y-4 p-5">
         <div className="flex flex-wrap gap-2">
@@ -127,4 +136,10 @@ function formatDate(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(date)
+}
+
+function contributorImagePreviewSrc(item: ContributorImageItem): string | null {
+  const variant = item.derivatives.card ? "card" : item.derivatives.thumb ? "thumb" : null
+  if (!variant) return null
+  return `/api/contributor/images/${encodeURIComponent(item.id)}/preview/${variant}`
 }

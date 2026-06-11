@@ -29,6 +29,12 @@ import {
   closeAccessInquiry,
   updateInquiryNotes,
 } from "./service";
+import {
+  buildStaffSubmissionAuditResponse,
+  sanitizeCustomerAccessInquiryForStaffResponse,
+  serializeStaffInquiryMutationResponse,
+  staffRoleIncludesSubmissionIpAddress,
+} from "../../../lib/access-inquiries/submission-audit-response";
 
 const ACCESS_INQUIRY_ROLES = new Set(["SUPER_ADMIN", "SUPPORT", "FINANCE"]);
 
@@ -121,6 +127,8 @@ staffAccessInquiryRoutes.get("/api/v1/staff/access-inquiries", zValidator("query
         imageQualityPreference: r.imageQualityPreference,
         royaltyFreeQuantityRange: r.royaltyFreeQuantityRange,
         royaltyFreeQualityPreference: r.royaltyFreeQualityPreference,
+        videoQuantityRange: r.videoQuantityRange,
+        caricatureQuantityRange: r.caricatureQuantityRange,
         createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
         companyName: displayName,
         companyEmail: contactEmail,
@@ -134,19 +142,23 @@ staffAccessInquiryRoutes.get("/api/v1/staff/access-inquiries", zValidator("query
 staffAccessInquiryRoutes.all("/api/v1/staff/access-inquiries", () => methodNotAllowed());
 
 staffAccessInquiryRoutes.get("/api/v1/staff/access-inquiries/:inquiryId", zValidator("param", inquiryIdParam), async (c) => {
-  const { db } = await requireAccessInquiryStaff(c);
+  const { db, staff } = await requireAccessInquiryStaff(c);
   const { inquiryId } = c.req.valid("param");
   const detail = await getAccessInquiryDetail(db, inquiryId);
   if (!detail) throw new AppError(404, "INQUIRY_NOT_FOUND", "Access inquiry was not found.");
   const inquiry = detail.inquiry;
   const isContributor = inquiry.inquiryType === "CONTRIBUTOR_APPLICATION";
+  const publicInquiry = sanitizeCustomerAccessInquiryForStaffResponse(inquiry);
   return json({
     ok: true as const,
     inquiry: {
-      ...inquiry,
+      ...publicInquiry,
       createdAt: inquiry.createdAt?.toISOString?.() ?? inquiry.createdAt,
       updatedAt: inquiry.updatedAt?.toISOString?.() ?? inquiry.updatedAt,
     },
+    submissionAudit: buildStaffSubmissionAuditResponse(inquiry, {
+      includeIpAddress: staffRoleIncludesSubmissionIpAddress(staff.role),
+    }),
     companyName: isContributor
       ? [inquiry.applicantFirstName, inquiry.applicantLastName].filter(Boolean).join(" ") || inquiry.proposedUsername
       : detail.companyName,
@@ -210,11 +222,7 @@ staffAccessInquiryRoutes.patch(
     const inquiry = await updateInquiryNotes(db, inquiryId, { staffNotes: body.staffNotes ?? null });
     return json({
       ok: true as const,
-      inquiry: {
-        ...inquiry,
-        createdAt: inquiry.createdAt?.toISOString?.() ?? inquiry.createdAt,
-        updatedAt: inquiry.updatedAt?.toISOString?.() ?? inquiry.updatedAt,
-      },
+      inquiry: serializeStaffInquiryMutationResponse(inquiry),
     });
   },
 );
@@ -231,11 +239,7 @@ staffAccessInquiryRoutes.post(
     await sendInquiryStatusEmail(c.env, db, inquiryId);
     return json({
       ok: true as const,
-      inquiry: {
-        ...inquiry,
-        createdAt: inquiry.createdAt?.toISOString?.() ?? inquiry.createdAt,
-        updatedAt: inquiry.updatedAt?.toISOString?.() ?? inquiry.updatedAt,
-      },
+      inquiry: serializeStaffInquiryMutationResponse(inquiry),
     });
   },
 );

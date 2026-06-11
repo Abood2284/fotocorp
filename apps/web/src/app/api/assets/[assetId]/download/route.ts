@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getCurrentAuthUser } from "@/lib/app-user"
 import { fetchSubscriberAssetDownload, type SubscriberDownloadSize } from "@/lib/api/subscriber-downloads-api"
+import { getRequestAuditContext } from "@/lib/server/request-audit-context"
 
 interface AssetDownloadRouteContext {
   params: Promise<{ assetId: string }>
@@ -32,13 +33,15 @@ export async function GET(request: Request, context: AssetDownloadRouteContext) 
   }
 
   let upstream: Response | null = null
+  const requestAudit = getRequestAuditContext(request, {
+    ipHashSecret: process.env.IP_HASH_SECRET ?? null,
+  })
   try {
     upstream = await fetchSubscriberAssetDownload({
       assetId,
       authUserId: authUser.id,
       size,
-      userAgent: request.headers.get("user-agent"),
-      requestIp: getClientIp(request),
+      requestAudit,
     })
   } catch (error) {
     logDownloadRouteError("internal_api_fetch_failed", {
@@ -141,12 +144,6 @@ function mapDownloadError(code: string | null) {
     default:
       return "download-failed"
   }
-}
-
-function getClientIp(request: Request) {
-  return request.headers.get("cf-connecting-ip")
-    ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    ?? null
 }
 
 function logDownloadRouteError(

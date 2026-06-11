@@ -2,6 +2,8 @@ import { desc, eq } from "drizzle-orm"
 import type { DrizzleClient } from "../../db"
 import { authIdentityClaims, customerAccessInquiries, users } from "../../db/schema"
 import { AppError } from "../errors"
+import { buildCustomerAccessInquirySubmissionAuditFields } from "../access-inquiries/submission-audit-fields"
+import type { RequestAuditContext } from "../request-audit-context"
 import type { ValidatedRegistrationProfile } from "../../routes/auth/services/fotocorp-registration-profile"
 
 export interface PlatformUserRow {
@@ -16,6 +18,7 @@ export interface CreatePlatformUserInput {
   displayName?: string | null
   avatarUrl?: string | null
   role?: "USER" | "ADMIN" | "SUPER_ADMIN"
+  requestAudit?: RequestAuditContext | null
 }
 
 function normalizePhoneClaim(countryCode: string, phoneNumber: string): string | null {
@@ -71,6 +74,8 @@ export async function createPlatformUser(
       imageQualityPreference: profile.imageQualityPreference,
       royaltyFreeQuantityRange: profile.royaltyFreeQuantityRange,
       royaltyFreeQualityPreference: profile.royaltyFreeQualityPreference,
+      videoQuantityRange: profile.videoQuantityRange,
+      caricatureQuantityRange: profile.caricatureQuantityRange,
       status: "ACTIVE",
       role: input.role ?? "USER",
     })
@@ -109,6 +114,9 @@ export async function createPlatformUser(
     imageQualityPreference: profile.imageQualityPreference,
     royaltyFreeQuantityRange: profile.royaltyFreeQuantityRange,
     royaltyFreeQualityPreference: profile.royaltyFreeQualityPreference,
+    videoQuantityRange: profile.videoQuantityRange,
+    caricatureQuantityRange: profile.caricatureQuantityRange,
+    ...buildCustomerAccessInquirySubmissionAuditFields(input.requestAudit),
   })
 
   return getPlatformUserById(db, userId)

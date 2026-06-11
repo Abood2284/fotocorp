@@ -166,6 +166,8 @@ export function buildAccessInquiryDetailGroups(input: {
     imageQualityPreference?: string | null
     royaltyFreeQuantityRange?: string | null
     royaltyFreeQualityPreference?: string | null
+    videoQuantityRange?: string | null
+    caricatureQuantityRange?: string | null
   }
   profile: {
     companyType?: string | null
@@ -183,6 +185,8 @@ export function buildAccessInquiryDetailGroups(input: {
   const interests = (input.inquiry.interestedAssetTypes ?? []).map((interest) => String(interest))
   const hasEditorial = hasAssetInterest(interests, "EDITORIAL", "IMAGE")
   const hasRoyaltyFree = hasAssetInterest(interests, "ROYALTY_FREE")
+  const hasVideo = hasAssetInterest(interests, "VIDEO")
+  const hasCaricature = hasAssetInterest(interests, "CARICATURE")
 
   const timelineFields: AccessInquiryDetailField[] = []
   const organizationFields: AccessInquiryDetailField[] = []
@@ -257,6 +261,14 @@ export function buildAccessInquiryDetailGroups(input: {
       input.inquiry.royaltyFreeQualityPreference,
     )
     pushTextField(preferenceFields, "Royalty Free", royaltyFreeSummary)
+  }
+
+  if (hasVideo) {
+    pushTextField(preferenceFields, "Video", formatImageQuantityRange(input.inquiry.videoQuantityRange))
+  }
+
+  if (hasCaricature) {
+    pushTextField(preferenceFields, "Caricature", formatImageQuantityRange(input.inquiry.caricatureQuantityRange))
   }
 
   return [

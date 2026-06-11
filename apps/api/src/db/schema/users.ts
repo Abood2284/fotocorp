@@ -32,6 +32,8 @@ export const users = pgTable(
     imageQualityPreference: text("image_quality_preference"),
     royaltyFreeQuantityRange: text("royalty_free_quantity_range"),
     royaltyFreeQualityPreference: text("royalty_free_quality_preference"),
+    videoQuantityRange: text("video_quantity_range"),
+    caricatureQuantityRange: text("caricature_quantity_range"),
     status: text("status").default("ACTIVE").notNull(),
     role: text("role").default("USER").notNull(),
     isSubscriber: boolean("is_subscriber").default(false).notNull(),

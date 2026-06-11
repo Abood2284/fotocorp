@@ -33,6 +33,10 @@ TYPESENSE_CF_ACCESS_CLIENT_SECRET=
 #
 # Must match apps/web `.env.local` INTERNAL_API_SECRET. Web proxies /api/auth/* and internal routes here.
 INTERNAL_API_SECRET=replace-with-long-random-internal-secret
+
+# Shared secret for salted IP hashes in request audit metadata. Set the same value on API and web Workers.
+# Prefer 32+ random bytes. If unset, ipHash is stored as null. Do not commit real values.
+IP_HASH_SECRET=replace-with-long-random-ip-hash-secret
 #
 # VPS jobs publish drain wake (PR-3). After staff contributor approval, Worker POSTs here (fire-and-forget).
 # `JOBS_DRAIN_WEBHOOK_SECRET` must equal `JOBS_WAKE_SECRET` in `apps/jobs/.env.production` on the VPS.

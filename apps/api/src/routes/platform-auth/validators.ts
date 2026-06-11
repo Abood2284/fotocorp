@@ -27,6 +27,8 @@ export const platformSignUpSchema = z.object({
   imageQualityPreference: z.string().trim().optional(),
   royaltyFreeQuantityRange: z.string().trim().optional(),
   royaltyFreeQualityPreference: z.string().trim().optional(),
+  videoQuantityRange: z.string().trim().optional(),
+  caricatureQuantityRange: z.string().trim().optional(),
   name: z.string().trim().optional(),
 })
 

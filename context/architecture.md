@@ -142,15 +142,45 @@
 - `apps/web` also keeps the photographer portal separate from Better Auth through `/api/photographer/*` proxy routes, server-side `/me` guards, and UI routes for `/photographer/login`, `/photographer/change-password`, `/photographer/dashboard`, `/photographer/images`, `/photographer/events` (list, create, edit), and `/photographer/uploads` (batch list, new bulk upload with presigned R2 PUT + submit, batch detail), including dashboard analytics fed by `GET /api/v1/photographer/analytics/summary`.
 - App user profile state lives in `app_user_profiles`.
 - App roles are `USER`, `PHOTOGRAPHER`, `ADMIN`, and `SUPER_ADMIN`.
-- Subscriber access combines `app_user_profiles` flags (`is_subscriber`, `subscription_status`, plan fields, dates) for UX with **`subscriber_entitlements`** for download authorization: an **ACTIVE** row per licensed **asset type**, remaining download count, **quality cap** vs requested download size, and optional validity window. Staff reviews **`customer_access_inquiries`** (status includes **`ACCESS_GRANTED`** after activation) under `/api/v1/staff/access-inquiries/*`, generates missing **DRAFT** entitlements without overwriting existing rows, edits counts, then activates.
+- Subscriber access combines `app_user_profiles` flags (`is_subscriber`, `subscription_status`, plan fields, dates) for UX with **`subscriber_entitlements`** for download authorization: an **ACTIVE** row per licensed **asset type**, remaining download count, **quality cap** vs requested download size, and optional validity window. Staff reviews **`customer_access_inquiries`** (status includes **`ACCESS_GRANTED`** after activation) under `/api/v1/staff/access-inquiries/*`, generates missing **DRAFT** entitlements without overwriting existing rows, edits counts, then activates. Registration preference capture stores quantity + quality for Editorial and Royalty Free, but quantity-only for Video and Caricature (`video_quantity_range`, `caricature_quantity_range`); Video/Caricature entitlement drafts default `quality_access` to `HIGH`.
 - Internal dashboard and privileged catalog tooling in `apps/web` under **`/staff/*`** require a **staff session** (`fotocorp_staff_session` cookie), backed by `staff_members` + `auth_credentials` / `auth_sessions` (`owner_type = STAFF`) in Neon. Subscriber `users.role` does **not** grant staff route access; staff credentials are bootstrapped separately. Legacy browser URLs under `/admin/*` were removed; reserved namespace ends in **404** (`app/admin/[[...path]]`).
-- Staff auth API (Hono): `POST /api/v1/staff/auth/login`, `POST /api/v1/staff/auth/logout`, `GET /api/v1/staff/auth/me` (`apps/api/src/routes/staff/auth/route.ts`). Sales-led inquiry + entitlement routes: `GET/POST /api/v1/staff/access-inquiries*`, `PATCH/POST /api/v1/staff/subscriber-entitlements/*` (activate + suspend) (`apps/api/src/routes/staff/access-inquiries/`). Staff audit foundation: `staff_audit_logs` (e.g. `STAFF_LOGIN_SUCCESS`, `STAFF_LOGIN_FAILED`, `STAFF_LOGOUT`, plus contributor-upload review actions `CONTRIBUTOR_UPLOAD_METADATA_SAVED`, `CONTRIBUTOR_UPLOAD_APPROVED`, `CONTRIBUTOR_UPLOAD_REJECTED`, `CONTRIBUTOR_UPLOAD_FILE_REPLACED`). Bootstrap: `pnpm --dir apps/api staff:bootstrap` with `STAFF_BOOTSTRAP_*` vars documented in `apps/api/.dev.vars.example`.
+- Staff auth API (Hono): `POST /api/v1/staff/auth/login`, `POST /api/v1/staff/auth/logout`, `GET /api/v1/staff/auth/me` (`apps/api/src/routes/staff/auth/route.ts`). Sales-led inquiry + entitlement routes: `GET/POST /api/v1/staff/access-inquiries*`, `PATCH/POST /api/v1/staff/subscriber-entitlements/*` (activate + suspend) (`apps/api/src/routes/staff/access-inquiries/`). Staff audit read: `GET /api/v1/staff/audit-logs` (`apps/api/src/routes/staff/audit-logs/route.ts`) — `SUPER_ADMIN` only; unified cursor-paginated feed across `staff_audit_logs`, `asset_admin_audit_logs`, and `admin_user_audit_logs` with sanitized metadata. Staff UI: `/staff/audit`. Write-side audit foundation remains `staff_audit_logs` (e.g. `STAFF_LOGIN_SUCCESS`, `STAFF_LOGIN_FAILED`, `STAFF_LOGOUT`, plus contributor-upload review actions `CONTRIBUTOR_UPLOAD_METADATA_SAVED`, `CONTRIBUTOR_UPLOAD_APPROVED`, `CONTRIBUTOR_UPLOAD_REJECTED`, `CONTRIBUTOR_UPLOAD_FILE_REPLACED`). Bootstrap: `pnpm --dir apps/api staff:bootstrap` with `STAFF_BOOTSTRAP_*` vars documented in `apps/api/.dev.vars.example`.
 - Staff workspace RBAC (`apps/web/src/lib/staff/staff-route-access.ts`): **`CAPTION_WRITER`** accesses `/staff/contributor-uploads` (full pre-publish workflow) and `/staff/captions`; only **`SUPER_ADMIN`** and **`CAPTION_WRITER`** may access contributor uploads. **`CATALOG_MANAGER`** and **`REVIEWER`** no longer access contributor uploads (catalog/homepage-hero remain for catalog manager). Contributor upload volume for admins is aggregateable from `contributor_upload_batches` / `contributor_upload_items` by `contributor_id`; staff caption/upload actions are tracked in `staff_audit_logs` via actor headers from the web BFF.
 - Main-app legacy `ADMIN` / `SUPER_ADMIN` roles may still exist in `app_user_profiles` for data/audit compatibility, but they are not used to gate the internal dashboard UI.
 - Main-app photographer roles remain part of the Better Auth/app-user model, but the dedicated contributor portal uses separate `contributor_accounts` and `contributor_sessions`; these sessions do not grant staff or subscriber access. Contributor accounts may carry `portal_role` (`STANDARD` | `PORTAL_ADMIN`); `PORTAL_ADMIN` can list all contributors and must choose a target photographer when creating events for someone else. Read-only `GET /api/v1/contributor/catalog/asset-categories` backs event category pickers.
 - Account routes require an authenticated user and an active profile.
 - Clean downloads require an active `app_user_profiles` row with **active subscriber flags**, a matching **ACTIVE** `subscriber_entitlement` for the asset type (API errors distinguish missing entitlement vs exhausted quota vs insufficient quality tier), sufficient quality tier for the requested download size, downloadable asset state, and an available canonical original object.
 - Internal API routes require the internal API secret in server-side calls. Browser components must never call them directly.
+
+## Request Audit Metadata
+
+Technical request metadata is captured for registration, contributor applications, and subscriber downloads to support security, entitlement enforcement, licensing compliance, and abuse investigation.
+
+### Capture helpers
+
+- API: `apps/api/src/lib/request-audit-context.ts` — reads IP (CF-Connecting-IP → X-Forwarded-For), approximate geo (request.cf → Cloudflare visitor headers), CF-Ray, User-Agent, and optional secret-based IP hash.
+- Web BFF: `apps/web/src/lib/server/request-audit-context.ts` — same shape for browser-facing routes (downloads).
+
+### Storage
+
+- **Registration and contributor applications:** submission metadata on `customer_access_inquiries` (`submission_ip_address`, hash, geo fields, CF-Ray, user-agent). Populated by `POST /api/v1/auth/sign-up` and `POST /api/v1/public/contributor-applications`. Applicant profile location fields remain separate from IP-derived metadata.
+- **Subscriber downloads:** metadata on `image_download_logs` (`ip_address`, hash, geo fields, CF-Ray, user-agent; legacy `ip_hash` / `user_agent` retained). Web BFF captures audit context on `/api/assets/:assetId/download` and forwards `requestAudit` to internal API. Internal API (`apps/api/src/routes/internal/downloads/service.ts`) normalizes `requestAudit` and legacy `requestIp` / `userAgent` via `apps/api/src/lib/downloads/download-request-audit.ts`.
+
+### Download logging behavior
+
+- **Preflight** (`POST /api/v1/internal/assets/:assetId/download/check`): no quota decrement, no download log writes.
+- **Actual download** (`POST /api/v1/internal/assets/:assetId/download`): quota increment unchanged; writes audit fields on `STARTED` and on relevant `FAILED` rows. `COMPLETED` updates status only (audit captured at `STARTED`).
+
+### Staff visibility
+
+- Staff inquiry detail (`GET /api/v1/staff/access-inquiries/:inquiryId`) returns `submissionAudit` separately from the sanitized `inquiry` object. Raw IP is included in `submissionAudit.ipAddress` only for **`SUPER_ADMIN`**; other authorized staff roles receive null for raw IP but may see hash, geo, CF-Ray, and user-agent.
+- Mutation responses (notes PATCH, close) use `sanitizeCustomerAccessInquiryForStaffResponse` / `serializeStaffInquiryMutationResponse` so raw submission audit columns are not returned on the `inquiry` object.
+
+### IP hashing and ops
+
+- New request audit hashes use secret-based SHA-256: `SHA-256(\`${ip}:${IP_HASH_SECRET}\`)` when both IP and secret are present; otherwise hash is null.
+- **`IP_HASH_SECRET` must be set on both API and web Workers** (same value in each environment). Use a strong random value, preferably 32+ bytes. Do not commit `.dev.vars`, `.env.local`, or other secret files.
+- Historical download rows may retain older unsalted IP hashes from before PR 5; new rows use secret-based hashes when configured. Raw IP may be stored separately where available.
 
 ## Database Ownership
 

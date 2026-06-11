@@ -53,6 +53,8 @@ export async function listAccessInquiriesWithProfiles(
       imageQualityPreference: customerAccessInquiries.imageQualityPreference,
       royaltyFreeQuantityRange: customerAccessInquiries.royaltyFreeQuantityRange,
       royaltyFreeQualityPreference: customerAccessInquiries.royaltyFreeQualityPreference,
+      videoQuantityRange: customerAccessInquiries.videoQuantityRange,
+      caricatureQuantityRange: customerAccessInquiries.caricatureQuantityRange,
       proposedUsername: customerAccessInquiries.proposedUsername,
       createdAt: customerAccessInquiries.createdAt,
       companyName: users.companyName,
@@ -171,10 +173,8 @@ function buildDraftEntitlementInsertRow(
   staffId: string,
 ) {
   if (assetType === "EDITORIAL" || assetType === "ROYALTY_FREE") {
-    const quantityRange =
-      assetType === "EDITORIAL" ? inquiry.imageQuantityRange : inquiry.royaltyFreeQuantityRange;
-    const qualityPref =
-      assetType === "EDITORIAL" ? inquiry.imageQualityPreference : inquiry.royaltyFreeQualityPreference;
+    const quantityRange = assetType === "EDITORIAL" ? inquiry.imageQuantityRange : inquiry.royaltyFreeQuantityRange;
+    const qualityPref = assetType === "EDITORIAL" ? inquiry.imageQualityPreference : inquiry.royaltyFreeQualityPreference;
     const allowed = suggestedImageDownloadsForRange(quantityRange ?? null);
     const quality = (qualityPref ?? "MEDIUM").toUpperCase();
     return {
@@ -184,6 +184,22 @@ function buildDraftEntitlementInsertRow(
       allowedDownloads: allowed,
       downloadsUsed: 0,
       qualityAccess: quality === "LOW" || quality === "MEDIUM" || quality === "HIGH" ? quality : "MEDIUM",
+      status: "DRAFT" as const,
+      validFrom: null,
+      validUntil: null,
+      createdByStaffId: staffId,
+      approvedByStaffId: null,
+    };
+  }
+  if (assetType === "VIDEO" || assetType === "CARICATURE") {
+    const quantityRange = assetType === "VIDEO" ? inquiry.videoQuantityRange : inquiry.caricatureQuantityRange;
+    return {
+      userId,
+      sourceInquiryId: inquiry.id,
+      assetType,
+      allowedDownloads: suggestedImageDownloadsForRange(quantityRange ?? null),
+      downloadsUsed: 0,
+      qualityAccess: "HIGH" as const,
       status: "DRAFT" as const,
       validFrom: null,
       validUntil: null,

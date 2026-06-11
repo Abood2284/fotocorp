@@ -7,7 +7,7 @@ import { AppError } from "../../../lib/errors";
 import { json } from "../../../lib/http";
 import { methodNotAllowed } from "../../../lib/route-errors";
 import { CONTRIBUTOR_SESSION_COOKIE, requirePhotographerSession } from "../auth/service";
-import { listPhotographerImages } from "./service";
+import { listPhotographerImages, streamContributorImagePreview } from "./service";
 import { photographerImagesQuerySchema } from "./validators";
 
 export const photographerImageRoutes = new Hono<{ Bindings: Env; Variables: AppRequestVariables }>();
@@ -23,6 +23,23 @@ photographerImageRoutes.get(
 );
 
 photographerImageRoutes.all("/api/v1/contributor/images", () => methodNotAllowed());
+
+photographerImageRoutes.get(
+  "/api/v1/contributor/images/:imageAssetId/preview/:variant",
+  async (c) => {
+    const database = db(c.env);
+    const session = await requirePhotographerSession(database, getCookie(c, CONTRIBUTOR_SESSION_COOKIE));
+    return await streamContributorImagePreview(
+      database,
+      session,
+      c.env,
+      c.req.param("imageAssetId"),
+      c.req.param("variant"),
+    );
+  },
+);
+
+photographerImageRoutes.all("/api/v1/contributor/images/:imageAssetId/preview/:variant", () => methodNotAllowed());
 
 function db(env: Env) {
   if (!env.DATABASE_URL) throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.");
