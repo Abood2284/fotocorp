@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Suspense } from "react"
 
 import { ContributorUploadFlow } from "@/components/contributor/contributor-upload-flow"
 import { getContributorMe } from "@/lib/api/contributor-api"
@@ -27,7 +28,15 @@ export default async function NewContributorUploadPage() {
         <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">New upload batch</h1>
       </div>
 
-      <ContributorUploadFlow initialSession={session} />
+      <Suspense
+        fallback={
+          <div className="rounded-xl border border-border bg-card px-4 py-8 text-sm text-muted-foreground">
+            Loading upload wizard…
+          </div>
+        }
+      >
+        <ContributorUploadFlow initialSession={session} />
+      </Suspense>
     </div>
   )
 }

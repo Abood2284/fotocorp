@@ -88,6 +88,8 @@ export const internalApiRoutes = {
   adminStaffUploadWizardAssetCategories: () => "/api/v1/internal/admin/staff-upload-wizard/asset-categories",
   adminStaffUploadWizardEvents: () => "/api/v1/internal/admin/staff-upload-wizard/events",
   adminStaffUploadWizardUploadBatches: () => "/api/v1/internal/admin/staff-upload-wizard/upload-batches",
+  adminStaffUploadWizardUploadBatchDetail: (batchId: string) =>
+    `/api/v1/internal/admin/staff-upload-wizard/upload-batches/${encodeURIComponent(batchId)}`,
   adminStaffUploadWizardUploadBatchFiles: (batchId: string) =>
     `/api/v1/internal/admin/staff-upload-wizard/upload-batches/${encodeURIComponent(batchId)}/files`,
   adminStaffUploadWizardUploadBatchFileComplete: (batchId: string, itemId: string) =>

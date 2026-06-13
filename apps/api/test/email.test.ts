@@ -51,6 +51,29 @@ describe("access email templates", () => {
     assert.match(rendered.html, /Reset password/)
   })
 
+  it("renders STAFF_NEW_ACCESS_INQUIRY with inquiry details and review CTA", () => {
+    const rendered = renderAccessEmailTemplate("STAFF_NEW_ACCESS_INQUIRY", {
+      recipient: { email: "staff@example.com", firstName: "Team", displayName: "Fotocorp Staff" },
+      loginUrl: "https://fotocorp.com/sign-in",
+      data: {
+        inquiryApplicantName: "Ada Lovelace",
+        inquiryCompanyName: "Analytical Engines Ltd",
+        inquiryApplicantEmail: "ada@example.com",
+        staffInquiryReviewUrl: "https://fotocorp.com/staff/access-inquiries/inquiry-123",
+      },
+    })
+
+    assert.equal(rendered.subject, "New Fotocorp access inquiry submitted")
+    assert.match(rendered.text, /Hello Team,/)
+    assert.match(rendered.text, /A new user has submitted an access inquiry on Fotocorp\./)
+    assert.match(rendered.text, /Name: Ada Lovelace/)
+    assert.match(rendered.text, /Company: Analytical Engines Ltd/)
+    assert.match(rendered.text, /Email: ada@example.com/)
+    assert.match(rendered.text, /staff\/access-inquiries\/inquiry-123/)
+    assert.match(rendered.html, /Review inquiry/)
+    assert.match(rendered.html, /staff\/access-inquiries\/inquiry-123/)
+  })
+
   it("renders CUSTOMER_ACCESS_APPROVED with entitlement limits and branded layout", () => {
     const rendered = renderAccessEmailTemplate("CUSTOMER_ACCESS_APPROVED", {
       recipient: { email: "reader@example.com", firstName: "Ada" },

@@ -32,6 +32,9 @@ import type {
   AdminContributorUploadReplacePresignBody,
 } from "./validators";
 
+const APPROVE_STAGING_VERIFY_CONCURRENCY = 10;
+const APPROVE_R2_COPY_CONCURRENCY = 6;
+
 interface AdminUploadListRow {
   image_asset_id: string;
   upload_item_id: string;
@@ -641,15 +644,20 @@ export async function approveAdminContributorUploadsService(
 
   // Phase 1b: verify each source object actually exists in the photographer staging bucket.
   // Fotokeys must NEVER be assigned for missing source objects.
-  const verified: PreparedApproval[] = [];
-  for (const item of prepared) {
+  const stagingExistsByAssetId = new Map<string, boolean>();
+  await runApproveWithConcurrency(prepared, APPROVE_STAGING_VERIFY_CONCURRENCY, async (item) => {
     let exists = false;
     try {
       exists = await verifyContributorStagingObjectExists(env, item.sourceStorageKey);
     } catch {
       exists = false;
     }
-    if (!exists) {
+    stagingExistsByAssetId.set(item.imageAssetId, exists);
+  });
+
+  const verified: PreparedApproval[] = [];
+  for (const item of prepared) {
+    if (!stagingExistsByAssetId.get(item.imageAssetId)) {
       skipped.push({ imageAssetId: item.imageAssetId, reason: "STAGING_OBJECT_MISSING" });
       continue;
     }
@@ -691,28 +699,41 @@ export async function approveAdminContributorUploadsService(
     sourceBucket: string;
   }
   const successful: SuccessfulCopy[] = [];
+  const copyOutcomes: Array<SuccessfulCopy | "CANONICAL_COPY_FAILED" | null> = new Array(verified.length).fill(null);
+  await runApproveWithConcurrency(
+    verified.map((item, index) => ({ item, index })),
+    APPROVE_R2_COPY_CONCURRENCY,
+    async ({ item, index }) => {
+      const allocation = allocations[index]!;
+      const canonicalExt = item.canonicalExtension!;
+      const canonicalKey = buildCanonicalOriginalKey(allocation.fotokey, canonicalExt);
+      try {
+        await copyStagingObjectToOriginals(env, {
+          sourceKey: item.sourceStorageKey,
+          destinationKey: canonicalKey,
+        });
+        copyOutcomes[index] = {
+          imageAssetId: item.imageAssetId,
+          fotokey: allocation.fotokey,
+          fotokeySequence: allocation.sequence,
+          canonicalKey,
+          canonicalExtension: canonicalExt,
+          sourceStorageKey: item.sourceStorageKey,
+          sourceBucket: item.sourceBucket,
+        };
+      } catch {
+        copyOutcomes[index] = "CANONICAL_COPY_FAILED";
+      }
+    },
+  );
+
   for (let i = 0; i < verified.length; i += 1) {
-    const item = verified[i]!;
-    const allocation = allocations[i]!;
-    const canonicalExt = item.canonicalExtension!;
-    const canonicalKey = buildCanonicalOriginalKey(allocation.fotokey, canonicalExt);
-    try {
-      await copyStagingObjectToOriginals(env, {
-        sourceKey: item.sourceStorageKey,
-        destinationKey: canonicalKey,
-      });
-      successful.push({
-        imageAssetId: item.imageAssetId,
-        fotokey: allocation.fotokey,
-        fotokeySequence: allocation.sequence,
-        canonicalKey,
-        canonicalExtension: canonicalExt,
-        sourceStorageKey: item.sourceStorageKey,
-        sourceBucket: item.sourceBucket,
-      });
-    } catch {
-      skipped.push({ imageAssetId: item.imageAssetId, reason: "CANONICAL_COPY_FAILED" });
+    const outcome = copyOutcomes[i];
+    if (!outcome || outcome === "CANONICAL_COPY_FAILED") {
+      skipped.push({ imageAssetId: verified[i]!.imageAssetId, reason: "CANONICAL_COPY_FAILED" });
+      continue;
     }
+    successful.push(outcome);
   }
 
   if (successful.length === 0) {
@@ -1206,22 +1227,32 @@ export async function patchAdminContributorUploadMetadataService(
     );
     const contributorRow = contributorRows[0];
 
-    const changedFields: string[] = [];
-    if (body.whoIsInPicture !== undefined) changedFields.push("whoIsInPicture");
-    if (body.caption !== undefined) changedFields.push("caption");
-    if (body.keywords !== undefined) changedFields.push("keywords");
-
-    await insertStaffAuditLog(httpDb(env), {
-      staffMemberId: context.staffMemberId,
-      action: CONTRIBUTOR_UPLOAD_AUDIT_ACTION.METADATA_SAVED,
-      entityType: "image_asset",
-      entityId: imageAssetId,
-      metadata: {
-        contributorId: contributorRow?.contributor_id ?? null,
-        batchId: contributorRow?.batch_id ?? null,
-        changedFields,
+    const changedFields = getContributorUploadChangedFields(
+      {
+        whoIsInPicture: cur.who_is_in_picture ?? null,
+        caption: cur.caption ?? null,
+        keywords: cur.keywords ?? null,
       },
-    }).catch(() => undefined);
+      {
+        whoIsInPicture: nextWhoIsInPicture,
+        caption: nextCaption,
+        keywords: nextKeywords,
+      },
+    );
+
+    if (changedFields.length > 0) {
+      await insertStaffAuditLog(httpDb(env), {
+        staffMemberId: context.staffMemberId,
+        action: CONTRIBUTOR_UPLOAD_AUDIT_ACTION.METADATA_SAVED,
+        entityType: "image_asset",
+        entityId: imageAssetId,
+        metadata: {
+          contributorId: contributorRow?.contributor_id ?? null,
+          batchId: contributorRow?.batch_id ?? null,
+          changedFields,
+        },
+      }).catch(() => undefined);
+    }
 
     return json({
       ok: true as const,
@@ -1582,6 +1613,17 @@ function normalizeKeywordsInput(value: string | string[] | null): string | null 
   return t ? t.slice(0, 8000) : null;
 }
 
+export function getContributorUploadChangedFields(
+  previous: { whoIsInPicture: string | null; caption: string | null; keywords: string | null },
+  next: { whoIsInPicture: string | null; caption: string | null; keywords: string | null },
+): string[] {
+  const changedFields: string[] = [];
+  if (previous.whoIsInPicture !== next.whoIsInPicture) changedFields.push("whoIsInPicture");
+  if (previous.caption !== next.caption) changedFields.push("caption");
+  if (previous.keywords !== next.keywords) changedFields.push("keywords");
+  return changedFields;
+}
+
 function parseExtensionFromFileName(name: string): string | null {
   const idx = name.lastIndexOf(".");
   if (idx <= 0 || idx === name.length - 1) return null;
@@ -1650,6 +1692,25 @@ function safeFileName(name: string, extension: string | null) {
 
 function unique<T>(items: T[]): T[] {
   return Array.from(new Set(items));
+}
+
+async function runApproveWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  if (items.length === 0) return;
+  const queue = [...items];
+  const poolSize = Math.min(limit, queue.length);
+  await Promise.all(
+    Array.from({ length: poolSize }, async () => {
+      while (queue.length > 0) {
+        const item = queue.shift();
+        if (!item) break;
+        await worker(item);
+      }
+    }),
+  );
 }
 
 function toIso(value: Date | string | null | undefined) {

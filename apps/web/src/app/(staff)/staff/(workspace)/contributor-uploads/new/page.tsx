@@ -1,5 +1,6 @@
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { Suspense } from "react"
 
 import { StaffUploadFlow } from "@/components/staff/staff-upload-flow"
 import { assertStaffRouteAccess, requireStaff } from "@/lib/staff-session"
@@ -30,7 +31,15 @@ export default async function StaffNewContributorUploadPage() {
         </p>
       </div>
 
-      <StaffUploadFlow />
+      <Suspense
+        fallback={
+          <div className="rounded-xl border border-border bg-card px-4 py-8 text-sm text-muted-foreground">
+            Loading upload wizard…
+          </div>
+        }
+      >
+        <StaffUploadFlow />
+      </Suspense>
     </div>
   )
 }

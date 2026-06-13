@@ -197,6 +197,17 @@ export function resolveContributorLoginUrl(env: EmailEnv): string {
   return origin ? `${origin}${DEFAULT_CONTRIBUTOR_LOGIN_PATH}` : `${DEFAULT_LOGIN_URL}${DEFAULT_CONTRIBUTOR_LOGIN_PATH}`
 }
 
+export function resolveStaffAccessInquiryNotifyEmail(env: EmailEnv): string | null {
+  const email = env.STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL?.trim().toLowerCase()
+  return email || null
+}
+
+export function resolveStaffInquiryReviewUrl(env: EmailEnv, inquiryId: string): string {
+  const origin = env.PUBLIC_WEB_ORIGIN?.trim().replace(/\/+$/, "")
+  const base = origin || DEFAULT_LOGIN_URL.replace(/\/sign-in$/, "")
+  return `${base}/staff/access-inquiries/${encodeURIComponent(inquiryId)}`
+}
+
 export function resolvePasswordResetUrl(env: EmailEnv, rawToken: string): string {
   const origin = env.PUBLIC_WEB_ORIGIN?.trim().replace(/\/+$/, "")
   const base = origin || DEFAULT_LOGIN_URL.replace(/\/sign-in$/, "")

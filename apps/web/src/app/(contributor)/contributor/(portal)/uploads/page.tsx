@@ -137,9 +137,19 @@ export default async function ContributorUploadsPage({
                           : "—"}
                       </td>
                       <td className="py-3">
-                        <Link href={`/contributor/uploads/${b.id}`} className="font-medium text-primary hover:underline">
-                          View
-                        </Link>
+                        <div className="flex flex-wrap items-center gap-3">
+                          {b.status === "OPEN" ? (
+                            <Link
+                              href={`/contributor/uploads/new?batchId=${encodeURIComponent(b.id)}`}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              Continue editing
+                            </Link>
+                          ) : null}
+                          <Link href={`/contributor/uploads/${b.id}`} className="font-medium text-muted-foreground hover:text-foreground hover:underline">
+                            View
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}

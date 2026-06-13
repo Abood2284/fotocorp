@@ -9,6 +9,7 @@ import {
   completeStaffUploadWizardFileService,
   createStaffUploadWizardBatchService,
   createStaffUploadWizardEventService,
+  getStaffUploadWizardBatchService,
   listStaffUploadWizardAssetCategoriesService,
   listStaffUploadWizardContributorsService,
   patchStaffUploadWizardMetadataService,
@@ -64,6 +65,16 @@ internalAdminStaffUploadWizardRoutes.post(
   async (c) => {
     const database = db(c.env);
     return await createStaffUploadWizardBatchService(database, c.req.valid("json"));
+  },
+);
+
+internalAdminStaffUploadWizardRoutes.get(
+  `${base}/upload-batches/:batchId`,
+  zValidator("param", uploadBatchIdParamSchema),
+  async (c) => {
+    const database = db(c.env);
+    const { batchId } = c.req.valid("param");
+    return await getStaffUploadWizardBatchService(database, batchId);
   },
 );
 

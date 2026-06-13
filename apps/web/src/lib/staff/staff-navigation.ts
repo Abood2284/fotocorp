@@ -1,7 +1,7 @@
 
 
 import type { StaffRole } from "@/lib/staff/staff-route-access"
-import { Images, ClosedCaption, Database, Calendar, LayoutDashboard, Inbox, MessageCircle, ShieldCheck, Users, ArrowRight, Sparkles } from "lucide-react"
+import { Images, ClosedCaption, Calendar, LayoutDashboard, Inbox, MessageCircle, ShieldCheck, Users, Sparkles, BarChart3 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 export interface StaffNavItem {
@@ -67,6 +67,12 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     label: "Audit",
     href: "/staff/audit",
     icon: ShieldCheck,
+    roles: ["SUPER_ADMIN"],
+  },
+  {
+    label: "Performance",
+    href: "/staff/team-performance",
+    icon: BarChart3,
     roles: ["SUPER_ADMIN"],
   },
   {

@@ -9,6 +9,7 @@ export const EMAIL_TEMPLATE_KEYS = [
   "CONTRIBUTOR_APPLICATION_APPROVED_WITH_CREDENTIALS",
   "CONTRIBUTOR_APPLICATION_REJECTED",
   "CUSTOMER_PASSWORD_RESET",
+  "STAFF_NEW_ACCESS_INQUIRY",
 ] as const
 
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number]
@@ -49,7 +50,13 @@ export interface EmailProvider {
 
 export type EmailEnv = Pick<
   Env,
-  "RESEND_API_KEY" | "EMAIL_PROVIDER" | "EMAIL_FROM_NAME" | "EMAIL_FROM_ADDRESS" | "EMAIL_REPLY_TO" | "PUBLIC_WEB_ORIGIN"
+  | "RESEND_API_KEY"
+  | "EMAIL_PROVIDER"
+  | "EMAIL_FROM_NAME"
+  | "EMAIL_FROM_ADDRESS"
+  | "EMAIL_REPLY_TO"
+  | "PUBLIC_WEB_ORIGIN"
+  | "STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL"
 >
 
 export interface EmailRelatedEntity {
@@ -81,4 +88,8 @@ export interface EmailTemplateData {
   entitlementChanges?: EntitlementChangeLine[]
   resetPasswordUrl?: string | null
   resetLinkExpiresMinutes?: number | null
+  inquiryApplicantName?: string | null
+  inquiryCompanyName?: string | null
+  inquiryApplicantEmail?: string | null
+  staffInquiryReviewUrl?: string | null
 }

@@ -28,6 +28,27 @@ Fotocorp News Photo Agency
 For questions, reply to this email.
 ```
 
+## STAFF_NEW_ACCESS_INQUIRY
+
+Internal staff notification sent when a customer completes registration. Recipient is `STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL` (env-configured).
+
+Subject: `New Fotocorp access inquiry submitted`
+
+```text
+Hello Team,
+
+A new user has submitted an access inquiry on Fotocorp.
+
+Name: {inquiryApplicantName}
+Company: {inquiryCompanyName}
+Email: {inquiryApplicantEmail}
+
+Review inquiry: {staffInquiryReviewUrl}
+
+Fotocorp News Photo Agency
+For questions, reply to this email.
+```
+
 ## CUSTOMER_ACCESS_APPROVED
 
 Subject (single asset): `Your Fotocorp {assetLabel} access has been approved`  

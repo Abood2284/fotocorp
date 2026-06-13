@@ -1,6 +1,6 @@
 "use client"
 
-import { Download, CircleHelp, ChevronDown, ChevronUp } from "lucide-react"
+import { Download, CircleHelp, Minus, Plus } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState } from "react"
 
@@ -130,7 +130,7 @@ export function AssetDetailActions({
       >
         <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">Details</h3>
         <span className="text-muted-foreground lg:hidden">
-          {detailsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {detailsOpen ? <Minus size={14} /> : <Plus size={14} />}
         </span>
       </button>
 
@@ -191,7 +191,7 @@ export function AssetDetailActions({
           Keywords
         </h3>
         <span className="text-muted-foreground lg:hidden">
-          {keywordsOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {keywordsOpen ? <Minus size={14} /> : <Plus size={14} />}
         </span>
       </button>
 
@@ -341,17 +341,20 @@ export function AssetDetailActions({
         ) : null}
       </div>
 
-      {/* More from this event contact sheet */}
+      {/* Event contact sheet */}
       {eventAssets.length > 0 && (
-        <div className="border-t border-border/60 pt-4">
+        <div className="hidden border-t border-border/60 pt-4 lg:block">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
-              More from this event
-            </h3>
+            <a
+              href="#event-gallery-section"
+              className="text-sm text-primary underline underline-offset-2 hover:text-primary-hover"
+            >
+              Images from this event
+            </a>
             {totalEventAssets > 0 && (
               <a
                 href="#event-gallery-section"
-                className="text-[10px] font-bold uppercase tracking-wider text-primary hover:underline underline-offset-2"
+                className="text-[10px] font-bold uppercase tracking-wider text-primary underline underline-offset-2 hover:text-primary-hover"
               >
                 View all {totalEventAssets}
               </a>

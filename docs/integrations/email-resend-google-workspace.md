@@ -27,13 +27,17 @@ Optional:
 
 ```sh
 PUBLIC_WEB_ORIGIN=https://fotocorp.com
+STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL=abdulraheemsayyed22@gmail.com
 ```
 
 When `PUBLIC_WEB_ORIGIN` is set, customer and contributor approval emails link to `/sign-in` on that origin. If it is not set, emails use `https://fotocorp.com/sign-in`.
 
+When `STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL` is set, customer registration also sends `STAFF_NEW_ACCESS_INQUIRY` to that address with a link to `/staff/access-inquiries/{inquiryId}`. If unset, the staff notification is skipped (registration still succeeds).
+
 ## Templates
 
 - `CUSTOMER_ACCESS_REQUEST_RECEIVED`: sent after customer registration/access inquiry creation.
+- `STAFF_NEW_ACCESS_INQUIRY`: sent to `STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL` after customer registration when that env var is set; includes applicant name, company, email, and staff review link.
 - `CUSTOMER_ACCESS_APPROVED`: sent when staff activates one or more subscriber entitlements; includes download limits per asset type (separate email per individual activation; one consolidated email for bulk activate).
 - `CUSTOMER_ENTITLEMENT_UPDATED`: sent when staff adjusts an active entitlement's download limit or quality cap.
 - `CUSTOMER_ACCESS_REJECTED`: sent after staff closes a customer inquiry without granting access.

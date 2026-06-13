@@ -1,4 +1,4 @@
-import { AlertTriangle, ChevronLeft, Calendar as Calendar, ExternalLink } from "lucide-react"
+import { AlertTriangle, ChevronLeft, Upload, Calendar as Calendar, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
@@ -44,12 +44,20 @@ export default async function StaffEventDetailPage({ params }: StaffEventDetailP
         </Link>
         <div className="mt-2 flex items-center justify-between">
           <h2 className="text-xl font-semibold tracking-tight">Event: {event.name}</h2>
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/staff/catalog?eventId=${event.id}`} className="flex items-center gap-2">
-              <ExternalLink size={16} />
-              View Assets in Catalog
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="default" size="sm">
+              <Link href={`/staff/events/${event.id}/upload`} className="flex items-center gap-2">
+                <Upload size={16} />
+                Upload Assets
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/staff/catalog?eventId=${event.id}`} className="flex items-center gap-2">
+                <ExternalLink size={16} />
+                View Assets in Catalog
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 

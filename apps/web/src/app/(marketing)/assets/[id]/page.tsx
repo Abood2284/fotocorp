@@ -163,7 +163,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               id="detail-search"
               name="q"
               defaultValue={searchDefaultValue}
-              placeholder="Search photos, events, people, places, Fotokey..."
+              placeholder="AI-enabled search for photos, events, people, places, Fotokey..."
               className="min-w-0 flex-1 bg-transparent py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground sm:text-base"
             />
             <span className="hidden border-l border-border pl-4 text-sm font-medium text-muted-foreground sm:block">
@@ -223,10 +223,10 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                   </h1>
                 )}
                 {totalEventAssets > 0 && asset.event?.id && (
-                  <div className="font-sans text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <div className="font-sans text-sm">
                     <a
                       href="#event-gallery-section"
-                      className="hover:text-black hover:underline underline-offset-2"
+                      className="text-primary underline underline-offset-2 hover:text-primary-hover"
                     >
                       {totalEventAssets} {totalEventAssets === 1 ? "image" : "images"} from this event
                     </a>
@@ -508,7 +508,7 @@ function relatedLabelForSource(
   source: "event" | "category" | "photographer" | "archive",
   asset: PublicAsset,
 ) {
-  if (source === "event") return "More images from this event"
+  if (source === "event") return "Images from this event"
   if (source === "category") return asset.category?.name ? `More from ${asset.category.name}` : "More from this category"
   if (source === "photographer") return asset.contributor?.displayName ? `More by ${asset.contributor.displayName}` : "More by this photographer"
   return "More from the archive"

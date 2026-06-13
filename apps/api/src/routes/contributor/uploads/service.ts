@@ -310,7 +310,55 @@ export async function getPhotographerUploadBatchDetail(db: DrizzleClient, sessio
   const batch = batchRows[0];
   if (!batch) throw new AppError(404, "UPLOAD_BATCH_NOT_FOUND", "Upload batch was not found.");
 
-  const itemRows = await executeRows<BatchDetailItemRow>(
+  const itemRows = await loadUploadBatchDetailItemRows(db, batchId);
+
+  return buildUploadBatchDetailResponse(batch, itemRows);
+}
+
+interface BatchDetailStaffRow extends BatchDetailEventRow {
+  contributor_display_name: string;
+}
+
+function mapUploadBatchDetailItems(itemRows: BatchDetailItemRow[]) {
+  return itemRows.map((row) => ({
+    id: row.id,
+    fileName: row.original_file_name,
+    uploadStatus: row.upload_status,
+    mimeType: row.mime_type,
+    sizeBytes: row.size_bytes === null ? null : Number(row.size_bytes),
+    imageAssetId: row.image_asset_id,
+    imageAssetStatus: row.image_asset_status,
+    imageAssetVisibility: row.image_asset_visibility,
+    whoIsInPicture: row.who_is_in_picture,
+    caption: row.caption,
+    keywords: row.keywords,
+    assetUpdatedAt: row.asset_updated_at ? toIso(row.asset_updated_at) : null,
+    failureCode: row.failure_code,
+    failureMessage: row.failure_message,
+    uploadedAt: row.uploaded_at ? toIso(row.uploaded_at) : null,
+    finalizedAt: row.finalized_at ? toIso(row.finalized_at) : null,
+    createdAt: toIso(row.created_at),
+  }));
+}
+
+function buildUploadBatchDetailResponse(batch: BatchDetailEventRow, itemRows: BatchDetailItemRow[]) {
+  return {
+    ok: true as const,
+    batch: mapBatch(batch),
+    event: {
+      id: batch.event_id,
+      name: batch.event_name,
+      status: batch.event_status,
+      eventDate: dateOnlyIso(batch.event_date),
+      city: batch.event_city,
+      location: batch.event_location,
+    },
+    items: mapUploadBatchDetailItems(itemRows),
+  };
+}
+
+async function loadUploadBatchDetailItemRows(db: DrizzleClient, batchId: string) {
+  return executeRows<BatchDetailItemRow>(
     db,
     sql`
       select
@@ -342,37 +390,53 @@ export async function getPhotographerUploadBatchDetail(db: DrizzleClient, sessio
       order by i.created_at asc, i.id asc
     `,
   );
+}
+
+/** Staff/internal delegate: load OPEN batch detail for wizard resume (caller must enforce auth). */
+export async function staffDelegateGetPhotographerUploadBatchDetail(db: DrizzleClient, batchId: string) {
+  const batchRows = await executeRows<BatchDetailStaffRow>(
+    db,
+    sql`
+      select
+        b.id,
+        b.contributor_id,
+        b.event_id,
+        b.status,
+        b.asset_type,
+        b.common_title,
+        b.common_caption,
+        b.common_keywords,
+        b.total_files,
+        b.uploaded_files,
+        b.failed_files,
+        b.submitted_at,
+        b.created_at,
+        b.updated_at,
+        pe.name as event_name,
+        pe.status as event_status,
+        pe.event_date as event_date,
+        pe.city as event_city,
+        pe.location as event_location,
+        p.display_name as contributor_display_name
+      from contributor_upload_batches b
+      inner join photo_events pe on pe.id = b.event_id
+      inner join contributors p on p.id = b.contributor_id
+      where b.id = ${batchId}::uuid
+      limit 1
+    `,
+  );
+  const batch = batchRows[0];
+  if (!batch) throw new AppError(404, "UPLOAD_BATCH_NOT_FOUND", "Upload batch was not found.");
+
+  const itemRows = await loadUploadBatchDetailItemRows(db, batchId);
+  const detail = buildUploadBatchDetailResponse(batch, itemRows);
 
   return {
-    ok: true as const,
-    batch: mapBatch(batch),
-    event: {
-      id: batch.event_id,
-      name: batch.event_name,
-      status: batch.event_status,
-      eventDate: dateOnlyIso(batch.event_date),
-      city: batch.event_city,
-      location: batch.event_location,
+    ...detail,
+    contributor: {
+      id: batch.contributor_id,
+      displayName: batch.contributor_display_name,
     },
-    items: itemRows.map((row) => ({
-      id: row.id,
-      fileName: row.original_file_name,
-      uploadStatus: row.upload_status,
-      mimeType: row.mime_type,
-      sizeBytes: row.size_bytes === null ? null : Number(row.size_bytes),
-      imageAssetId: row.image_asset_id,
-      imageAssetStatus: row.image_asset_status,
-      imageAssetVisibility: row.image_asset_visibility,
-      whoIsInPicture: row.who_is_in_picture,
-      caption: row.caption,
-      keywords: row.keywords,
-      assetUpdatedAt: row.asset_updated_at ? toIso(row.asset_updated_at) : null,
-      failureCode: row.failure_code,
-      failureMessage: row.failure_message,
-      uploadedAt: row.uploaded_at ? toIso(row.uploaded_at) : null,
-      finalizedAt: row.finalized_at ? toIso(row.finalized_at) : null,
-      createdAt: toIso(row.created_at),
-    })),
   };
 }
 

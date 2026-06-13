@@ -150,6 +150,21 @@ export async function internalSubscriberAssetDownloadService(request: Request, e
     })
   }
 
+  try {
+    await db.execute(sql`
+      update users
+      set download_quota_used = download_quota_used + 1,
+          updated_at = now()
+      where id = ${authUserId}::uuid
+    `)
+  } catch (error) {
+    console.warn("[downloads] failed to increment users.download_quota_used", {
+      authUserId,
+      assetId: asset.id,
+      reason: error instanceof Error ? error.message : "unknown",
+    })
+  }
+
   let object: Awaited<ReturnType<typeof getR2Object>> | null = null
   try { object = await getR2Object(env.MEDIA_ORIGINALS_BUCKET, asset.r2_original_key) } catch { throw new AppError(502, "DOWNLOAD_STREAM_FAILED", "Download service is unavailable.") }
   if (!object?.body) {

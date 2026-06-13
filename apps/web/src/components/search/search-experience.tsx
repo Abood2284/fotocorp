@@ -464,7 +464,7 @@ export function SearchExperience({
                 value={queryDraft}
                 onChange={(event) => setQueryDraft(event.target.value)}
                 onFocus={requestFilters}
-                placeholder="Search images, events, categories, Fotokey"
+                placeholder="AI-enabled search for images, events, categories, Fotokey"
                 className="h-full min-w-0 flex-1 border-0 bg-transparent text-lg font-medium text-foreground shadow-none outline-none ring-0 placeholder:text-lg placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus-visible:!outline-none focus-visible:ring-0 md:text-xl md:placeholder:text-xl"
               />
             </label>

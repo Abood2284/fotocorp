@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react"
 import type { TrackedFile } from "@/components/contributor/contributor-upload-types"
 import { ContributorUploadStepCard } from "@/components/contributor/upload/contributor-upload-layout"
 import { formatFileSize, labelForStatus } from "@/components/contributor/upload/contributor-upload-utils"
+import { getTrackedDisplayName, getTrackedSizeBytes } from "@/lib/upload-wizard-resume"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -109,9 +110,9 @@ export function ContributorUploadStepFiles({
                   className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0 flex-1 pr-4">
-                    <p className="truncate font-medium text-foreground">{row.file.name}</p>
+                    <p className="truncate font-medium text-foreground">{getTrackedDisplayName(row)}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                      {formatFileSize(row.file.size)} · {labelForStatus(row.status)}
+                      {formatFileSize(getTrackedSizeBytes(row))} · {labelForStatus(row.status)}
                     </p>
                     {row.status === "uploading" && row.uploadProgress !== null ? (
                       <div

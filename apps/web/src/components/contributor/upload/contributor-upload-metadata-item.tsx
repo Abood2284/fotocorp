@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react"
 import type { TrackedFile } from "@/components/contributor/contributor-upload-types"
+import { getTrackedDisplayName } from "@/lib/upload-wizard-resume"
 import { uploadFieldLabelClass, uploadInputClass } from "@/components/contributor/upload/contributor-upload-field-styles"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { Link2 } from "lucide-react"
 
 export interface MetadataDraft {
   whoIsInPicture: string
@@ -15,11 +17,15 @@ export interface MetadataDraft {
 interface ContributorUploadMetadataItemProps {
   row: TrackedFile
   onSave: (draft: MetadataDraft) => Promise<void>
+  /** When true, the editor shows a visual indicator that sync mode is active */
+  syncMode?: boolean
+  /** Called immediately on keystroke (before debounce) to propagate full draft to other images in sync mode */
+  onImmediateDraftChange?: (draft: MetadataDraft) => void
 }
 
 const SAVE_DEBOUNCE_MS = 800
 
-export function ContributorUploadMetadataItem({ row, onSave }: ContributorUploadMetadataItemProps) {
+export function ContributorUploadMetadataItem({ row, onSave, syncMode = false, onImmediateDraftChange }: ContributorUploadMetadataItemProps) {
   const [whoIsInPicture, setWhoIsInPicture] = useState(row.whoIsInPicture)
   const [caption, setCaption] = useState(row.caption)
   const [keywords, setKeywords] = useState(row.keywords)
@@ -30,19 +36,9 @@ export function ContributorUploadMetadataItem({ row, onSave }: ContributorUpload
   const saveGenRef = useRef(0)
   const latestDraftRef = useRef<MetadataDraft>({ whoIsInPicture, caption, keywords })
 
-  useEffect(() => {
-    setWhoIsInPicture(row.whoIsInPicture)
-    setCaption(row.caption)
-    setKeywords(row.keywords)
-    latestDraftRef.current = {
-      whoIsInPicture: row.whoIsInPicture,
-      caption: row.caption,
-      keywords: row.keywords,
-    }
-    setSaveState("idle")
-    setSaveHint(null)
-  }, [row.key])
-
+  // Only react to saveHint (conflict recovery from the server).
+  // We intentionally do NOT reset local state when row.caption/keywords/whoIsInPicture change —
+  // the editor initialises from props on mount and remounts only when the parent changes its key.
   useEffect(() => {
     if (!row.saveHint) return
     setWhoIsInPicture(row.whoIsInPicture)
@@ -55,7 +51,7 @@ export function ContributorUploadMetadataItem({ row, onSave }: ContributorUpload
     }
     setSaveState("error")
     setSaveHint(row.saveHint)
-  }, [row.saveHint, row.whoIsInPicture, row.caption, row.keywords])
+  }, [row.saveHint])
 
   useEffect(() => {
     return () => {
@@ -96,6 +92,7 @@ export function ContributorUploadMetadataItem({ row, onSave }: ContributorUpload
     if (patch.whoIsInPicture !== undefined) setWhoIsInPicture(patch.whoIsInPicture)
     if (patch.caption !== undefined) setCaption(patch.caption)
     if (patch.keywords !== undefined) setKeywords(patch.keywords)
+    if (syncMode && onImmediateDraftChange) onImmediateDraftChange(next)
     scheduleSave(next)
   }
 
@@ -103,8 +100,8 @@ export function ContributorUploadMetadataItem({ row, onSave }: ContributorUpload
     <li className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className="border-b border-border bg-muted/20 px-4 py-3 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="max-w-full truncate text-sm text-muted-foreground sm:text-base" title={row.file.name}>
-            {row.file.name}
+          <p className="max-w-full truncate text-sm text-muted-foreground sm:text-base" title={getTrackedDisplayName(row)}>
+            {getTrackedDisplayName(row)}
           </p>
           <SaveHint state={saveState} hint={saveHint} />
         </div>
@@ -128,7 +125,10 @@ export function ContributorUploadMetadataItem({ row, onSave }: ContributorUpload
 
         <div className="mt-8 w-full max-w-xl space-y-5 sm:mt-10 sm:space-y-6">
           <label className="block space-y-2 text-left">
-            <span className={uploadFieldLabelClass}>Caption</span>
+            <span className={uploadFieldLabelClass}>
+              Caption
+              {syncMode ? <SyncBadge /> : null}
+            </span>
             <textarea
               className={cn(
                 "min-h-[88px] w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm sm:min-h-[100px] sm:text-base",
@@ -141,7 +141,10 @@ export function ContributorUploadMetadataItem({ row, onSave }: ContributorUpload
           </label>
 
           <label className="block space-y-2 text-left">
-            <span className={uploadFieldLabelClass}>Keywords</span>
+            <span className={uploadFieldLabelClass}>
+              Keywords
+              {syncMode ? <SyncBadge /> : null}
+            </span>
             <Input
               value={keywords}
               onChange={(e) => patchDraft({ keywords: e.target.value })}
@@ -152,7 +155,10 @@ export function ContributorUploadMetadataItem({ row, onSave }: ContributorUpload
           </label>
 
           <label className="block space-y-2 text-left">
-            <span className={uploadFieldLabelClass}>Who is in the picture</span>
+            <span className={uploadFieldLabelClass}>
+              Who is in the picture
+              {syncMode ? <SyncBadge /> : null}
+            </span>
             <Input
               value={whoIsInPicture}
               onChange={(e) => patchDraft({ whoIsInPicture: e.target.value })}
@@ -188,5 +194,14 @@ function SaveHint({
     )
   }
   return null
+}
+
+function SyncBadge() {
+  return (
+    <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+      <Link2 size={10} />
+      sync
+    </span>
+  )
 }
 

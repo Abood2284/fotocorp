@@ -352,6 +352,50 @@ export async function getStaffAuditLogs(
   })
 }
 
+export interface StaffProductivitySummary {
+  captionsEdited: number
+  uniqueAssetsCaptioned: number
+  metadataEdits: number
+  uploadsApproved: number
+  uploadsRejected: number
+  activeStaffCount: number
+}
+
+export interface StaffProductivityMember {
+  staffMemberId: string
+  displayName: string
+  username: string | null
+  role: string
+  status: string
+  captionsEdited: number
+  uniqueAssetsCaptioned: number
+  metadataEdits: number
+  uploadsApproved: number
+  uploadsRejected: number
+  lastActivityAt: string | null
+}
+
+export async function getStaffProductivity(
+  options: {
+    cookieHeader?: string
+    from?: string
+    to?: string
+  } = {},
+) {
+  const params = new URLSearchParams()
+  if (options.from) params.set("from", options.from)
+  if (options.to) params.set("to", options.to)
+  const query = params.toString() ? `?${params.toString()}` : ""
+  return staffJson<{
+    ok: true
+    summary: StaffProductivitySummary
+    members: StaffProductivityMember[]
+  }>(`/productivity${query}`, {
+    method: "GET",
+    cookieHeader: options.cookieHeader,
+  })
+}
+
 export async function patchStaffMemberAccount(
   memberId: string,
   body: {

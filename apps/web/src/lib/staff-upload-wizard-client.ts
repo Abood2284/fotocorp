@@ -87,6 +87,62 @@ export async function staffWizardCreateUploadBatch(body: {
   )
 }
 
+export interface StaffWizardUploadBatchItemDto {
+  id: string
+  fileName: string
+  uploadStatus: string
+  mimeType: string | null
+  sizeBytes: number | null
+  imageAssetId: string | null
+  imageAssetStatus: string | null
+  imageAssetVisibility: string | null
+  whoIsInPicture: string | null
+  caption: string | null
+  keywords: string | null
+  assetUpdatedAt: string | null
+  failureCode: string | null
+  failureMessage: string | null
+  uploadedAt: string | null
+  finalizedAt: string | null
+  createdAt: string
+}
+
+export interface StaffWizardUploadBatchDetailResponse {
+  ok: true
+  batch: {
+    id: string
+    eventId: string
+    status: string
+    assetType: string
+    totalFiles: number
+    uploadedFiles: number
+    failedFiles: number
+    submittedAt: string | null
+    createdAt: string
+    updatedAt: string
+  }
+  event: {
+    id: string
+    name: string
+    status: string
+    eventDate: string | null
+    city: string | null
+    location: string | null
+  }
+  contributor: {
+    id: string
+    displayName: string
+  }
+  items: StaffWizardUploadBatchItemDto[]
+}
+
+export async function staffWizardGetUploadBatch(batchId: string) {
+  return staffWizardJson<StaffWizardUploadBatchDetailResponse>(
+    `/upload-batches/${encodeURIComponent(batchId)}`,
+    { method: "GET" },
+  )
+}
+
 export interface StaffWizardPrepareFileMeta {
   fileName: string
   mimeType: "image/jpeg"

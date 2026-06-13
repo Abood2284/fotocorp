@@ -48,6 +48,10 @@ export const EMAIL_TEMPLATE_METADATA: Record<EmailTemplateKey, { displayName: st
     displayName: "Customer Password Reset",
     subject: "Reset your Fotocorp password",
   },
+  STAFF_NEW_ACCESS_INQUIRY: {
+    displayName: "Staff New Access Inquiry",
+    subject: "New Fotocorp access inquiry submitted",
+  },
 }
 
 export function renderAccessEmailTemplate(
@@ -228,6 +232,37 @@ function bodyLines(
         "Thank you for applying to contribute to Fotocorp. Your contributor application has been received and is now under review by our team.",
         "We will notify you after staff review has been completed.",
       ],
+    }
+  }
+
+  if (templateKey === "STAFF_NEW_ACCESS_INQUIRY") {
+    const applicantName = data.inquiryApplicantName?.trim() || "Not available"
+    const companyName = data.inquiryCompanyName?.trim() || "Not available"
+    const applicantEmail = data.inquiryApplicantEmail?.trim() || "Not available"
+    const reviewUrl = data.staffInquiryReviewUrl?.trim() || loginUrl
+    const detailLines = [
+      `Name: ${applicantName}`,
+      `Company: ${companyName}`,
+      `Email: ${applicantEmail}`,
+    ]
+    const intro = [
+      `Hello ${greetingName},`,
+      "A new user has submitted an access inquiry on Fotocorp.",
+    ]
+    const textLines = [
+      ...intro,
+      "",
+      ...detailLines,
+      "",
+      `Review inquiry: ${reviewUrl}`,
+    ]
+
+    return {
+      introLines: intro,
+      textLines,
+      credentialLines: detailLines,
+      ctaLabel: "Review inquiry",
+      ctaUrl: reviewUrl,
     }
   }
 

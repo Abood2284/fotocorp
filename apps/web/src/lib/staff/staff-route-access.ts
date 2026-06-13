@@ -110,6 +110,7 @@ export function staffRoleCanAccessPath(role: string, pathname: string): boolean 
   if (
     normalized.startsWith("/staff/users") ||
     normalized.startsWith("/staff/audit") ||
+    normalized.startsWith("/staff/team-performance") ||
     normalized.startsWith("/staff/migration") ||
     normalized.startsWith("/staff/staff-users") ||
     normalized.startsWith("/staff/events")

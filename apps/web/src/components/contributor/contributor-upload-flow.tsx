@@ -1,7 +1,7 @@
 "use client"
 
 import { Loader2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   MAX_FILES_PER_PREPARE,
@@ -16,7 +16,7 @@ import { ContributorUploadStepMetadata } from "@/components/contributor/upload/c
 import { ContributorUploadLayout } from "@/components/contributor/upload/contributor-upload-layout"
 import { ContributorUploadStatusBar } from "@/components/contributor/upload/contributor-upload-status-bar"
 import { ContributorUploadStepper } from "@/components/contributor/upload/contributor-upload-stepper"
-import { mimeForJpegUpload, validateJpegFiles } from "@/components/contributor/upload/contributor-upload-utils"
+import { mimeForJpegUpload, validateJpegFiles, yieldToBrowserForPaint } from "@/components/contributor/upload/contributor-upload-utils"
 import {
   completeContributorUploadFile,
   createContributorEvent,
@@ -24,6 +24,7 @@ import {
   ContributorApiError,
   getContributorAssetCategories,
   getContributorPortalContributors,
+  getContributorUploadBatch,
   humanizeContributorNetworkError,
   patchContributorUploadAssetMetadata,
   prepareContributorUploadFiles,
@@ -37,36 +38,33 @@ import {
 } from "@/lib/api/contributor-api"
 import type { MetadataDraft } from "@/components/contributor/upload/contributor-upload-metadata-item"
 import { keywordsToTags, normalizeWhoIsInPicture, tagsToKeywords } from "@/lib/contributor-upload-metadata"
+import {
+  executeMetadataImport,
+  type MetadataImportSummary,
+} from "@/lib/contributor-upload-metadata-import"
+import { useToastNotify } from "@/components/staff/shared/toast"
+import {
+  buildResumeStateFromBatchDetail,
+  clearUploadWizardDraft,
+  createTrackedFileFromLocal,
+  getTrackedSizeBytes,
+  persistBatchIdInBrowserUrl,
+  readUploadWizardDraft,
+  toUploadBatchDetailLike,
+  writeUploadWizardDraft,
+} from "@/lib/upload-wizard-resume"
 import { Button } from "@/components/ui/button"
 
 function portalRoleOf(session: ContributorAuthResponse) {
   return session.account.portalRole ?? "STANDARD"
 }
 
-function newTrackedFile(file: File, index: number): TrackedFile {
-  const key = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${index}-${file.name}`
-  const previewUrl = URL.createObjectURL(file)
-  return {
-    key,
-    file,
-    status: "queued",
-    errorMessage: null,
-    itemId: null,
-    imageAssetId: null,
-    instruction: null,
-    uploadProgress: null,
-    previewUrl,
-    whoIsInPicture: "",
-    caption: "",
-    keywords: "",
-    assetUpdatedAt: null,
-    saveState: "idle",
-    saveHint: null,
-  }
-}
-
 export function ContributorUploadFlow({ initialSession }: { initialSession: ContributorAuthResponse }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const resumeBatchId = searchParams.get("batchId")
+  const { toast } = useToastNotify()
   const [currentStep, setCurrentStep] = useState<UploadWizardStep>(1)
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => new Set())
 
@@ -88,9 +86,15 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
   const [batchId, setBatchId] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [metadataImportSummary, setMetadataImportSummary] = useState<MetadataImportSummary | null>(null)
+  const [metadataImportError, setMetadataImportError] = useState<string | null>(null)
+  const [metadataImportBusy, setMetadataImportBusy] = useState(false)
+  const [resuming, setResuming] = useState(Boolean(resumeBatchId))
 
   const trackedRef = useRef(tracked)
   trackedRef.current = tracked
+  const resumeAttemptedRef = useRef(false)
+  const initialResumeBatchIdRef = useRef(resumeBatchId)
   const isPortalAdmin = portalRoleOf(initialSession) === "PORTAL_ADMIN"
 
   useEffect(() => {
@@ -107,9 +111,98 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
   }, [isPortalAdmin])
 
   useEffect(() => {
+    if (resumeAttemptedRef.current) return
+
+    const batchToResume =
+      initialResumeBatchIdRef.current ?? readUploadWizardDraft("contributor")?.batchId ?? null
+    if (!batchToResume) return
+
+    resumeAttemptedRef.current = true
+    if (!initialResumeBatchIdRef.current) {
+      persistBatchIdInBrowserUrl(pathname, batchToResume)
+    }
+    setResuming(true)
+
+    void getContributorUploadBatch(batchToResume)
+      .then((detail) => {
+        if (detail.batch.status !== "OPEN") {
+          router.replace(`/contributor/uploads/${batchToResume}`)
+          return
+        }
+        const resume = buildResumeStateFromBatchDetail(toUploadBatchDetailLike(detail), "contributor")
+        setBatchId(resume.batchId)
+        setEventId(resume.eventId)
+        setBatchEventName(resume.batchEventName)
+        if (resume.targetContributorId) setTargetContributorId(resume.targetContributorId)
+        setTracked(resume.tracked)
+        setCurrentStep(resume.currentStep)
+        setCompletedSteps(resume.completedSteps)
+        setBlockingError(null)
+      })
+      .catch((e) => {
+        const message = e instanceof ContributorApiError ? e.message : "Could not resume upload batch."
+        setBlockingError(message)
+      })
+      .finally(() => {
+        setResuming(false)
+      })
+  }, [pathname, router])
+
+  useEffect(() => {
+    if (resumeAttemptedRef.current) return
+    const draft = readUploadWizardDraft("contributor")
+    if (!draft || draft.batchId) return
+    setCurrentStep(draft.currentStep)
+    setCompletedSteps(new Set(draft.completedSteps))
+    setEventId(draft.eventId)
+    setBatchEventName(draft.batchEventName)
+    setTargetContributorId(draft.targetContributorId || initialSession.contributor.id)
+    setNewEventName(draft.newEventName)
+    setNewCategoryId(draft.newCategoryId)
+    setNewEventDate(draft.newEventDate)
+    if (draft.batchId) setBatchId(draft.batchId)
+  }, [initialSession.contributor.id])
+
+  useEffect(() => {
+    if (!batchId) return
+    persistBatchIdInBrowserUrl(pathname, batchId)
+  }, [batchId, pathname])
+
+  useEffect(() => {
+    if (resuming) return
+    const timer = window.setTimeout(() => {
+      writeUploadWizardDraft("contributor", {
+        version: 1,
+        currentStep,
+        completedSteps: [...completedSteps],
+        eventId,
+        batchEventName,
+        batchId,
+        targetContributorId,
+        newEventName,
+        newCategoryId,
+        newEventDate,
+        updatedAt: Date.now(),
+      })
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [
+    batchEventName,
+    batchId,
+    completedSteps,
+    currentStep,
+    eventId,
+    newCategoryId,
+    newEventDate,
+    newEventName,
+    resuming,
+    targetContributorId,
+  ])
+
+  useEffect(() => {
     return () => {
       for (const row of tracked) {
-        if (row.previewUrl) URL.revokeObjectURL(row.previewUrl)
+        if (row.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(row.previewUrl)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- cleanup on unmount only
@@ -118,6 +211,22 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
   const updateTracked = useCallback((key: string, patch: Partial<TrackedFile>) => {
     setTracked((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)))
   }, [])
+
+  /** Bulk-update multiple tracked files in a single state transition. */
+  const bulkUpdateTracked = useCallback(
+    (patches: Array<{ key: string; patch: Partial<TrackedFile> }>) => {
+      if (patches.length === 0) return
+      setTracked((prev) => {
+        const map = new Map(prev.map((r) => [r.key, r]))
+        for (const { key, patch } of patches) {
+          const existing = map.get(key)
+          if (existing) map.set(key, { ...existing, ...patch })
+        }
+        return Array.from(map.values())
+      })
+    },
+    [],
+  )
 
   const markStepComplete = useCallback((step: number) => {
     setCompletedSteps((prev) => new Set(prev).add(step))
@@ -130,7 +239,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     if (rejected.length) setRejectedFiles((prev) => [...prev, ...rejected])
     if (!accepted.length) return
 
-    const next = accepted.map((file, i) => newTrackedFile(file, i))
+    const next = accepted.map((file, i) => createTrackedFileFromLocal(file, i))
     setTracked((prev) => [...prev, ...next])
     setBlockingError(null)
   }, [])
@@ -140,7 +249,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
       if (phase === "running") return
       setTracked((prev) => {
         const row = prev.find((r) => r.key === key)
-        if (row?.previewUrl) URL.revokeObjectURL(row.previewUrl)
+        if (row?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(row.previewUrl)
         return prev.filter((r) => r.key !== key)
       })
     },
@@ -216,7 +325,8 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
       setBlockingError("Create an event first.")
       return
     }
-    const files = tracked.map((t) => t.file)
+    const localTracked = tracked.filter((row): row is TrackedFile & { file: File } => row.file !== null)
+    const files = localTracked.map((row) => row.file)
     const { accepted, rejected } = validateJpegFiles(files)
     if (rejected.length) {
       setRejectedFiles((prev) => [...prev, ...rejected])
@@ -236,10 +346,12 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
           assetType: "IMAGE",
         })
         currentBatchId = created.batch.id
+        resumeAttemptedRef.current = true
         setBatchId(currentBatchId)
+        persistBatchIdInBrowserUrl(pathname, currentBatchId)
       }
 
-      const work = tracked.filter(
+      const work = localTracked.filter(
         (t) => t.status === "queued" || t.status === "failed" || t.status === "ready" || t.status === "preparing",
       )
       if (work.length === 0) {
@@ -258,7 +370,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
           const slice = needsPrepare.slice(offset, offset + MAX_FILES_PER_PREPARE)
           const meta: ContributorPrepareUploadFileMeta[] = slice.map((r) => {
             const mime = mimeForJpegUpload(r.file)!
-            return { fileName: r.file.name, mimeType: mime, sizeBytes: r.file.size }
+            return { fileName: r.fileName, mimeType: mime, sizeBytes: r.sizeBytes }
           })
           let prep
           try {
@@ -407,6 +519,54 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     [batchId, updateTracked],
   )
 
+  const handleMetadataImportFile = useCallback(
+    async (file: File) => {
+      setMetadataImportError(null)
+      setMetadataImportBusy(true)
+      try {
+        const summary = await executeMetadataImport({
+          file,
+          tracked: trackedRef.current,
+          saveItem: saveMetadataItem,
+          onTrackedUpdate: (updater) => {
+            setTracked((prev) => {
+              const next = updater(prev)
+              trackedRef.current = next
+              return next
+            })
+          },
+          onSaveSuccess: (key) => {
+            updateTracked(key, { saveState: "saved", saveHint: null })
+          },
+          onSaveFailure: (key, message) => {
+            updateTracked(key, { saveState: "error", saveHint: message })
+          },
+        })
+        setMetadataImportSummary(summary)
+        if (summary.updatedImageCount > 0 && summary.savedCount > 0) {
+          toast({
+            message: `Imported metadata for ${summary.savedCount} image${summary.savedCount === 1 ? "" : "s"}.`,
+            variant: "success",
+          })
+        }
+        if (summary.saveFailureCount > 0) {
+          toast({
+            message: `${summary.saveFailureCount} metadata save${summary.saveFailureCount === 1 ? "" : "s"} failed during import.`,
+            variant: "error",
+          })
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Could not import metadata file."
+        setMetadataImportError(message)
+        setMetadataImportSummary(null)
+        toast({ message, variant: "error" })
+      } finally {
+        setMetadataImportBusy(false)
+      }
+    },
+    [saveMetadataItem, toast, updateTracked],
+  )
+
   const submitBatch = useCallback(async () => {
     if (!batchId) return
     setSubmitError(null)
@@ -417,18 +577,19 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     }
     setSubmitting(true)
     try {
+      await yieldToBrowserForPaint()
       await submitContributorUploadBatch(batchId)
+      clearUploadWizardDraft("contributor")
       router.push(`/contributor/uploads/${batchId}`)
       router.refresh()
     } catch (e) {
       setSubmitError(e instanceof ContributorApiError ? e.message : humanizeContributorNetworkError(e))
-    } finally {
       setSubmitting(false)
     }
   }, [batchId, router, tracked])
 
   const doneCount = tracked.filter((t) => t.status === "done").length
-  const totalBytes = useMemo(() => tracked.reduce((sum, row) => sum + row.file.size, 0), [tracked])
+  const totalBytes = useMemo(() => tracked.reduce((sum, row) => sum + getTrackedSizeBytes(row), 0), [tracked])
   const fileStatuses = useMemo(() => tracked.map((t) => t.status), [tracked])
   const eventCreated = Boolean(eventId)
 
@@ -468,44 +629,31 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
         </div>
       ) : null}
 
-      {currentStep === 3 ? (
-        <div className="space-y-8">
-          <ContributorUploadStepMetadata active items={tracked} onSaveItem={saveMetadataItem} />
-          <div
-            className="mx-auto w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
-            data-upload-action
-          >
-            <h2 className="text-center text-base font-semibold text-foreground sm:text-lg">{actionTitle}</h2>
-            <div className="mt-4 sm:mt-5">
-              <Button
-                type="button"
-                className="h-11 w-full text-sm sm:h-12 sm:text-base"
-                disabled={!batchId || doneCount < 1 || submitting}
-                onClick={() => void submitBatch()}
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2  animate-spin" size={16} />
-                    Submitting…
-                  </>
-                ) : (
-                  "Submit batch"
-                )}
-              </Button>
-            </div>
-            <ContributorUploadStatusBar
-              className="mt-4 sm:mt-5"
-              fileCount={0}
-              totalBytes={0}
-              batchPhase={phase}
-              fileStatuses={[]}
-              batchStatus={batchId ? "OPEN" : null}
-              readyImageCount={doneCount}
-            />
-          </div>
+      {resuming ? (
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-8 text-sm text-muted-foreground">
+          <Loader2 className="animate-spin" size={18} />
+          Loading upload batch…
         </div>
-      ) : (
-      <ContributorUploadLayout
+      ) : null}
+
+      {!resuming && currentStep === 3 ? (
+        <ContributorUploadStepMetadata
+          active
+          items={tracked}
+          onSaveItem={saveMetadataItem}
+          onBulkUpdate={bulkUpdateTracked}
+          metadataImportSummary={metadataImportSummary}
+          metadataImportError={metadataImportError}
+          metadataImportBusy={metadataImportBusy}
+          onImportMetadataFile={handleMetadataImportFile}
+          onSubmitBatch={() => void submitBatch()}
+          submitDisabled={!batchId || doneCount < 1 || metadataImportBusy || resuming}
+          submitBusy={submitting}
+          submitError={submitError}
+          onDismissSubmitError={() => setSubmitError(null)}
+        />
+      ) : !resuming ? (
+        <ContributorUploadLayout
         rightLocked={rightLocked}
         left={
           <>
@@ -610,7 +758,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
           </div>
         }
       />
-      )}
+      ) : null}
     </div>
   )
 }

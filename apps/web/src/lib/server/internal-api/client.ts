@@ -11,6 +11,7 @@ interface InternalApiFetchInput {
   body?: unknown
   accept?: string
   headers?: HeadersInit
+  timeoutMs?: number
 }
 
 interface InternalApiJsonInput {
@@ -18,6 +19,7 @@ interface InternalApiJsonInput {
   method?: InternalApiMethod
   body?: unknown
   headers?: HeadersInit
+  timeoutMs?: number
 }
 
 export class InternalApiRequestError extends Error {
@@ -48,9 +50,10 @@ export async function internalApiJson<TResponse>(input: InternalApiJsonInput): P
 
 export async function internalApiFetch(input: InternalApiFetchInput): Promise<Response> {
   const method = input.method ?? "GET"
+  const timeoutMs = input.timeoutMs ?? INTERNAL_API_TIMEOUT_MS
   const startedAt = Date.now()
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), INTERNAL_API_TIMEOUT_MS)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   const headers = new Headers(input.headers)
   headers.set("Accept", input.accept ?? headers.get("Accept") ?? "application/json")
   headers.set("x-internal-api-secret", getInternalApiSecret())
@@ -75,7 +78,7 @@ export async function internalApiFetch(input: InternalApiFetchInput): Promise<Re
       method,
       status: response.status,
       durationMs: Date.now() - startedAt,
-      timeoutMs: INTERNAL_API_TIMEOUT_MS,
+      timeoutMs,
     }))
     return response
   } catch (error) {
@@ -85,7 +88,7 @@ export async function internalApiFetch(input: InternalApiFetchInput): Promise<Re
       method,
       status: "error",
       durationMs: Date.now() - startedAt,
-      timeoutMs: INTERNAL_API_TIMEOUT_MS,
+      timeoutMs,
       timedOut: isAbortError(error),
       message: error instanceof Error ? error.message : String(error),
     }))

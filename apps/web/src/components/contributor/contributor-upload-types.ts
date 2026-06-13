@@ -11,7 +11,9 @@ export type FileUiStatus =
 
 export interface TrackedFile {
   key: string
-  file: File
+  file: File | null
+  fileName: string
+  sizeBytes: number
   status: FileUiStatus
   errorMessage: string | null
   itemId: string | null
@@ -25,6 +27,8 @@ export interface TrackedFile {
   assetUpdatedAt: string | null
   saveState: "idle" | "saving" | "saved" | "error"
   saveHint: string | null
+  metadataRevision?: number
+  resumedFromServer?: boolean
 }
 
 export const UPLOAD_STEPS = [

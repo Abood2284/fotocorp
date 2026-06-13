@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ContributorApiError, getContributorUploadBatch } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
@@ -47,6 +48,13 @@ export default async function ContributorUploadBatchDetailPage({ params }: { par
         <p className="mt-4 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contributor portal</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground">Upload batch</h1>
         <p className="mt-1 font-mono text-xs text-muted-foreground">{batch.id}</p>
+        {batch.status === "OPEN" ? (
+          <div className="mt-4">
+            <Button asChild>
+              <Link href={`/contributor/uploads/new?batchId=${encodeURIComponent(batch.id)}`}>Continue editing</Link>
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <Card>

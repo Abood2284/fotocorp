@@ -152,12 +152,15 @@ export async function listStaffContributorUploadBatches(
   })
 }
 
+const APPROVE_CONTRIBUTOR_UPLOADS_TIMEOUT_MS = 120_000
+
 export async function approveStaffContributorUploads(imageAssetIds: string[]) {
   return internalApiJson<StaffContributorUploadsApproveResponse>({
     path: internalApiRoutes.adminContributorUploadsApprove(),
     method: "POST",
     body: { imageAssetIds },
     headers: await staffActorHeaders(),
+    timeoutMs: APPROVE_CONTRIBUTOR_UPLOADS_TIMEOUT_MS,
   })
 }
 

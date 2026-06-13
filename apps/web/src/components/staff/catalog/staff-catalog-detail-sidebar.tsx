@@ -22,7 +22,6 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
 
   const [whoIsInPicture, setWhoIsInPicture] = useState("")
   const [caption, setCaption] = useState("")
-  const [categoryId, setCategoryId] = useState("")
   const [eventId, setEventId] = useState("")
   const [keywords, setKeywords] = useState("")
 
@@ -34,7 +33,6 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
         setAsset(res.asset)
         setWhoIsInPicture(res.asset.whoIsInPicture || "")
         setCaption(res.asset.caption || "")
-        setCategoryId(res.asset.category?.id || "")
         setEventId(res.asset.event?.id || "")
         setKeywords(res.asset.keywords || "")
       }
@@ -53,7 +51,7 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
           whoIsInPicture: whoIsInPicture.trim() || null,
           headline: asset.headline,
           caption: caption || null,
-          categoryId: categoryId || null,
+          categoryId: asset.category?.id || null,
           eventId: eventId || null,
           keywords: keywords ? keywords.split(",").map(k => k.trim()).filter(Boolean) : null,
           description: asset.description,
@@ -182,14 +180,9 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground">Category</label>
-                  <select 
-                    value={categoryId} 
-                    onChange={e => setCategoryId(e.target.value)}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="">None</option>
-                    {filters.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <p className="w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground">
+                    {asset.category?.name || "—"}
+                  </p>
                 </div>
 
                 <div className="space-y-1.5">

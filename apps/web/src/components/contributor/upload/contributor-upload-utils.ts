@@ -65,3 +65,12 @@ export function labelForStatus(s: string) {
   if (s === "failed") return "Failed"
   return s
 }
+
+/** Lets React paint loading UI before starting a long async action. */
+export function yieldToBrowserForPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve())
+    })
+  })
+}

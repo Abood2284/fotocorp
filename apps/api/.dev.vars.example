@@ -50,6 +50,8 @@ EMAIL_FROM_NAME=Fotocorp Subscriptions
 EMAIL_FROM_ADDRESS=subscription@fotocorp.com
 EMAIL_REPLY_TO=subscription@fotocorp.com
 RESEND_API_KEY=
+# Internal staff inbox notified when a customer submits a new access inquiry on registration.
+STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL=abdulraheemsayyed22@gmail.com
 
 # Runtime media delivery uses Worker R2 bindings in wrangler.jsonc:
 # - MEDIA_PREVIEWS_BUCKET for watermarked derivatives

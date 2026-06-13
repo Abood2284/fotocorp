@@ -8,6 +8,7 @@ import type { PatchUploadAssetMetadataBody, PrepareUploadFilesBody } from "../..
 import {
   staffDelegateCompletePhotographerUploadItem,
   staffDelegateCreatePhotographerUploadBatch,
+  staffDelegateGetPhotographerUploadBatchDetail,
   staffDelegatePatchPhotographerUploadAssetMetadata,
   staffDelegatePreparePhotographerUploadFiles,
   staffDelegateSubmitPhotographerUploadBatch,
@@ -152,6 +153,10 @@ export async function createStaffUploadWizardBatchService(
   body: StaffUploadWizardBatchBody,
 ): Promise<Response> {
   return json(await staffDelegateCreatePhotographerUploadBatch(db, body), 201);
+}
+
+export async function getStaffUploadWizardBatchService(db: DrizzleClient, batchId: string): Promise<Response> {
+  return json(await staffDelegateGetPhotographerUploadBatchDetail(db, batchId));
 }
 
 export async function prepareStaffUploadWizardFilesService(

@@ -1,6 +1,6 @@
 "use client"
 
-import { Calendar, Search } from "lucide-react"
+import { Calendar, Search, Upload } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -140,9 +140,17 @@ export function StaffEventsClient({ initialData }: { initialData: AdminEventList
                   {event.photoCount || 0}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={`/staff/events/${event.id}`}>View & Edit</Link>
-                  </Button>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button asChild variant="default" size="sm">
+                      <Link href={`/staff/events/${event.id}/upload`} className="flex items-center gap-1">
+                        <Upload size={14} />
+                        Upload
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/staff/events/${event.id}`}>View & Edit</Link>
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}
