@@ -4,7 +4,7 @@
   "packageManager": "pnpm@10.33.1",
   "scripts": {
     "dev:web": "pnpm -C apps/web dev",
-    "dev:api": "pnpm -C apps/api exec wrangler dev --port 8787",
+    "dev:api": "pnpm -C apps/api run dev",
     "dev:jobs": "pnpm --dir apps/jobs dev",
     "dev": "concurrently -n web,api -c auto \"pnpm dev:web\" \"pnpm dev:api\"",
     "db:generate": "pnpm --dir apps/api db:generate",

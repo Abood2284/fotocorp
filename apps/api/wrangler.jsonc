@@ -25,7 +25,7 @@
 		"EMAIL_FROM_NAME": "Fotocorp Subscriptions",
 		"EMAIL_FROM_ADDRESS": "subscription@fotocorp.com",
 		"EMAIL_REPLY_TO": "subscription@fotocorp.com"
-	},	
+	},
 	"r2_buckets": [
 		{
 			"binding": "MEDIA_ORIGINALS_BUCKET",
@@ -48,6 +48,16 @@
 			"pattern": "api.fotocorp.com",
 			"zone_name": "fotocorp.com",
 			"custom_domain": true
+		}
+	],
+	"hyperdrive": [
+		{
+			"binding": "CORE_HYPERDRIVE",
+			"id": "c5cc5223929c4f14a8273b4b6f115a1c"
+		},
+		{
+			"binding": "PUBLIC_READ_HYPERDRIVE",
+			"id": "320cb248c2af4ab0b0708eb41feec5cf"
 		}
 	],
 }

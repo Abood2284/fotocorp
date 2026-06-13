@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono"
 import type { Env } from "../../appTypes"
-import { createHttpDb, type AppRequestVariables } from "../../db"
+import { withPublicReadDb, type AppRequestVariables } from "../../db"
 import {
   buildEventCategoryBrowseResponse,
   buildLatestEventsResponse,
@@ -40,16 +40,15 @@ export const PUBLIC_CREATIVE_FEATURED_CACHE_CONTROL = PUBLIC_ROYALTY_FREE_FEATUR
 export const PUBLIC_EVENT_CATEGORY_BROWSE_CACHE_CONTROL =
   "public, max-age=86400, s-maxage=2592000, stale-while-revalidate=86400"
 
+const PUBLIC_READ_DB_PATH_HEADER = "x-fotocorp-db-path"
+const PUBLIC_READ_DB_PATH = "public-read"
+
 publicHomepageRoutes.get("/api/v1/public/homepage", async (c) => {
   const startedAt = Date.now()
 
   try {
-    if (!c.env.DATABASE_URL) {
-      throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
-    }
-
     const cdn = parsePublicPreviewCdnConfig(c.env)
-    const feed = await getPublicHomepageFeed(createHttpDb(c.env.DATABASE_URL), cdn)
+    const feed = await withPublicReadDb(c.env, (readDb) => getPublicHomepageFeed(readDb, cdn))
     const durationMs = Date.now() - startedAt
 
     console.info(
@@ -66,6 +65,7 @@ publicHomepageRoutes.get("/api/v1/public/homepage", async (c) => {
       headers: {
         "Cache-Control": PUBLIC_HOMEPAGE_FEED_CACHE_CONTROL,
         "X-Content-Type-Options": "nosniff",
+        [PUBLIC_READ_DB_PATH_HEADER]: PUBLIC_READ_DB_PATH,
       },
     })
   } catch (error) {
@@ -100,15 +100,10 @@ publicHomepageRoutes.get("/api/v1/public/events/latest", async (c) => {
   }
 
   try {
-    if (!c.env.DATABASE_URL) {
-      throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
-    }
-
     const cdn = parsePublicPreviewCdnConfig(c.env)
-    const db = createHttpDb(c.env.DATABASE_URL)
     const query = parseLatestEventsQuery(input)
     tracker.mark("parse")
-    const { rows, dbTrace } = await fetchPublicLatestEventsRows(db, query)
+    const { rows, dbTrace } = await withPublicReadDb(c.env, (readDb) => fetchPublicLatestEventsRows(readDb, query))
     tracker.mark("db")
     const response = buildLatestEventsResponse(rows, query, cdn)
     tracker.mark("map")
@@ -146,6 +141,7 @@ publicHomepageRoutes.get("/api/v1/public/events/latest", async (c) => {
         "X-Content-Type-Options": "nosniff",
         [FOTOCORP_REQUEST_ID_HEADER]: requestId,
         "Server-Timing": formatServerTiming(segmentTimings, durationMs),
+        [PUBLIC_READ_DB_PATH_HEADER]: PUBLIC_READ_DB_PATH,
       },
     })
   } catch (error) {
@@ -192,14 +188,9 @@ publicHomepageRoutes.get("/api/v1/public/events/browse", async (c) => {
   }
 
   try {
-    if (!c.env.DATABASE_URL) {
-      throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
-    }
-
     const cdn = parsePublicPreviewCdnConfig(c.env)
-    const db = createHttpDb(c.env.DATABASE_URL)
     const query = parseEventCategoryBrowseQuery(input)
-    const { rows } = await fetchPublicEventCategoryBrowseRows(db, query)
+    const { rows } = await withPublicReadDb(c.env, (readDb) => fetchPublicEventCategoryBrowseRows(readDb, query))
     const response = buildEventCategoryBrowseResponse(rows, query, cdn)
     const durationMs = Date.now() - startedAt
 
@@ -220,6 +211,7 @@ publicHomepageRoutes.get("/api/v1/public/events/browse", async (c) => {
       headers: {
         "Cache-Control": PUBLIC_EVENT_CATEGORY_BROWSE_CACHE_CONTROL,
         "X-Content-Type-Options": "nosniff",
+        [PUBLIC_READ_DB_PATH_HEADER]: PUBLIC_READ_DB_PATH,
       },
     })
   } catch (error) {
@@ -247,12 +239,8 @@ publicHomepageRoutes.get("/api/v1/public/homepage/hero-set", async (c) => {
   const route = "/api/v1/public/homepage/hero-set"
 
   try {
-    if (!c.env.DATABASE_URL) {
-      throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
-    }
-
     const cdn = parsePublicPreviewCdnConfig(c.env)
-    const response = await getPublicHomepageHeroSet(createHttpDb(c.env.DATABASE_URL), cdn)
+    const response = await withPublicReadDb(c.env, (readDb) => getPublicHomepageHeroSet(readDb, cdn))
     const durationMs = Date.now() - startedAt
 
     console.info(
@@ -271,6 +259,7 @@ publicHomepageRoutes.get("/api/v1/public/homepage/hero-set", async (c) => {
       headers: {
         "Cache-Control": PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL,
         "X-Content-Type-Options": "nosniff",
+        [PUBLIC_READ_DB_PATH_HEADER]: PUBLIC_READ_DB_PATH,
       },
     })
   } catch (error) {
@@ -301,18 +290,14 @@ async function handleRoyaltyFreeFeaturedRequest(
   const { route, legacyRoute } = options
 
   try {
-    if (!c.env.DATABASE_URL) {
-      throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
-    }
-
     const cdn = parsePublicPreviewCdnConfig(c.env)
-    const { response, timings } = await listPublicRoyaltyFreeFeaturedAssets(
-      createHttpDb(c.env.DATABASE_URL),
+    const { response, timings } = await withPublicReadDb(c.env, (readDb) => listPublicRoyaltyFreeFeaturedAssets(
+      readDb,
       { limit: c.req.query("limit") },
       c.env.MEDIA_PREVIEW_TOKEN_SECRET,
       parsePreviewTtl(c.env.MEDIA_PREVIEW_TOKEN_TTL_SECONDS),
       cdn,
-    )
+    ))
     const durationMs = Date.now() - startedAt
 
     console.info(
@@ -332,6 +317,7 @@ async function handleRoyaltyFreeFeaturedRequest(
       headers: {
         "Cache-Control": PUBLIC_ROYALTY_FREE_FEATURED_CACHE_CONTROL,
         "X-Content-Type-Options": "nosniff",
+        [PUBLIC_READ_DB_PATH_HEADER]: PUBLIC_READ_DB_PATH,
       },
     })
   } catch (error) {

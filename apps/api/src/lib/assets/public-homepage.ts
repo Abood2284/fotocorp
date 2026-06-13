@@ -1,11 +1,14 @@
 import { sql, type SQL } from "drizzle-orm"
-import type { DrizzleClient } from "../../db"
 import { AppError } from "../errors"
 import {
   type PublicPreviewCdnConfig,
   resolvePublicStablePreviewUrl,
 } from "../media/public-preview-cdn-url"
 import { joinPublicCardDerivative, publicAssetPredicate } from "./public-catalog-sql"
+
+type PublicReadQueryClient = {
+  execute(query: SQL): Promise<unknown>
+}
 
 export interface PublicHomepageEventDto {
   id: string
@@ -88,7 +91,7 @@ const MAX_WINDOW_DAYS = 365
 const NULL_EVENT_DATE_CURSOR = new Date(0).toISOString()
 
 export async function getPublicHomepageFeed(
-  db: DrizzleClient,
+  db: PublicReadQueryClient,
   cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ): Promise<PublicHomepageFeedDto> {
   const latestEvents = await listPublicLatestEvents(db, {
@@ -120,7 +123,7 @@ export interface PublicLatestEventsDbTrace {
 }
 
 export async function fetchPublicLatestEventsRows(
-  db: DrizzleClient,
+  db: PublicReadQueryClient,
   query: PublicLatestEventsQuery,
 ): Promise<{ rows: HomepageEventRow[]; dbTrace: PublicLatestEventsDbTrace }> {
   const dbStartedAt = Date.now()
@@ -144,7 +147,7 @@ export async function fetchPublicLatestEventsRows(
 }
 
 export async function listPublicLatestEvents(
-  db: DrizzleClient,
+  db: PublicReadQueryClient,
   input: PublicLatestEventsQueryInput,
   cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
 ): Promise<PublicLatestEventsResponseDto> {
@@ -210,7 +213,7 @@ export function parseEventCategoryBrowseQuery(
 }
 
 export async function fetchPublicEventCategoryBrowseRows(
-  db: DrizzleClient,
+  db: PublicReadQueryClient,
   query: PublicEventCategoryBrowseQuery,
 ): Promise<{ rows: HomepageEventRow[]; dbTrace: PublicEventCategoryBrowseDbTrace }> {
   const dbStartedAt = Date.now()
@@ -521,7 +524,7 @@ function encodeLatestEventsCursor(cursor: LatestEventsCursor): string {
   return btoa(JSON.stringify(cursor)).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "")
 }
 
-async function executeRows<T>(db: DrizzleClient, query: SQL): Promise<T[]> {
+async function executeRows<T>(db: PublicReadQueryClient, query: SQL): Promise<T[]> {
   const result = await db.execute(query)
   if (Array.isArray(result)) return result as T[]
   if (result && typeof result === "object" && "rows" in result && Array.isArray(result.rows)) {

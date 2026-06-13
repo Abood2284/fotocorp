@@ -1,6 +1,5 @@
 // apps/api/src/lib/assets/public-assets.ts
 import { sql, type SQL } from "drizzle-orm";
-import type { DrizzleClient } from "../../db";
 import { AppError } from "../errors";
 import {
   buildPublicPreviewCdnUrl,
@@ -14,6 +13,10 @@ import {
 } from "../media/watermark";
 
 export const PUBLIC_ROYALTY_FREE_CATEGORY_NAME = "Royalty Free";
+
+type PublicReadQueryClient = {
+  execute(query: SQL): Promise<unknown>;
+};
 
 type SortMode = "newest" | "oldest" | "relevance";
 
@@ -149,7 +152,7 @@ interface AssetDto {
 }
 
 export async function listPublicAssets(
-  db: DrizzleClient,
+  db: PublicReadQueryClient,
   input: PublicAssetListQueryInput,
   secret: string | undefined,
   ttlSeconds: number,
@@ -228,7 +231,7 @@ function currentRoyaltyFreeFeaturedPeriodKey(date = new Date()) {
 }
 
 export async function listPublicRoyaltyFreeFeaturedAssets(
-  db: DrizzleClient,
+  db: PublicReadQueryClient,
   input: { limit?: string | null },
   secret: string | undefined,
   ttlSeconds: number,
@@ -305,7 +308,7 @@ export async function listPublicRoyaltyFreeFeaturedAssets(
 export const listPublicCreativeFeaturedAssets = listPublicRoyaltyFreeFeaturedAssets;
 
 export async function getPublicAssetDetail(
-  db: DrizzleClient,
+  db: PublicReadQueryClient,
   assetId: string,
   secret: string | undefined,
   ttlSeconds: number,
@@ -328,7 +331,7 @@ interface PublicAssetFiltersOptions {
   includeCounts?: boolean;
 }
 
-export async function getPublicAssetFilters(db: DrizzleClient, options: PublicAssetFiltersOptions = {}) {
+export async function getPublicAssetFilters(db: PublicReadQueryClient, options: PublicAssetFiltersOptions = {}) {
   if (options.includeCounts !== true) {
     return getPublicAssetFiltersWithoutCounts(db);
   }
@@ -387,7 +390,7 @@ export async function getPublicAssetFilters(db: DrizzleClient, options: PublicAs
   };
 }
 
-async function getPublicAssetFiltersWithoutCounts(db: DrizzleClient) {
+async function getPublicAssetFiltersWithoutCounts(db: PublicReadQueryClient) {
   const [categories, events] = await Promise.all([
     executeRows<{ id: string; name: string | null }>(db, sql`
       select id, name
@@ -420,7 +423,7 @@ async function getPublicAssetFiltersWithoutCounts(db: DrizzleClient) {
 }
 
 export async function getPublicAssetCollections(
-  db: DrizzleClient,
+  db: PublicReadQueryClient,
   secret: string | undefined,
   ttlSeconds: number,
   cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
@@ -493,7 +496,7 @@ export async function getPublicAssetCollections(
 }
 
 export async function getPublicAssetEvents(
-  db: DrizzleClient,
+  db: PublicReadQueryClient,
   secret: string | undefined,
   ttlSeconds: number,
   cdn: PublicPreviewCdnConfig = { baseUrl: null, version: null },
@@ -848,7 +851,7 @@ function toCursor(row: AssetRow, sort: SortMode): CursorPayload {
   };
 }
 
-async function executeRows<T>(db: DrizzleClient, query: SQL): Promise<T[]> {
+async function executeRows<T>(db: PublicReadQueryClient, query: SQL): Promise<T[]> {
   const result = await db.execute(query);
   if (Array.isArray(result)) return result as T[];
   if (result && typeof result === "object" && "rows" in result && Array.isArray(result.rows)) {

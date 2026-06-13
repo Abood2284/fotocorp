@@ -1,9 +1,8 @@
 // apps/api/src/routes/public/catalog-routes.ts
 import { Hono } from "hono";
 import type { Env } from "../../appTypes";
-import { createHttpDb } from "../../db";
+import { withPublicReadDb } from "../../db";
 import { getPublicAssetCollections, getPublicAssetDetail, getPublicAssetEvents, getPublicAssetFilters, listPublicAssets, parsePreviewTtl } from "../../lib/assets/public-assets";
-import { AppError } from "../../lib/errors";
 import { json } from "../../lib/http";
 import { resolveRequestId } from "../../lib/latency-trace";
 import { parsePublicPreviewCdnConfig } from "../../lib/media/public-preview-cdn-url";
@@ -32,6 +31,9 @@ export const PUBLIC_ASSET_DETAIL_CACHE_CONTROL =
 export const PUBLIC_CATALOG_FILTERS_CACHE_CONTROL =
   "public, max-age=300, s-maxage=900, stale-while-revalidate=1800";
 
+const PUBLIC_READ_DB_PATH_HEADER = "x-fotocorp-db-path";
+const PUBLIC_READ_DB_PATH = "public-read";
+
 publicCatalogRoutes.get("/api/v1/assets", async (c) => {
   const routeStartedAt = Date.now();
   const requestId = resolveRequestId(c.req.raw.headers);
@@ -54,8 +56,8 @@ publicCatalogRoutes.get("/api/v1/assets", async (c) => {
     cdnConfigured: Boolean(cdn.baseUrl),
   });
 
-  const result = await listPublicAssets(
-      db(c.env),
+  const result = await withPublicReadDb(c.env, (readDb) => listPublicAssets(
+      readDb,
       {
         q: c.req.query("q"),
         categoryId: c.req.query("categoryId"),
@@ -71,7 +73,7 @@ publicCatalogRoutes.get("/api/v1/assets", async (c) => {
       ttl(c.env),
       cdn,
       debugLog,
-  );
+  ));
   debugLog({
     step: "route_complete",
     durationMs: Date.now() - routeStartedAt,
@@ -79,7 +81,7 @@ publicCatalogRoutes.get("/api/v1/assets", async (c) => {
     hasMore: result.hasMore,
   });
 
-  return json(result, 200, { headers: { "Cache-Control": PUBLIC_CATALOG_LIST_CACHE_CONTROL } });
+  return json(result, 200, { headers: publicReadHeaders({ "Cache-Control": PUBLIC_CATALOG_LIST_CACHE_CONTROL }) });
 });
 
 publicCatalogRoutes.all("/api/v1/assets", () => methodNotAllowed());
@@ -315,8 +317,8 @@ publicCatalogRoutes.all("/api/v1/search/events", () => methodNotAllowed());
 
 publicCatalogRoutes.get("/api/v1/assets/filters", async (c) => {
   const includeCounts = c.req.query("includeCounts") === "true";
-  return json(await getPublicAssetFilters(db(c.env), { includeCounts }), 200, {
-    headers: { "Cache-Control": PUBLIC_CATALOG_FILTERS_CACHE_CONTROL },
+  return json(await withPublicReadDb(c.env, (readDb) => getPublicAssetFilters(readDb, { includeCounts })), 200, {
+    headers: publicReadHeaders({ "Cache-Control": PUBLIC_CATALOG_FILTERS_CACHE_CONTROL }),
   });
 });
 
@@ -325,12 +327,14 @@ publicCatalogRoutes.all("/api/v1/assets/filters", () => methodNotAllowed());
 publicCatalogRoutes.get("/api/v1/assets/collections", async (c) => {
   const cdn = parsePublicPreviewCdnConfig(c.env);
   return json(
-    await getPublicAssetCollections(
-      db(c.env),
+    await withPublicReadDb(c.env, (readDb) => getPublicAssetCollections(
+      readDb,
       c.env.MEDIA_PREVIEW_TOKEN_SECRET,
       ttl(c.env),
       cdn,
-    ),
+    )),
+    200,
+    { headers: publicReadHeaders() },
   );
 });
 
@@ -339,12 +343,14 @@ publicCatalogRoutes.all("/api/v1/assets/collections", () => methodNotAllowed());
 publicCatalogRoutes.get("/api/v1/assets/events", async (c) => {
   const cdn = parsePublicPreviewCdnConfig(c.env);
   return json(
-    await getPublicAssetEvents(
-      db(c.env),
+    await withPublicReadDb(c.env, (readDb) => getPublicAssetEvents(
+      readDb,
       c.env.MEDIA_PREVIEW_TOKEN_SECRET,
       ttl(c.env),
       cdn,
-    ),
+    )),
+    200,
+    { headers: publicReadHeaders() },
   );
 });
 
@@ -353,32 +359,32 @@ publicCatalogRoutes.all("/api/v1/assets/events", () => methodNotAllowed());
 publicCatalogRoutes.get("/api/v1/assets/:assetId", async (c) => {
   const cdn = parsePublicPreviewCdnConfig(c.env);
   return json(
-    await getPublicAssetDetail(
-      db(c.env),
+    await withPublicReadDb(c.env, (readDb) => getPublicAssetDetail(
+      readDb,
       c.req.param("assetId"),
       c.env.MEDIA_PREVIEW_TOKEN_SECRET,
       ttl(c.env),
       cdn,
-    ),
+    )),
     200,
     {
-      headers: {
+      headers: publicReadHeaders({
         "Cache-Control": PUBLIC_ASSET_DETAIL_CACHE_CONTROL,
         "X-Content-Type-Options": "nosniff",
-      },
+      }),
     },
   );
 });
 
 publicCatalogRoutes.all("/api/v1/assets/:assetId", () => methodNotAllowed());
 
-function db(env: Env) {
-  if (!env.DATABASE_URL) {
-    throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.");
-  }
-  return createHttpDb(env.DATABASE_URL);
-}
-
 function ttl(env: Env) {
   return parsePreviewTtl(env.MEDIA_PREVIEW_TOKEN_TTL_SECONDS);
+}
+
+function publicReadHeaders(headers: Record<string, string> = {}) {
+  return {
+    ...headers,
+    [PUBLIC_READ_DB_PATH_HEADER]: PUBLIC_READ_DB_PATH,
+  };
 }

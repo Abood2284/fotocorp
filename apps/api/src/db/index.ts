@@ -6,6 +6,17 @@ import * as schema from "./schema";
 import { createHttpDb, type DrizzleClient } from "./http";
 
 export { createHttpDb, type DrizzleClient };
+export {
+  createCoreDb,
+  createHyperdrivePgDb,
+  createPublicReadDb,
+  withCoreDb,
+  withPublicReadDb,
+  type CoreDbClient,
+  type CoreDbConnection,
+  type PublicReadDbClient,
+  type PublicReadDbConnection,
+} from "./hyperdrive";
 
 export interface AppRequestVariables {
   requestId: string;

@@ -1,5 +1,4 @@
-import { sql } from "drizzle-orm"
-import type { DrizzleClient } from "../../db"
+import { sql, type SQL } from "drizzle-orm"
 import {
   heroPublicReadyJoinSql,
   heroPublicReadyWhereSql,
@@ -11,6 +10,10 @@ import {
 } from "../media/public-preview-cdn-url"
 
 export const PUBLIC_HOMEPAGE_HERO_DISPLAY_COUNT = 9
+
+type PublicReadQueryClient = {
+  execute(query: SQL): Promise<unknown>
+}
 
 export const PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL =
   "public, max-age=0, s-maxage=30, stale-while-revalidate=60"
@@ -44,7 +47,7 @@ interface PoolAssetRow {
 }
 
 export async function getPublicHomepageHeroSet(
-  db: DrizzleClient,
+  db: PublicReadQueryClient,
   cdn: PublicPreviewCdnConfig,
 ): Promise<PublicHomepageHeroSetResponseDto> {
   const rows = await fetchPoolAssetRows(db)
@@ -65,7 +68,7 @@ export async function getPublicHomepageHeroSet(
   }
 }
 
-async function fetchPoolAssetRows(db: DrizzleClient): Promise<PoolAssetRow[]> {
+async function fetchPoolAssetRows(db: PublicReadQueryClient): Promise<PoolAssetRow[]> {
   return executeRows<PoolAssetRow>(db, sql`
     select
       p.position,
@@ -128,7 +131,7 @@ function resolveTitle(row: {
   )
 }
 
-async function executeRows<T>(db: DrizzleClient, query: ReturnType<typeof sql>): Promise<T[]> {
+async function executeRows<T>(db: PublicReadQueryClient, query: SQL): Promise<T[]> {
   const result = await db.execute(query)
   if (Array.isArray(result)) return result as T[]
   if (result && typeof result === "object" && "rows" in result && Array.isArray(result.rows)) {
