@@ -30,6 +30,8 @@ export interface Env {
   TYPESENSE_HOST?: string;
   TYPESENSE_API_KEY?: string;
   TYPESENSE_COLLECTION_ALIAS?: string;
+  TYPESENSE_CARICATURE_COLLECTION_ALIAS?: string;
+  TYPESENSE_CARICATURE_SEARCH_TIMEOUT_MS?: string;
   TYPESENSE_SEARCH_TIMEOUT_MS?: string;
   /** Optional higher timeout budget for grouped event search (defaults to 8000ms). */
   TYPESENSE_EVENT_SEARCH_TIMEOUT_MS?: string;

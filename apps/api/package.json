@@ -52,6 +52,7 @@
     "media:verify-r2-originals": "tsx scripts/media/verify-r2-originals.ts",
     "media:scan-original-metadata": "tsx scripts/media/scan-original-image-metadata.ts",
     "typesense:index-public-assets": "tsx scripts/search/index-public-assets-typesense.ts",
+    "typesense:index-caricatures": "tsx scripts/search/index-caricatures-typesense.ts",
     "search:smoke-typesense": "tsx scripts/search/smoke-typesense.ts"
   },
   "dependencies": {
