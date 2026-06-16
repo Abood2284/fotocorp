@@ -34,3 +34,7 @@ export * from "./users";
 export * from "./staff-audit-logs";
 export * from "./email-delivery-logs";
 export * from "./password-reset-tokens";
+export * from "./caricature-categories";
+export * from "./caricature-assets";
+export * from "./caricature-derivatives";
+export * from "./caricature-download-logs";

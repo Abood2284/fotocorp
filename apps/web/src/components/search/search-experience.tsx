@@ -21,13 +21,21 @@ import {
 } from "@/components/search/catalog-search-filter-panel"
 import { SearchFilterPanelSkeleton } from "@/components/search/search-filter-skeletons"
 import { SearchEventResultsGrid } from "@/components/search/search-event-results-grid"
+import { SearchSegmentSelect } from "@/components/search/search-segment-select"
 import { useSearchFilters, hasPopulatedAssetFilters } from "@/components/search/search-filters-context"
 import { Button } from "@/components/ui/button"
 import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 import { getPublicCatalogTaxonomy, isTypesenseSearchEnabled, searchPublicAssets, searchPublicEvents } from "@/lib/api/fotocorp-api"
 import { hasSearchIntent } from "@/lib/search/search-intent"
+import {
+  applySearchSegmentChange,
+  buildSearchPageHref,
+  DEFAULT_SEARCH_SEGMENT,
+  isEditorialSearchSegment,
+  type SearchSegment,
+} from "@/lib/search/search-segment"
 import { cn, formatInteger } from "@/lib/utils"
-import { ChevronDown, ChevronLeft, ChevronRight, Images, SlidersHorizontal, X, SearchIcon } from "lucide-react"
+import { ChevronLeft, ChevronRight, Images, SlidersHorizontal, X, SearchIcon } from "lucide-react"
 
 export type { SearchSelectedEvent } from "@/components/search/search-experience-types"
 
@@ -45,6 +53,7 @@ interface SearchExperienceProps {
     page?: number
     view?: SearchViewMode
     mode?: SearchResultMode
+    segment?: SearchSegment
   }
   initialEventResult?: PublicSearchEventsResponse | null
   initialImageCount?: number
@@ -76,7 +85,9 @@ export function SearchExperience({
   const router = useRouter()
   const { filters, mergeFilters } = useSearchFilters()
   const searchActive = hasSearchIntent(initialParams)
-  const isBrowseLatest = !searchActive && (initialParams.mode ?? "images") === "images"
+  const searchSegment = initialParams.segment ?? DEFAULT_SEARCH_SEGMENT
+  const isCaricatureSegment = !isEditorialSearchSegment(searchSegment)
+  const isBrowseLatest = !searchActive && (initialParams.mode ?? "images") === "images" && !isCaricatureSegment
   const [filtersRequested, setFiltersRequested] = useState(searchActive)
   const [isPending, startTransition] = useTransition()
   const [showFilters, setShowFilters] = useState(false)
@@ -129,7 +140,7 @@ export function SearchExperience({
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    enabled: (searchActive || isBrowseLatest) && resultMode === "images",
+    enabled: (searchActive || isBrowseLatest) && resultMode === "images" && !isCaricatureSegment,
   })
   const {
     data: filterSnapshot,
@@ -140,7 +151,7 @@ export function SearchExperience({
     staleTime: 5 * 60_000,
     gcTime: 10 * 60_000,
     refetchOnWindowFocus: false,
-    enabled: filtersRequested,
+    enabled: filtersRequested && !isCaricatureSegment,
   })
   const eventSearchQueryParams = useMemo(
     () => buildEventSearchQueryParams(initialParams, paginationMode),
@@ -167,7 +178,7 @@ export function SearchExperience({
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    enabled: searchActive && typesenseSearchEnabled && resultMode === "events",
+    enabled: searchActive && typesenseSearchEnabled && resultMode === "events" && !isCaricatureSegment,
   })
   const {
     data: eventCountSnapshot,
@@ -189,7 +200,7 @@ export function SearchExperience({
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    enabled: searchActive && typesenseSearchEnabled && resultMode === "images",
+    enabled: searchActive && typesenseSearchEnabled && resultMode === "images" && !isCaricatureSegment,
   })
   const {
     data: displayEventResult = initialEventResult ?? undefined,
@@ -214,7 +225,7 @@ export function SearchExperience({
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
-    enabled: searchActive && typesenseSearchEnabled && resultMode === "events",
+    enabled: searchActive && typesenseSearchEnabled && resultMode === "events" && !isCaricatureSegment,
   })
   const items = displayResult?.items ?? initialResult.items
   const nextCursor = displayResult?.nextCursor ?? initialResult.nextCursor
@@ -313,20 +324,7 @@ export function SearchExperience({
   }, [initialParams.q, initialParams.categoryId, initialParams.eventId, initialParams.city, initialParams.year, initialParams.month, categoryName, eventChipLabel, cityName])
 
   function updateParams(next: Partial<SearchExperienceProps["initialParams"]>, forceSort = true) {
-    const params = new URLSearchParams()
     const merged = { ...initialParams, ...next }
-
-    if (merged.q) params.set("q", merged.q)
-    if (merged.categoryId) params.set("categoryId", merged.categoryId)
-    if (merged.eventId) params.set("eventId", merged.eventId)
-    if (merged.city) params.set("city", merged.city)
-    if (merged.contributorId) params.set("contributorId", merged.contributorId)
-    if (merged.year) params.set("year", String(merged.year))
-    if (merged.month) params.set("month", String(merged.month))
-    if (!isPagePagination && merged.cursor) params.set("cursor", merged.cursor)
-    if (isPagePagination && merged.page && merged.page > 1) params.set("page", String(merged.page))
-    if (merged.view === "card") params.set("view", "card")
-    if (merged.mode === "events") params.set("mode", "events")
 
     const effectiveSort = forceSort
       ? merged.sort === "relevance" && merged.q
@@ -336,13 +334,20 @@ export function SearchExperience({
           : "newest"
       : merged.sort
 
-    if (effectiveSort && effectiveSort !== "newest") params.set("sort", effectiveSort)
-    if (!("cursor" in next)) params.delete("cursor")
-    if (isPagePagination && !("page" in next)) params.delete("page")
+    const nextParams: SearchExperienceProps["initialParams"] = {
+      ...merged,
+      sort: effectiveSort,
+      cursor: "cursor" in next ? merged.cursor : isPagePagination ? undefined : merged.cursor,
+      page: isPagePagination && !("page" in next) ? undefined : merged.page,
+    }
 
     startTransition(() => {
-      router.replace(params.toString() ? `/search?${params.toString()}` : "/search")
+      router.replace(buildSearchPageHref(nextParams))
     })
+  }
+
+  function setSearchSegment(nextSegment: SearchSegment) {
+    updateParams(applySearchSegmentChange(initialParams, nextSegment), false)
   }
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
@@ -464,15 +469,19 @@ export function SearchExperience({
                 value={queryDraft}
                 onChange={(event) => setQueryDraft(event.target.value)}
                 onFocus={requestFilters}
-                placeholder="AI-enabled search for images, events, categories, Fotokey"
+                placeholder={isCaricatureSegment
+                  ? "Search caricatures by headline, subject, or visible text"
+                  : "AI-enabled search for images, events, categories, Fotokey"}
                 className="h-full min-w-0 flex-1 border-0 bg-transparent text-lg font-medium text-foreground shadow-none outline-none ring-0 placeholder:text-lg placeholder:text-muted-foreground focus:outline-none focus:ring-0 focus-visible:!outline-none focus-visible:ring-0 md:text-xl md:placeholder:text-xl"
               />
             </label>
 
-            <div className="hidden items-center justify-center bg-background px-6 text-base font-medium text-foreground md:flex">
-              Editorial images
-              <ChevronDown className="ml-3" size={16} />
-            </div>
+            <SearchSegmentSelect
+              value={searchSegment}
+              onChange={setSearchSegment}
+              disabled={isPending}
+              className="hidden md:flex"
+            />
 
             <div className="flex items-center bg-background">
               {queryDraft && (
@@ -491,13 +500,23 @@ export function SearchExperience({
             </div>
           </form>
 
+          <div className="border-b border-border bg-background md:hidden">
+            <SearchSegmentSelect
+              value={searchSegment}
+              onChange={setSearchSegment}
+              disabled={isPending}
+            />
+          </div>
+
           <div className="grid border-b border-border bg-background md:grid-cols-[250px_1fr]">
             <button
               type="button"
               onClick={toggleFiltersPanel}
+              disabled={isCaricatureSegment}
               className={cn(
                 "flex h-16 items-center justify-between border-b border-border px-5 text-left text-base font-semibold uppercase tracking-wide transition-colors md:border-b-0 md:border-r",
                 showFilters ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted",
+                isCaricatureSegment && "cursor-not-allowed opacity-50 hover:bg-background",
               )}
               aria-expanded={showFilters}
             >
@@ -513,7 +532,7 @@ export function SearchExperience({
                 <CatalogSearchActiveChips chips={filterChips} onClearAll={clearAll} />
               </div>
 
-              {(searchActive || isBrowseLatest) && (
+              {(searchActive || isBrowseLatest) && !isCaricatureSegment && (
                 <div className="flex shrink-0 items-center gap-6 sm:border-l sm:border-border sm:pl-4">
                   <ResultMetric
                     compact
@@ -538,8 +557,8 @@ export function SearchExperience({
       </div>
 
       <section className="order-2 bg-surface-warm px-3 py-6 sm:px-5 lg:px-6">
-        <div className={cn("grid gap-5", showFilters && "lg:grid-cols-[300px_minmax(0,1fr)]")}>
-          {showFilters && (
+        <div className={cn("grid gap-5", showFilters && !isCaricatureSegment && "lg:grid-cols-[300px_minmax(0,1fr)]")}>
+          {showFilters && !isCaricatureSegment && (
             showFiltersLoading ? (
               <SearchFilterPanelSkeleton />
             ) : (
@@ -555,6 +574,19 @@ export function SearchExperience({
           )}
 
           <main className="relative min-w-0">
+            {isCaricatureSegment ? (
+              <div className="border border-border bg-background py-16">
+                <EmptyState
+                  icon={Images}
+                  title={searchActive ? "No caricatures matched your search yet." : "Caricature search is coming soon."}
+                  description={searchActive
+                    ? "Caricature indexing is not live yet. Try editorial images while we finish the caricature catalog."
+                    : "Switch to editorial images to browse the archive, or check back soon for caricature results."}
+                  action={{ label: "Search editorial images", href: buildSearchPageHref({ q: initialParams.q, segment: "editorial" }) }}
+                />
+              </div>
+            ) : (
+              <>
             {(isPending || (isResultsFetching && (isEventsMode ? hasEventResults : hasImageResults))) && (
               <div
                 className="pointer-events-none absolute inset-0 z-10 bg-background/35"
@@ -635,6 +667,8 @@ export function SearchExperience({
                   action={{ label: "View latest", href: "/search?mode=events" }}
                 />
               </div>
+            )}
+              </>
             )}
           </main>
         </div>
@@ -769,6 +803,7 @@ function buildSearchAssetHref(asset: PublicAsset, params: SearchExperienceProps[
   if (params.page && params.page > 1) searchParams.set("page", String(params.page))
   if (params.cursor) searchParams.set("cursor", params.cursor)
   if (params.view === "card") searchParams.set("view", "card")
+  if (params.segment && params.segment !== "editorial") searchParams.set("segment", params.segment)
 
   const query = searchParams.toString()
   return query ? `/assets/${asset.id}?${query}` : `/assets/${asset.id}`

@@ -4,6 +4,7 @@ import { Search, X, Image as ImageIcon, PlayCircle, ChevronDown, ChevronUp } fro
 import { useRouter } from "next/navigation"
 import { useRef, useState, useEffect } from "react"
 
+import { buildHomeHeroSearchHref } from "@/lib/search/search-segment"
 import { cn } from "@/lib/utils"
 
 interface SearchBarProps {
@@ -53,7 +54,7 @@ export function SearchBar({
     e.preventDefault()
     const q = value.trim()
     if (navigate) {
-      router.push(q ? `/search?q=${encodeURIComponent(q)}` : "/search")
+      router.push(q ? buildHomeHeroSearchHref(q) : buildHomeHeroSearchHref(""))
     } else {
       onSearch?.(q)
     }

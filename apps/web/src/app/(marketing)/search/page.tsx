@@ -2,6 +2,7 @@ import { SearchExperience } from "@/components/search/search-experience"
 import { SearchFiltersProvider } from "@/components/search/search-filters-context"
 import { isTypesenseSearchEnabled } from "@/lib/api/fotocorp-api"
 import type { PublicAssetSort } from "@/features/assets/types"
+import { parseSearchSegment } from "@/lib/search/search-segment"
 
 interface SearchPageProps {
   searchParams: Promise<{
@@ -19,6 +20,7 @@ interface SearchPageProps {
     page?: string
     view?: string
     mode?: string
+    segment?: string
   }>
 }
 
@@ -39,6 +41,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const view: "grid" | "card" = params.view === "card" ? "card" : "grid"
   const mode: "images" | "events" =
     params.mode === "events" || params.sort?.trim().toLowerCase() === "latest" ? "events" : "images"
+  const segment = parseSearchSegment(params.segment)
   const initialParams = {
     q,
     categoryId: normalized(params.categoryId ?? params.category),
@@ -51,7 +54,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     cursor: undefined,
     page,
     view,
-    mode,
+    mode: segment === "caricature" ? "images" as const : mode,
+    segment,
   }
 
   return (
