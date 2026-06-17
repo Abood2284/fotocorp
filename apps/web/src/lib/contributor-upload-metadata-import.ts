@@ -1,5 +1,6 @@
 import type { TrackedFile } from "@/components/contributor/contributor-upload-types"
 import { getTrackedDisplayName } from "@/lib/upload-wizard-resume"
+import { isPhuploadLegacyCode } from "@/lib/catalog-asset-identity"
 
 export type ImportedMetadataRow = {
   sourceRowNumber: number
@@ -68,6 +69,55 @@ export interface MetadataImportDraft {
 
 const REQUIRED_COLUMNS = ["image_codes", "caption", "keywords", "who_is_in_picture"] as const
 const METADATA_IMPORT_SAVE_CONCURRENCY = 5
+
+/** How imported spreadsheet values merge with existing asset metadata. */
+export type ImportOverwritePolicy = "fill_empty_only" | "overwrite"
+
+export type MetadataImportMatchKey = "filename" | "fotokey_with_filename_fallback" | "original_filename_first"
+
+export const DEFAULT_IMPORT_OVERWRITE_POLICY: ImportOverwritePolicy = "fill_empty_only"
+
+export const DEFAULT_METADATA_IMPORT_MATCH_KEY: MetadataImportMatchKey = "filename"
+
+/** Legacy rushed-upload placeholder; treated as empty when `treatPlaceholdersAsEmpty` is true. */
+export const METADATA_IMPORT_PLACEHOLDER_VALUES = ["Coming Soon"] as const
+
+function isFieldEmpty(value: string): boolean {
+  return value.trim().length === 0
+}
+
+export type ImportOverwriteOptions = {
+  overwritePolicy?: ImportOverwritePolicy
+  /** When true, placeholder values (e.g. Coming Soon) count as empty under fill_empty_only. */
+  treatPlaceholdersAsEmpty?: boolean
+  /** How spreadsheet `image_codes` map to selected assets. */
+  matchKey?: MetadataImportMatchKey
+}
+
+export function isMetadataImportPlaceholderValue(
+  value: string,
+  placeholders: readonly string[] = METADATA_IMPORT_PLACEHOLDER_VALUES,
+): boolean {
+  const trimmed = value.trim()
+  if (!trimmed) return false
+  const normalized = trimmed.toLowerCase()
+  return placeholders.some((placeholder) => placeholder.trim().toLowerCase() === normalized)
+}
+
+export function isMetadataFieldEmptyForImport(
+  value: string,
+  options: Pick<ImportOverwriteOptions, "overwritePolicy" | "treatPlaceholdersAsEmpty"> = {},
+): boolean {
+  const policy = options.overwritePolicy ?? DEFAULT_IMPORT_OVERWRITE_POLICY
+  if (isFieldEmpty(value)) return true
+  if (policy === "overwrite") return false
+  if (options.treatPlaceholdersAsEmpty && isMetadataImportPlaceholderValue(value)) return true
+  return false
+}
+
+export function normalizeFotokey(value: string): string {
+  return value.trim().toUpperCase()
+}
 
 export function normalizeColumnHeader(header: string): string {
   return header.trim().toLowerCase().replace(/[\s-]+/g, "_")
@@ -170,6 +220,10 @@ export function detectDuplicateImageCodes(rows: ImportedMetadataRow[]): Metadata
 function buildTrackedFileMaps(trackedFiles: TrackedFile[]) {
   const exactMap = new Map<string, TrackedFile[]>()
   const baseMap = new Map<string, TrackedFile[]>()
+  const fotokeyMap = new Map<string, TrackedFile[]>()
+  const originalFileNameMap = new Map<string, TrackedFile[]>()
+  const originalBaseMap = new Map<string, TrackedFile[]>()
+  const legacyCodeMap = new Map<string, TrackedFile[]>()
 
   for (const file of trackedFiles) {
     const displayName = getTrackedDisplayName(file)
@@ -182,19 +236,139 @@ function buildTrackedFileMaps(trackedFiles: TrackedFile[]) {
     const baseList = baseMap.get(baseKey) ?? []
     baseList.push(file)
     baseMap.set(baseKey, baseList)
+
+    if (file.fotokey?.trim()) {
+      const fotokey = normalizeFotokey(file.fotokey)
+      const fotokeyList = fotokeyMap.get(fotokey) ?? []
+      fotokeyList.push(file)
+      fotokeyMap.set(fotokey, fotokeyList)
+    }
+
+    if (file.originalFileName?.trim()) {
+      const originalKey = normalizeFileName(file.originalFileName)
+      const originalList = originalFileNameMap.get(originalKey) ?? []
+      originalList.push(file)
+      originalFileNameMap.set(originalKey, originalList)
+
+      const originalBaseKey = getBaseName(file.originalFileName)
+      const originalBaseList = originalBaseMap.get(originalBaseKey) ?? []
+      originalBaseList.push(file)
+      originalBaseMap.set(originalBaseKey, originalBaseList)
+    }
+
+    if (file.legacyImageCode?.trim() && !isPhuploadLegacyCode(file.legacyImageCode)) {
+      const legacyKey = normalizeFileName(file.legacyImageCode)
+      const legacyList = legacyCodeMap.get(legacyKey) ?? []
+      legacyList.push(file)
+      legacyCodeMap.set(legacyKey, legacyList)
+    }
   }
 
-  return { exactMap, baseMap }
+  return { exactMap, baseMap, fotokeyMap, originalFileNameMap, originalBaseMap, legacyCodeMap }
 }
 
 function matchImageCode(
   imageCode: string,
   exactMap: Map<string, TrackedFile[]>,
   baseMap: Map<string, TrackedFile[]>,
+  fotokeyMap: Map<string, TrackedFile[]>,
+  originalFileNameMap: Map<string, TrackedFile[]>,
+  originalBaseMap: Map<string, TrackedFile[]>,
+  legacyCodeMap: Map<string, TrackedFile[]>,
+  matchKey: MetadataImportMatchKey,
 ):
   | { type: "found"; file: TrackedFile }
   | { type: "not_found" }
   | { type: "ambiguous"; matchedFileNames: string[] } {
+  function resolveSingle(matches: TrackedFile[] | undefined, matchedFileNames: string[]) {
+    if (!matches || matches.length === 0) return { type: "not_found" as const }
+    if (matches.length === 1) return { type: "found" as const, file: matches[0]! }
+    return { type: "ambiguous" as const, matchedFileNames }
+  }
+
+  if (matchKey === "filename") {
+    const exactMatches = exactMap.get(normalizeFileName(imageCode))
+    if (exactMatches?.length === 1) return { type: "found", file: exactMatches[0]! }
+    if (exactMatches && exactMatches.length > 1) {
+      return { type: "ambiguous", matchedFileNames: exactMatches.map((file) => getTrackedDisplayName(file)) }
+    }
+
+    const baseMatches = baseMap.get(getBaseName(imageCode))
+    if (!baseMatches || baseMatches.length === 0) return { type: "not_found" }
+    if (baseMatches.length === 1) return { type: "found", file: baseMatches[0]! }
+    return { type: "ambiguous", matchedFileNames: baseMatches.map((file) => getTrackedDisplayName(file)) }
+  }
+
+  if (matchKey === "original_filename_first") {
+    const originalMatches = originalFileNameMap.get(normalizeFileName(imageCode))
+    const originalResult = resolveSingle(
+      originalMatches,
+      originalMatches?.map((file) => file.originalFileName ?? getTrackedDisplayName(file)) ?? [],
+    )
+    if (originalResult.type !== "not_found") return originalResult
+
+    const originalBaseMatches = originalBaseMap.get(getBaseName(imageCode))
+    const originalBaseResult = resolveSingle(
+      originalBaseMatches,
+      originalBaseMatches?.map((file) => file.originalFileName ?? getTrackedDisplayName(file)) ?? [],
+    )
+    if (originalBaseResult.type !== "not_found") return originalBaseResult
+
+    const legacyMatches = legacyCodeMap.get(normalizeFileName(imageCode))
+    const legacyResult = resolveSingle(
+      legacyMatches,
+      legacyMatches?.map((file) => file.legacyImageCode ?? getTrackedDisplayName(file)) ?? [],
+    )
+    if (legacyResult.type !== "not_found") return legacyResult
+
+    const fotokeyMatches = fotokeyMap.get(normalizeFotokey(imageCode))
+    const fotokeyResult = resolveSingle(
+      fotokeyMatches,
+      fotokeyMatches?.map((file) => file.fotokey ?? getTrackedDisplayName(file)) ?? [],
+    )
+    if (fotokeyResult.type !== "not_found") return fotokeyResult
+
+    const exactMatches = exactMap.get(normalizeFileName(imageCode))
+    if (exactMatches?.length === 1) return { type: "found", file: exactMatches[0]! }
+    if (exactMatches && exactMatches.length > 1) {
+      return { type: "ambiguous", matchedFileNames: exactMatches.map((file) => getTrackedDisplayName(file)) }
+    }
+
+    const baseMatches = baseMap.get(getBaseName(imageCode))
+    return resolveSingle(
+      baseMatches,
+      baseMatches?.map((file) => getTrackedDisplayName(file)) ?? [],
+    )
+  }
+
+  const fotokeyMatches = fotokeyMap.get(normalizeFotokey(imageCode))
+  const fotokeyResult = resolveSingle(
+    fotokeyMatches,
+    fotokeyMatches?.map((file) => file.fotokey ?? getTrackedDisplayName(file)) ?? [],
+  )
+  if (fotokeyResult.type !== "not_found") return fotokeyResult
+
+  const originalMatches = originalFileNameMap.get(normalizeFileName(imageCode))
+  const originalResult = resolveSingle(
+    originalMatches,
+    originalMatches?.map((file) => file.originalFileName ?? getTrackedDisplayName(file)) ?? [],
+  )
+  if (originalResult.type !== "not_found") return originalResult
+
+  const originalBaseMatches = originalBaseMap.get(getBaseName(imageCode))
+  const originalBaseResult = resolveSingle(
+    originalBaseMatches,
+    originalBaseMatches?.map((file) => file.originalFileName ?? getTrackedDisplayName(file)) ?? [],
+  )
+  if (originalBaseResult.type !== "not_found") return originalBaseResult
+
+  const legacyMatches = legacyCodeMap.get(normalizeFileName(imageCode))
+  const legacyResult = resolveSingle(
+    legacyMatches,
+    legacyMatches?.map((file) => file.legacyImageCode ?? getTrackedDisplayName(file)) ?? [],
+  )
+  if (legacyResult.type !== "not_found") return legacyResult
+
   const exactMatches = exactMap.get(normalizeFileName(imageCode))
   if (exactMatches?.length === 1) return { type: "found", file: exactMatches[0]! }
   if (exactMatches && exactMatches.length > 1) {
@@ -202,21 +376,26 @@ function matchImageCode(
   }
 
   const baseMatches = baseMap.get(getBaseName(imageCode))
-  if (!baseMatches || baseMatches.length === 0) return { type: "not_found" }
-  if (baseMatches.length === 1) return { type: "found", file: baseMatches[0]! }
-  return { type: "ambiguous", matchedFileNames: baseMatches.map((file) => getTrackedDisplayName(file)) }
+  return resolveSingle(
+    baseMatches,
+    baseMatches?.map((file) => getTrackedDisplayName(file)) ?? [],
+  )
 }
 
 export function buildMetadataImportMatches(
   rows: ImportedMetadataRow[],
   trackedFiles: TrackedFile[],
+  options: ImportOverwriteOptions = {},
 ): {
   matches: MetadataImportMatch[]
   notFoundCodes: MetadataImportNotFoundCode[]
   ambiguousCodes: MetadataImportAmbiguousCode[]
 } {
+  const overwritePolicy = options.overwritePolicy ?? DEFAULT_IMPORT_OVERWRITE_POLICY
+  const matchKey = options.matchKey ?? DEFAULT_METADATA_IMPORT_MATCH_KEY
   const eligible = trackedFiles.filter((row) => row.status === "done" && row.imageAssetId)
-  const { exactMap, baseMap } = buildTrackedFileMaps(eligible)
+  const { exactMap, baseMap, fotokeyMap, originalFileNameMap, originalBaseMap, legacyCodeMap } =
+    buildTrackedFileMaps(eligible)
 
   const matches: MetadataImportMatch[] = []
   const notFoundCodes: MetadataImportNotFoundCode[] = []
@@ -225,7 +404,16 @@ export function buildMetadataImportMatches(
 
   for (const row of rows) {
     for (const imageCode of row.imageCodes) {
-      const result = matchImageCode(imageCode, exactMap, baseMap)
+      const result = matchImageCode(
+        imageCode,
+        exactMap,
+        baseMap,
+        fotokeyMap,
+        originalFileNameMap,
+        originalBaseMap,
+        legacyCodeMap,
+        matchKey,
+      )
       if (result.type === "not_found") {
         notFoundCodes.push({ imageCode, sourceRowNumber: row.sourceRowNumber })
         continue
@@ -242,11 +430,13 @@ export function buildMetadataImportMatches(
       if (matchedKeys.has(result.file.key)) {
         const existing = matches.find((match) => match.trackedKey === result.file.key)
         if (existing) {
-          if (!existing.caption.trim() && row.caption.trim()) existing.caption = row.caption
-          if (!existing.keywords.trim() && row.keywords.trim()) existing.keywords = row.keywords
-          if (!existing.whoIsInPicture.trim() && row.whoIsInPicture.trim()) {
-            existing.whoIsInPicture = row.whoIsInPicture
-          }
+          existing.caption = mergeImportedMatchField(existing.caption, row.caption, overwritePolicy)
+          existing.keywords = mergeImportedMatchField(existing.keywords, row.keywords, overwritePolicy)
+          existing.whoIsInPicture = mergeImportedMatchField(
+            existing.whoIsInPicture,
+            row.whoIsInPicture,
+            overwritePolicy,
+          )
         }
         continue
       }
@@ -266,8 +456,15 @@ export function buildMetadataImportMatches(
   return { matches, notFoundCodes, ambiguousCodes }
 }
 
-function isFieldEmpty(value: string): boolean {
-  return value.trim().length === 0
+function mergeImportedMatchField(
+  existing: string,
+  incoming: string,
+  overwritePolicy: ImportOverwritePolicy,
+): string {
+  if (isFieldEmpty(incoming)) return existing
+  if (overwritePolicy === "overwrite") return incoming
+  if (isFieldEmpty(existing)) return incoming
+  return existing
 }
 
 function applyFieldImport(options: {
@@ -276,22 +473,45 @@ function applyFieldImport(options: {
   currentValue: string
   importedValue: string
   skippedFields: MetadataImportSkippedField[]
+  overwritePolicy: ImportOverwritePolicy
+  treatPlaceholdersAsEmpty: boolean
 }): string | null {
-  const { fileName, field, currentValue, importedValue, skippedFields } = options
+  const {
+    fileName,
+    field,
+    currentValue,
+    importedValue,
+    skippedFields,
+    overwritePolicy,
+    treatPlaceholdersAsEmpty,
+  } = options
+
   if (isFieldEmpty(importedValue)) {
-    if (!isFieldEmpty(currentValue)) return null
     return null
   }
-  if (!isFieldEmpty(currentValue)) {
+
+  if (overwritePolicy === "overwrite") {
+    if (importedValue === currentValue) return null
+    return importedValue
+  }
+
+  const currentIsEmpty = isMetadataFieldEmptyForImport(currentValue, {
+    overwritePolicy,
+    treatPlaceholdersAsEmpty,
+  })
+
+  if (!currentIsEmpty) {
     skippedFields.push({ fileName, field, reason: "existing_value" })
     return null
   }
+
   return importedValue
 }
 
 export function applyImportedMetadataToTracked(
   tracked: TrackedFile[],
   matches: MetadataImportMatch[],
+  options: ImportOverwriteOptions = {},
 ): {
   nextTracked: TrackedFile[]
   skippedFields: MetadataImportSkippedField[]
@@ -299,6 +519,8 @@ export function applyImportedMetadataToTracked(
   unchangedImageCount: number
   saveDrafts: Array<{ key: string; draft: MetadataImportDraft }>
 } {
+  const overwritePolicy = options.overwritePolicy ?? DEFAULT_IMPORT_OVERWRITE_POLICY
+  const treatPlaceholdersAsEmpty = options.treatPlaceholdersAsEmpty ?? false
   const skippedFields: MetadataImportSkippedField[] = []
   const matchByKey = new Map(matches.map((match) => [match.trackedKey, match]))
   let updatedImageCount = 0
@@ -316,6 +538,8 @@ export function applyImportedMetadataToTracked(
         currentValue: row.caption,
         importedValue: match.caption,
         skippedFields,
+        overwritePolicy,
+        treatPlaceholdersAsEmpty,
       }) ?? row.caption
     const nextKeywords =
       applyFieldImport({
@@ -324,6 +548,8 @@ export function applyImportedMetadataToTracked(
         currentValue: row.keywords,
         importedValue: match.keywords,
         skippedFields,
+        overwritePolicy,
+        treatPlaceholdersAsEmpty,
       }) ?? row.keywords
     const nextWhoIsInPicture =
       applyFieldImport({
@@ -332,6 +558,8 @@ export function applyImportedMetadataToTracked(
         currentValue: row.whoIsInPicture,
         importedValue: match.whoIsInPicture,
         skippedFields,
+        overwritePolicy,
+        treatPlaceholdersAsEmpty,
       }) ?? row.whoIsInPicture
 
     const changed =
@@ -391,12 +619,24 @@ export async function executeMetadataImport(options: {
   onSaveSuccess: (key: string) => void
   onSaveFailure: (key: string, message: string) => void
   onTrackedUpdate: (updater: (prev: TrackedFile[]) => TrackedFile[]) => void
+  overwritePolicy?: ImportOverwritePolicy
+  treatPlaceholdersAsEmpty?: boolean
+  matchKey?: MetadataImportMatchKey
 }): Promise<MetadataImportSummary> {
+  const importOptions: ImportOverwriteOptions = {
+    overwritePolicy: options.overwritePolicy ?? DEFAULT_IMPORT_OVERWRITE_POLICY,
+    treatPlaceholdersAsEmpty: options.treatPlaceholdersAsEmpty ?? false,
+    matchKey: options.matchKey ?? DEFAULT_METADATA_IMPORT_MATCH_KEY,
+  }
   const rows = await parseUploadMetadataFile(options.file)
   const duplicateCodes = detectDuplicateImageCodes(rows)
-  const { matches, notFoundCodes, ambiguousCodes } = buildMetadataImportMatches(rows, options.tracked)
+  const { matches, notFoundCodes, ambiguousCodes } = buildMetadataImportMatches(
+    rows,
+    options.tracked,
+    importOptions,
+  )
   const { nextTracked, skippedFields, updatedImageCount, unchangedImageCount, saveDrafts } =
-    applyImportedMetadataToTracked(options.tracked, matches)
+    applyImportedMetadataToTracked(options.tracked, matches, importOptions)
 
   options.onTrackedUpdate(() => nextTracked)
 

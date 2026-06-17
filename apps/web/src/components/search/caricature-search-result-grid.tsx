@@ -1,5 +1,8 @@
+import Link from "next/link"
+
 import { PreviewImage } from "@/components/assets/preview-image"
 import type { CaricatureSearchGridItem } from "@/lib/search/caricature-search"
+import { buildCaricatureDetailHref } from "@/lib/search/caricature-search"
 import { cn } from "@/lib/utils"
 
 interface CaricatureSearchResultGridProps {
@@ -21,10 +24,12 @@ export function CaricatureSearchResultGrid({
       )}
     >
       {items.map((item, index) => (
-        <article
+        <Link
           key={item.id}
-          className="group relative overflow-hidden border-b border-r border-border bg-muted text-white transition-all duration-300 hover:-translate-y-[2px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
+          href={buildCaricatureDetailHref(item.id)}
+          className="group relative overflow-hidden border-b border-r border-border bg-muted text-white transition-all duration-300 hover:-translate-y-[2px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
+          <article>
           <div
             className="relative min-h-[220px] overflow-hidden bg-background"
             style={item.preview ? { aspectRatio: getPreviewAspectRatio(item.preview) } : undefined}
@@ -54,7 +59,8 @@ export function CaricatureSearchResultGrid({
               )}
             </div>
           </div>
-        </article>
+          </article>
+        </Link>
       ))}
     </div>
   )

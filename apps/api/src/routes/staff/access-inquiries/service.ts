@@ -160,10 +160,11 @@ export async function getAccessInquiryDetail(db: DrizzleClient, inquiryId: strin
 
 export async function approveContributorApplicationInquiry(
   db: DrizzleClient,
+  databaseUrl: string,
   inquiryId: string,
   input: { username?: string | null },
 ) {
-  return approveContributorApplication(db, inquiryId, input);
+  return approveContributorApplication(db, databaseUrl, inquiryId, input);
 }
 
 function buildDraftEntitlementInsertRow(

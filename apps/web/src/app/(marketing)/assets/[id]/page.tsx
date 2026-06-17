@@ -94,6 +94,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
   const relatedAssets = relatedResult.items
   const relatedLabel = relatedResult.label
   const relatedCountLabel = formatRelatedCountLabel(relatedResult.totalCount)
+  const relatedHeaderLabel = formatRelatedHeaderLabel(relatedResult.source, relatedResult.totalCount, asset)
   const searchDefaultValue = resolvedSearchParams?.q ?? ""
   const actionMetadataRows = getActionMetadataRows(asset)
 
@@ -150,6 +151,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
     label: relatedLabel,
     browseHref: relatedResult.browseHref,
     relatedCountLabel: relatedCountLabel,
+    headerLabel: relatedHeaderLabel,
   }
 
   return (
@@ -228,7 +230,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
                       href="#event-gallery-section"
                       className="text-primary underline underline-offset-2 hover:text-primary-hover"
                     >
-                      {totalEventAssets} {totalEventAssets === 1 ? "image" : "images"} from this event
+                      View {totalEventAssets.toLocaleString()} {totalEventAssets === 1 ? "image" : "images"} from this event
                     </a>
                   </div>
                 )}
@@ -411,6 +413,7 @@ async function getRelatedAssets(asset: PublicAsset) {
     if (items.length > 0) {
       return {
         items,
+        source: "event" as const,
         label: relatedLabelForSource("event", asset),
         browseHref: relatedBrowseHref("event", asset),
         totalCount: asset.event.assetCount ?? eventResult?.totalCount,
@@ -425,6 +428,7 @@ async function getRelatedAssets(asset: PublicAsset) {
     if (items.length > 0) {
       return {
         items,
+        source: "category" as const,
         label: relatedLabelForSource("category", asset),
         browseHref: relatedBrowseHref("category", asset),
         totalCount: categoryResult?.totalCount,
@@ -439,6 +443,7 @@ async function getRelatedAssets(asset: PublicAsset) {
     if (items.length > 0) {
       return {
         items,
+        source: "photographer" as const,
         label: relatedLabelForSource("photographer", asset),
         browseHref: relatedBrowseHref("photographer", asset),
         totalCount: photographerResult?.totalCount,
@@ -451,6 +456,7 @@ async function getRelatedAssets(asset: PublicAsset) {
   const items = collectRelatedItems(archiveResult?.items ?? [], asset.id, targetCount)
   return {
     items,
+    source: "archive" as const,
     label: relatedLabelForSource("archive", asset),
     browseHref: relatedBrowseHref("archive", asset),
     totalCount: archiveResult?.totalCount,
@@ -473,6 +479,18 @@ function formatRelatedCountLabel(totalCount: number | undefined) {
   if (totalCount == null || totalCount <= 0) return null
   const formatted = totalCount.toLocaleString()
   return totalCount === 1 ? `${formatted} image` : `${formatted} images`
+}
+
+function formatRelatedHeaderLabel(
+  source: "event" | "category" | "photographer" | "archive",
+  totalCount: number | undefined,
+  asset: PublicAsset,
+) {
+  if (source === "event" && totalCount != null && totalCount > 0) {
+    const formatted = totalCount.toLocaleString()
+    return `View ${formatted} ${totalCount === 1 ? "image" : "images"} from this event`
+  }
+  return relatedLabelForSource(source, asset)
 }
 
 function appendRelated(
@@ -516,10 +534,10 @@ function relatedLabelForSource(
 
 function getActionMetadataRows(asset: PublicAsset) {
   return [
-    { label: "Credit:", value: asset.contributor?.displayName ?? "—" },
-    { label: "Fotokey #:", value: asset.fotokey ?? "—" },
     { label: "Event:", value: asset.event?.name ?? "—" },
     { label: "Category:", value: asset.category?.name ?? "—" },
+    { label: "Fotokey #:", value: asset.fotokey ?? "—" },
+    { label: "Credit:", value: asset.contributor?.displayName ?? "—" },
     { label: "Source:", value: asset.source ? humanizeEnum(asset.source) : "—" },
   ]
 }

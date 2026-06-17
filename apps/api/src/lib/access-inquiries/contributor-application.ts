@@ -1,5 +1,6 @@
 import { and, eq, ne, or, sql } from "drizzle-orm"
 import type { DrizzleClient } from "../../db"
+import { createTransactionalDb } from "../../db"
 import { authCredentials, authIdentityClaims, contributors, customerAccessInquiries } from "../../db/schema"
 import { isValidUsername, normalizeUsername } from "../../auth/username"
 import {
@@ -160,6 +161,7 @@ export async function submitContributorApplication(db: DrizzleClient, input: Sub
 
 export async function approveContributorApplication(
   db: DrizzleClient,
+  databaseUrl: string,
   inquiryId: string,
   input: ApproveContributorApplicationInput,
 ) {
@@ -207,45 +209,50 @@ export async function approveContributorApplication(
   const temporaryPassword = generatePhotographerPortalTemporaryPassword()
   const passwordHash = await hashPhotographerPortalPassword(temporaryPassword)
 
-  await db.transaction(async (tx) => {
-    await tx
-      .update(contributors)
-      .set({ status: "ACTIVE", updatedAt: sql`now()` })
-      .where(eq(contributors.id, contributorId))
+  const writeDb = createTransactionalDb(databaseUrl)
+  try {
+    await writeDb.db.transaction(async (tx) => {
+      await tx
+        .update(contributors)
+        .set({ status: "ACTIVE", updatedAt: sql`now()` })
+        .where(eq(contributors.id, contributorId))
 
-    await tx.insert(authCredentials).values({
-      ownerType: "CONTRIBUTOR",
-      ownerId: contributorId,
-      loginIdentifier: username,
-      identifierType: "USERNAME",
-      passwordHash,
-      status: "ACTIVE",
-      mustResetPassword: true,
-    })
+      await tx.insert(authCredentials).values({
+        ownerType: "CONTRIBUTOR",
+        ownerId: contributorId,
+        loginIdentifier: username,
+        identifierType: "USERNAME",
+        passwordHash,
+        status: "ACTIVE",
+        mustResetPassword: true,
+      })
 
-    await tx
-      .update(authIdentityClaims)
-      .set({ status: "ACTIVE", updatedAt: sql`now()` })
-      .where(and(eq(authIdentityClaims.ownerType, "CONTRIBUTOR"), eq(authIdentityClaims.ownerId, contributorId)))
-
-    if (username !== normalizeUsername(inquiry.proposedUsername ?? "")) {
       await tx
         .update(authIdentityClaims)
-        .set({ normalizedValue: username, updatedAt: sql`now()` })
-        .where(
-          and(
-            eq(authIdentityClaims.ownerType, "CONTRIBUTOR"),
-            eq(authIdentityClaims.ownerId, contributorId),
-            eq(authIdentityClaims.claimType, "USERNAME"),
-          ),
-        )
-    }
+        .set({ status: "ACTIVE", updatedAt: sql`now()` })
+        .where(and(eq(authIdentityClaims.ownerType, "CONTRIBUTOR"), eq(authIdentityClaims.ownerId, contributorId)))
 
-    await tx
-      .update(customerAccessInquiries)
-      .set({ status: "CONTRIBUTOR_APPROVED", proposedUsername: username, updatedAt: sql`now()` })
-      .where(eq(customerAccessInquiries.id, inquiryId))
-  })
+      if (username !== normalizeUsername(inquiry.proposedUsername ?? "")) {
+        await tx
+          .update(authIdentityClaims)
+          .set({ normalizedValue: username, updatedAt: sql`now()` })
+          .where(
+            and(
+              eq(authIdentityClaims.ownerType, "CONTRIBUTOR"),
+              eq(authIdentityClaims.ownerId, contributorId),
+              eq(authIdentityClaims.claimType, "USERNAME"),
+            ),
+          )
+      }
+
+      await tx
+        .update(customerAccessInquiries)
+        .set({ status: "CONTRIBUTOR_APPROVED", proposedUsername: username, updatedAt: sql`now()` })
+        .where(eq(customerAccessInquiries.id, inquiryId))
+    })
+  } finally {
+    await writeDb.close().catch(() => undefined)
+  }
 
   return { contributorId, username, temporaryPassword, inquiryId }
 }

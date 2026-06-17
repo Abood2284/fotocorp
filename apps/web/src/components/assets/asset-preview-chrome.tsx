@@ -4,6 +4,8 @@ import { CircleHelp, Plus, ChevronLeft, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { FotoboxSaveButton } from "@/components/assets/fotobox-save-button"
+import { parseWhoIsInPicture } from "@/lib/who-is-in-picture"
+import { useSharedAuthSession } from "@/lib/use-shared-auth-session"
 import { cn } from "@/lib/utils"
 
 interface AssetPreviewChromeProps {
@@ -41,7 +43,9 @@ export function AssetPreviewChrome({
   nextAssetId,
   orientation = "portrait",
 }: AssetPreviewChromeProps) {
-  const peopleLabel = whoIsInPicture?.trim()
+  const { data: session, isPending: authPending } = useSharedAuthSession()
+  const isAuthenticated = session?.kind === "user" && Boolean(session.user)
+  const whoIsInPictureNames = parseWhoIsInPicture(whoIsInPicture)
   const showPagination = currentPhotoNumber !== undefined && totalPhotos !== undefined && totalPhotos > 1
   const isLandscape = orientation === "landscape"
 
@@ -56,7 +60,7 @@ export function AssetPreviewChrome({
         className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border pb-3 px-1 sm:px-0"
         aria-label="Image actions"
       >
-        {peopleLabel ? (
+        {whoIsInPictureNames.length > 0 ? (
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <div className="group relative shrink-0">
               <span
@@ -69,31 +73,60 @@ export function AssetPreviewChrome({
               <span
                 id="who-is-in-picture-tooltip"
                 role="tooltip"
-                className="pointer-events-none absolute left-0 top-full z-30 mt-1.5 whitespace-nowrap rounded-none border border-border bg-foreground px-2.5 py-1.5 font-sans text-[10px] font-bold uppercase tracking-wider text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+                className="pointer-events-none absolute left-0 top-full z-30 mt-1.5 whitespace-nowrap rounded-none border border-border bg-foreground px-2.5 py-1.5 font-sans text-[10px] font-normal normal-case tracking-normal text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
               >
-                Who is in picture?
+                Who is in picture
               </span>
             </div>
-            <p className="min-w-0 font-sans text-sm font-medium leading-snug text-foreground">{peopleLabel}</p>
+            <p className="min-w-0 font-sans text-sm font-medium leading-snug text-foreground">
+              {whoIsInPictureNames.map((name, index) => (
+                <span key={name}>
+                  {index > 0 ? ", " : null}
+                  <Link
+                    href={`/search?q=${encodeURIComponent(name)}`}
+                    className="text-primary underline underline-offset-4 hover:text-primary-hover"
+                  >
+                    {name}
+                  </Link>
+                </span>
+              ))}
+            </p>
           </div>
         ) : (
           <div className="min-w-0 flex-1" />
         )}
 
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3 font-sans">
-          <span className="rounded-none border border-border bg-muted/30 px-2.5 py-1.5 font-mono text-xs font-medium text-foreground/80">
-            {fotokey ?? "Unavailable"}
-          </span>
-          <span className="hidden h-6 w-px bg-border/80 sm:block" aria-hidden />
-          <FotoboxSaveButton
-            assetId={assetId}
-            variant="ghost"
-            className="m-0 shrink-0"
-            buttonClassName="h-9 gap-1.5 rounded-none border border-black bg-black px-4 text-xs font-bold uppercase tracking-wider text-white shadow-none hover:bg-neutral-800 cursor-pointer"
-            icon={<Plus strokeWidth={2.5} size={14} />}
-            text="Fotobox"
-            hoverLabel="Add to Fotobox"
-          />
+          <div className="group relative shrink-0">
+            <span
+              className="inline-block rounded-none border border-border bg-muted/30 px-2.5 py-1.5 font-mono text-xs font-medium text-foreground/80"
+              tabIndex={0}
+              aria-describedby="fotokey-tooltip"
+            >
+              {fotokey ?? "Unavailable"}
+            </span>
+            <span
+              id="fotokey-tooltip"
+              role="tooltip"
+              className="pointer-events-none absolute right-0 top-full z-30 mt-1.5 whitespace-nowrap rounded-none border border-border bg-foreground px-2.5 py-1.5 font-sans text-[10px] font-normal normal-case tracking-normal text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            >
+              Fotokey
+            </span>
+          </div>
+          {isAuthenticated && !authPending ? (
+            <>
+              <span className="hidden h-6 w-px bg-border/80 sm:block" aria-hidden />
+              <FotoboxSaveButton
+                assetId={assetId}
+                variant="ghost"
+                className="m-0 shrink-0"
+                buttonClassName="h-9 gap-1.5 rounded-none border border-black bg-black px-4 text-xs font-bold uppercase tracking-wider text-white shadow-none hover:bg-neutral-800 cursor-pointer"
+                icon={<Plus strokeWidth={2.5} size={14} />}
+                text="Fotobox"
+                hoverLabel="Add to Fotobox"
+              />
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -149,8 +182,8 @@ export function AssetPreviewChrome({
         )}
 
       </div>
-      {peopleLabel ? (
-        <span className="sr-only">Who is in this picture: {peopleLabel}</span>
+      {whoIsInPictureNames.length > 0 ? (
+        <span className="sr-only">Who is in this picture: {whoIsInPictureNames.join(", ")}</span>
       ) : null}
     </div>
   )

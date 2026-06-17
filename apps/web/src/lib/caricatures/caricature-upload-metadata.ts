@@ -11,6 +11,13 @@ export type CaricatureLanguage =
 
 export type CaricatureAssetStatus = "DRAFT" | "PENDING_REVIEW" | "PUBLISHED" | "REJECTED"
 
+export type CaricaturePreviewGenerationStatus =
+  | "NONE"
+  | "QUEUED"
+  | "GENERATING"
+  | "READY"
+  | "FAILED"
+
 export interface CaricatureCategoryOption {
   id: string
   name: string
@@ -36,6 +43,7 @@ export interface CaricatureAssetRecord extends CaricatureAssetMetadataPayload {
   id: string
   hasOriginalFile: boolean
   hasReadyPreviewDerivatives?: boolean
+  previewGenerationStatus?: CaricaturePreviewGenerationStatus
   hasVisibleText: boolean
   categoryName: string
   visibility: string

@@ -10,6 +10,11 @@ export const typesenseSyncEventBodySchema = z.object({
   critical: z.boolean().optional(),
 })
 
+export const typesenseSyncCaricatureBodySchema = z.object({
+  assetId: z.string().uuid(),
+  critical: z.boolean().optional(),
+})
+
 export const typesenseDeleteEventBodySchema = z.object({
   eventId: z.string().uuid(),
   critical: z.boolean().optional(),

@@ -7,6 +7,7 @@ import type {
   PublicAssetListResponse,
   PublicCaricatureSearchParams,
   PublicCaricatureSearchResponse,
+  PublicCaricatureDetailResponse,
   PublicEventBrowseSection,
   PublicEventCategoryBrowseResponse,
   PublicEventListResponse,
@@ -225,6 +226,25 @@ export async function getPublicAsset(assetId: string): Promise<PublicAssetDetail
 
   return {
     asset: normalizeAssetPreviewUrls(response.asset),
+  }
+}
+
+export async function getPublicCaricature(assetId: string): Promise<PublicCaricatureDetailResponse> {
+  const response = await getJson<PublicCaricatureDetailResponse>(
+    `${resolveCaricatureDetailPath()}/${encodeURIComponent(assetId)}`,
+    {
+      cachePolicy: "public-detail",
+    },
+  )
+
+  return {
+    caricature: {
+      ...response.caricature,
+      previews: {
+        card: normalizePreview(response.caricature.previews.card),
+        detail: normalizePreview(response.caricature.previews.detail),
+      },
+    },
   }
 }
 
@@ -609,6 +629,10 @@ function resolveSearchEventsPath() {
 
 function resolveSearchCaricaturesPath() {
   return typeof window === "undefined" ? "/api/v1/search/caricatures" : "/api/public/search/caricatures"
+}
+
+function resolveCaricatureDetailPath() {
+  return typeof window === "undefined" ? "/api/v1/caricatures" : "/api/public/caricatures"
 }
 
 function resolveLatestEventsPath() {

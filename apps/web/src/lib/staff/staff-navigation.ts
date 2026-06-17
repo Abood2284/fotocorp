@@ -1,7 +1,7 @@
 
 
 import type { StaffRole } from "@/lib/staff/staff-route-access"
-import { Images, ClosedCaption, Calendar, LayoutDashboard, Inbox, MessageCircle, ShieldCheck, Users, Sparkles, BarChart3 } from "lucide-react"
+import { Images, ClosedCaption, Calendar, LayoutDashboard, Inbox, MessageCircle, ShieldCheck, Users, Sparkles, BarChart3, PenLine } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 export interface StaffNavItem {
@@ -22,9 +22,15 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     roles: ["SUPER_ADMIN", "CATALOG_MANAGER", "REVIEWER", "FINANCE", "SUPPORT"],
   },
   {
+    label: "Caricatures",
+    href: "/staff/caricatures",
+    icon: PenLine,
+    roles: ["SUPER_ADMIN", "CAPTION_WRITER"],
+  },
+  {
     label: "Uploads",
     href: "/staff/contributor-uploads",
-        icon: Inbox,
+    icon: Inbox,
     roles: ["SUPER_ADMIN", "CAPTION_WRITER"],
   },
   {
@@ -37,19 +43,19 @@ export const STAFF_NAV_ITEMS: StaffNavItem[] = [
     label: "Catalog",
     href: "/staff/catalog",
     icon: Images,
-    roles: ["SUPER_ADMIN", "CATALOG_MANAGER"],
+    roles: ["SUPER_ADMIN", "CATALOG_MANAGER", "CAPTION_WRITER"],
   },
   {
     label: "Homepage Hero",
     href: "/staff/homepage-hero",
     icon: Sparkles,
-    roles: ["SUPER_ADMIN", "CATALOG_MANAGER"],
+    roles: ["SUPER_ADMIN", "CATALOG_MANAGER", "CAPTION_WRITER"],
   },
   {
     label: "Events",
     href: "/staff/events",
     icon: Calendar,
-    roles: ["SUPER_ADMIN"],
+    roles: ["SUPER_ADMIN", "CAPTION_WRITER"],
   },
   {
     label: "Captions",

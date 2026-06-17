@@ -6,11 +6,13 @@ import { internalAuthMiddleware } from "../../../middleware/internalAuth"
 import {
   deleteTypesenseEventService,
   syncTypesenseAssetService,
+  syncTypesenseCaricatureService,
   syncTypesenseEventService,
 } from "./service"
 import {
   typesenseDeleteEventBodySchema,
   typesenseSyncAssetBodySchema,
+  typesenseSyncCaricatureBodySchema,
   typesenseSyncEventBodySchema,
 } from "./validators"
 
@@ -37,6 +39,16 @@ internalSearchTypesenseRoutes.post(
   },
 )
 internalSearchTypesenseRoutes.all("/api/v1/internal/search/typesense/sync-event", () => methodNotAllowed())
+
+internalSearchTypesenseRoutes.post(
+  "/api/v1/internal/search/typesense/sync-caricature",
+  zValidator("json", typesenseSyncCaricatureBodySchema),
+  async (c) => {
+    const body = c.req.valid("json")
+    return await syncTypesenseCaricatureService(c.env, body)
+  },
+)
+internalSearchTypesenseRoutes.all("/api/v1/internal/search/typesense/sync-caricature", () => methodNotAllowed())
 
 internalSearchTypesenseRoutes.post(
   "/api/v1/internal/search/typesense/delete-event",

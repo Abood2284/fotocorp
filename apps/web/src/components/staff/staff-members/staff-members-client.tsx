@@ -55,8 +55,8 @@ export function StaffMembersClient({ initialItems }: StaffMembersClientProps) {
         <div className="space-y-1">
           <h2 className="text-xl font-semibold tracking-tight">Caption writers</h2>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Create staff logins for caption writers. They can access contributor uploads and captions only, and cannot
-            browse the public site.
+            Create staff logins for caption writers. They can access contributor uploads, captions, catalog, homepage
+            hero, and events, and cannot browse the public site.
           </p>
         </div>
         <div className="flex items-center gap-2">

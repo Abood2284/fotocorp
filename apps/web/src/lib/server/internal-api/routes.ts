@@ -128,6 +128,15 @@ export const internalApiRoutes = {
 
   adminCaricatureGeneratePreviews: (assetId: string) =>
     `/api/v1/internal/admin/caricature-assets/${encodeURIComponent(assetId)}/generate-previews`,
+
+  adminCaricatureApprove: (assetId: string) =>
+    `/api/v1/internal/admin/caricature-assets/${encodeURIComponent(assetId)}/approve`,
+
+  adminCaricatureReject: (assetId: string) =>
+    `/api/v1/internal/admin/caricature-assets/${encodeURIComponent(assetId)}/reject`,
+
+  adminCaricatureOriginal: (assetId: string) =>
+    `/api/v1/internal/admin/caricature-assets/${encodeURIComponent(assetId)}/original`,
 } as const
 
 export function withQuery(path: string, params: URLSearchParams) {

@@ -13,7 +13,9 @@ const CONTRIBUTOR_UPLOAD_ROLES: StaffRole[] = ["SUPER_ADMIN", "CAPTION_WRITER"]
 
 const CAPTION_ROUTE_ROLES: StaffRole[] = ["SUPER_ADMIN", "CAPTION_MANAGER", "CAPTION_WRITER"]
 
-const CATALOG_ASSET_ROLES: StaffRole[] = ["SUPER_ADMIN", "CATALOG_MANAGER"]
+const CATALOG_ASSET_ROLES: StaffRole[] = ["SUPER_ADMIN", "CATALOG_MANAGER", "CAPTION_WRITER"]
+
+const EVENT_ROUTE_ROLES: StaffRole[] = ["SUPER_ADMIN", "CAPTION_WRITER"]
 
 const OPS_ONLY: StaffRole[] = ["SUPER_ADMIN"]
 
@@ -91,6 +93,10 @@ export function staffRoleCanAccessPath(role: string, pathname: string): boolean 
     return CONTRIBUTOR_UPLOAD_ROLES.includes(r)
   }
 
+  if (normalized.startsWith("/staff/caricatures")) {
+    return CONTRIBUTOR_UPLOAD_ROLES.includes(r)
+  }
+
   if (normalized.startsWith("/staff/access-inquiries")) {
     return ["SUPER_ADMIN", "SUPPORT", "FINANCE"].includes(r)
   }
@@ -107,13 +113,16 @@ export function staffRoleCanAccessPath(role: string, pathname: string): boolean 
     return CATALOG_ASSET_ROLES.includes(r)
   }
 
+  if (normalized === "/staff/events" || normalized.startsWith("/staff/events/")) {
+    return EVENT_ROUTE_ROLES.includes(r)
+  }
+
   if (
     normalized.startsWith("/staff/users") ||
     normalized.startsWith("/staff/audit") ||
     normalized.startsWith("/staff/team-performance") ||
     normalized.startsWith("/staff/migration") ||
-    normalized.startsWith("/staff/staff-users") ||
-    normalized.startsWith("/staff/events")
+    normalized.startsWith("/staff/staff-users")
   ) {
     return OPS_ONLY.includes(r)
   }

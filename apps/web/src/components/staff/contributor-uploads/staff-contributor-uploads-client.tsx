@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { StaffContributorBatchMetadataEditor } from "@/components/staff/contributor-uploads/staff-contributor-batch-metadata-editor"
 import type {
   StaffContributorUploadDto,
   StaffContributorUploadBatchGroupDto,
@@ -59,7 +60,13 @@ export function StaffContributorUploadsClient({
   const saveGenRef = useRef(0)
   const replaceInputRef = useRef<HTMLInputElement | null>(null)
 
-  const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>({})
+  const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>(() => {
+    if (currentParams.batchId) {
+      return { [currentParams.batchId]: true }
+    }
+    return {}
+  })
+  const [metadataEditorBatchId, setMetadataEditorBatchId] = useState<string | null>(null)
 
   const batches = useMemo(
     () =>
@@ -81,6 +88,11 @@ export function StaffContributorUploadsClient({
   const selectedUpload = useMemo(
     () => (selectedId ? allItems.find((u) => u.imageAssetId === selectedId) ?? null : null),
     [allItems, selectedId],
+  )
+
+  const metadataEditorBatch = useMemo(
+    () => batches.find((batch) => batch.batchId === metadataEditorBatchId) ?? null,
+    [batches, metadataEditorBatchId],
   )
 
   useEffect(() => {
@@ -766,6 +778,20 @@ export function StaffContributorUploadsClient({
                               type="button"
                               variant="outline"
                               size="sm"
+                              disabled={approvableInBatch.length === 0}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setExpandedBatches((prev) => ({ ...prev, [batch.batchId]: true }))
+                                setMetadataEditorBatchId(batch.batchId)
+                              }}
+                            >
+                              <Upload className="mr-1" size={14} />
+                              Bulk edit metadata
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
                               disabled={
                                 approvableInBatch.length === 0 || isApproving
                               }
@@ -1187,6 +1213,23 @@ export function StaffContributorUploadsClient({
             </div>
           </div>
         </div>
+      ) : null}
+
+      {metadataEditorBatch ? (
+        <StaffContributorBatchMetadataEditor
+          batch={metadataEditorBatch}
+          open={Boolean(metadataEditorBatchId)}
+          onClose={() => setMetadataEditorBatchId(null)}
+          onItemsPatch={(patches) => {
+            setLocalPatch((prev) => {
+              const next = { ...prev }
+              for (const [imageAssetId, patch] of Object.entries(patches)) {
+                next[imageAssetId] = { ...prev[imageAssetId], ...patch }
+              }
+              return next
+            })
+          }}
+        />
       ) : null}
     </div>
   )

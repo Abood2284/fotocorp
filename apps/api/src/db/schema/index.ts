@@ -38,3 +38,4 @@ export * from "./caricature-categories";
 export * from "./caricature-assets";
 export * from "./caricature-derivatives";
 export * from "./caricature-download-logs";
+export * from "./caricature-preview-jobs";

@@ -8,7 +8,11 @@ import {
   normalizeCaricatureMetadataInput,
   type CaricatureMetadataInput,
 } from "./caricature-asset-metadata"
-import { hasReadyCaricaturePreviewDerivatives } from "./caricature-preview-generation"
+import {
+  getCaricaturePreviewGenerationStatus,
+  hasReadyCaricaturePreviewDerivatives,
+  type CaricaturePreviewGenerationStatus,
+} from "./caricature-preview-generation"
 
 export interface AdminCaricatureAssetListFilters {
   q?: string
@@ -42,6 +46,7 @@ export interface AdminCaricatureAssetDetail extends AdminCaricatureAssetListItem
   depictedSubjects: string[]
   visibility: string
   hasReadyPreviewDerivatives: boolean
+  previewGenerationStatus: CaricaturePreviewGenerationStatus
 }
 
 export async function listAdminCaricatureAssets(
@@ -119,7 +124,8 @@ export async function getAdminCaricatureAssetById(
   const row = rows[0]
   if (!row) return null
   const detail = mapDetail(row.asset, row.categoryName)
-  detail.hasReadyPreviewDerivatives = await hasReadyCaricaturePreviewDerivatives(db, assetId)
+  detail.previewGenerationStatus = await getCaricaturePreviewGenerationStatus(db, assetId)
+  detail.hasReadyPreviewDerivatives = detail.previewGenerationStatus === "READY"
   return detail
 }
 
@@ -277,5 +283,6 @@ function mapDetail(
     depictedSubjects: asset.depictedSubjects,
     visibility: asset.visibility,
     hasReadyPreviewDerivatives: false,
+    previewGenerationStatus: "NONE",
   }
 }

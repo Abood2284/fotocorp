@@ -6,6 +6,7 @@ import {
   buildMetadataImportMatches,
   detectDuplicateImageCodes,
   getBaseName,
+  isMetadataImportPlaceholderValue,
   normalizeColumnHeader,
   normalizeFileName,
   type ImportedMetadataRow,
@@ -138,7 +139,7 @@ describe("upload metadata import helpers", () => {
     assert.deepEqual(duplicates[0]?.sourceRowNumbers, [2, 3])
   })
 
-  it("does not overwrite existing metadata values", () => {
+  it("does not overwrite existing metadata values under fill_empty_only", () => {
     const rows: ImportedMetadataRow[] = [
       {
         sourceRowNumber: 2,
@@ -195,8 +196,273 @@ describe("upload metadata import helpers", () => {
     assert.equal(nextTracked[0]?.whoIsInPicture, "Person")
   })
 
+  it("does not fill Coming Soon placeholders under default fill_empty_only", () => {
+    const rows: ImportedMetadataRow[] = [
+      {
+        sourceRowNumber: 2,
+        imageCodes: ["photo.jpg"],
+        caption: "Real caption",
+        keywords: "real, tags",
+        whoIsInPicture: "Real person",
+      },
+    ]
+
+    const tracked = [
+      mockTracked("photo.jpg", {
+        caption: "Coming Soon",
+        keywords: "Coming Soon",
+        whoIsInPicture: "Coming Soon",
+      }),
+    ]
+
+    const { matches } = buildMetadataImportMatches(rows, tracked)
+    const { nextTracked, updatedImageCount, skippedFields } = applyImportedMetadataToTracked(
+      tracked,
+      matches,
+    )
+
+    assert.equal(updatedImageCount, 0)
+    assert.equal(nextTracked[0]?.caption, "Coming Soon")
+    assert.equal(skippedFields.filter((field) => field.reason === "existing_value").length, 3)
+  })
+
+  it("fills Coming Soon placeholders when treatPlaceholdersAsEmpty is enabled", () => {
+    const rows: ImportedMetadataRow[] = [
+      {
+        sourceRowNumber: 2,
+        imageCodes: ["photo.jpg"],
+        caption: "Real caption",
+        keywords: "real, tags",
+        whoIsInPicture: "Real person",
+      },
+    ]
+
+    const tracked = [
+      mockTracked("photo.jpg", {
+        caption: "Coming Soon",
+        keywords: "Coming Soon",
+        whoIsInPicture: "Coming Soon",
+      }),
+    ]
+
+    const importOptions = { treatPlaceholdersAsEmpty: true }
+    const { matches } = buildMetadataImportMatches(rows, tracked, importOptions)
+    const { nextTracked, updatedImageCount } = applyImportedMetadataToTracked(
+      tracked,
+      matches,
+      importOptions,
+    )
+
+    assert.equal(updatedImageCount, 1)
+    assert.equal(nextTracked[0]?.caption, "Real caption")
+    assert.equal(nextTracked[0]?.keywords, "real, tags")
+    assert.equal(nextTracked[0]?.whoIsInPicture, "Real person")
+  })
+
+  it("overwrites existing metadata values under overwrite policy", () => {
+    const rows: ImportedMetadataRow[] = [
+      {
+        sourceRowNumber: 2,
+        imageCodes: ["photo.jpg"],
+        caption: "Imported caption",
+        keywords: "imported",
+        whoIsInPicture: "Imported person",
+      },
+    ]
+
+    const tracked = [
+      mockTracked("photo.jpg", {
+        caption: "Existing caption",
+        keywords: "existing",
+        whoIsInPicture: "Existing person",
+      }),
+    ]
+
+    const importOptions = { overwritePolicy: "overwrite" as const }
+    const { matches } = buildMetadataImportMatches(rows, tracked, importOptions)
+    const { nextTracked, updatedImageCount, skippedFields } = applyImportedMetadataToTracked(
+      tracked,
+      matches,
+      importOptions,
+    )
+
+    assert.equal(updatedImageCount, 1)
+    assert.equal(nextTracked[0]?.caption, "Imported caption")
+    assert.equal(nextTracked[0]?.keywords, "imported")
+    assert.equal(nextTracked[0]?.whoIsInPicture, "Imported person")
+    assert.equal(skippedFields.length, 0)
+  })
+
+  it("overwrite policy replaces Coming Soon placeholders", () => {
+    const rows: ImportedMetadataRow[] = [
+      {
+        sourceRowNumber: 2,
+        imageCodes: ["photo.jpg"],
+        caption: "Final caption",
+        keywords: "final",
+        whoIsInPicture: "Final person",
+      },
+    ]
+
+    const tracked = [
+      mockTracked("photo.jpg", {
+        caption: "Coming Soon",
+        keywords: "Coming Soon",
+        whoIsInPicture: "Coming Soon",
+      }),
+    ]
+
+    const importOptions = { overwritePolicy: "overwrite" as const }
+    const { matches } = buildMetadataImportMatches(rows, tracked, importOptions)
+    const { nextTracked, updatedImageCount } = applyImportedMetadataToTracked(
+      tracked,
+      matches,
+      importOptions,
+    )
+
+    assert.equal(updatedImageCount, 1)
+    assert.equal(nextTracked[0]?.caption, "Final caption")
+  })
+
+  it("overwrite policy does not clear existing fields with empty imported values", () => {
+    const rows: ImportedMetadataRow[] = [
+      {
+        sourceRowNumber: 2,
+        imageCodes: ["photo.jpg"],
+        caption: "",
+        keywords: "",
+        whoIsInPicture: "",
+      },
+    ]
+
+    const tracked = [
+      mockTracked("photo.jpg", {
+        caption: "Keep me",
+        keywords: "keep",
+        whoIsInPicture: "Person",
+      }),
+    ]
+
+    const importOptions = { overwritePolicy: "overwrite" as const }
+    const { matches } = buildMetadataImportMatches(rows, tracked, importOptions)
+    const { nextTracked, updatedImageCount } = applyImportedMetadataToTracked(
+      tracked,
+      matches,
+      importOptions,
+    )
+
+    assert.equal(updatedImageCount, 0)
+    assert.equal(nextTracked[0]?.caption, "Keep me")
+  })
+
+  it("detects metadata import placeholder values", () => {
+    assert.equal(isMetadataImportPlaceholderValue("Coming Soon"), true)
+    assert.equal(isMetadataImportPlaceholderValue("coming soon"), true)
+    assert.equal(isMetadataImportPlaceholderValue("Real caption"), false)
+  })
+
   it("normalizes filenames case-insensitively", () => {
     assert.equal(normalizeFileName(" Photo.JPG "), "photo.jpg")
     assert.equal(getBaseName("Photo.JPG"), "photo")
+  })
+
+  it("matches spreadsheet rows by fotokey before filename fallback", () => {
+    const rows: ImportedMetadataRow[] = [
+      {
+        sourceRowNumber: 2,
+        imageCodes: ["fk-001"],
+        caption: "By fotokey",
+        keywords: "",
+        whoIsInPicture: "",
+      },
+      {
+        sourceRowNumber: 3,
+        imageCodes: ["other.jpg"],
+        caption: "By filename",
+        keywords: "",
+        whoIsInPicture: "",
+      },
+    ]
+
+    const tracked = [
+      mockTracked("unrelated.jpg", {
+        key: "key-1",
+        imageAssetId: "asset-1",
+        fotokey: "FK-001",
+        legacyImageCode: "legacy-one.jpg",
+      }),
+      mockTracked("other.jpg", {
+        key: "key-2",
+        imageAssetId: "asset-2",
+        fotokey: null,
+        legacyImageCode: "other.jpg",
+      }),
+    ]
+
+    const { matches } = buildMetadataImportMatches(rows, tracked, {
+      matchKey: "fotokey_with_filename_fallback",
+    })
+
+    assert.equal(matches.length, 2)
+    assert.equal(matches.find((match) => match.trackedKey === "key-1")?.caption, "By fotokey")
+    assert.equal(matches.find((match) => match.trackedKey === "key-2")?.caption, "By filename")
+  })
+
+  it("matches spreadsheet rows by original upload filename before fotokey", () => {
+    const rows: ImportedMetadataRow[] = [
+      {
+        sourceRowNumber: 2,
+        imageCodes: ["a114.jpg"],
+        caption: "From upload original",
+        keywords: "",
+        whoIsInPicture: "",
+      },
+    ]
+
+    const tracked = [
+      mockTracked("FC140626204", {
+        key: "key-1",
+        imageAssetId: "asset-1",
+        fotokey: "FC140626204",
+        legacyImageCode: "PHUPLOAD-123",
+        originalFileName: "a114.JPG",
+      }),
+    ]
+
+    const { matches } = buildMetadataImportMatches(rows, tracked, {
+      matchKey: "original_filename_first",
+    })
+
+    assert.equal(matches.length, 1)
+    assert.equal(matches[0]?.caption, "From upload original")
+  })
+
+  it("matches spreadsheet rows by original upload filename before phupload legacy codes", () => {
+    const rows: ImportedMetadataRow[] = [
+      {
+        sourceRowNumber: 2,
+        imageCodes: ["camera-shot.jpg"],
+        caption: "From original filename",
+        keywords: "",
+        whoIsInPicture: "",
+      },
+    ]
+
+    const tracked = [
+      mockTracked("Not assigned", {
+        key: "key-1",
+        imageAssetId: "asset-1",
+        fotokey: null,
+        legacyImageCode: "PHUPLOAD-123",
+        originalFileName: "camera-shot.jpg",
+      }),
+    ]
+
+    const { matches } = buildMetadataImportMatches(rows, tracked, {
+      matchKey: "fotokey_with_filename_fallback",
+    })
+
+    assert.equal(matches.length, 1)
+    assert.equal(matches[0]?.caption, "From original filename")
   })
 })

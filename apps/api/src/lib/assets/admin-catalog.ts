@@ -60,6 +60,8 @@ interface AdminAssetRow {
   id: string;
   fotokey: string | null;
   legacy_imagecode: string | null;
+  original_file_name: string | null;
+  upload_original_file_name: string | null;
   who_is_in_picture: string | null;
   caption: string | null;
   headline: string | null;
@@ -759,6 +761,8 @@ function adminSelectSql(sort: AdminSort): SQL {
       a.id,
       a.fotokey,
       a.legacy_image_code as legacy_imagecode,
+      a.original_file_name,
+      upload_src.upload_original_file_name,
       a.who_is_in_picture,
       a.caption,
       a.headline,
@@ -804,6 +808,13 @@ function adminSelectSql(sort: AdminSort): SQL {
 function adminFromSql(): SQL {
   return sql`
     from image_assets a
+    left join lateral (
+      select pui.original_file_name as upload_original_file_name
+      from contributor_upload_items pui
+      where pui.image_asset_id = a.id
+      order by pui.finalized_at desc nulls last, pui.created_at desc
+      limit 1
+    ) upload_src on true
     left join asset_categories c on c.id = a.category_id
     left join photo_events e on e.id = a.event_id
     left join contributors p on p.id = a.contributor_id
@@ -883,6 +894,8 @@ async function mapAdminAssetRow(row: AdminAssetRow, secret: string | undefined, 
     id: row.id,
     fotokey: row.fotokey,
     legacyImageCode: row.legacy_imagecode,
+    originalFileName: row.original_file_name,
+    uploadOriginalFileName: row.upload_original_file_name,
     whoIsInPicture: row.who_is_in_picture,
     caption: row.caption,
     headline: row.headline,

@@ -89,6 +89,7 @@ async function handlePublicProxy(
   const isAssetList = bffPath === "assets"
   const isAssetFilters = bffPath === "assets/filters"
   const isAssetDetail = bffPath.startsWith("assets/")
+  const isCaricatureDetail = bffPath.startsWith("caricatures/")
   const isSearchAssets = bffPath === "search/assets"
   const isSearchCaricatures = bffPath === "search/caricatures"
   const isSearchEvents = bffPath === "search/events"
@@ -96,7 +97,7 @@ async function handlePublicProxy(
   const isEventCategoryBrowse = bffPath === "events/browse"
   const isRoyaltyFreeFeatured = bffPath === "royalty-free/featured" || bffPath === "creative/featured"
   const isHomepageHeroSet = bffPath === "homepage/hero-set"
-  const revalidateSeconds = isAssetDetail
+  const revalidateSeconds = isAssetDetail || isCaricatureDetail
     ? 300
     : isAssetList || isSearchAssets || isSearchCaricatures || isSearchEvents
     ? 30
@@ -121,7 +122,7 @@ async function handlePublicProxy(
         ? PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL
       : isRoyaltyFreeFeatured
         ? PUBLIC_ROYALTY_FREE_FEATURED_CACHE_CONTROL
-        : isAssetDetail
+        : isAssetDetail || isCaricatureDetail
           ? PUBLIC_ASSET_DETAIL_CACHE_CONTROL
           : undefined
 
@@ -132,7 +133,7 @@ async function handlePublicProxy(
     upstreamFetch,
     cacheMode: revalidateSeconds ? `revalidate-${revalidateSeconds}` : "no-store",
     upstreamRevalidateSeconds: revalidateSeconds,
-    passthroughCacheControl: isAssetList || isAssetFilters || isAssetDetail || isSearchAssets || isSearchEvents || isLatestEvents || isEventCategoryBrowse || isRoyaltyFreeFeatured || isHomepageHeroSet,
+    passthroughCacheControl: isAssetList || isAssetFilters || isAssetDetail || isCaricatureDetail || isSearchAssets || isSearchEvents || isLatestEvents || isEventCategoryBrowse || isRoyaltyFreeFeatured || isHomepageHeroSet,
     responseCacheControl,
     responseBody: options.responseBody,
   })
@@ -142,6 +143,9 @@ function resolvePublicUpstreamBase(bffPath: string) {
   const exact = PUBLIC_UPSTREAM_BY_BFF_PATH[bffPath]
   if (exact) return exact
   if (bffPath.startsWith("assets/") && !bffPath.includes("..")) {
+    return `/api/v1/${bffPath}`
+  }
+  if (bffPath.startsWith("caricatures/") && !bffPath.includes("..")) {
     return `/api/v1/${bffPath}`
   }
   return undefined

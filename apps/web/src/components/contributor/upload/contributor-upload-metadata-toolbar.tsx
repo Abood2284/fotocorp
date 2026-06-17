@@ -5,6 +5,7 @@ import { useRef } from "react"
 import { cn } from "@/lib/utils"
 
 interface MetadataStickyToolbarProps {
+  variant?: "upload-wizard" | "staff-review" | "staff-catalog"
   /** Total number of completed (uploaded) images */
   imageCount: number
   /** Number of images that have at least one metadata field filled */
@@ -12,6 +13,7 @@ interface MetadataStickyToolbarProps {
   /** Fill-all handler */
   onFillAll: () => void
   fillAllBusy: boolean
+  fillAllDisabled?: boolean
   /** Sync mode */
   syncMode: boolean
   onToggleSync: () => void
@@ -24,13 +26,16 @@ interface MetadataStickyToolbarProps {
   submitError: string | null
   onSubmit: () => void
   onDismissSubmitError: () => void
+  onDone?: () => void
 }
 
 export function MetadataStickyToolbar({
+  variant = "upload-wizard",
   imageCount,
   metadataCount,
   onFillAll,
   fillAllBusy,
+  fillAllDisabled = false,
   syncMode,
   onToggleSync,
   onImportMetadataFile,
@@ -40,9 +45,11 @@ export function MetadataStickyToolbar({
   submitError,
   onSubmit,
   onDismissSubmitError,
+  onDone,
 }: MetadataStickyToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const missingCount = imageCount - metadataCount
+  const isStaffReview = variant === "staff-review" || variant === "staff-catalog"
 
   return (
     <div className="space-y-3">
@@ -81,10 +88,10 @@ export function MetadataStickyToolbar({
         <button
           type="button"
           onClick={onFillAll}
-          disabled={fillAllBusy || imageCount === 0}
+          disabled={fillAllBusy || fillAllDisabled || imageCount === 0}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/40",
-            (fillAllBusy || imageCount === 0) && "cursor-not-allowed opacity-60",
+            (fillAllBusy || fillAllDisabled || imageCount === 0) && "cursor-not-allowed opacity-60",
           )}
         >
           {fillAllBusy ? <Loader2 className="animate-spin" size={14} /> : <Globe size={14} />}
@@ -123,36 +130,46 @@ export function MetadataStickyToolbar({
           </span>
         </div>
 
-        {/* Submit */}
-        <button
-          type="button"
-          disabled={submitDisabled || submitBusy}
-          aria-busy={submitBusy}
-          onClick={() => {
-            onDismissSubmitError()
-            onSubmit()
-          }}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors",
-            submitBusy
-              ? "cursor-wait bg-primary text-primary-foreground opacity-90"
-              : submitDisabled
-                ? "cursor-not-allowed bg-muted text-muted-foreground"
-                : "bg-primary text-primary-foreground hover:bg-primary/90",
-          )}
-        >
-          {submitBusy ? (
-            <>
-              <Loader2 className="animate-spin" size={14} aria-hidden />
-              Submitting…
-            </>
-          ) : (
-            <>
-              Submit batch
-              {missingCount > 0 ? ` (${missingCount} missing)` : ""}
-            </>
-          )}
-        </button>
+        {/* Primary action */}
+        {isStaffReview ? (
+          <button
+            type="button"
+            onClick={onDone}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Done
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={submitDisabled || submitBusy}
+            aria-busy={submitBusy}
+            onClick={() => {
+              onDismissSubmitError()
+              onSubmit()
+            }}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-xs font-semibold transition-colors",
+              submitBusy
+                ? "cursor-wait bg-primary text-primary-foreground opacity-90"
+                : submitDisabled
+                  ? "cursor-not-allowed bg-muted text-muted-foreground"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90",
+            )}
+          >
+            {submitBusy ? (
+              <>
+                <Loader2 className="animate-spin" size={14} aria-hidden />
+                Submitting…
+              </>
+            ) : (
+              <>
+                Submit batch
+                {missingCount > 0 ? ` (${missingCount} missing)` : ""}
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Submit error */}

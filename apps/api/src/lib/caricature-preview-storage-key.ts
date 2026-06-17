@@ -1,6 +1,7 @@
 import { CARICATURE_DERIVATIVE_TYPES } from "../db/schema/caricature-derivatives"
 
-export const CARICATURE_PREVIEWS_BUCKET_NAME = "fotocorp-caricature-previews"
+/** Shared public previews bucket (same as editorial `MEDIA_PREVIEWS_BUCKET`). Keys live under `caricatures/`. */
+export const CARICATURE_PREVIEWS_BUCKET_NAME = "fotocorp-2026-previews"
 
 export const CARICATURE_BLUR_VERSION = "fotocorp_caricature_blur_v1"
 export const CARICATURE_STRIP_VERSION = "fotocorp_caricature_strip_v1"

@@ -20,6 +20,7 @@ Do not add long-lived business logic here — use Drizzle migrations or permanen
 | `backfill-photo-events-category-id.ts` | `pnpm --dir apps/api db:backfill:photo-events-category-id` | Set `photo_events.category_id` from dominant public `image_assets.category_id` | Backfill verified on **every** env you care about; re-run investigation browse counts |
 | `backfill-image-assets-category-gaps.ts` | `pnpm --dir apps/api db:backfill:image-assets-category-gaps` | Copy event category to null asset rows; assign public ACTIVE uncategorized assets to **More** | Backfill verified on **every** env you care about |
 | `merge-asset-categories.ts` | `pnpm --dir apps/api db:merge:asset-categories` | Merge ShowBiz → Entertainment, Politics → News; delete source categories | Verified on **every** env; reindex Typesense after |
+| `merge-contributor-duplicates.ts` | `pnpm --dir apps/api db:merge:contributor-duplicates` | Merge pre-approved duplicate contributor rows (Ganesh L→Ganesh Lad, Jafar Khan, Subhash Barolia); reassign FKs; delete losers | Verified on Development; run on Production when ready |
 | `rename-travel-category-to-royalty-free.ts` | `pnpm --dir apps/api db:rename:travel-to-royalty-free` | Rename **Travel** category to **Royalty Free** | Verified on **every** env |
 
 ### `backfill-photo-events-category-id.ts` — how to run

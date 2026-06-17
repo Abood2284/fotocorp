@@ -117,6 +117,20 @@ export async function r2HeadObject(config: R2ClientConfig, bucket: string, key: 
   return true
 }
 
+export async function r2PutObject(
+  config: R2ClientConfig,
+  bucket: string,
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<void> {
+  const response = await signedR2Request(config, bucket, "PUT", key, body, {
+    "content-type": contentType
+  })
+  if (!response.ok)
+    throw new Error(`R2 PUT failed with status ${response.status} for bucket object (key redacted)`)
+}
+
 export async function r2PutPreviewObject(
   config: R2ClientConfig,
   key: string,

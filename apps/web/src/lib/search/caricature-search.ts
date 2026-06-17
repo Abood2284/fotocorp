@@ -3,6 +3,7 @@ import type {
   PublicCaricatureSearchParams,
   PublicPreview,
 } from "@/features/assets/types"
+import { CARICATURE_LANGUAGE_OPTIONS } from "@/lib/caricatures/caricature-upload-metadata"
 
 export interface CaricatureSearchGridItem {
   id: string
@@ -66,4 +67,25 @@ export function hasCaricatureSearchIntent(params: {
   if (params.page != null && params.page > 1) return true
   if (params.sort?.trim() && params.sort !== "newest") return true
   return false
+}
+
+export function buildCaricatureDetailHref(assetId: string) {
+  return `/caricatures/${encodeURIComponent(assetId)}`
+}
+
+export function buildCaricatureSearchBackHref(query?: string | null) {
+  const params = new URLSearchParams({ segment: "caricature" })
+  const trimmed = query?.trim()
+  if (trimmed) params.set("q", trimmed)
+  return `/search?${params.toString()}`
+}
+
+export function formatCaricatureLanguageLabel(language: string | null | undefined) {
+  const normalized = language?.trim().toUpperCase()
+  if (!normalized) return "—"
+  return CARICATURE_LANGUAGE_OPTIONS.find((option) => option.value === normalized)?.label ?? normalized
+}
+
+export function getStaffCaricatureOriginalUrl(assetId: string) {
+  return `/api/staff/upload-wizard/caricatures/${encodeURIComponent(assetId)}/original`
 }

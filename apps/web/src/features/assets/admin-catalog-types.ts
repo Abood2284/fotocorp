@@ -11,6 +11,9 @@ export interface AdminCatalogAssetItem {
   id: string
   fotokey: string | null
   legacyImageCode: string | null
+  originalFileName: string | null
+  /** Photographer upload filename from contributor_upload_items, when linked. */
+  uploadOriginalFileName: string | null
   whoIsInPicture: string | null
   caption: string | null
   headline: string | null

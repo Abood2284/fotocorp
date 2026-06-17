@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { Env } from "../../appTypes";
 import { withPublicReadDb } from "../../db";
 import { getPublicAssetCollections, getPublicAssetDetail, getPublicAssetEvents, getPublicAssetFilters, listPublicAssets, parsePreviewTtl } from "../../lib/assets/public-assets";
+import { getPublicCaricatureDetail } from "../../lib/caricatures/public-caricature-assets";
 import { json } from "../../lib/http";
 import { resolveRequestId } from "../../lib/latency-trace";
 import { parsePublicPreviewCdnConfig } from "../../lib/media/public-preview-cdn-url";
@@ -499,6 +500,21 @@ publicCatalogRoutes.get("/api/v1/assets/:assetId", async (c) => {
 });
 
 publicCatalogRoutes.all("/api/v1/assets/:assetId", () => methodNotAllowed());
+
+publicCatalogRoutes.get("/api/v1/caricatures/:assetId", async (c) => {
+  return json(
+    await withPublicReadDb(c.env, (readDb) => getPublicCaricatureDetail(readDb, c.req.param("assetId"))),
+    200,
+    {
+      headers: publicReadHeaders({
+        "Cache-Control": PUBLIC_ASSET_DETAIL_CACHE_CONTROL,
+        "X-Content-Type-Options": "nosniff",
+      }),
+    },
+  );
+});
+
+publicCatalogRoutes.all("/api/v1/caricatures/:assetId", () => methodNotAllowed());
 
 function ttl(env: Env) {
   return parsePreviewTtl(env.MEDIA_PREVIEW_TOKEN_TTL_SECONDS);

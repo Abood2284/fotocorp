@@ -1,5 +1,6 @@
 export const FOTOCORP_STAFF_SESSION_COOKIE = "fotocorp_staff_session"
 const STAFF_API_TIMEOUT_MS = 8_000
+const STAFF_API_SERVER_TIMEOUT_MS = 20_000
 
 export interface StaffAuthStaff {
   id: string
@@ -53,7 +54,8 @@ async function staffJson<T>(
 ): Promise<T> {
   const startedAt = Date.now()
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), STAFF_API_TIMEOUT_MS)
+  const timeoutMs = typeof window === "undefined" ? STAFF_API_SERVER_TIMEOUT_MS : STAFF_API_TIMEOUT_MS
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   let response: Response
 
   try {
@@ -76,7 +78,7 @@ async function staffJson<T>(
       method: input.method,
       status: "error",
       durationMs: Date.now() - startedAt,
-      timeoutMs: STAFF_API_TIMEOUT_MS,
+      timeoutMs,
       timedOut: isAbortError(error),
       message: error instanceof Error ? error.message : String(error),
     }))
@@ -91,7 +93,7 @@ async function staffJson<T>(
     method: input.method,
     status: response.status,
     durationMs: Date.now() - startedAt,
-    timeoutMs: STAFF_API_TIMEOUT_MS,
+    timeoutMs: timeoutMs,
   }))
 
   if (!response.ok) {

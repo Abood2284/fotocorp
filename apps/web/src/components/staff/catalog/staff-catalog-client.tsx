@@ -1,25 +1,34 @@
 "use client"
 
 import { SquareCheck, ChevronLeft, ChevronRight, ImageOff, Square, X, Filter, Search, Ellipsis, FileImage } from "lucide-react"
-import { useState, useTransition, useEffect } from "react"
+import { useState, useTransition, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 import type { AdminCatalogAssetItem, AdminCatalogAssetsResponse, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
-import { fetchAdminAssetFiltersAction, updateAdminAssetStateBulkAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
+import {
+  fetchAdminAssetFiltersAction,
+  fetchAdminAssetsForEventBulkEditAction,
+  updateAdminAssetStateBulkAction,
+} from "@/app/(staff)/staff/(workspace)/catalog/actions"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { StaffCatalogDetailSidebar } from "./staff-catalog-detail-sidebar"
+import { StaffCatalogBulkMetadataEditor } from "./staff-catalog-bulk-metadata-editor"
 import { ConfirmDialog } from "@/components/staff/shared/confirm-dialog"
+import { formatCatalogFotokeyDisplay, getCatalogImportMatchName } from "@/lib/catalog-asset-identity"
+import { getStaffCatalogPreviewUrl, getStaffCatalogPreviewVariant } from "@/lib/staff-catalog-preview"
+import { resolveCatalogBulkEditScope } from "@/lib/staff-catalog-metadata"
 import { cn } from "@/lib/utils"
 
 interface StaffCatalogClientProps {
   initialResponse: AdminCatalogAssetsResponse
   filters: AdminCatalogFilters
   filtersDeferred?: boolean
+  filtersActive?: boolean
   initialQuery: Record<string, string>
 }
 
-export function StaffCatalogClient({ initialResponse, filters, filtersDeferred = false, initialQuery }: StaffCatalogClientProps) {
+export function StaffCatalogClient({ initialResponse, filters, filtersDeferred = false, filtersActive = false, initialQuery }: StaffCatalogClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   
@@ -35,8 +44,32 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
     variant: "default" | "destructive"
     action: () => void
   } | null>(null)
-  
+  const [bulkMetadataOpen, setBulkMetadataOpen] = useState(false)
+  const [eventBulkEditAssets, setEventBulkEditAssets] = useState<AdminCatalogAssetItem[] | null>(null)
+  const [eventBulkEditLoading, setEventBulkEditLoading] = useState(false)
+  const [eventBulkEditError, setEventBulkEditError] = useState<string | null>(null)
+  const [localAssetPatches, setLocalAssetPatches] = useState<Record<string, Partial<AdminCatalogAssetItem>>>({})
+
+  const catalogItems = useMemo(
+    () => initialResponse.items.map((item) => ({ ...item, ...localAssetPatches[item.id] })),
+    [initialResponse.items, localAssetPatches],
+  )
+  const selectedAssets = useMemo(
+    () => catalogItems.filter((item) => selectedIds.has(item.id)),
+    [catalogItems, selectedIds],
+  )
+  const bulkEditorAssets = eventBulkEditAssets ?? selectedAssets
+  const selectedBulkEditScope = useMemo(
+    () => resolveCatalogBulkEditScope(selectedAssets),
+    [selectedAssets],
+  )
+
   const queryParams = new URLSearchParams(initialQuery)
+  const activeEventId = queryParams.get("eventId")?.trim() || null
+  const activeEvent = activeEventId
+    ? activeFilters.events.find((event) => event.id === activeEventId) ?? null
+    : null
+  const pageIsFullySelected = selectedIds.size > 0 && selectedIds.size === catalogItems.length
   const previousQuery = new URLSearchParams(queryParams)
   previousQuery.delete("cursor")
   const nextQuery = new URLSearchParams(queryParams)
@@ -50,10 +83,10 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
   }
 
   const toggleAll = () => {
-    if (selectedIds.size === initialResponse.items.length) {
+    if (selectedIds.size === catalogItems.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(initialResponse.items.map(i => i.id)))
+      setSelectedIds(new Set(catalogItems.map(i => i.id)))
     }
   }
 
@@ -61,6 +94,36 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
     startTransition(() => {
       router.refresh()
     })
+  }
+
+  const closeBulkMetadataEditor = () => {
+    setBulkMetadataOpen(false)
+    setEventBulkEditAssets(null)
+    setEventBulkEditError(null)
+  }
+
+  const handleBulkEditAllInEvent = async () => {
+    if (!activeEventId) return
+    setEventBulkEditError(null)
+    setEventBulkEditLoading(true)
+    try {
+      const assets = await fetchAdminAssetsForEventBulkEditAction(activeEventId)
+      if (assets.length === 0) {
+        setEventBulkEditError("No assets found for this event.")
+        return
+      }
+      const scope = resolveCatalogBulkEditScope(assets)
+      if (!scope.ok) {
+        setEventBulkEditError(scope.blockReason ?? "This event cannot be bulk-edited.")
+        return
+      }
+      setEventBulkEditAssets(assets)
+      setBulkMetadataOpen(true)
+    } catch (error) {
+      setEventBulkEditError(error instanceof Error ? error.message : "Could not load event assets.")
+    } finally {
+      setEventBulkEditLoading(false)
+    }
   }
 
   const handleBulkArchive = async () => {
@@ -115,18 +178,18 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
       }
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault()
-        const currentIndex = initialResponse.items.findIndex(a => a.id === inspectAssetId)
+        const currentIndex = catalogItems.findIndex(a => a.id === inspectAssetId)
         if (currentIndex === -1) return
-        if (e.key === "ArrowDown" && currentIndex < initialResponse.items.length - 1) {
-          setInspectAssetId(initialResponse.items[currentIndex + 1].id)
+        if (e.key === "ArrowDown" && currentIndex < catalogItems.length - 1) {
+          setInspectAssetId(catalogItems[currentIndex + 1].id)
         } else if (e.key === "ArrowUp" && currentIndex > 0) {
-          setInspectAssetId(initialResponse.items[currentIndex - 1].id)
+          setInspectAssetId(catalogItems[currentIndex - 1].id)
         }
       }
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [inspectAssetId, initialResponse.items])
+  }, [inspectAssetId, catalogItems])
 
   return (
     <div className="space-y-5 relative">
@@ -153,14 +216,62 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
 
       <div className="flex w-full items-stretch gap-4">
         <div className={cn("space-y-5 transition-all duration-300", inspectAssetId ? "w-[60%]" : "w-full")}>
+          {/* Event-scoped bulk metadata */}
+          {activeEvent && (
+            <div className="rounded-lg border border-border bg-card px-4 py-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    Event filter: {activeEvent.name ?? "Untitled event"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {activeEvent.assetCount.toLocaleString()} assets in this event
+                    {filtersActive
+                      ? ` · showing all ${catalogItems.length.toLocaleString()} filtered results`
+                      : ` · showing ${catalogItems.length} on this page`}
+                  </p>
+                  {eventBulkEditError ? (
+                    <p className="mt-1 text-xs text-destructive">{eventBulkEditError}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleBulkEditAllInEvent()}
+                  disabled={eventBulkEditLoading || activeEvent.assetCount === 0}
+                  className="shrink-0 rounded border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {eventBulkEditLoading
+                    ? "Loading event assets…"
+                    : `Bulk edit all ${activeEvent.assetCount.toLocaleString()} in event`}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Bulk actions bar */}
           {selectedIds.size > 0 && (
             <div className="sticky top-16 z-30 flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 shadow-sm backdrop-blur">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-primary">{selectedIds.size} selected</span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                <span className="text-sm font-medium text-primary">{selectedIds.size} selected on this page</span>
                 <button onClick={() => setSelectedIds(new Set())} className="text-xs text-muted-foreground hover:text-foreground">Clear</button>
+                {!selectedBulkEditScope.ok ? (
+                  <span className="text-xs text-amber-700 dark:text-amber-300">{selectedBulkEditScope.blockReason}</span>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedBulkEditScope.ok) return
+                    setEventBulkEditAssets(null)
+                    setBulkMetadataOpen(true)
+                  }}
+                  disabled={!selectedBulkEditScope.ok}
+                  title={selectedBulkEditScope.blockReason ?? undefined}
+                  className="rounded border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Bulk edit metadata
+                </button>
                 <button onClick={handleBulkArchive} className="rounded border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted text-rose-600">
                   Bulk Archive
                 </button>
@@ -182,8 +293,12 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
           <thead className="bg-muted/60">
             <tr>
               <th className="px-3 py-2 text-left w-10">
-                <button onClick={toggleAll} className="text-muted-foreground hover:text-foreground">
-                  {selectedIds.size === initialResponse.items.length && initialResponse.items.length > 0 ? (
+                <button
+                  onClick={toggleAll}
+                  className="text-muted-foreground hover:text-foreground"
+                  title={pageIsFullySelected ? "Clear page selection" : "Select all assets on this page"}
+                >
+                  {pageIsFullySelected ? (
                     <SquareCheck size={16} />
                   ) : (
                     <Square size={16} />
@@ -191,7 +306,7 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
                 </button>
               </th>
               <Th>Preview</Th>
-              <Th filterControl={<HeaderSearchFilter query={queryParams} />}>Asset</Th>
+              <Th filterControl={<HeaderSearchFilter query={queryParams} />}>Fotokey</Th>
               <Th filterControl={
                 <HeaderSelectFilter 
                   query={queryParams} 
@@ -235,17 +350,15 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
             </tr>
           </thead>
           <tbody>
-            {initialResponse.items.length === 0 ? (
+            {catalogItems.length === 0 ? (
               <tr>
                 <td colSpan={8} className="p-8 text-center text-muted-foreground">
                   No assets found matching filters.
                 </td>
               </tr>
             ) : (
-              initialResponse.items.map(asset => {
-                // Prefer the canonical business identifier in staff listings.
-                // Contributor uploads often carry PHUPLOAD-* as legacyImageCode before approval assigns a fotokey.
-                const assetIdentifier = asset.fotokey ?? asset.legacyImageCode ?? asset.id.split('-')[0]
+              catalogItems.map(asset => {
+                const importFileName = getCatalogImportMatchName(asset)
                 return (
                 <tr 
                   key={asset.id} 
@@ -258,10 +371,10 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
                     </button>
                   </td>
                   <td className="px-3 py-2">
-                    {bestPreviewVariant(asset) ? (
+                    {getStaffCatalogPreviewVariant(asset) ? (
                       <div className="h-12 w-20 overflow-hidden rounded border border-border bg-muted">
                         <PreviewImage
-                          src={`/staff/catalog/${asset.id}/preview-image?variant=${bestPreviewVariant(asset)}`}
+                          src={getStaffCatalogPreviewUrl(asset) ?? ""}
                           alt={asset.whoIsInPicture || asset.caption || "Preview"}
                           className="h-full w-full object-cover"
                         />
@@ -272,8 +385,15 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2 max-w-[200px]">
-                    <p className="font-mono text-xs">{assetIdentifier}</p>
+                  <td className="px-3 py-2 max-w-[220px]">
+                    <p className={cn("font-mono text-xs font-medium", !asset.fotokey && "text-amber-700")}>
+                      {formatCatalogFotokeyDisplay(asset.fotokey)}
+                    </p>
+                    {importFileName ? (
+                      <p className="mt-0.5 truncate text-[10px] text-muted-foreground" title={importFileName}>
+                        File: {importFileName}
+                      </p>
+                    ) : null}
                     <p className="mt-0.5 truncate font-medium" title={asset.whoIsInPicture || asset.event?.name || asset.headline || "Untitled"}>{asset.whoIsInPicture || asset.event?.name || asset.headline || "Untitled"}</p>
                     {!asset.whoIsInPicture && <span className="text-[10px] text-amber-600 font-medium">Missing who is in picture</span>}
                     {!asset.caption && <span className="text-[10px] text-amber-600 font-medium ml-2">Missing caption</span>}
@@ -291,6 +411,11 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
         </table>
       </div>
 
+          {filtersActive ? (
+            <p className="text-xs text-muted-foreground">
+              Showing all {catalogItems.length.toLocaleString()} assets matching the current filters.
+            </p>
+          ) : (
           <div className="flex items-center justify-between gap-3">
             <Link href={`/staff/catalog?${previousQuery.toString()}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
               <ChevronLeft size={14} />
@@ -305,6 +430,7 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
               <span className="text-xs text-muted-foreground">End of results</span>
             )}
           </div>
+          )}
         </div>
 
         {inspectAssetId && (
@@ -320,6 +446,23 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
           </div>
         )}
       </div>
+
+      <StaffCatalogBulkMetadataEditor
+        assets={bulkEditorAssets}
+        open={bulkMetadataOpen}
+        onClose={closeBulkMetadataEditor}
+        onAssetsPatch={(patches) => {
+          setLocalAssetPatches((prev) => {
+            const next = { ...prev }
+            for (const [id, patch] of Object.entries(patches)) {
+              next[id] = { ...next[id], ...patch }
+            }
+            return next
+          })
+          closeBulkMetadataEditor()
+          refreshData()
+        }}
+      />
     </div>
   )
 }
@@ -332,14 +475,6 @@ function StatusBadge({ children, tone }: { children: React.ReactNode; tone: "ok"
     neutral: "bg-slate-100 text-slate-800 border-slate-200",
   }
   return <span className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${map[tone]}`}>{children}</span>
-}
-
-function bestPreviewVariant(asset: AdminCatalogAssetItem) {
-  if (!asset.readyPreviewVariants) return null
-  if (asset.readyPreviewVariants.includes("card")) return "card"
-  if (asset.readyPreviewVariants.includes("detail")) return "detail"
-  if (asset.readyPreviewVariants.includes("thumb")) return "thumb"
-  return null
 }
 
 function toDate(value: string | null) {

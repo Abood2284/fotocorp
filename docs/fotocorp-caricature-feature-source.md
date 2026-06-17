@@ -20,7 +20,8 @@
 | PR 8 | Staff/contributor upload wizard caricature path + metadata API | Done |
 | PR 9 | Caricature original private R2 upload (wizard step 3) | Done |
 | PR 10 | Blurred preview generation + publish gate | Done |
-| PR 11–13 | Publish UX, downloads, popularity | Planned |
+| PR 11 | Publish flow + public detail/list cards + staff review UX | Done |
+| PR 12–13 | Downloads, popularity | Planned |
 
 ---
 
@@ -278,7 +279,7 @@ Caricatures should use two separate R2 buckets.
 | Bucket | Access | Stores |
 |---|---|---|
 | `fotocorp-caricature-originals` | Private | Original clean uploaded caricature files. |
-| `fotocorp-caricature-previews` | Public/CDN-safe | Only blurred preview derivatives. |
+| `fotocorp-2026-previews` | Public/CDN-safe | Editorial watermarked previews, caricature blurred previews (`caricatures/{assetId}/...`), future video previews. Served via `PUBLIC_PREVIEW_CDN_BASE_URL` (`https://media.fotocorp.com`). |
 
 This is intentionally separate from editorial images because caricature previews require stronger protection.
 
@@ -317,8 +318,8 @@ Per caricature, store:
 | File | Bucket | Public? | Purpose |
 |---|---|---:|---|
 | Original | `fotocorp-caricature-originals` | No | Staff view and licensed download. |
-| Blurred Card Preview | `fotocorp-caricature-previews` | Yes | Grid/listing/search card preview. |
-| Blurred Detail Preview | `fotocorp-caricature-previews` | Yes | Detail page preview. |
+| Blurred Card Preview | `fotocorp-2026-previews` | Yes | Grid/listing/search card preview (`caricatures/{assetId}/blurred-card.webp`). |
+| Blurred Detail Preview | `fotocorp-2026-previews` | Yes | Detail page preview (`caricatures/{assetId}/blurred-detail.webp`). |
 
 Total per caricature:
 

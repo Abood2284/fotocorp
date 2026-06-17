@@ -8,11 +8,18 @@ import {
 } from "../src/lib/staff/staff-route-access"
 
 describe("staff-route-access", () => {
-  it("CAPTION_WRITER can access uploads and captions", () => {
+  it("CAPTION_WRITER can access uploads, captions, catalog, homepage hero, and events", () => {
     assert.equal(staffCanAccessContributorUploads("CAPTION_WRITER"), true)
     assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/contributor-uploads"), true)
     assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/contributor-uploads/new"), true)
+    assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/caricatures"), true)
     assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/captions"), true)
+    assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/catalog"), true)
+    assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/catalog/asset-id-123"), true)
+    assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/homepage-hero"), true)
+    assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/events"), true)
+    assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/events/event-id-123"), true)
+    assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/events/event-id-123/upload"), true)
     assert.equal(getDefaultStaffLandingPath("CAPTION_WRITER"), "/staff/contributor-uploads")
   })
 

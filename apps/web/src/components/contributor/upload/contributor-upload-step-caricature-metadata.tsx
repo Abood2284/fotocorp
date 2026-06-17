@@ -9,6 +9,7 @@ import type {
   CaricatureAssetRecord,
   CaricatureCategoryOption,
   CaricatureLanguage,
+  CaricaturePreviewGenerationStatus,
 } from "@/lib/caricatures/caricature-upload-metadata"
 import {
   CARICATURE_LANGUAGE_OPTIONS,
@@ -19,6 +20,7 @@ import {
   formatCaricatureStringList,
   toDatetimeLocalValue,
 } from "@/lib/caricatures/caricature-upload-metadata"
+import { getStaffCaricatureOriginalUrl } from "@/lib/search/caricature-search"
 import { ContributorUploadStepCard } from "@/components/contributor/upload/contributor-upload-layout"
 
 interface ContributorUploadStepCaricatureMetadataProps {
@@ -29,6 +31,9 @@ interface ContributorUploadStepCaricatureMetadataProps {
   defaultCredit: string
   hasOriginalFile: boolean
   onSave: (payload: CaricatureAssetMetadataPayload) => Promise<void>
+  onGeneratePreviews?: () => Promise<void>
+  generatePreviewsBusy?: boolean
+  generatePreviewsMessage?: string | null
   submitBusy: boolean
   submitError: string | null
   onDismissSubmitError: () => void
@@ -42,6 +47,9 @@ export function ContributorUploadStepCaricatureMetadata({
   defaultCredit,
   hasOriginalFile,
   onSave,
+  onGeneratePreviews,
+  generatePreviewsBusy = false,
+  generatePreviewsMessage = null,
   submitBusy,
   submitError,
   onDismissSubmitError,
@@ -54,19 +62,16 @@ export function ContributorUploadStepCaricatureMetadata({
   const showVisibleText = caricatureLanguageRequiresVisibleText(language)
   const showTranslation = caricatureLanguageShowsTranslation(language)
   const showLanguageOther = caricatureLanguageRequiresOther(language)
-  const publishBlocked = asset ? !asset.hasOriginalFile : !hasOriginalFile
-  const previewsBlocked = asset ? !asset.hasReadyPreviewDerivatives : true
+  const previewStatus = asset?.previewGenerationStatus ?? (asset?.hasReadyPreviewDerivatives ? "READY" : "NONE")
+  const canQueuePreviews = staffMode && hasOriginalFile && previewStatus !== "READY" && previewStatus !== "GENERATING"
+  const staffOriginalUrl = staffMode && asset?.id && hasOriginalFile ? getStaffCaricatureOriginalUrl(asset.id) : null
 
   const statusOptions = useMemo(() => {
-    let options = CARICATURE_STATUS_OPTIONS
-    if (!staffMode) {
-      options = options.filter((option) => option.value !== "PUBLISHED")
-    }
-    if (publishBlocked || previewsBlocked) {
-      options = options.filter((option) => option.value !== "PUBLISHED")
-    }
-    return options
-  }, [staffMode, publishBlocked, previewsBlocked])
+    if (!staffMode) return CARICATURE_STATUS_OPTIONS.filter((option) => option.value === "PENDING_REVIEW")
+    return CARICATURE_STATUS_OPTIONS.filter(
+      (option) => option.value === "DRAFT" || option.value === "PENDING_REVIEW",
+    )
+  }, [staffMode])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -94,7 +99,9 @@ export function ContributorUploadStepCaricatureMetadata({
         .map((part) => part.trim())
         .filter(Boolean),
       publishedAt: publishedAtRaw ? new Date(publishedAtRaw).toISOString() : "",
-      status: (formData.get("status")?.toString().trim() ?? "DRAFT") as CaricatureAssetMetadataPayload["status"],
+      status: staffMode
+        ? ((formData.get("status")?.toString().trim() ?? "DRAFT") as CaricatureAssetMetadataPayload["status"])
+        : "PENDING_REVIEW",
     }
 
     try {
@@ -117,14 +124,55 @@ export function ContributorUploadStepCaricatureMetadata({
           <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
             Upload the caricature image on the previous step before saving metadata.
           </div>
-        ) : null}
-
-        {publishBlocked || previewsBlocked ? (
+        ) : staffMode ? (
           <div className="rounded border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-            {publishBlocked
-              ? "Publishing requires a completed original upload."
-              : "Publishing requires staff-approved blurred previews. Save as draft or pending review until previews are generated."}
+            Save as draft or pending review, then approve from the Caricatures queue to publish automatically.
           </div>
+        ) : (
+          <div className="rounded border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+            Submitting sends this caricature to staff review. Publishing happens after staff approval.
+          </div>
+        )}
+
+        {staffMode && hasOriginalFile ? (
+          <section className="space-y-4 rounded-lg border border-border bg-card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Staff review</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {describePreviewGenerationStatus(previewStatus)}
+                </p>
+              </div>
+              {onGeneratePreviews ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!canQueuePreviews || generatePreviewsBusy}
+                  onClick={() => void onGeneratePreviews()}
+                >
+                  {generatePreviewsBusy ? "Queueing…" : "Generate blurred previews"}
+                </Button>
+              ) : null}
+            </div>
+
+            {generatePreviewsMessage ? (
+              <div className="rounded border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                {generatePreviewsMessage}
+              </div>
+            ) : null}
+
+            {staffOriginalUrl ? (
+              <div className="overflow-hidden rounded-md border border-border bg-muted/30">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={staffOriginalUrl}
+                  alt="Clean caricature original for staff review"
+                  className="mx-auto max-h-[420px] w-auto max-w-full object-contain"
+                />
+              </div>
+            ) : null}
+          </section>
         ) : null}
 
         <section className="space-y-4">
@@ -292,10 +340,29 @@ export function ContributorUploadStepCaricatureMetadata({
 
         <div className="flex justify-end">
           <Button type="submit" disabled={!active || submitBusy || !hasOriginalFile}>
-            {submitBusy ? "Saving…" : "Save caricature"}
+            {submitBusy ? "Saving…" : staffMode ? "Save caricature" : "Submit for review"}
           </Button>
         </div>
       </form>
     </ContributorUploadStepCard>
   )
+}
+
+function describePreviewGenerationStatus(status: CaricaturePreviewGenerationStatus): string {
+  switch (status) {
+    case "NONE":
+      return "No blurred previews yet. Staff approval will queue preview generation automatically."
+    case "QUEUED":
+      return "Blurred previews are queued. Processing starts automatically after staff approval."
+    case "GENERATING":
+      return "Preview generation is in progress on the jobs worker."
+    case "READY":
+      return "Blurred previews are ready."
+    case "FAILED":
+      return "Preview generation failed. Staff can approve again to retry."
+    default: {
+      const _exhaustive: never = status
+      return _exhaustive
+    }
+  }
 }

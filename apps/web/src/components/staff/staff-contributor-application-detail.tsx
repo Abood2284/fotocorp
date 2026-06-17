@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useCallback, useState } from "react"
 import {
   getStaffAccessInquiryDetail,
@@ -22,7 +21,6 @@ interface StaffContributorApplicationDetailProps {
 }
 
 export function StaffContributorApplicationDetail({ inquiryId, initial }: StaffContributorApplicationDetailProps) {
-  const router = useRouter()
   const [detail, setDetail] = useState(initial)
   const [usernameOverride, setUsernameOverride] = useState("")
   const [approvedCredentials, setApprovedCredentials] = useState<{ username: string; temporaryPassword: string } | null>(
@@ -35,8 +33,7 @@ export function StaffContributorApplicationDetail({ inquiryId, initial }: StaffC
   const refetchDetail = useCallback(async () => {
     const next = await getStaffAccessInquiryDetail(inquiryId)
     setDetail(next)
-    router.refresh()
-  }, [inquiryId, router])
+  }, [inquiryId])
 
   const inquiry = detail.inquiry as {
     status?: string

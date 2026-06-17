@@ -4,6 +4,10 @@ import { listAdminAssets } from "@/lib/api/admin-assets-api"
 import { EmptyState } from "@/components/shared/empty-state"
 import { StaffCatalogClient } from "@/components/staff/catalog/staff-catalog-client"
 import type { AdminCatalogAssetsResponse, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
+import {
+  hasActiveCatalogFilters,
+  listAllFilteredAdminCatalogAssets,
+} from "@/lib/server/staff-catalog-list"
 
 interface StaffCatalogPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -16,10 +20,14 @@ export const metadata = {
 export default async function StaffCatalogPage({ searchParams }: StaffCatalogPageProps) {
   const params = await searchParams
   const query = toQueryParams(params)
+  const filtersActive = hasActiveCatalogFilters(query)
 
   let response: AdminCatalogAssetsResponse | null = null
   try {
-    response = await timeStaffCatalogPageCall("listAdminAssets", () => listAdminAssets(query))
+    response = await timeStaffCatalogPageCall(
+      filtersActive ? "listAllFilteredAdminCatalogAssets" : "listAdminAssets",
+      () => (filtersActive ? listAllFilteredAdminCatalogAssets(query) : listAdminAssets(query)),
+    )
   } catch (error) {
     console.error(JSON.stringify({
       event: "staff_catalog_page_data_call_failed",
@@ -44,6 +52,7 @@ export default async function StaffCatalogPage({ searchParams }: StaffCatalogPag
       initialResponse={response}
       filters={fallbackFilters}
       filtersDeferred
+      filtersActive={filtersActive}
       initialQuery={Object.fromEntries(query.entries())}
     />
   )

@@ -7,6 +7,7 @@ import {
   scheduleTypesenseSyncForAsset,
   scheduleTypesenseSyncForEvent,
 } from "../../../lib/search/typesense-public-asset-sync"
+import { scheduleTypesenseSyncForCaricature } from "../../../lib/search/typesense-public-caricature-sync"
 
 function db(env: Env) {
   if (!env.DATABASE_URL) throw new AppError(500, "DATABASE_URL_MISSING", "Database connection is not configured.")
@@ -35,4 +36,12 @@ export async function deleteTypesenseEventService(
 ) {
   await scheduleTypesenseDeleteForEvent(env, body.eventId, { critical: body.critical })
   return json({ ok: true, eventId: body.eventId })
+}
+
+export async function syncTypesenseCaricatureService(
+  env: Env,
+  body: { assetId: string; critical?: boolean },
+) {
+  await scheduleTypesenseSyncForCaricature(db(env), env, body.assetId, { critical: body.critical })
+  return json({ ok: true, assetId: body.assetId })
 }

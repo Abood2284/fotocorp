@@ -33,6 +33,9 @@ interface CaricatureUploadWizardPanelProps {
   onSetupContinue: () => void
   onUploadContinue: () => void | Promise<void>
   onSaveMetadata: (payload: CaricatureAssetMetadataPayload) => Promise<void>
+  onGeneratePreviews?: () => Promise<void>
+  generatePreviewsBusy?: boolean
+  generatePreviewsMessage?: string | null
   submitBusy: boolean
   submitError: string | null
   onDismissSubmitError: () => void
@@ -57,6 +60,9 @@ export function CaricatureUploadWizardPanel({
   onSetupContinue,
   onUploadContinue,
   onSaveMetadata,
+  onGeneratePreviews,
+  generatePreviewsBusy = false,
+  generatePreviewsMessage = null,
   submitBusy,
   submitError,
   onDismissSubmitError,
@@ -74,6 +80,9 @@ export function CaricatureUploadWizardPanel({
         defaultCredit={defaultCredit}
         hasOriginalFile={hasOriginalFile || Boolean(caricatureAsset?.hasOriginalFile)}
         onSave={onSaveMetadata}
+        onGeneratePreviews={onGeneratePreviews}
+        generatePreviewsBusy={generatePreviewsBusy}
+        generatePreviewsMessage={generatePreviewsMessage}
         submitBusy={submitBusy}
         submitError={submitError}
         onDismissSubmitError={onDismissSubmitError}
