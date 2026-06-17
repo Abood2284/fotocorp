@@ -41,14 +41,14 @@ describe("upload wizard resume helpers", () => {
       "OPEN",
     )
 
-    assert.equal(result.currentStep, 3)
-    assert.deepEqual([...result.completedSteps].sort(), [1, 2])
+    assert.equal(result.currentStep, 4)
+    assert.deepEqual([...result.completedSteps].sort(), [1, 2, 3])
   })
 
   it("builds resume state from batch detail", () => {
     const resume = buildResumeStateFromBatchDetail(
       {
-        batch: { id: "batch-1", eventId: "event-1", status: "OPEN" },
+        batch: { id: "batch-1", eventId: "event-1", status: "OPEN", assetType: "IMAGE" },
         event: { id: "event-1", name: "Premiere" },
         contributor: { id: "contributor-1", displayName: "Photographer" },
         items: [
@@ -72,7 +72,8 @@ describe("upload wizard resume helpers", () => {
     )
 
     assert.equal(resume.batchId, "batch-1")
-    assert.equal(resume.currentStep, 3)
+    assert.equal(resume.currentStep, 4)
+    assert.equal(resume.batchAssetType, "IMAGE")
     assert.equal(resume.tracked.length, 1)
     assert.equal(resume.targetContributorId, "contributor-1")
     assert.equal(getTrackedDisplayName(resume.tracked[0]!), "a.jpg")

@@ -1,4 +1,4 @@
-import type { TrackedFile, UploadWizardStep } from "@/components/contributor/contributor-upload-types"
+import type { TrackedFile, UploadBatchAssetType, UploadWizardStep } from "@/components/contributor/contributor-upload-types"
 import type { ContributorUploadBatchItemDto } from "@/lib/api/contributor-api"
 import type { StaffWizardUploadBatchItemDto } from "@/lib/staff-upload-wizard-client"
 
@@ -24,6 +24,7 @@ export interface UploadBatchDetailLike {
     id: string
     eventId: string
     status: string
+    assetType?: string
   }
   event: {
     id: string
@@ -40,9 +41,11 @@ export interface UploadWizardDraft {
   version: 1
   currentStep: UploadWizardStep
   completedSteps: number[]
+  batchAssetType: UploadBatchAssetType
   eventId: string
   batchEventName: string
   batchId: string | null
+  caricatureAssetId: string | null
   targetContributorId: string
   newEventName: string
   newCategoryId: string
@@ -54,6 +57,7 @@ export interface UploadWizardResumeState {
   batchId: string
   eventId: string
   batchEventName: string
+  batchAssetType: UploadBatchAssetType
   targetContributorId: string
   currentStep: UploadWizardStep
   completedSteps: Set<number>
@@ -63,6 +67,13 @@ export interface UploadWizardResumeState {
 const DRAFT_STORAGE_KEYS: Record<UploadWizardFlowKind, string> = {
   contributor: "fotocorp:upload-wizard:contributor",
   staff: "fotocorp:upload-wizard:staff",
+}
+
+function normalizeBatchAssetType(value: string | undefined): UploadBatchAssetType {
+  const upper = value?.trim().toUpperCase()
+  if (upper === "VIDEO") return "VIDEO"
+  if (upper === "CARICATURE") return "CARICATURE"
+  return "IMAGE"
 }
 
 export function getTrackedDisplayName(row: TrackedFile): string {
@@ -138,17 +149,18 @@ export function deriveWizardStepFromBatch(items: UploadBatchItemLike[], batchSta
   }
 
   completedSteps.add(1)
+  completedSteps.add(2)
   const hasUploaded = items.some((item) => item.uploadStatus === "ASSET_CREATED")
   if (hasUploaded) {
-    completedSteps.add(2)
-    return { currentStep: 3, completedSteps }
+    completedSteps.add(3)
+    return { currentStep: 4, completedSteps }
   }
 
   if (items.length > 0) {
-    return { currentStep: 2, completedSteps }
+    return { currentStep: 3, completedSteps }
   }
 
-  return { currentStep: 2, completedSteps }
+  return { currentStep: 3, completedSteps }
 }
 
 export function buildResumeStateFromBatchDetail(
@@ -164,6 +176,7 @@ export function buildResumeStateFromBatchDetail(
     batchId: detail.batch.id,
     eventId: detail.batch.eventId,
     batchEventName: detail.event.name,
+    batchAssetType: normalizeBatchAssetType(detail.batch.assetType),
     targetContributorId: detail.contributor?.id ?? "",
     currentStep,
     completedSteps,
@@ -174,12 +187,12 @@ export function buildResumeStateFromBatchDetail(
 export function toUploadBatchDetailLike(
   detail:
     | {
-        batch: { id: string; eventId: string; status: string }
+        batch: { id: string; eventId: string; status: string; assetType?: string }
         event: { id: string; name: string }
         items: ContributorUploadBatchItemDto[]
       }
     | {
-        batch: { id: string; eventId: string; status: string }
+        batch: { id: string; eventId: string; status: string; assetType?: string }
         event: { id: string; name: string }
         items: StaffWizardUploadBatchItemDto[]
         contributor: { id: string; displayName: string }

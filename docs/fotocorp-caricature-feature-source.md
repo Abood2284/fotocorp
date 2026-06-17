@@ -13,11 +13,12 @@
 | PR 1 | Drizzle schema: `caricature_categories`, `caricature_assets`, `caricature_derivatives`, `caricature_download_logs` | Done |
 | PR 3 | Search page `segment=editorial\|caricature` URL + dropdown scaffold | Done |
 | PR 4 | Home hero search always routes to `segment=editorial` | Done |
-| PR 2 | Category seed + staff/internal category reads | Planned |
+| PR 2 | Category seed + staff/internal category reads | Done |
 | PR 5 | Typesense caricature index contract | Done |
 | PR 6 | Public caricature search API route | Done |
 | PR 7 | Web caricature search client wiring | Done |
-| PR 8–13 | Staff upload, storage, previews, publish UX, downloads, popularity | Planned |
+| PR 8 | Staff/contributor upload wizard caricature path + metadata API | Done |
+| PR 9–13 | Storage upload, previews, publish UX, downloads, popularity | Planned |
 
 ---
 

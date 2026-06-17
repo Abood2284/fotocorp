@@ -9,6 +9,11 @@
 - [Resend + Google Workspace email integration](../../docs/integrations/email-resend-google-workspace.md) — access-flow transactional email sender, reply handling, env vars, delivery logs, and manual test steps.
 - [Hyperdrive rollout](../../docs/infrastructure/hyperdrive-rollout.md) — two-path Hyperdrive rollout rules, PR-1 core binding scope, and cached public-read guardrails.
 
+## Incremental update (2026-06-16)
+
+- **Caricature staff metadata CRUD + upload wizard (PR 8):** Internal routes `GET|POST /api/v1/internal/admin/caricature-assets` and `GET|PATCH .../:assetId` with language/visible-text validation and publish blocked until original file exists. Contributor routes `GET /api/v1/contributor/caricatures/categories`, `POST|GET|PATCH /api/v1/contributor/caricatures/:assetId`. Caricature is enabled in step 1 of the shared staff/contributor upload wizard; editorial keeps Event → Upload → Metadata, caricature uses Details → single-file Upload → caricature Metadata. Staff BFF: `/api/staff/upload-wizard/caricature-categories`, `/api/staff/upload-wizard/caricatures`. Image storage upload deferred to PR 9.
+- **Caricature categories seed + staff read (PR 2):** Idempotent `pnpm --dir apps/api db:seed:caricature-categories` for MVP taxonomy. Internal read route `GET /api/v1/internal/admin/caricature-categories` (`activeOnly` default true). Route ownership: `apps/api/src/routes/internal/admin-caricature-categories/route.ts`.
+
 ## Incremental update (2026-06-13)
 
 - **Hyperdrive public-read DB PR-2:** `PUBLIC_READ_HYPERDRIVE` is active for reviewed anonymous public read-only Postgres routes only. The binding uses a read-only Neon role with Hyperdrive query caching configured for max-age 60 seconds and stale-while-revalidate 15 seconds. Migrated responses include `x-fotocorp-db-path: public-read`. Auth/session/download/entitlement/staff/contributor mutation paths remain core/non-cached. Public media preview metadata remains unchanged. Typesense search routes remain Typesense-backed and are not part of this DB migration.

@@ -1,3 +1,9 @@
+import type {
+  CaricatureAssetMetadataPayload,
+  CaricatureAssetRecord,
+  CaricatureCategoryOption,
+} from "@/lib/caricatures/caricature-upload-metadata"
+
 export interface ContributorAccountSummary {
   id: string
   username: string
@@ -532,6 +538,43 @@ export async function patchContributorUploadAssetMetadata(
       cookieHeader: options.cookieHeader,
     },
   )
+}
+
+export async function getContributorCaricatureCategories(options: ContributorRequestOptions = {}) {
+  return contributorJson<{ ok: true; categories: CaricatureCategoryOption[] }>("/caricatures/categories", {
+    method: "GET",
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function createContributorCaricatureAsset(
+  payload: CaricatureAssetMetadataPayload,
+  options: ContributorRequestOptions = {},
+) {
+  return contributorJson<CaricatureAssetRecord>("/caricatures", {
+    method: "POST",
+    body: payload,
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function getContributorCaricatureAsset(assetId: string, options: ContributorRequestOptions = {}) {
+  return contributorJson<CaricatureAssetRecord>(`/caricatures/${encodeURIComponent(assetId)}`, {
+    method: "GET",
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function updateContributorCaricatureAsset(
+  assetId: string,
+  payload: CaricatureAssetMetadataPayload,
+  options: ContributorRequestOptions = {},
+) {
+  return contributorJson<CaricatureAssetRecord>(`/caricatures/${encodeURIComponent(assetId)}`, {
+    method: "PATCH",
+    body: payload,
+    cookieHeader: options.cookieHeader,
+  })
 }
 
 /** Maps `fetch` / XHR network failures to contributor-safe copy (never raw "Failed to fetch" alone). */

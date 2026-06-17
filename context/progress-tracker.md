@@ -21,6 +21,8 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Caricature staff metadata CRUD + upload wizard (PR 8):** Internal admin caricature asset CRUD plus contributor caricature create/update routes. Caricature is unblocked in the shared upload wizard step 1 (staff `/staff/contributor-uploads/new` and contributor `/contributor/uploads/new`); caricature path skips editorial events and uses Details → single-file Upload → caricature Metadata. Staff wizard BFF proxies caricature categories/assets. Category seed + internal category reads (PR 2) included. Original R2 storage upload remains PR 9. Tests: `apps/api/test/caricature-asset-metadata.test.ts`, `apps/api/test/caricature-category-taxonomy.test.ts`, `apps/web/test/admin-caricature-types.test.ts`.
+
 - **Caricature public search client (PR 7):** `/search?segment=caricature` calls `searchPublicCaricatures()` via BFF `/api/public/search/caricatures` when `NEXT_PUBLIC_USE_TYPESENSE_SEARCH=true`. Results render in `CaricatureSearchResultGrid`; empty catalog and upstream failures are handled separately. Run `pnpm --dir apps/api typesense:index-caricatures` once per env to provision the collection. Tests: `apps/web/test/caricature-search.test.ts`.
 
 - **Caricature public search API (PR 6):** `GET /api/v1/search/caricatures` proxies to `searchTypesenseCaricatures()` with public cache headers. Missing Typesense collection returns an empty result set instead of 502. Index script ensures the collection even with zero published assets.

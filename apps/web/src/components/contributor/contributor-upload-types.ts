@@ -29,12 +29,47 @@ export interface TrackedFile {
   saveHint: string | null
   metadataRevision?: number
   resumedFromServer?: boolean
+  /** Catalog bulk import: original upload filename (Excel matching). */
+  originalFileName?: string | null
+  /** Catalog bulk import: canonical public business id. */
+  fotokey?: string | null
+  /** Catalog bulk import: legacy filename/code fallback. */
+  legacyImageCode?: string | null
 }
 
+export type UploadBatchAssetType = "IMAGE" | "VIDEO" | "CARICATURE"
+
+export const UPLOAD_ASSET_TYPE_OPTIONS: ReadonlyArray<{
+  value: UploadBatchAssetType
+  label: string
+  description: string
+  enabled: boolean
+}> = [
+  {
+    value: "IMAGE",
+    label: "Editorial",
+    description: "JPEG images (JPG / JPEG only).",
+    enabled: true,
+  },
+  {
+    value: "VIDEO",
+    label: "Videos",
+    description: "MP4 video files.",
+    enabled: false,
+  },
+  {
+    value: "CARICATURE",
+    label: "Caricature",
+    description: "Single caricature artwork (JPG, PNG, or WebP).",
+    enabled: true,
+  },
+]
+
 export const UPLOAD_STEPS = [
-  { id: 1, label: "Event" },
-  { id: 2, label: "Upload" },
-  { id: 3, label: "Metadata" },
+  { id: 1, label: "Asset type" },
+  { id: 2, label: "Event" },
+  { id: 3, label: "Upload" },
+  { id: 4, label: "Metadata" },
 ] as const
 
 export type UploadWizardStep = (typeof UPLOAD_STEPS)[number]["id"]

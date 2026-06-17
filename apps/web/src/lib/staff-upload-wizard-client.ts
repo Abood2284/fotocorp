@@ -1,5 +1,11 @@
 /** Browser-safe fetch helpers for staff upload wizard BFF (`/api/staff/upload-wizard/*`). */
 
+import type {
+  CaricatureAssetMetadataPayload,
+  CaricatureAssetRecord,
+  CaricatureCategoryOption,
+} from "@/lib/caricatures/caricature-upload-metadata"
+
 export class StaffWizardApiError extends Error {
   constructor(
     public readonly status: number,
@@ -198,6 +204,32 @@ export async function staffWizardPatchAssetMetadata(
     keywords: string | null
     updatedAt: string
   }>(`/upload-batches/${encodeURIComponent(batchId)}/assets/${encodeURIComponent(imageAssetId)}/metadata`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function staffWizardListCaricatureCategories() {
+  return staffWizardJson<{ ok: true; categories: CaricatureCategoryOption[] }>("/caricature-categories", {
+    method: "GET",
+  })
+}
+
+export async function staffWizardCreateCaricatureAsset(payload: CaricatureAssetMetadataPayload) {
+  return staffWizardJson<CaricatureAssetRecord>("/caricatures", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function staffWizardGetCaricatureAsset(assetId: string) {
+  return staffWizardJson<CaricatureAssetRecord>(`/caricatures/${encodeURIComponent(assetId)}`, {
+    method: "GET",
+  })
+}
+
+export async function staffWizardUpdateCaricatureAsset(assetId: string, payload: CaricatureAssetMetadataPayload) {
+  return staffWizardJson<CaricatureAssetRecord>(`/caricatures/${encodeURIComponent(assetId)}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   })

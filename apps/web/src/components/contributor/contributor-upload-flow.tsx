@@ -8,8 +8,11 @@ import {
   UPLOAD_CONCURRENCY,
   UPLOAD_STEPS,
   type TrackedFile,
+  type UploadBatchAssetType,
   type UploadWizardStep,
 } from "@/components/contributor/contributor-upload-types"
+import { ContributorUploadStepAssetType } from "@/components/contributor/upload/contributor-upload-step-asset-type"
+import { CaricatureUploadWizardPanel } from "@/components/contributor/upload/caricature-upload-wizard-panel"
 import { ContributorUploadStepEvent } from "@/components/contributor/upload/contributor-upload-step-event"
 import { ContributorUploadStepFiles } from "@/components/contributor/upload/contributor-upload-step-files"
 import { ContributorUploadStepMetadata } from "@/components/contributor/upload/contributor-upload-step-metadata"
@@ -30,18 +33,17 @@ import {
   prepareContributorUploadFiles,
   putContributorFileToSignedUrl,
   submitContributorUploadBatch,
+  getContributorCaricatureCategories,
+  createContributorCaricatureAsset,
+  updateContributorCaricatureAsset,
   type ContributorAuthResponse,
   type ContributorAssetCategoryDto,
   type ContributorPortalContributorDto,
   type ContributorPrepareUploadFileMeta,
   type ContributorPrepareUploadItemInstruction,
 } from "@/lib/api/contributor-api"
-import type { MetadataDraft } from "@/components/contributor/upload/contributor-upload-metadata-item"
-import { keywordsToTags, normalizeWhoIsInPicture, tagsToKeywords } from "@/lib/contributor-upload-metadata"
-import {
-  executeMetadataImport,
-  type MetadataImportSummary,
-} from "@/lib/contributor-upload-metadata-import"
+import type { MetadataImportSummary } from "@/lib/contributor-upload-metadata-import"
+import { useUploadWizardMetadata } from "@/lib/use-upload-wizard-metadata"
 import { useToastNotify } from "@/components/staff/shared/toast"
 import {
   buildResumeStateFromBatchDetail,
@@ -54,6 +56,14 @@ import {
   writeUploadWizardDraft,
 } from "@/lib/upload-wizard-resume"
 import { Button } from "@/components/ui/button"
+import { isCaricatureUpload, validateCaricatureUploadFile } from "@/lib/caricatures/caricature-upload-metadata"
+import type { CaricatureAssetRecord, CaricatureCategoryOption } from "@/lib/caricatures/caricature-upload-metadata"
+import {
+  caricatureUploadActionTitle,
+  editorialUploadActionTitle,
+  uploadStepsForAssetType,
+  uploadWizardAssetTypeHint,
+} from "@/lib/upload-wizard-caricature"
 
 function portalRoleOf(session: ContributorAuthResponse) {
   return session.account.portalRole ?? "STANDARD"
@@ -67,6 +77,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
   const { toast } = useToastNotify()
   const [currentStep, setCurrentStep] = useState<UploadWizardStep>(1)
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => new Set())
+  const [batchAssetType, setBatchAssetType] = useState<UploadBatchAssetType>("IMAGE")
 
   const [eventId, setEventId] = useState("")
   const [batchEventName, setBatchEventName] = useState("")
@@ -90,6 +101,12 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
   const [metadataImportError, setMetadataImportError] = useState<string | null>(null)
   const [metadataImportBusy, setMetadataImportBusy] = useState(false)
   const [resuming, setResuming] = useState(Boolean(resumeBatchId))
+  const [caricatureAssetId, setCaricatureAssetId] = useState<string | null>(null)
+  const [caricatureAsset, setCaricatureAsset] = useState<CaricatureAssetRecord | null>(null)
+  const [caricatureCategories, setCaricatureCategories] = useState<CaricatureCategoryOption[]>([])
+
+  const isCaricature = isCaricatureUpload(batchAssetType)
+  const wizardSteps = useMemo(() => [...uploadStepsForAssetType(batchAssetType)], [batchAssetType])
 
   const trackedRef = useRef(tracked)
   trackedRef.current = tracked
@@ -105,10 +122,17 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
 
   useEffect(() => {
     if (!isPortalAdmin) return
-    void getContributorPortalContributors({ limit: 100 })
+    void getContributorPortalContributors({ limit: 200 })
       .then((r) => setContributors(r.contributors))
       .catch(() => setContributors([]))
   }, [isPortalAdmin])
+
+  useEffect(() => {
+    if (!isCaricature) return
+    void getContributorCaricatureCategories()
+      .then((response) => setCaricatureCategories(response.categories))
+      .catch(() => setCaricatureCategories([]))
+  }, [isCaricature])
 
   useEffect(() => {
     if (resumeAttemptedRef.current) return
@@ -133,6 +157,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
         setBatchId(resume.batchId)
         setEventId(resume.eventId)
         setBatchEventName(resume.batchEventName)
+        setBatchAssetType(resume.batchAssetType)
         if (resume.targetContributorId) setTargetContributorId(resume.targetContributorId)
         setTracked(resume.tracked)
         setCurrentStep(resume.currentStep)
@@ -154,6 +179,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     if (!draft || draft.batchId) return
     setCurrentStep(draft.currentStep)
     setCompletedSteps(new Set(draft.completedSteps))
+    setBatchAssetType(draft.batchAssetType ?? "IMAGE")
     setEventId(draft.eventId)
     setBatchEventName(draft.batchEventName)
     setTargetContributorId(draft.targetContributorId || initialSession.contributor.id)
@@ -161,6 +187,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     setNewCategoryId(draft.newCategoryId)
     setNewEventDate(draft.newEventDate)
     if (draft.batchId) setBatchId(draft.batchId)
+    if (draft.caricatureAssetId) setCaricatureAssetId(draft.caricatureAssetId)
   }, [initialSession.contributor.id])
 
   useEffect(() => {
@@ -175,9 +202,11 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
         version: 1,
         currentStep,
         completedSteps: [...completedSteps],
+        batchAssetType,
         eventId,
         batchEventName,
         batchId,
+        caricatureAssetId,
         targetContributorId,
         newEventName,
         newCategoryId,
@@ -187,8 +216,10 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     }, 400)
     return () => window.clearTimeout(timer)
   }, [
+    batchAssetType,
     batchEventName,
     batchId,
+    caricatureAssetId,
     completedSteps,
     currentStep,
     eventId,
@@ -213,24 +244,96 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
   }, [])
 
   /** Bulk-update multiple tracked files in a single state transition. */
-  const bulkUpdateTracked = useCallback(
-    (patches: Array<{ key: string; patch: Partial<TrackedFile> }>) => {
-      if (patches.length === 0) return
-      setTracked((prev) => {
-        const map = new Map(prev.map((r) => [r.key, r]))
-        for (const { key, patch } of patches) {
-          const existing = map.get(key)
-          if (existing) map.set(key, { ...existing, ...patch })
-        }
-        return Array.from(map.values())
-      })
-    },
-    [],
-  )
+  const { bulkUpdateTracked, saveMetadataItem, handleMetadataImportFile } = useUploadWizardMetadata({
+    batchId,
+    trackedRef,
+    updateTracked,
+    setTracked,
+    patchMetadata: patchContributorUploadAssetMetadata,
+    isConflictError: (e) => e instanceof ContributorApiError && e.code === "METADATA_CONFLICT",
+    getConflictDetail: (e) =>
+      e instanceof ContributorApiError && e.code === "METADATA_CONFLICT" && e.detail
+        ? (e.detail as {
+            whoIsInPicture?: string | null
+            caption?: string | null
+            keywords?: string | null
+            updatedAt?: string
+          })
+        : undefined,
+    getErrorMessage: (e) => (e instanceof ContributorApiError ? e.message : "Save failed."),
+    toast,
+    setMetadataImportSummary,
+    setMetadataImportError,
+    setMetadataImportBusy,
+  })
 
   const markStepComplete = useCallback((step: number) => {
     setCompletedSteps((prev) => new Set(prev).add(step))
   }, [])
+
+  const onCaricatureFilePicked = useCallback((list: FileList | null) => {
+    if (!list?.length) return
+    const file = list[0]!
+    const validation = validateCaricatureUploadFile(file)
+    if (!validation.ok) {
+      setRejectedFiles([{ file, reason: validation.reason }])
+      return
+    }
+    setRejectedFiles([])
+    setTracked((prev) => {
+      const existing = prev[0]
+      if (existing?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(existing.previewUrl)
+      return [createTrackedFileFromLocal(file, 0)]
+    })
+    setBlockingError(null)
+  }, [])
+
+  const onCaricatureRemoveFile = useCallback(() => {
+    setTracked((prev) => {
+      const row = prev[0]
+      if (row?.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(row.previewUrl)
+      return []
+    })
+    setRejectedFiles([])
+  }, [])
+
+  const handleCaricatureSetupContinue = useCallback(() => {
+    markStepComplete(2)
+    setCurrentStep(3)
+  }, [markStepComplete])
+
+  const handleCaricatureUploadContinue = useCallback(() => {
+    if (!tracked.length) return
+    markStepComplete(3)
+    setCurrentStep(4)
+  }, [markStepComplete, tracked.length])
+
+  const saveCaricatureMetadata = useCallback(
+    async (payload: Parameters<typeof createContributorCaricatureAsset>[0]) => {
+      setSubmitError(null)
+      setSubmitting(true)
+      try {
+        if (caricatureAssetId) {
+          const updated = await updateContributorCaricatureAsset(caricatureAssetId, payload)
+          setCaricatureAsset(updated)
+        } else {
+          const created = await createContributorCaricatureAsset(payload)
+          setCaricatureAssetId(created.id)
+          setCaricatureAsset(created)
+        }
+        clearUploadWizardDraft("contributor")
+        router.push("/contributor/uploads")
+        router.refresh()
+      } catch (e) {
+        const msg = e instanceof ContributorApiError ? e.message : humanizeContributorNetworkError(e)
+        setSubmitError(msg)
+        throw new Error(msg)
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [caricatureAssetId, router],
+  )
 
   const onFilesPicked = useCallback((list: FileList | null) => {
     if (!list?.length) return
@@ -260,7 +363,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     if (phase === "running") return
     setTracked((prev) => {
       for (const row of prev) {
-        if (row.previewUrl) URL.revokeObjectURL(row.previewUrl)
+        if (row.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(row.previewUrl)
       }
       return []
     })
@@ -278,6 +381,16 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     )
     setBlockingError(null)
   }, [])
+
+  const handleAssetTypeSelect = useCallback(
+    (assetType: UploadBatchAssetType) => {
+      if (batchId) return
+      setBatchAssetType(assetType)
+      markStepComplete(1)
+      setCurrentStep(2)
+    },
+    [batchId, markStepComplete],
+  )
 
   const handleCreateEvent = useCallback(async () => {
     setCreateErr(null)
@@ -309,8 +422,8 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
       setEventId(res.event.id)
       setBatchEventName(res.event.name)
       setBlockingError(null)
-      markStepComplete(1)
-      setCurrentStep(2)
+      markStepComplete(2)
+      setCurrentStep(3)
       router.refresh()
     } catch (e) {
       setCreateErr(e instanceof ContributorApiError ? e.message : "Could not create event.")
@@ -343,7 +456,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
       if (!currentBatchId) {
         const created = await createContributorUploadBatch({
           eventId,
-          assetType: "IMAGE",
+          assetType: batchAssetType,
         })
         currentBatchId = created.batch.id
         resumeAttemptedRef.current = true
@@ -463,8 +576,8 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
       await Promise.all(Array.from({ length: poolSize }, () => uploadWorker()))
 
       if (completed >= 1) {
-        markStepComplete(2)
-        setCurrentStep(3)
+        markStepComplete(3)
+        setCurrentStep(4)
       } else if (work.length > 0) {
         setBlockingError("No files finished successfully. Fix errors or retry failed uploads.")
       }
@@ -474,98 +587,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
       setBlockingError(msg)
       setPhase("idle")
     }
-  }, [batchId, eventId, markStepComplete, tracked, updateTracked])
-
-  const saveMetadataItem = useCallback(
-    async (key: string, draft: MetadataDraft) => {
-      const row = trackedRef.current.find((r) => r.key === key)
-      if (!row?.imageAssetId || !batchId) return
-
-      try {
-        const res = await patchContributorUploadAssetMetadata(batchId, row.imageAssetId, {
-          expectedUpdatedAt: row.assetUpdatedAt ?? undefined,
-          whoIsInPicture: normalizeWhoIsInPicture(draft.whoIsInPicture),
-          caption: draft.caption.trim() || null,
-          keywords: tagsToKeywords(keywordsToTags(draft.keywords)),
-        })
-        updateTracked(key, {
-          assetUpdatedAt: res.updatedAt,
-          saveState: "saved",
-          saveHint: null,
-        })
-      } catch (e) {
-        if (e instanceof ContributorApiError && e.code === "METADATA_CONFLICT" && e.detail) {
-          const d = e.detail as {
-            whoIsInPicture?: string | null
-            caption?: string | null
-            keywords?: string | null
-            updatedAt?: string
-          }
-          updateTracked(key, {
-            whoIsInPicture: d.whoIsInPicture ?? "",
-            caption: d.caption ?? "",
-            keywords: d.keywords ?? "",
-            assetUpdatedAt: d.updatedAt ?? row.assetUpdatedAt,
-            saveState: "error",
-            saveHint: "Updated elsewhere — form refreshed.",
-          })
-          throw new Error("Updated elsewhere — form refreshed.")
-        }
-        const message = e instanceof ContributorApiError ? e.message : "Save failed."
-        updateTracked(key, { saveState: "error", saveHint: message })
-        throw new Error(message)
-      }
-    },
-    [batchId, updateTracked],
-  )
-
-  const handleMetadataImportFile = useCallback(
-    async (file: File) => {
-      setMetadataImportError(null)
-      setMetadataImportBusy(true)
-      try {
-        const summary = await executeMetadataImport({
-          file,
-          tracked: trackedRef.current,
-          saveItem: saveMetadataItem,
-          onTrackedUpdate: (updater) => {
-            setTracked((prev) => {
-              const next = updater(prev)
-              trackedRef.current = next
-              return next
-            })
-          },
-          onSaveSuccess: (key) => {
-            updateTracked(key, { saveState: "saved", saveHint: null })
-          },
-          onSaveFailure: (key, message) => {
-            updateTracked(key, { saveState: "error", saveHint: message })
-          },
-        })
-        setMetadataImportSummary(summary)
-        if (summary.updatedImageCount > 0 && summary.savedCount > 0) {
-          toast({
-            message: `Imported metadata for ${summary.savedCount} image${summary.savedCount === 1 ? "" : "s"}.`,
-            variant: "success",
-          })
-        }
-        if (summary.saveFailureCount > 0) {
-          toast({
-            message: `${summary.saveFailureCount} metadata save${summary.saveFailureCount === 1 ? "" : "s"} failed during import.`,
-            variant: "error",
-          })
-        }
-      } catch (e) {
-        const message = e instanceof Error ? e.message : "Could not import metadata file."
-        setMetadataImportError(message)
-        setMetadataImportSummary(null)
-        toast({ message, variant: "error" })
-      } finally {
-        setMetadataImportBusy(false)
-      }
-    },
-    [saveMetadataItem, toast, updateTracked],
-  )
+  }, [batchAssetType, batchId, eventId, markStepComplete, pathname, tracked, updateTracked])
 
   const submitBatch = useCallback(async () => {
     if (!batchId) return
@@ -597,22 +619,27 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     (step: number) => {
       if (phase === "running") return
       if (step === currentStep) return
+      if (batchId && step === 1) return
       if (step < currentStep || completedSteps.has(step)) setCurrentStep(step as UploadWizardStep)
     },
-    [completedSteps, currentStep, phase],
+    [batchId, completedSteps, currentStep, phase],
   )
 
-  const rightLocked =
-    (currentStep === 2 && (!eventCreated || tracked.length === 0)) ||
-    (currentStep === 3 && doneCount < 1)
+  const rightLocked = isCaricature
+    ? currentStep === 3 && tracked.length === 0
+    : (currentStep === 3 && (!eventCreated || tracked.length === 0)) ||
+      (currentStep === 4 && doneCount < 1)
 
-  const actionTitle =
-    currentStep === 1 ? "Create event" : currentStep === 2 ? "Upload images" : "Submit batch"
+  const actionTitle = isCaricature
+    ? caricatureUploadActionTitle(currentStep)
+    : editorialUploadActionTitle(currentStep)
+
+  const caricatureDefaultCredit = initialSession.contributor.displayName.trim() || "Contributor upload"
 
   return (
     <div className="space-y-6">
       <ContributorUploadStepper
-        steps={[...UPLOAD_STEPS]}
+        steps={wizardSteps}
         currentStep={currentStep}
         completedSteps={completedSteps}
         onStepClick={(step) => goToStep(step)}
@@ -636,9 +663,10 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
         </div>
       ) : null}
 
-      {!resuming && currentStep === 3 ? (
+      {!resuming && currentStep === 4 && !isCaricature ? (
         <ContributorUploadStepMetadata
           active
+          eventTitle={batchEventName}
           items={tracked}
           onSaveItem={saveMetadataItem}
           onBulkUpdate={bulkUpdateTracked}
@@ -652,12 +680,40 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
           submitError={submitError}
           onDismissSubmitError={() => setSubmitError(null)}
         />
-      ) : !resuming ? (
+      ) : !resuming && isCaricature && currentStep > 1 ? (
+        <CaricatureUploadWizardPanel
+          currentStep={currentStep}
+          staffMode={false}
+          contributors={contributors}
+          targetContributorId={targetContributorId}
+          onTargetContributorIdChange={setTargetContributorId}
+          tracked={tracked}
+          rejectedFiles={rejectedFiles}
+          onFilePicked={onCaricatureFilePicked}
+          onRemoveFile={onCaricatureRemoveFile}
+          categories={caricatureCategories}
+          caricatureAsset={caricatureAsset}
+          defaultCredit={caricatureDefaultCredit}
+          onSetupContinue={handleCaricatureSetupContinue}
+          onUploadContinue={handleCaricatureUploadContinue}
+          onSaveMetadata={saveCaricatureMetadata}
+          submitBusy={submitting}
+          submitError={submitError}
+          onDismissSubmitError={() => setSubmitError(null)}
+        />
+      ) : !resuming && currentStep === 1 ? (
+        <ContributorUploadStepAssetType
+          active
+          selectedType={batchAssetType}
+          hint={uploadWizardAssetTypeHint(batchAssetType)}
+          onSelect={handleAssetTypeSelect}
+        />
+      ) : !resuming && !isCaricature ? (
         <ContributorUploadLayout
         rightLocked={rightLocked}
         left={
           <>
-            {currentStep === 1 ? (
+            {currentStep === 2 ? (
               <ContributorUploadStepEvent
                 active
                 eventCreated={eventCreated}
@@ -681,16 +737,16 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
                   setBatchEventName("")
                   setCompletedSteps((prev) => {
                     const next = new Set(prev)
-                    next.delete(1)
                     next.delete(2)
                     next.delete(3)
+                    next.delete(4)
                     return next
                   })
-                  setCurrentStep(1)
+                  setCurrentStep(2)
                 }}
               />
             ) : null}
-            {currentStep === 2 ? (
+            {currentStep === 3 ? (
               <ContributorUploadStepFiles
                 active
                 tracked={tracked}
@@ -708,7 +764,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
             <h2 className="text-base font-semibold text-foreground sm:text-lg">{actionTitle}</h2>
             <div className="mt-4 sm:mt-5">
-              {currentStep === 1 ? (
+              {currentStep === 2 ? (
                 <Button
                   type="button"
                   className="h-11 w-full text-sm sm:h-12 sm:text-base"
@@ -727,7 +783,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
                   )}
                 </Button>
               ) : null}
-              {currentStep === 2 ? (
+              {currentStep === 3 ? (
                 <Button
                   type="button"
                   className="h-11 w-full text-sm sm:h-12 sm:text-base"
@@ -745,7 +801,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
                 </Button>
               ) : null}
             </div>
-            {currentStep !== 1 ? (
+            {currentStep !== 2 ? (
               <ContributorUploadStatusBar
                 className="mt-4 sm:mt-5"
                 fileCount={tracked.length}

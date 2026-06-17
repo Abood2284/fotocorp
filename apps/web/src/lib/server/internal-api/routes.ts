@@ -110,6 +110,13 @@ export const internalApiRoutes = {
   adminHomepageHeroPool: () => "/api/v1/internal/admin/homepage-hero-pool",
 
   adminHomepageHeroPoolCandidates: () => "/api/v1/internal/admin/homepage-hero-pool/candidates",
+
+  adminCaricatureCategories: () => "/api/v1/internal/admin/caricature-categories",
+
+  adminCaricatureAssets: () => "/api/v1/internal/admin/caricature-assets",
+
+  adminCaricatureAsset: (assetId: string) =>
+    `/api/v1/internal/admin/caricature-assets/${encodeURIComponent(assetId)}`,
 } as const
 
 export function withQuery(path: string, params: URLSearchParams) {
