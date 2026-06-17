@@ -51,7 +51,8 @@ async function main() {
     }
 
     if (candidateCount === 0) {
-      console.log("[typesense-caricatures-index] no candidates to index");
+      await ensureCollection(env);
+      console.log("[typesense-caricatures-index] no candidates to index; ensured empty collection");
       return;
     }
 

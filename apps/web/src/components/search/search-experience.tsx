@@ -19,13 +19,18 @@ import {
   CatalogSearchActiveChips,
   CatalogSearchFilterPanel,
 } from "@/components/search/catalog-search-filter-panel"
+import { CaricatureSearchResultGrid } from "@/components/search/caricature-search-result-grid"
 import { SearchFilterPanelSkeleton } from "@/components/search/search-filter-skeletons"
 import { SearchEventResultsGrid } from "@/components/search/search-event-results-grid"
 import { SearchSegmentSelect } from "@/components/search/search-segment-select"
 import { useSearchFilters, hasPopulatedAssetFilters } from "@/components/search/search-filters-context"
 import { Button } from "@/components/ui/button"
 import type { SearchSelectedEvent } from "@/components/search/search-experience-types"
-import { getPublicCatalogTaxonomy, isTypesenseSearchEnabled, searchPublicAssets, searchPublicEvents } from "@/lib/api/fotocorp-api"
+import { getPublicCatalogTaxonomy, isTypesenseSearchEnabled, searchPublicAssets, searchPublicCaricatures, searchPublicEvents } from "@/lib/api/fotocorp-api"
+import {
+  buildCaricatureSearchQueryParams,
+  mapCaricatureSearchItemToGridItem,
+} from "@/lib/search/caricature-search"
 import { hasSearchIntent } from "@/lib/search/search-intent"
 import {
   applySearchSegmentChange,
@@ -54,6 +59,9 @@ interface SearchExperienceProps {
     view?: SearchViewMode
     mode?: SearchResultMode
     segment?: SearchSegment
+    language?: string
+    credit?: string
+    hasVisibleText?: boolean
   }
   initialEventResult?: PublicSearchEventsResponse | null
   initialImageCount?: number
@@ -109,6 +117,32 @@ export function SearchExperience({
       initialParams.year,
       initialParams.month,
       initialParams.sort,
+      initialParams.language,
+      initialParams.credit,
+      initialParams.hasVisibleText,
+    ],
+  )
+  const caricatureSearchQueryParams = useMemo(
+    () => buildCaricatureSearchQueryParams({
+      q: initialParams.q,
+      categoryId: initialParams.categoryId,
+      language: initialParams.language,
+      credit: initialParams.credit,
+      hasVisibleText: initialParams.hasVisibleText,
+      page: paginationMode === "page" ? initialParams.page ?? 1 : 1,
+      limit: PAGE_SIZE,
+      sort: initialParams.sort,
+      includeFacets: false,
+    }),
+    [
+      initialParams.q,
+      initialParams.categoryId,
+      initialParams.language,
+      initialParams.credit,
+      initialParams.hasVisibleText,
+      initialParams.page,
+      initialParams.sort,
+      paginationMode,
     ],
   )
   const searchCacheKey = useMemo(
@@ -141,6 +175,20 @@ export function SearchExperience({
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
     enabled: (searchActive || isBrowseLatest) && resultMode === "images" && !isCaricatureSegment,
+  })
+  const {
+    data: caricatureResult,
+    error: caricatureSearchError,
+    isFetching: isCaricatureFetching,
+  } = useQuery({
+    queryKey: ["public-search-caricatures", caricatureSearchQueryParams],
+    queryFn: () => searchPublicCaricatures(caricatureSearchQueryParams),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+    placeholderData: keepPreviousData,
+    enabled: isCaricatureSegment && typesenseSearchEnabled,
   })
   const {
     data: filterSnapshot,
@@ -228,6 +276,10 @@ export function SearchExperience({
     enabled: searchActive && typesenseSearchEnabled && resultMode === "events" && !isCaricatureSegment,
   })
   const items = displayResult?.items ?? initialResult.items
+  const caricatureItems = useMemo(
+    () => (caricatureResult?.items ?? []).map(mapCaricatureSearchItemToGridItem),
+    [caricatureResult?.items],
+  )
   const nextCursor = displayResult?.nextCursor ?? initialResult.nextCursor
   const hasMore = displayResult?.hasMore ?? initialResult.hasMore ?? Boolean(nextCursor)
   const viewMode = initialParams.view ?? "grid"
@@ -306,7 +358,10 @@ export function SearchExperience({
         ? "Loading event…"
         : "Selected event"
       : undefined)
-  const effectiveHasLoadError = hasLoadError || Boolean(searchError) || (isEventsMode && Boolean(eventSearchError))
+  const effectiveHasLoadError = hasLoadError
+    || Boolean(searchError)
+    || (isCaricatureSegment && Boolean(caricatureSearchError))
+    || (isEventsMode && Boolean(eventSearchError))
 
   const filterChips = useMemo(() => {
     const chips: Array<{ key: string; label: string; remove: () => void }> = []
@@ -331,6 +386,8 @@ export function SearchExperience({
         ? "relevance"
         : merged.sort === "oldest"
           ? "oldest"
+          : merged.sort === "popular" && merged.segment === "caricature"
+            ? "popular"
           : "newest"
       : merged.sort
 
@@ -450,9 +507,14 @@ export function SearchExperience({
     ? (displayEventResult?.foundEvents ?? eventItems.length)
     : (exactTotalCount ?? Math.max(totalCount, (displayPage - 1) * PAGE_SIZE + items.length))
   const hasActiveFilters = filterChips.length > 0 || initialParams.sort !== "newest"
-  const isResultsFetching = isEventsMode ? isEventFetching : isFetching
+  const isResultsFetching = isCaricatureSegment ? isCaricatureFetching : (isEventsMode ? isEventFetching : isFetching)
   const hasEventResults = eventItems.length > 0
   const hasImageResults = items.length > 0
+  const hasCaricatureResults = caricatureItems.length > 0
+  const caricatureTotalCount = caricatureResult?.totalCount ?? caricatureItems.length
+  const caricatureTotalPages = caricatureResult?.totalPages
+    ?? Math.max(1, Math.ceil(caricatureTotalCount / PAGE_SIZE))
+  const caricatureCurrentPage = Math.min(caricatureResult?.page ?? initialParams.page ?? 1, caricatureTotalPages)
 
   return (
     <>
@@ -575,16 +637,53 @@ export function SearchExperience({
 
           <main className="relative min-w-0">
             {isCaricatureSegment ? (
-              <div className="border border-border bg-background py-16">
-                <EmptyState
-                  icon={Images}
-                  title={searchActive ? "No caricatures matched your search yet." : "Caricature search is coming soon."}
-                  description={searchActive
-                    ? "Caricature indexing is not live yet. Try editorial images while we finish the caricature catalog."
-                    : "Switch to editorial images to browse the archive, or check back soon for caricature results."}
-                  action={{ label: "Search editorial images", href: buildSearchPageHref({ q: initialParams.q, segment: "editorial" }) }}
-                />
-              </div>
+              !typesenseSearchEnabled ? (
+                <div className="border border-border bg-background py-16">
+                  <EmptyState
+                    icon={Images}
+                    title="Caricature search is not enabled yet."
+                    description="Set NEXT_PUBLIC_USE_TYPESENSE_SEARCH=true and configure the caricature Typesense collection to browse caricatures here."
+                    action={{ label: "Search editorial images", href: buildSearchPageHref({ q: initialParams.q, segment: "editorial" }) }}
+                  />
+                </div>
+              ) : caricatureSearchError && !isCaricatureFetching ? (
+                <div className="border border-border bg-background py-16">
+                  <EmptyState
+                    icon={Images}
+                    title="Caricature search is temporarily unavailable."
+                    description="The caricature search index may not be provisioned yet. Run `pnpm --dir apps/api typesense:index-caricatures` once, then retry."
+                    action={{ label: "Search editorial images", href: buildSearchPageHref({ q: initialParams.q, segment: "editorial" }) }}
+                  />
+                </div>
+              ) : hasCaricatureResults ? (
+                <>
+                  <CaricatureSearchResultGrid items={caricatureItems} priorityCount={8} />
+                  <Pagination
+                    currentPage={caricatureCurrentPage}
+                    totalPages={caricatureTotalPages}
+                    isFirstPage={caricatureCurrentPage === 1}
+                    hasNextPage={caricatureResult?.hasMore === true || caricatureCurrentPage < caricatureTotalPages}
+                    disabled={isPending}
+                    onPrev={goToPrev}
+                    onNext={goToNext}
+                  />
+                </>
+              ) : isCaricatureFetching ? (
+                <SearchGridSkeleton />
+              ) : (
+                <div className="border border-border bg-background py-16">
+                  <EmptyState
+                    icon={Images}
+                    title={searchActive ? "No caricatures matched your search." : "No caricatures published yet."}
+                    description={effectiveHasLoadError
+                      ? "Caricature search is temporarily unavailable. Try again in a moment."
+                      : searchActive
+                        ? "Try a broader search term or remove filters."
+                        : "Published caricatures will appear here once staff uploads and publishes them."}
+                    action={{ label: "Search editorial images", href: buildSearchPageHref({ q: initialParams.q, segment: "editorial" }) }}
+                  />
+                </div>
+              )
             ) : (
               <>
             {(isPending || (isResultsFetching && (isEventsMode ? hasEventResults : hasImageResults))) && (
@@ -819,6 +918,9 @@ function buildSearchScopeQueryParams(params: SearchExperienceProps["initialParam
     year: params.year,
     month: params.month,
     sort: params.sort,
+    language: params.language,
+    credit: params.credit,
+    hasVisibleText: params.hasVisibleText,
   }
 }
 

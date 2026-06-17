@@ -9,6 +9,7 @@ import {
   TYPESENSE_CARICATURE_QUERY_BY,
   TYPESENSE_CARICATURE_QUERY_BY_WEIGHTS,
   buildCaricaturesCollectionSchema,
+  buildEmptyTypesenseCaricatureSearchResponse,
   buildTypesenseCaricatureDocument,
   buildTypesenseCaricatureFilterSummary,
   buildTypesenseCaricatureSearchUrl,
@@ -81,6 +82,14 @@ describe("Typesense caricature document mapping", () => {
 });
 
 describe("Typesense caricature search mapping", () => {
+  it("returns an empty search response when the collection is missing", () => {
+    const query = parseTypesenseCaricatureSearchQuery(new URLSearchParams("q=*&page=1&limit=2"));
+    const response = buildEmptyTypesenseCaricatureSearchResponse(query);
+    assert.equal(response.total, 0);
+    assert.equal(response.items.length, 0);
+    assert.equal(response.hasMore, false);
+  });
+
   it("maps frontend query params into Typesense filters, weights, and sorting", () => {
     const query = parseTypesenseCaricatureSearchQuery(
       new URLSearchParams(

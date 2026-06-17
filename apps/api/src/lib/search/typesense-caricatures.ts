@@ -311,6 +311,34 @@ export function buildTypesenseCaricatureSearchUrl(
   return url;
 }
 
+export function buildEmptyTypesenseCaricatureSearchResponse(
+  query: TypesenseCaricatureSearchQuery,
+): TypesenseCaricatureSearchResponse {
+  return {
+    items: [],
+    total: 0,
+    totalCount: 0,
+    page: query.page,
+    perPage: query.limit,
+    limit: query.limit,
+    totalPages: 0,
+    hasMore: false,
+    facets: {
+      categories: [],
+      languages: [],
+      credits: [],
+      hasVisibleText: [],
+    },
+    timing: {
+      backend: "typesense",
+      tookMs: 0,
+    },
+    meta: {
+      source: "typesense",
+    },
+  };
+}
+
 export async function searchTypesenseCaricatures(
   env: Env,
   query: TypesenseCaricatureSearchQuery,
@@ -326,6 +354,10 @@ export async function searchTypesenseCaricatures(
       headers: buildTypesenseRequestHeaders(config),
       signal: controller.signal,
     });
+
+    if (response.status === 404) {
+      return buildEmptyTypesenseCaricatureSearchResponse(query);
+    }
 
     if (!response.ok) {
       throw new TypesenseSearchFailedError(

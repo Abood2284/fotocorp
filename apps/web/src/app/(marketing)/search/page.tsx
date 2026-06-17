@@ -21,6 +21,9 @@ interface SearchPageProps {
     view?: string
     mode?: string
     segment?: string
+    language?: string
+    credit?: string
+    hasVisibleText?: string
   }>
 }
 
@@ -56,6 +59,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     view,
     mode: segment === "caricature" ? "images" as const : mode,
     segment,
+    language: normalized(params.language),
+    credit: normalized(params.credit),
+    hasVisibleText: parseOptionalBoolean(params.hasVisibleText),
   }
 
   return (
@@ -79,8 +85,16 @@ function normalized(value: string | undefined) {
 function parseSort(value: string | undefined, q: string | undefined): PublicAssetSort {
   if (value === "oldest") return "oldest"
   if (value === "latest") return "newest"
+  if (value === "popular") return "popular"
   if (value === "relevance" && q) return "relevance"
   return "newest"
+}
+
+function parseOptionalBoolean(value: string | undefined) {
+  const normalized = value?.trim().toLowerCase()
+  if (normalized === "true") return true
+  if (normalized === "false") return false
+  return undefined
 }
 
 function parseOptionalNumber(value: string | undefined) {

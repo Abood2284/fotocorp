@@ -5,6 +5,8 @@ import type {
   PublicAssetFiltersResponse,
   PublicAssetListParams,
   PublicAssetListResponse,
+  PublicCaricatureSearchParams,
+  PublicCaricatureSearchResponse,
   PublicEventBrowseSection,
   PublicEventCategoryBrowseResponse,
   PublicEventListResponse,
@@ -153,6 +155,35 @@ export async function searchPublicAssets(params: PublicAssetListParams = {}): Pr
   logTypesenseSearchDebug(params, response, clientTtfbMs)
 
   return normalizeTypesenseSearchResponse(response)
+}
+
+export async function searchPublicCaricatures(
+  params: PublicCaricatureSearchParams = {},
+): Promise<PublicCaricatureSearchResponse> {
+  const searchParams = new URLSearchParams()
+  appendParam(searchParams, "q", params.q?.trim() || "*")
+  appendTypesenseScopeParam(searchParams, "categoryId", "category", params.categoryId, params.category)
+  appendParam(searchParams, "language", params.language)
+  appendParam(searchParams, "credit", params.credit)
+  if (params.hasVisibleText === true) appendParam(searchParams, "hasVisibleText", "true")
+  if (params.hasVisibleText === false) appendParam(searchParams, "hasVisibleText", "false")
+  appendParam(searchParams, "depictedSubject", params.depictedSubject)
+  appendParam(searchParams, "page", params.page)
+  appendParam(searchParams, "limit", params.limit)
+  appendParam(searchParams, "sort", params.sort)
+  if (params.includeFacets === false) appendParam(searchParams, "includeFacets", "false")
+
+  const query = searchParams.toString()
+  const response = await getJson<PublicCaricatureSearchResponse>(
+    `${resolveSearchCaricaturesPath()}${query ? `?${query}` : ""}`,
+    {
+      cachePolicy: "public-search-short",
+      traceRoute: "/api/public/search/caricatures",
+      layer: typeof window === "undefined" ? "web" : "browser",
+    },
+  )
+
+  return normalizeCaricatureSearchResponse(response)
 }
 
 export async function searchPublicEvents(params: PublicAssetListParams = {}): Promise<PublicSearchEventsResponse> {
@@ -576,6 +607,10 @@ function resolveSearchEventsPath() {
   return typeof window === "undefined" ? "/api/v1/search/events" : "/api/public/search/events"
 }
 
+function resolveSearchCaricaturesPath() {
+  return typeof window === "undefined" ? "/api/v1/search/caricatures" : "/api/public/search/caricatures"
+}
+
 function resolveLatestEventsPath() {
   return typeof window === "undefined" ? "/api/v1/public/events/latest" : "/api/public/events/latest"
 }
@@ -731,6 +766,55 @@ function normalizeTypesenseSearchResponse(response: TypesenseSearchResponse): Pu
       backend: "typesense",
       tookMs: response.timing?.tookMs ?? 0,
     },
+  }
+}
+
+function normalizeCaricatureSearchResponse(response: PublicCaricatureSearchResponse): PublicCaricatureSearchResponse {
+  const items = Array.isArray(response.items) ? response.items.map(normalizeCaricatureSearchItem) : []
+  const totalCount = typeof response.total === "number"
+    ? response.total
+    : typeof response.totalCount === "number"
+      ? response.totalCount
+      : items.length
+
+  return {
+    ...response,
+    items,
+    total: totalCount,
+    totalCount,
+    facets: {
+      categories: response.facets?.categories ?? [],
+      languages: response.facets?.languages ?? [],
+      credits: response.facets?.credits ?? [],
+      hasVisibleText: response.facets?.hasVisibleText ?? [],
+    },
+    timing: {
+      backend: "typesense",
+      tookMs: response.timing?.tookMs ?? 0,
+    },
+  }
+}
+
+function normalizeCaricatureSearchItem(
+  item: PublicCaricatureSearchResponse["items"][number],
+): PublicCaricatureSearchResponse["items"][number] {
+  const cardPreview = item.previews?.card
+    ?? (item.previewUrl && item.width && item.height
+      ? { url: item.previewUrl, width: item.width, height: item.height }
+      : null)
+  const detailPreview = item.previews?.detail ?? null
+
+  return {
+    ...item,
+    keywords: Array.isArray(item.keywords) ? item.keywords : [],
+    depictedSubjects: Array.isArray(item.depictedSubjects) ? item.depictedSubjects : [],
+    previews: {
+      card: cardPreview ? normalizePreview(cardPreview) : null,
+      detail: detailPreview ? normalizePreview(detailPreview) : null,
+    },
+    previewUrl: cardPreview?.url ?? item.previewUrl,
+    width: cardPreview?.width ?? item.width,
+    height: cardPreview?.height ?? item.height,
   }
 }
 

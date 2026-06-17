@@ -18,6 +18,9 @@ export interface SearchSegmentParams {
   mode?: string
   view?: string
   segment?: SearchSegment
+  language?: string
+  credit?: string
+  hasVisibleText?: boolean
 }
 
 export function parseSearchSegment(value: string | undefined): SearchSegment {
@@ -83,6 +86,10 @@ export function buildSearchPageHref(params: SearchSegmentParams) {
   if (params.mode === "events") searchParams.set("mode", "events")
   if (params.sort && params.sort !== "newest") searchParams.set("sort", params.sort)
   if (segment !== DEFAULT_SEARCH_SEGMENT) searchParams.set("segment", segment)
+  if (params.language) searchParams.set("language", params.language)
+  if (params.credit) searchParams.set("credit", params.credit)
+  if (params.hasVisibleText === true) searchParams.set("hasVisibleText", "true")
+  if (params.hasVisibleText === false) searchParams.set("hasVisibleText", "false")
 
   const query = searchParams.toString()
   return query ? `/search?${query}` : "/search"

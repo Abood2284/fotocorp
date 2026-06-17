@@ -15,8 +15,8 @@
 | PR 4 | Home hero search always routes to `segment=editorial` | Done |
 | PR 2 | Category seed + staff/internal category reads | Planned |
 | PR 5 | Typesense caricature index contract | Done |
-| PR 6 | Public caricature search API route | Planned |
-| PR 7 | Web caricature search client wiring | Planned |
+| PR 6 | Public caricature search API route | Done |
+| PR 7 | Web caricature search client wiring | Done |
 | PR 8–13 | Staff upload, storage, previews, publish UX, downloads, popularity | Planned |
 
 ---

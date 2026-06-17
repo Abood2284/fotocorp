@@ -14,6 +14,7 @@ const PUBLIC_UPSTREAM_BY_BFF_PATH: Record<string, string> = {
   assets: "/api/v1/assets",
   "assets/filters": "/api/v1/assets/filters",
   "search/assets": "/api/v1/search/assets",
+  "search/caricatures": "/api/v1/search/caricatures",
   "search/events": "/api/v1/search/events",
   "events/latest": "/api/v1/public/events/latest",
   "events/browse": "/api/v1/public/events/browse",
@@ -89,6 +90,7 @@ async function handlePublicProxy(
   const isAssetFilters = bffPath === "assets/filters"
   const isAssetDetail = bffPath.startsWith("assets/")
   const isSearchAssets = bffPath === "search/assets"
+  const isSearchCaricatures = bffPath === "search/caricatures"
   const isSearchEvents = bffPath === "search/events"
   const isLatestEvents = bffPath === "events/latest"
   const isEventCategoryBrowse = bffPath === "events/browse"
@@ -96,7 +98,7 @@ async function handlePublicProxy(
   const isHomepageHeroSet = bffPath === "homepage/hero-set"
   const revalidateSeconds = isAssetDetail
     ? 300
-    : isAssetList || isSearchAssets || isSearchEvents
+    : isAssetList || isSearchAssets || isSearchCaricatures || isSearchEvents
     ? 30
     : isLatestEvents
       ? 60
@@ -113,7 +115,7 @@ async function handlePublicProxy(
     ? PUBLIC_EVENTS_CACHE_CONTROL
     : isEventCategoryBrowse
       ? PUBLIC_EVENT_CATEGORY_BROWSE_CACHE_CONTROL
-    : isSearchAssets || isSearchEvents
+    : isSearchAssets || isSearchCaricatures || isSearchEvents
       ? PUBLIC_SEARCH_CACHE_CONTROL
       : isHomepageHeroSet
         ? PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL

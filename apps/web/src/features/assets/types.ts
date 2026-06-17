@@ -1,4 +1,4 @@
-export type PublicAssetSort = "newest" | "oldest" | "relevance"
+export type PublicAssetSort = "newest" | "oldest" | "relevance" | "popular"
 
 export interface PublicPreview {
   url: string
@@ -226,6 +226,63 @@ export interface PublicAssetListParams {
   year?: number
   month?: number
   cursor?: string
+  page?: number
+  limit?: number
+  sort?: PublicAssetSort
+  includeFacets?: boolean
+}
+
+export interface PublicCaricatureSearchItem {
+  id: string
+  headline: string | null
+  description: string | null
+  credit: string | null
+  categoryId: string | null
+  categoryName: string | null
+  language: string | null
+  hasVisibleText: boolean | null
+  keywords: string[]
+  depictedSubjects: string[]
+  publishedAt: string | null
+  createdAt: string | null
+  previewUrl: string | null
+  width: number | null
+  height: number | null
+  previews: {
+    card: PublicPreview | null
+    detail: PublicPreview | null
+  }
+}
+
+export interface PublicCaricatureSearchResponse {
+  items: PublicCaricatureSearchItem[]
+  total: number
+  totalCount: number
+  page: number
+  perPage: number
+  limit: number
+  totalPages: number
+  hasMore: boolean
+  facets: {
+    categories: Array<{ value: string; count: number; name: string; assetCount: number }>
+    languages: Array<{ value: string; count: number; name: string; assetCount: number }>
+    credits: Array<{ value: string; count: number; name: string; assetCount: number }>
+    hasVisibleText: Array<{ value: string; count: number; name: string; assetCount: number }>
+  }
+  timing?: {
+    backend: "typesense"
+    tookMs: number
+  }
+}
+
+export interface PublicCaricatureSearchParams {
+  q?: string
+  categoryId?: string
+  category?: string
+  language?: string
+  credit?: string
+  hasVisibleText?: boolean
+  depictedSubject?: string
   page?: number
   limit?: number
   sort?: PublicAssetSort

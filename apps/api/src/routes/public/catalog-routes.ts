@@ -15,6 +15,11 @@ import {
   parseTypesensePublicAssetSearchQuery,
   searchTypesensePublicAssets,
 } from "../../lib/search/typesense-public-assets";
+import {
+  buildTypesenseCaricatureFilterSummary,
+  parseTypesenseCaricatureSearchQuery,
+  searchTypesenseCaricatures,
+} from "../../lib/search/typesense-caricatures";
 import { searchTypesensePublicEvents } from "../../lib/search/typesense-public-event-search";
 
 export const publicCatalogRoutes = new Hono<{ Bindings: Env }>();
@@ -202,6 +207,123 @@ publicCatalogRoutes.get("/api/v1/search/assets", async (c) => {
 });
 
 publicCatalogRoutes.all("/api/v1/search/assets", () => methodNotAllowed());
+
+publicCatalogRoutes.get("/api/v1/search/caricatures", async (c) => {
+  const route = "/api/v1/search/caricatures";
+  const startedAt = Date.now();
+  let q = "*";
+  let page = 1;
+  let limit = 50;
+  let filters = "";
+
+  try {
+    const query = parseTypesenseCaricatureSearchQuery(new URL(c.req.url).searchParams);
+    q = query.q;
+    page = query.page;
+    limit = query.limit;
+    filters = buildTypesenseCaricatureFilterSummary(query);
+
+    const response = await searchTypesenseCaricatures(c.env, query);
+    const durationMs = Date.now() - startedAt;
+
+    console.info(
+      JSON.stringify({
+        event: "typesense_public_caricature_search",
+        route,
+        durationMs,
+        status: "ok",
+        statusCode: 200,
+        backend: "typesense",
+        q,
+        filters,
+        page,
+        limit,
+        found: response.total,
+        hits: response.items.length,
+        facetCount:
+          response.facets.categories.length +
+          response.facets.languages.length +
+          response.facets.credits.length +
+          response.facets.hasVisibleText.length,
+        tookMs: response.timing.tookMs,
+        timeout: false,
+      }),
+    );
+
+    return json(response, 200, {
+      headers: {
+        "Cache-Control": PUBLIC_TYPESENSE_SEARCH_CACHE_CONTROL,
+        "X-Content-Type-Options": "nosniff",
+      },
+    });
+  } catch (error) {
+    const durationMs = Date.now() - startedAt;
+
+    if (isTypesenseNotConfiguredError(error)) {
+      console.error(
+        JSON.stringify({
+          event: "typesense_public_caricature_search",
+          route,
+          durationMs,
+          status: "error",
+          statusCode: 503,
+          backend: "typesense",
+          q,
+          filters,
+          page,
+          limit,
+          timeout: false,
+        }),
+      );
+      return json({ error: "typesense_not_configured" }, 503);
+    }
+
+    if (isTypesenseSearchInputError(error)) {
+      console.warn(
+        JSON.stringify({
+          event: "typesense_public_caricature_search",
+          route,
+          durationMs,
+          status: "error",
+          statusCode: 400,
+          backend: "typesense",
+          q,
+          filters,
+          page,
+          limit,
+          timeout: false,
+          error: error.code,
+        }),
+      );
+      return json({ error: error.code }, 400);
+    }
+
+    if (isTypesenseSearchFailedError(error)) {
+      console.error(
+        JSON.stringify({
+          event: "typesense_public_caricature_search",
+          route,
+          durationMs,
+          status: "error",
+          statusCode: 502,
+          backend: "typesense",
+          q,
+          filters,
+          page,
+          limit,
+          tookMs: durationMs,
+          timeout: error.timedOut,
+          upstreamStatusCode: error.statusCode ?? null,
+        }),
+      );
+      return json({ error: "typesense_search_failed" }, 502);
+    }
+
+    throw error;
+  }
+});
+
+publicCatalogRoutes.all("/api/v1/search/caricatures", () => methodNotAllowed());
 
 publicCatalogRoutes.get("/api/v1/search/events", async (c) => {
   const route = "/api/v1/search/events";
