@@ -48,6 +48,10 @@ import {
 import { isCaricatureUpload, validateCaricatureUploadFile } from "@/lib/caricatures/caricature-upload-metadata"
 import type { CaricatureAssetRecord, CaricatureCategoryOption } from "@/lib/caricatures/caricature-upload-metadata"
 import {
+  isStaffWizardUploadError,
+  uploadCaricatureOriginalViaStaffWizard,
+} from "@/lib/caricatures/caricature-original-upload-client"
+import {
   caricatureUploadActionTitle,
   editorialUploadActionTitle,
   uploadStepsForAssetType,
@@ -131,6 +135,8 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
   const [caricatureAssetId, setCaricatureAssetId] = useState<string | null>(null)
   const [caricatureAsset, setCaricatureAsset] = useState<CaricatureAssetRecord | null>(null)
   const [caricatureCategories, setCaricatureCategories] = useState<CaricatureCategoryOption[]>([])
+  const [caricatureUploadBusy, setCaricatureUploadBusy] = useState(false)
+  const [caricatureUploadProgress, setCaricatureUploadProgress] = useState<number | null>(null)
 
   const isCaricature = isCaricatureUpload(batchAssetType)
   const wizardSteps = useMemo(() => [...uploadStepsForAssetType(batchAssetType)], [batchAssetType])
@@ -341,11 +347,41 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
     setCurrentStep(3)
   }, [markStepComplete, targetContributorId])
 
-  const handleCaricatureUploadContinue = useCallback(() => {
-    if (!tracked.length) return
-    markStepComplete(3)
-    setCurrentStep(4)
-  }, [markStepComplete, tracked.length])
+  const caricatureDefaultCredit = useMemo(() => {
+    const contributor = contributors.find((entry) => entry.id === targetContributorId)
+    return contributor?.displayName?.trim() || "Staff upload"
+  }, [contributors, targetContributorId])
+
+  const handleCaricatureUploadContinue = useCallback(async () => {
+    const row = tracked[0]
+    if (!row?.file || caricatureUploadBusy) return
+    setBlockingError(null)
+    setCaricatureUploadBusy(true)
+    setCaricatureUploadProgress(0)
+    try {
+      const result = await uploadCaricatureOriginalViaStaffWizard({
+        file: row.file,
+        credit: caricatureDefaultCredit,
+        existingAssetId: caricatureAssetId,
+        onProgress: setCaricatureUploadProgress,
+      })
+      setCaricatureAssetId(result.assetId)
+      setCaricatureAsset(result.asset)
+      markStepComplete(3)
+      setCurrentStep(4)
+    } catch (e) {
+      const msg = isStaffWizardUploadError(e) ? e.message : humanizeContributorNetworkError(e)
+      setBlockingError(msg)
+    } finally {
+      setCaricatureUploadBusy(false)
+    }
+  }, [
+    tracked,
+    caricatureUploadBusy,
+    caricatureDefaultCredit,
+    caricatureAssetId,
+    markStepComplete,
+  ])
 
   const saveCaricatureMetadata = useCallback(
     async (payload: Parameters<typeof staffWizardCreateCaricatureAsset>[0]) => {
@@ -674,14 +710,10 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
   )
 
   const rightLocked = isCaricature
-    ? (currentStep === 2 && !targetContributorId) || (currentStep === 3 && tracked.length === 0)
+    ? (currentStep === 2 && !targetContributorId) ||
+      (currentStep === 3 && (tracked.length === 0 || caricatureUploadBusy))
     : (currentStep === 3 && (!eventCreated || tracked.length === 0 || (hasExistingEvent && !targetContributorId))) ||
       (currentStep === 4 && doneCount < 1)
-
-  const caricatureDefaultCredit = useMemo(() => {
-    const contributor = contributors.find((entry) => entry.id === targetContributorId)
-    return contributor?.displayName?.trim() || "Staff upload"
-  }, [contributors, targetContributorId])
 
   const actionTitle = isCaricature
     ? caricatureUploadActionTitle(currentStep)
@@ -740,11 +772,14 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
           onTargetContributorIdChange={setTargetContributorId}
           tracked={tracked}
           rejectedFiles={rejectedFiles}
+          uploadBusy={caricatureUploadBusy}
+          uploadProgress={caricatureUploadProgress}
           onFilePicked={onCaricatureFilePicked}
           onRemoveFile={onCaricatureRemoveFile}
           categories={caricatureCategories}
           caricatureAsset={caricatureAsset}
           defaultCredit={caricatureDefaultCredit}
+          hasOriginalFile={Boolean(caricatureAsset?.hasOriginalFile)}
           onSetupContinue={handleCaricatureSetupContinue}
           onUploadContinue={handleCaricatureUploadContinue}
           onSaveMetadata={saveCaricatureMetadata}

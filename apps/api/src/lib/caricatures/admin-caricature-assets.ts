@@ -8,6 +8,7 @@ import {
   normalizeCaricatureMetadataInput,
   type CaricatureMetadataInput,
 } from "./caricature-asset-metadata"
+import { hasReadyCaricaturePreviewDerivatives } from "./caricature-preview-generation"
 
 export interface AdminCaricatureAssetListFilters {
   q?: string
@@ -40,6 +41,7 @@ export interface AdminCaricatureAssetDetail extends AdminCaricatureAssetListItem
   keywords: string[]
   depictedSubjects: string[]
   visibility: string
+  hasReadyPreviewDerivatives: boolean
 }
 
 export async function listAdminCaricatureAssets(
@@ -116,7 +118,9 @@ export async function getAdminCaricatureAssetById(
 
   const row = rows[0]
   if (!row) return null
-  return mapDetail(row.asset, row.categoryName)
+  const detail = mapDetail(row.asset, row.categoryName)
+  detail.hasReadyPreviewDerivatives = await hasReadyCaricaturePreviewDerivatives(db, assetId)
+  return detail
 }
 
 export async function createAdminCaricatureAsset(
@@ -176,7 +180,11 @@ export async function updateAdminCaricatureAsset(
   }
 
   const hasOriginalFile = Boolean(row.originalObjectKey?.trim())
-  const metadata = normalizeCaricatureMetadataInput(input, { hasOriginalFile })
+  const hasReadyPreviewDerivatives = await hasReadyCaricaturePreviewDerivatives(db, assetId)
+  const metadata = normalizeCaricatureMetadataInput(input, {
+    hasOriginalFile,
+    hasReadyPreviewDerivatives,
+  })
   await assertActiveCategory(db, metadata.categoryId)
 
   const now = new Date()
@@ -268,5 +276,6 @@ function mapDetail(
     keywords: asset.keywords,
     depictedSubjects: asset.depictedSubjects,
     visibility: asset.visibility,
+    hasReadyPreviewDerivatives: false,
   }
 }

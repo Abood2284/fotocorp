@@ -11,6 +11,8 @@ interface ContributorUploadStepCaricatureFilesProps {
   active: boolean
   tracked: TrackedFile[]
   rejectedFiles: { file: File; reason: string }[]
+  uploadBusy?: boolean
+  uploadProgress?: number | null
   onFilePicked: (list: FileList | null) => void
   onRemoveFile: () => void
 }
@@ -19,6 +21,8 @@ export function ContributorUploadStepCaricatureFiles({
   active,
   tracked,
   rejectedFiles,
+  uploadBusy = false,
+  uploadProgress = null,
   onFilePicked,
   onRemoveFile,
 }: ContributorUploadStepCaricatureFilesProps) {
@@ -36,7 +40,7 @@ export function ContributorUploadStepCaricatureFiles({
             type="file"
             accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
             className="sr-only"
-            disabled={!active}
+            disabled={!active || uploadBusy}
             onChange={(event) => {
               onFilePicked(event.target.files)
               event.target.value = ""
@@ -68,17 +72,23 @@ export function ContributorUploadStepCaricatureFiles({
               <p className="truncate text-sm font-medium text-foreground">{getTrackedDisplayName(row)}</p>
               <p className="text-xs text-muted-foreground">{formatFileSize(getTrackedSizeBytes(row))}</p>
             </div>
-            <Button type="button" variant="outline" size="sm" disabled={!active} onClick={onRemoveFile}>
+            <Button type="button" variant="outline" size="sm" disabled={!active || uploadBusy} onClick={onRemoveFile}>
               Remove
             </Button>
           </div>
         ) : (
           <>
             <p className="text-sm font-medium text-foreground">Drop a caricature file here</p>
-            <p className="mt-1 text-xs text-muted-foreground">Original storage upload completes in the next release.</p>
+            <p className="mt-1 text-xs text-muted-foreground">The original is stored privately in R2 when you continue.</p>
           </>
         )}
       </div>
+
+      {uploadBusy ? (
+        <p className="mb-4 text-xs text-muted-foreground">
+          Uploading to private storage… {uploadProgress != null ? `${uploadProgress}%` : ""}
+        </p>
+      ) : null}
 
       {rejectedFiles.length > 0 ? (
         <ul className="space-y-1 text-xs text-destructive">

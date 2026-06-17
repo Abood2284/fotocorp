@@ -22,13 +22,16 @@ interface CaricatureUploadWizardPanelProps {
   onTargetContributorIdChange: (value: string) => void
   tracked: TrackedFile[]
   rejectedFiles: { file: File; reason: string }[]
+  uploadBusy?: boolean
+  uploadProgress?: number | null
   onFilePicked: (list: FileList | null) => void
   onRemoveFile: () => void
   categories: CaricatureCategoryOption[]
   caricatureAsset: CaricatureAssetRecord | null
   defaultCredit: string
+  hasOriginalFile: boolean
   onSetupContinue: () => void
-  onUploadContinue: () => void
+  onUploadContinue: () => void | Promise<void>
   onSaveMetadata: (payload: CaricatureAssetMetadataPayload) => Promise<void>
   submitBusy: boolean
   submitError: string | null
@@ -43,11 +46,14 @@ export function CaricatureUploadWizardPanel({
   onTargetContributorIdChange,
   tracked,
   rejectedFiles,
+  uploadBusy = false,
+  uploadProgress = null,
   onFilePicked,
   onRemoveFile,
   categories,
   caricatureAsset,
   defaultCredit,
+  hasOriginalFile,
   onSetupContinue,
   onUploadContinue,
   onSaveMetadata,
@@ -62,10 +68,11 @@ export function CaricatureUploadWizardPanel({
     return (
       <ContributorUploadStepCaricatureMetadata
         active
+        staffMode={staffMode}
         categories={categories}
         asset={caricatureAsset}
         defaultCredit={defaultCredit}
-        hasLocalFile={hasLocalFile}
+        hasOriginalFile={hasOriginalFile || Boolean(caricatureAsset?.hasOriginalFile)}
         onSave={onSaveMetadata}
         submitBusy={submitBusy}
         submitError={submitError}
@@ -78,7 +85,7 @@ export function CaricatureUploadWizardPanel({
     <ContributorUploadLayout
       rightLocked={
         (currentStep === 2 && setupDisabled) ||
-        (currentStep === 3 && !hasLocalFile)
+        (currentStep === 3 && (!hasLocalFile || uploadBusy))
       }
       left={
         <>
@@ -98,6 +105,8 @@ export function CaricatureUploadWizardPanel({
               active
               tracked={tracked}
               rejectedFiles={rejectedFiles}
+              uploadBusy={uploadBusy}
+              uploadProgress={uploadProgress}
               onFilePicked={onFilePicked}
               onRemoveFile={onRemoveFile}
             />
@@ -114,10 +123,13 @@ export function CaricatureUploadWizardPanel({
               <Button
                 type="button"
                 className="h-11 w-full text-sm sm:h-12 sm:text-base"
-                disabled={currentStep === 2 ? setupDisabled : !hasLocalFile}
-                onClick={currentStep === 2 ? onSetupContinue : onUploadContinue}
+                disabled={currentStep === 2 ? setupDisabled : !hasLocalFile || uploadBusy}
+                onClick={() => {
+                  if (currentStep === 2) onSetupContinue()
+                  else void onUploadContinue()
+                }}
               >
-                {currentStep === 2 ? "Continue to upload" : "Continue to metadata"}
+                {uploadBusy ? "Uploading…" : currentStep === 2 ? "Continue to upload" : caricatureUploadActionTitle(currentStep)}
               </Button>
             </div>
           </ContributorUploadStepCard>

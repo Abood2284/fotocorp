@@ -31,7 +31,7 @@ export function caricatureUploadActionTitle(step: number): string {
     case 2:
       return "Continue"
     case 3:
-      return "Continue to metadata"
+      return "Upload and continue"
     case 4:
       return "Save caricature"
     default:

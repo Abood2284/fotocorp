@@ -6,15 +6,22 @@ import { methodNotAllowed } from "../../../lib/route-errors"
 import { internalAuthMiddleware } from "../../../middleware/internalAuth"
 import {
   actorStaffIdFromRequest,
+  completeCaricatureOriginalUploadService,
   createAdminCaricatureAssetService,
+  createCaricatureUploadShellService,
   getAdminCaricatureAssetByIdService,
   listAdminCaricatureAssetsService,
+  presignCaricatureOriginalUploadService,
+  queueCaricaturePreviewsService,
   updateAdminCaricatureAssetService,
 } from "./service"
 import {
   adminCaricatureAssetListQuerySchema,
   adminCaricatureAssetMetadataSchema,
   adminCaricatureAssetParamSchema,
+  caricatureOriginalCompleteSchema,
+  caricatureOriginalPresignSchema,
+  caricatureUploadShellSchema,
 } from "./validators"
 
 const base = "/api/v1/internal/admin/caricature-assets"
@@ -42,6 +49,18 @@ internalAdminCaricatureAssetsRoutes.post(
   },
 )
 
+internalAdminCaricatureAssetsRoutes.post(
+  `${base}/upload-shell`,
+  zValidator("json", caricatureUploadShellSchema),
+  async (c) => {
+    const payload = c.req.valid("json")
+    const actorStaffId = actorStaffIdFromRequest(c.req.raw)
+    return await createCaricatureUploadShellService(c.env, payload, actorStaffId)
+  },
+)
+
+internalAdminCaricatureAssetsRoutes.all(`${base}/upload-shell`, () => methodNotAllowed())
+
 internalAdminCaricatureAssetsRoutes.all(base, () => methodNotAllowed())
 
 internalAdminCaricatureAssetsRoutes.get(
@@ -64,5 +83,41 @@ internalAdminCaricatureAssetsRoutes.patch(
     return await updateAdminCaricatureAssetService(c.env, assetId, payload, actorStaffId)
   },
 )
+
+internalAdminCaricatureAssetsRoutes.post(
+  `${base}/:assetId/original/presign`,
+  zValidator("param", adminCaricatureAssetParamSchema),
+  zValidator("json", caricatureOriginalPresignSchema),
+  async (c) => {
+    const { assetId } = c.req.valid("param")
+    const payload = c.req.valid("json")
+    return await presignCaricatureOriginalUploadService(c.env, assetId, payload)
+  },
+)
+
+internalAdminCaricatureAssetsRoutes.post(
+  `${base}/:assetId/original/complete`,
+  zValidator("param", adminCaricatureAssetParamSchema),
+  zValidator("json", caricatureOriginalCompleteSchema),
+  async (c) => {
+    const { assetId } = c.req.valid("param")
+    const payload = c.req.valid("json")
+    return await completeCaricatureOriginalUploadService(c.env, assetId, payload)
+  },
+)
+
+internalAdminCaricatureAssetsRoutes.all(`${base}/:assetId/original/presign`, () => methodNotAllowed())
+internalAdminCaricatureAssetsRoutes.all(`${base}/:assetId/original/complete`, () => methodNotAllowed())
+
+internalAdminCaricatureAssetsRoutes.post(
+  `${base}/:assetId/generate-previews`,
+  zValidator("param", adminCaricatureAssetParamSchema),
+  async (c) => {
+    const { assetId } = c.req.valid("param")
+    return await queueCaricaturePreviewsService(c.env, assetId)
+  },
+)
+
+internalAdminCaricatureAssetsRoutes.all(`${base}/:assetId/generate-previews`, () => methodNotAllowed())
 
 internalAdminCaricatureAssetsRoutes.all(`${base}/:assetId`, () => methodNotAllowed())

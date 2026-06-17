@@ -23,10 +23,11 @@ import { ContributorUploadStepCard } from "@/components/contributor/upload/contr
 
 interface ContributorUploadStepCaricatureMetadataProps {
   active: boolean
+  staffMode: boolean
   categories: CaricatureCategoryOption[]
   asset: CaricatureAssetRecord | null
   defaultCredit: string
-  hasLocalFile: boolean
+  hasOriginalFile: boolean
   onSave: (payload: CaricatureAssetMetadataPayload) => Promise<void>
   submitBusy: boolean
   submitError: string | null
@@ -35,10 +36,11 @@ interface ContributorUploadStepCaricatureMetadataProps {
 
 export function ContributorUploadStepCaricatureMetadata({
   active,
+  staffMode,
   categories,
   asset,
   defaultCredit,
-  hasLocalFile,
+  hasOriginalFile,
   onSave,
   submitBusy,
   submitError,
@@ -52,15 +54,19 @@ export function ContributorUploadStepCaricatureMetadata({
   const showVisibleText = caricatureLanguageRequiresVisibleText(language)
   const showTranslation = caricatureLanguageShowsTranslation(language)
   const showLanguageOther = caricatureLanguageRequiresOther(language)
-  const publishBlocked = asset ? !asset.hasOriginalFile : true
+  const publishBlocked = asset ? !asset.hasOriginalFile : !hasOriginalFile
+  const previewsBlocked = asset ? !asset.hasReadyPreviewDerivatives : true
 
-  const statusOptions = useMemo(
-    () =>
-      publishBlocked
-        ? CARICATURE_STATUS_OPTIONS.filter((option) => option.value !== "PUBLISHED")
-        : CARICATURE_STATUS_OPTIONS,
-    [publishBlocked],
-  )
+  const statusOptions = useMemo(() => {
+    let options = CARICATURE_STATUS_OPTIONS
+    if (!staffMode) {
+      options = options.filter((option) => option.value !== "PUBLISHED")
+    }
+    if (publishBlocked || previewsBlocked) {
+      options = options.filter((option) => option.value !== "PUBLISHED")
+    }
+    return options
+  }, [staffMode, publishBlocked, previewsBlocked])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -107,16 +113,17 @@ export function ContributorUploadStepCaricatureMetadata({
           </div>
         )}
 
-        {!hasLocalFile ? (
+        {!hasOriginalFile ? (
           <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
-            Add a caricature image on the previous step before saving metadata.
+            Upload the caricature image on the previous step before saving metadata.
           </div>
         ) : null}
 
-        {publishBlocked ? (
+        {publishBlocked || previewsBlocked ? (
           <div className="rounded border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-            Publishing stays disabled until original storage upload is wired in the next release. Save
-            as draft or pending review for now.
+            {publishBlocked
+              ? "Publishing requires a completed original upload."
+              : "Publishing requires staff-approved blurred previews. Save as draft or pending review until previews are generated."}
           </div>
         ) : null}
 
@@ -284,7 +291,7 @@ export function ContributorUploadStepCaricatureMetadata({
         </section>
 
         <div className="flex justify-end">
-          <Button type="submit" disabled={!active || submitBusy || !hasLocalFile}>
+          <Button type="submit" disabled={!active || submitBusy || !hasOriginalFile}>
             {submitBusy ? "Saving…" : "Save caricature"}
           </Button>
         </div>

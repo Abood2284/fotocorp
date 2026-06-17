@@ -234,3 +234,40 @@ export async function staffWizardUpdateCaricatureAsset(assetId: string, payload:
     body: JSON.stringify(payload),
   })
 }
+
+export async function createStaffCaricatureUploadShell(payload: { credit: string; fileName?: string }) {
+  return staffWizardJson<CaricatureAssetRecord>("/caricatures/upload-shell", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function presignStaffCaricatureOriginalUpload(
+  assetId: string,
+  payload: { fileName: string; mimeType: string; sizeBytes: number },
+) {
+  return staffWizardJson<{
+    assetId: string
+    storageKey: string
+    uploadMethod: "SIGNED_PUT"
+    uploadUrl: string
+    expiresAt: string
+    headers: { "content-type": string }
+  }>(`/caricatures/${encodeURIComponent(assetId)}/original/presign`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function completeStaffCaricatureOriginalUpload(
+  assetId: string,
+  payload: { width?: number | null; height?: number | null; checksum?: string | null } = {},
+) {
+  return staffWizardJson<{ ok: true; assetId: string; hasOriginalFile: true; idempotent?: true }>(
+    `/caricatures/${encodeURIComponent(assetId)}/original/complete`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  )
+}

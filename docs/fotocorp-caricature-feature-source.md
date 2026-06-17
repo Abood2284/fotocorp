@@ -18,7 +18,9 @@
 | PR 6 | Public caricature search API route | Done |
 | PR 7 | Web caricature search client wiring | Done |
 | PR 8 | Staff/contributor upload wizard caricature path + metadata API | Done |
-| PR 9–13 | Storage upload, previews, publish UX, downloads, popularity | Planned |
+| PR 9 | Caricature original private R2 upload (wizard step 3) | Done |
+| PR 10 | Blurred preview generation + publish gate | Done |
+| PR 11–13 | Publish UX, downloads, popularity | Planned |
 
 ---
 

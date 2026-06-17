@@ -14,8 +14,16 @@ import {
   updateAdminCaricatureAsset,
 } from "../../../lib/caricatures/admin-caricature-assets"
 import {
+  completeCaricatureOriginalUpload,
+  createCaricatureUploadShell,
+  presignCaricatureOriginalUpload,
+} from "../../../lib/caricatures/caricature-original-upload"
+import {
   adminCaricatureAssetMetadataSchema,
   adminCaricatureAssetParamSchema,
+  caricatureOriginalCompleteSchema,
+  caricatureOriginalPresignSchema,
+  caricatureUploadShellSchema,
 } from "../../internal/admin-caricature-assets/validators"
 import { CONTRIBUTOR_SESSION_COOKIE, requirePhotographerSession } from "../auth/service"
 
@@ -30,6 +38,20 @@ contributorCaricatureRoutes.get(`${base}/categories`, async (c) => {
 })
 
 contributorCaricatureRoutes.all(`${base}/categories`, () => methodNotAllowed())
+
+contributorCaricatureRoutes.post(
+  `${base}/upload-shell`,
+  zValidator("json", caricatureUploadShellSchema),
+  async (c) => {
+    const database = db(c.env)
+    await requirePhotographerSession(database, getCookie(c, CONTRIBUTOR_SESSION_COOKIE))
+    const payload = c.req.valid("json")
+    const created = await createCaricatureUploadShell(database, payload, null)
+    return json(created, 201)
+  },
+)
+
+contributorCaricatureRoutes.all(`${base}/upload-shell`, () => methodNotAllowed())
 
 contributorCaricatureRoutes.post(
   base,
@@ -68,6 +90,35 @@ contributorCaricatureRoutes.patch(
     return json(await updateAdminCaricatureAsset(database, assetId, payload, null))
   },
 )
+
+contributorCaricatureRoutes.post(
+  `${base}/:assetId/original/presign`,
+  zValidator("param", adminCaricatureAssetParamSchema),
+  zValidator("json", caricatureOriginalPresignSchema),
+  async (c) => {
+    const database = db(c.env)
+    await requirePhotographerSession(database, getCookie(c, CONTRIBUTOR_SESSION_COOKIE))
+    const { assetId } = c.req.valid("param")
+    const payload = c.req.valid("json")
+    return json(await presignCaricatureOriginalUpload(database, c.env, assetId, payload))
+  },
+)
+
+contributorCaricatureRoutes.post(
+  `${base}/:assetId/original/complete`,
+  zValidator("param", adminCaricatureAssetParamSchema),
+  zValidator("json", caricatureOriginalCompleteSchema),
+  async (c) => {
+    const database = db(c.env)
+    await requirePhotographerSession(database, getCookie(c, CONTRIBUTOR_SESSION_COOKIE))
+    const { assetId } = c.req.valid("param")
+    const payload = c.req.valid("json")
+    return json(await completeCaricatureOriginalUpload(database, c.env, assetId, payload))
+  },
+)
+
+contributorCaricatureRoutes.all(`${base}/:assetId/original/presign`, () => methodNotAllowed())
+contributorCaricatureRoutes.all(`${base}/:assetId/original/complete`, () => methodNotAllowed())
 
 contributorCaricatureRoutes.all(base, () => methodNotAllowed())
 contributorCaricatureRoutes.all(`${base}/:assetId`, () => methodNotAllowed())

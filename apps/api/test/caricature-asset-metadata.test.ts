@@ -79,14 +79,30 @@ describe("caricature asset metadata", () => {
     )
   })
 
-  it("allows publish when original file exists", () => {
+  it("blocks publish without ready preview derivatives", () => {
+    assert.throws(
+      () =>
+        normalizeCaricatureMetadataInput(
+          {
+            ...baseInput,
+            language: "NO_VISIBLE_TEXT",
+            status: "PUBLISHED",
+          },
+          { hasOriginalFile: true, hasReadyPreviewDerivatives: false },
+        ),
+      (error: unknown) =>
+        error instanceof AppError && error.code === "CARICATURE_PUBLISH_REQUIRES_PREVIEWS",
+    )
+  })
+
+  it("allows publish when original file and preview derivatives exist", () => {
     const normalized = normalizeCaricatureMetadataInput(
       {
         ...baseInput,
         language: "NO_VISIBLE_TEXT",
         status: "PUBLISHED",
       },
-      { hasOriginalFile: true },
+      { hasOriginalFile: true, hasReadyPreviewDerivatives: true },
     )
     assert.equal(normalized.status, "PUBLISHED")
   })

@@ -35,6 +35,7 @@ export interface CaricatureAssetMetadataPayload {
 export interface CaricatureAssetRecord extends CaricatureAssetMetadataPayload {
   id: string
   hasOriginalFile: boolean
+  hasReadyPreviewDerivatives?: boolean
   hasVisibleText: boolean
   categoryName: string
   visibility: string

@@ -58,6 +58,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { isCaricatureUpload, validateCaricatureUploadFile } from "@/lib/caricatures/caricature-upload-metadata"
 import type { CaricatureAssetRecord, CaricatureCategoryOption } from "@/lib/caricatures/caricature-upload-metadata"
+import { uploadCaricatureOriginalViaContributorApi } from "@/lib/caricatures/caricature-original-upload-client"
 import {
   caricatureUploadActionTitle,
   editorialUploadActionTitle,
@@ -104,6 +105,8 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
   const [caricatureAssetId, setCaricatureAssetId] = useState<string | null>(null)
   const [caricatureAsset, setCaricatureAsset] = useState<CaricatureAssetRecord | null>(null)
   const [caricatureCategories, setCaricatureCategories] = useState<CaricatureCategoryOption[]>([])
+  const [caricatureUploadBusy, setCaricatureUploadBusy] = useState(false)
+  const [caricatureUploadProgress, setCaricatureUploadProgress] = useState<number | null>(null)
 
   const isCaricature = isCaricatureUpload(batchAssetType)
   const wizardSteps = useMemo(() => [...uploadStepsForAssetType(batchAssetType)], [batchAssetType])
@@ -302,11 +305,32 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     setCurrentStep(3)
   }, [markStepComplete])
 
-  const handleCaricatureUploadContinue = useCallback(() => {
-    if (!tracked.length) return
-    markStepComplete(3)
-    setCurrentStep(4)
-  }, [markStepComplete, tracked.length])
+  const caricatureDefaultCredit = initialSession.contributor.displayName.trim() || "Contributor upload"
+
+  const handleCaricatureUploadContinue = useCallback(async () => {
+    const row = tracked[0]
+    if (!row?.file || caricatureUploadBusy) return
+    setBlockingError(null)
+    setCaricatureUploadBusy(true)
+    setCaricatureUploadProgress(0)
+    try {
+      const result = await uploadCaricatureOriginalViaContributorApi({
+        file: row.file,
+        credit: caricatureDefaultCredit,
+        existingAssetId: caricatureAssetId,
+        onProgress: setCaricatureUploadProgress,
+      })
+      setCaricatureAssetId(result.assetId)
+      setCaricatureAsset(result.asset)
+      markStepComplete(3)
+      setCurrentStep(4)
+    } catch (e) {
+      const msg = e instanceof ContributorApiError ? e.message : humanizeContributorNetworkError(e)
+      setBlockingError(msg)
+    } finally {
+      setCaricatureUploadBusy(false)
+    }
+  }, [tracked, caricatureUploadBusy, caricatureDefaultCredit, caricatureAssetId, markStepComplete])
 
   const saveCaricatureMetadata = useCallback(
     async (payload: Parameters<typeof createContributorCaricatureAsset>[0]) => {
@@ -634,8 +658,6 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     ? caricatureUploadActionTitle(currentStep)
     : editorialUploadActionTitle(currentStep)
 
-  const caricatureDefaultCredit = initialSession.contributor.displayName.trim() || "Contributor upload"
-
   return (
     <div className="space-y-6">
       <ContributorUploadStepper
@@ -689,11 +711,14 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
           onTargetContributorIdChange={setTargetContributorId}
           tracked={tracked}
           rejectedFiles={rejectedFiles}
+          uploadBusy={caricatureUploadBusy}
+          uploadProgress={caricatureUploadProgress}
           onFilePicked={onCaricatureFilePicked}
           onRemoveFile={onCaricatureRemoveFile}
           categories={caricatureCategories}
           caricatureAsset={caricatureAsset}
           defaultCredit={caricatureDefaultCredit}
+          hasOriginalFile={Boolean(caricatureAsset?.hasOriginalFile)}
           onSetupContinue={handleCaricatureSetupContinue}
           onUploadContinue={handleCaricatureUploadContinue}
           onSaveMetadata={saveCaricatureMetadata}

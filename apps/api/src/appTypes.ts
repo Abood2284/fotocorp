@@ -1,7 +1,13 @@
+type HyperdriveBinding = {
+  connectionString: string;
+};
+
 export interface Env {
   BETTER_AUTH_SECRET?: string;
   BETTER_AUTH_URL?: string;
   DATABASE_URL?: string;
+  CORE_HYPERDRIVE?: HyperdriveBinding;
+  PUBLIC_READ_HYPERDRIVE?: HyperdriveBinding;
   FOTOCORP_SUPER_ADMIN_EMAIL?: string;
   MEDIA_ORIGINALS_BUCKET?: R2Bucket;
   MEDIA_PREVIEWS_BUCKET: R2Bucket;
@@ -64,4 +70,14 @@ export interface Env {
   CLOUDFLARE_R2_PREVIEWS_BUCKET?: string;
   /** Legacy alias for the same bucket as `R2_CONTRIBUTOR_STAGING_BUCKET`. Do not use `R2_PHOTOGRAPHER_STAGING_BUCKET`. */
   CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET?: string;
+  /** Private caricature originals bucket binding (browser PUT via presigned URL). */
+  MEDIA_CARICATURE_ORIGINALS_BUCKET?: R2Bucket;
+  /** Public caricature blurred previews bucket binding (server-side PUT only). */
+  MEDIA_CARICATURE_PREVIEWS_BUCKET?: R2Bucket;
+  /** Private caricature originals bucket name for S3 API presign/head (same as Worker binding). */
+  R2_CARICATURE_ORIGINALS_BUCKET?: string;
+  CLOUDFLARE_R2_CARICATURE_ORIGINALS_BUCKET?: string;
+  /** Public caricature previews bucket name for S3 API put/head. */
+  R2_CARICATURE_PREVIEWS_BUCKET?: string;
+  CLOUDFLARE_R2_CARICATURE_PREVIEWS_BUCKET?: string;
 }

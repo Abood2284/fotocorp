@@ -61,6 +61,8 @@ STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL=abdulraheemsayyed22@gmail.com
 # - MEDIA_PREVIEWS_BUCKET for watermarked derivatives
 # - MEDIA_ORIGINALS_BUCKET for canonical Fotokey originals (admin tunnel + subscriber download)
 # - MEDIA_CONTRIBUTOR_UPLOADS_BUCKET for contributor pre-approval staging objects (browser PUT target)
+# - MEDIA_CARICATURE_ORIGINALS_BUCKET for private caricature originals (browser PUT via presigned URL)
+# - MEDIA_CARICATURE_PREVIEWS_BUCKET for public blurred caricature previews (server-side PUT only)
 # When both staging + originals bindings are present (e.g. `wrangler dev`), contributor **approve**
 # copies staging → originals via native R2 get/put without S3 API keys.
 # S3-compatible R2 credentials (server-side only; never expose to the browser).
@@ -72,6 +74,8 @@ R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_CONTRIBUTOR_STAGING_BUCKET=fotocorp-2026-contributor-uploads
+R2_CARICATURE_ORIGINALS_BUCKET=fotocorp-caricature-originals
+R2_CARICATURE_PREVIEWS_BUCKET=fotocorp-caricature-previews
 #
 # Legacy aliases (still read by the API if the `R2_*` names above are unset):
 CLOUDFLARE_R2_ACCOUNT_ID=
@@ -87,7 +91,7 @@ CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET=fotocorp-2026-contributor-uploads
 #   same name as Worker binding `MEDIA_CONTRIBUTOR_UPLOADS_BUCKET` in wrangler.jsonc).
 # - Canonical originals bucket holds Fotokey-named files at root; promotion is server-side (R2 CopyObject), not browser PUT.
 #
-# R2 CORS (browser PUT): the **contributor staging** bucket needs a CORS rule allowing PUT from your web origin
+# R2 CORS (browser PUT): the **contributor staging** and **caricature originals** buckets need CORS rules allowing PUT from your web origin
 # (e.g. `http://localhost:3000` in dev, and your deployed Pages/Workers site origin in production). AllowedMethods
 # should include `PUT`; AllowedHeaders must allow `Content-Type`. Without CORS, presigned PUT succeeds from curl/Node
 # but fails in the browser. Paste JSON in R2 → bucket → Settings → CORS policy. Example file:

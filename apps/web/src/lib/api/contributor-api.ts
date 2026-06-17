@@ -577,6 +577,51 @@ export async function updateContributorCaricatureAsset(
   })
 }
 
+export async function createContributorCaricatureUploadShell(
+  payload: { credit: string; fileName?: string },
+  options: ContributorRequestOptions = {},
+) {
+  return contributorJson<CaricatureAssetRecord>("/caricatures/upload-shell", {
+    method: "POST",
+    body: payload,
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function presignContributorCaricatureOriginalUpload(
+  assetId: string,
+  payload: { fileName: string; mimeType: string; sizeBytes: number },
+  options: ContributorRequestOptions = {},
+) {
+  return contributorJson<{
+    assetId: string
+    storageKey: string
+    uploadMethod: "SIGNED_PUT"
+    uploadUrl: string
+    expiresAt: string
+    headers: { "content-type": string }
+  }>(`/caricatures/${encodeURIComponent(assetId)}/original/presign`, {
+    method: "POST",
+    body: payload,
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function completeContributorCaricatureOriginalUpload(
+  assetId: string,
+  payload: { width?: number | null; height?: number | null; checksum?: string | null } = {},
+  options: ContributorRequestOptions = {},
+) {
+  return contributorJson<{ ok: true; assetId: string; hasOriginalFile: true; idempotent?: true }>(
+    `/caricatures/${encodeURIComponent(assetId)}/original/complete`,
+    {
+      method: "POST",
+      body: payload,
+      cookieHeader: options.cookieHeader,
+    },
+  )
+}
+
 /** Maps `fetch` / XHR network failures to contributor-safe copy (never raw "Failed to fetch" alone). */
 export function humanizeContributorNetworkError(error: unknown): string {
   const msg = error instanceof Error ? error.message : ""

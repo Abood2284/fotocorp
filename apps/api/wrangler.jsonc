@@ -41,6 +41,16 @@
 			"binding": "MEDIA_CONTRIBUTOR_UPLOADS_BUCKET",
 			"bucket_name": "fotocorp-2026-contributor-uploads",
 			"remote": true
+		},
+		{
+			"binding": "MEDIA_CARICATURE_ORIGINALS_BUCKET",
+			"bucket_name": "fotocorp-caricature-originals",
+			"remote": true
+		},
+		{
+			"binding": "MEDIA_CARICATURE_PREVIEWS_BUCKET",
+			"bucket_name": "fotocorp-caricature-previews",
+			"remote": true
 		}
 	],
 	"routes": [

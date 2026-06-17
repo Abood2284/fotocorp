@@ -48,6 +48,7 @@ export interface NormalizedCaricatureMetadata {
 
 export interface ValidateCaricatureMetadataOptions {
   hasOriginalFile?: boolean
+  hasReadyPreviewDerivatives?: boolean
 }
 
 export function normalizeCaricatureMetadataInput(
@@ -74,6 +75,14 @@ export function normalizeCaricatureMetadataInput(
       400,
       "CARICATURE_PUBLISH_REQUIRES_FILE",
       "Publishing requires an uploaded caricature image. Save as draft until the image is attached.",
+    )
+  }
+
+  if (status === "PUBLISHED" && !options.hasReadyPreviewDerivatives) {
+    throw new AppError(
+      400,
+      "CARICATURE_PUBLISH_REQUIRES_PREVIEWS",
+      "Publishing requires generated blurred previews. Approve the caricature and run preview generation first.",
     )
   }
 

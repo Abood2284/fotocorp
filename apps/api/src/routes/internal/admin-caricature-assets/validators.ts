@@ -31,3 +31,20 @@ export const adminCaricatureAssetMetadataSchema = z.object({
   publishedAt: z.string().datetime(),
   status: z.enum(CARICATURE_ASSET_STATUSES),
 })
+
+export const caricatureUploadShellSchema = z.object({
+  credit: z.string().trim().min(1).max(500),
+  fileName: z.string().trim().max(500).optional(),
+})
+
+export const caricatureOriginalPresignSchema = z.object({
+  fileName: z.string().trim().min(1).max(500),
+  mimeType: z.string().trim().min(1).max(200),
+  sizeBytes: z.number().int().positive().max(50 * 1024 * 1024),
+})
+
+export const caricatureOriginalCompleteSchema = z.object({
+  width: z.number().int().positive().optional().nullable(),
+  height: z.number().int().positive().optional().nullable(),
+  checksum: z.string().trim().max(128).optional().nullable(),
+})

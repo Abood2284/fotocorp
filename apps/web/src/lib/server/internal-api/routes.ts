@@ -117,6 +117,17 @@ export const internalApiRoutes = {
 
   adminCaricatureAsset: (assetId: string) =>
     `/api/v1/internal/admin/caricature-assets/${encodeURIComponent(assetId)}`,
+
+  adminCaricatureUploadShell: () => "/api/v1/internal/admin/caricature-assets/upload-shell",
+
+  adminCaricatureOriginalPresign: (assetId: string) =>
+    `/api/v1/internal/admin/caricature-assets/${encodeURIComponent(assetId)}/original/presign`,
+
+  adminCaricatureOriginalComplete: (assetId: string) =>
+    `/api/v1/internal/admin/caricature-assets/${encodeURIComponent(assetId)}/original/complete`,
+
+  adminCaricatureGeneratePreviews: (assetId: string) =>
+    `/api/v1/internal/admin/caricature-assets/${encodeURIComponent(assetId)}/generate-previews`,
 } as const
 
 export function withQuery(path: string, params: URLSearchParams) {

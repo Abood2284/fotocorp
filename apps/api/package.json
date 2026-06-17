@@ -24,6 +24,7 @@
     "smoke:derivative-shards": "tsx scripts/smoke/check-derivative-shards.ts",
     "smoke:public-preview": "tsx scripts/smoke/check-public-preview.ts",
     "media:generate-derivatives": "tsx scripts/media/generate-watermarked-derivatives.ts",
+    "media:generate-caricature-previews": "tsx scripts/media/generate-caricature-previews.ts",
     "media:process-image-publish-jobs": "tsx scripts/media/process-image-publish-jobs.ts",
     "royalty-free:refresh-featured": "tsx scripts/public/refresh-royalty-free-featured.ts",
     "creative:refresh-featured": "tsx scripts/public/refresh-royalty-free-featured.ts",
