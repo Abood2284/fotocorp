@@ -43,8 +43,6 @@ import {
   staffWizardSubmitBatch,
   staffWizardListCaricatureCategories,
   staffWizardCreateCaricatureAsset,
-  staffWizardGenerateCaricaturePreviews,
-  staffWizardGetCaricatureAsset,
   staffWizardUpdateCaricatureAsset,
 } from "@/lib/staff-upload-wizard-client"
 import { isCaricatureUpload, validateCaricatureUploadFile } from "@/lib/caricatures/caricature-upload-metadata"
@@ -139,8 +137,6 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
   const [caricatureCategories, setCaricatureCategories] = useState<CaricatureCategoryOption[]>([])
   const [caricatureUploadBusy, setCaricatureUploadBusy] = useState(false)
   const [caricatureUploadProgress, setCaricatureUploadProgress] = useState<number | null>(null)
-  const [generatePreviewsBusy, setGeneratePreviewsBusy] = useState(false)
-  const [generatePreviewsMessage, setGeneratePreviewsMessage] = useState<string | null>(null)
 
   const isCaricature = isCaricatureUpload(batchAssetType)
   const wizardSteps = useMemo(() => [...uploadStepsForAssetType(batchAssetType)], [batchAssetType])
@@ -413,24 +409,6 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
     },
     [caricatureAssetId, router],
   )
-
-  const generateCaricaturePreviews = useCallback(async () => {
-    if (!caricatureAssetId || generatePreviewsBusy) return
-    setGeneratePreviewsBusy(true)
-    setGeneratePreviewsMessage(null)
-    try {
-      const result = await staffWizardGenerateCaricaturePreviews(caricatureAssetId)
-      const refreshed = await staffWizardGetCaricatureAsset(caricatureAssetId)
-      setCaricatureAsset(refreshed)
-      setGeneratePreviewsMessage(result.message)
-    } catch (e) {
-      const msg = e instanceof StaffWizardApiError ? e.message : humanizeContributorNetworkError(e)
-      setGeneratePreviewsMessage(msg)
-      throw new Error(msg)
-    } finally {
-      setGeneratePreviewsBusy(false)
-    }
-  }, [caricatureAssetId, generatePreviewsBusy])
 
   const onFilesPicked = useCallback((list: FileList | null) => {
     if (!list?.length) return
@@ -805,9 +783,6 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
           onSetupContinue={handleCaricatureSetupContinue}
           onUploadContinue={handleCaricatureUploadContinue}
           onSaveMetadata={saveCaricatureMetadata}
-          onGeneratePreviews={caricatureAssetId ? generateCaricaturePreviews : undefined}
-          generatePreviewsBusy={generatePreviewsBusy}
-          generatePreviewsMessage={generatePreviewsMessage}
           submitBusy={submitting}
           submitError={submitError}
           onDismissSubmitError={() => setSubmitError(null)}

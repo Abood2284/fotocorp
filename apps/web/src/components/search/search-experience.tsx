@@ -188,7 +188,7 @@ export function SearchExperience({
     refetchOnWindowFocus: false,
     retry: false,
     placeholderData: keepPreviousData,
-    enabled: isCaricatureSegment && typesenseSearchEnabled,
+    enabled: isCaricatureSegment,
   })
   const {
     data: filterSnapshot,
@@ -637,21 +637,12 @@ export function SearchExperience({
 
           <main className="relative min-w-0">
             {isCaricatureSegment ? (
-              !typesenseSearchEnabled ? (
-                <div className="border border-border bg-background py-16">
-                  <EmptyState
-                    icon={Images}
-                    title="Caricature search is not enabled yet."
-                    description="Set NEXT_PUBLIC_USE_TYPESENSE_SEARCH=true and configure the caricature Typesense collection to browse caricatures here."
-                    action={{ label: "Search editorial images", href: buildSearchPageHref({ q: initialParams.q, segment: "editorial" }) }}
-                  />
-                </div>
-              ) : caricatureSearchError && !isCaricatureFetching ? (
+              caricatureSearchError && !isCaricatureFetching ? (
                 <div className="border border-border bg-background py-16">
                   <EmptyState
                     icon={Images}
                     title="Caricature search is temporarily unavailable."
-                    description="The caricature search index may not be provisioned yet. Run `pnpm --dir apps/api typesense:index-caricatures` once, then retry."
+                    description="Caricature search is temporarily unavailable. If this persists, confirm published caricatures have blurred previews and run `pnpm --dir apps/api typesense:index-caricatures` to rebuild the search index."
                     action={{ label: "Search editorial images", href: buildSearchPageHref({ q: initialParams.q, segment: "editorial" }) }}
                   />
                 </div>
@@ -679,7 +670,7 @@ export function SearchExperience({
                       ? "Caricature search is temporarily unavailable. Try again in a moment."
                       : searchActive
                         ? "Try a broader search term or remove filters."
-                        : "Published caricatures will appear here once staff uploads and publishes them."}
+                        : "Published caricatures appear here once staff approval finishes and blurred previews are ready. If items were published recently, refresh in a moment or run `pnpm --dir apps/api typesense:index-caricatures` to backfill search."}
                     action={{ label: "Search editorial images", href: buildSearchPageHref({ q: initialParams.q, segment: "editorial" }) }}
                   />
                 </div>

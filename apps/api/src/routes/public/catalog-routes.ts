@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { Env } from "../../appTypes";
 import { withPublicReadDb } from "../../db";
 import { getPublicAssetCollections, getPublicAssetDetail, getPublicAssetEvents, getPublicAssetFilters, listPublicAssets, parsePreviewTtl } from "../../lib/assets/public-assets";
-import { getPublicCaricatureDetail } from "../../lib/caricatures/public-caricature-assets";
+import { getPublicCaricatureDetail, listPublicCaricatures, shouldTryCaricatureSqlFallback } from "../../lib/caricatures/public-caricature-assets";
 import { json } from "../../lib/http";
 import { resolveRequestId } from "../../lib/latency-trace";
 import { parsePublicPreviewCdnConfig } from "../../lib/media/public-preview-cdn-url";
@@ -216,6 +216,7 @@ publicCatalogRoutes.get("/api/v1/search/caricatures", async (c) => {
   let page = 1;
   let limit = 50;
   let filters = "";
+  let backend: "typesense" | "postgres" = "typesense";
 
   try {
     const query = parseTypesenseCaricatureSearchQuery(new URL(c.req.url).searchParams);
@@ -224,7 +225,16 @@ publicCatalogRoutes.get("/api/v1/search/caricatures", async (c) => {
     limit = query.limit;
     filters = buildTypesenseCaricatureFilterSummary(query);
 
-    const response = await searchTypesenseCaricatures(c.env, query);
+    let response = await searchTypesenseCaricatures(c.env, query);
+
+    if (shouldTryCaricatureSqlFallback(query, response.total)) {
+      const sqlResponse = await withPublicReadDb(c.env, (readDb) => listPublicCaricatures(readDb, query));
+      if (sqlResponse.total > 0) {
+        response = sqlResponse;
+        backend = "postgres";
+      }
+    }
+
     const durationMs = Date.now() - startedAt;
 
     console.info(
@@ -234,7 +244,7 @@ publicCatalogRoutes.get("/api/v1/search/caricatures", async (c) => {
         durationMs,
         status: "ok",
         statusCode: 200,
-        backend: "typesense",
+        backend,
         q,
         filters,
         page,
@@ -260,23 +270,51 @@ publicCatalogRoutes.get("/api/v1/search/caricatures", async (c) => {
   } catch (error) {
     const durationMs = Date.now() - startedAt;
 
-    if (isTypesenseNotConfiguredError(error)) {
-      console.error(
-        JSON.stringify({
-          event: "typesense_public_caricature_search",
-          route,
-          durationMs,
-          status: "error",
-          statusCode: 503,
-          backend: "typesense",
-          q,
-          filters,
-          page,
-          limit,
-          timeout: false,
-        }),
-      );
-      return json({ error: "typesense_not_configured" }, 503);
+    if (isTypesenseNotConfiguredError(error) || isTypesenseSearchFailedError(error)) {
+      try {
+        const query = parseTypesenseCaricatureSearchQuery(new URL(c.req.url).searchParams);
+        const response = await withPublicReadDb(c.env, (readDb) => listPublicCaricatures(readDb, query));
+        console.warn(
+          JSON.stringify({
+            event: "typesense_public_caricature_search",
+            route,
+            durationMs: Date.now() - startedAt,
+            status: "ok",
+            statusCode: 200,
+            backend: "postgres",
+            q: query.q,
+            filters: buildTypesenseCaricatureFilterSummary(query),
+            page: query.page,
+            limit: query.limit,
+            found: response.total,
+            hits: response.items.length,
+            fallbackReason: isTypesenseNotConfiguredError(error) ? "typesense_not_configured" : "typesense_search_failed",
+          }),
+        );
+        return json(response, 200, {
+          headers: {
+            "Cache-Control": PUBLIC_TYPESENSE_SEARCH_CACHE_CONTROL,
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
+      } catch (fallbackError) {
+        console.error(
+          JSON.stringify({
+            event: "typesense_public_caricature_search",
+            route,
+            durationMs,
+            status: "error",
+            statusCode: 502,
+            backend: "postgres",
+            q,
+            filters,
+            page,
+            limit,
+            errorMessage: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+          }),
+        );
+        return json({ error: "caricature_search_failed" }, 502);
+      }
     }
 
     if (isTypesenseSearchInputError(error)) {
@@ -297,27 +335,6 @@ publicCatalogRoutes.get("/api/v1/search/caricatures", async (c) => {
         }),
       );
       return json({ error: error.code }, 400);
-    }
-
-    if (isTypesenseSearchFailedError(error)) {
-      console.error(
-        JSON.stringify({
-          event: "typesense_public_caricature_search",
-          route,
-          durationMs,
-          status: "error",
-          statusCode: 502,
-          backend: "typesense",
-          q,
-          filters,
-          page,
-          limit,
-          tookMs: durationMs,
-          timeout: error.timedOut,
-          upstreamStatusCode: error.statusCode ?? null,
-        }),
-      );
-      return json({ error: "typesense_search_failed" }, 502);
     }
 
     throw error;

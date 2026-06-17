@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,15 +9,14 @@ import type {
   CaricatureAssetRecord,
   CaricatureCategoryOption,
   CaricatureLanguage,
-  CaricaturePreviewGenerationStatus,
 } from "@/lib/caricatures/caricature-upload-metadata"
 import {
   CARICATURE_LANGUAGE_OPTIONS,
-  CARICATURE_STATUS_OPTIONS,
   caricatureLanguageRequiresOther,
   caricatureLanguageRequiresVisibleText,
   caricatureLanguageShowsTranslation,
-  formatCaricatureStringList,
+  caricatureUploadWizardSaveStatus,
+  resolveCaricatureMetadataFormDefaults,
   toDatetimeLocalValue,
 } from "@/lib/caricatures/caricature-upload-metadata"
 import { getStaffCaricatureOriginalUrl } from "@/lib/search/caricature-search"
@@ -31,9 +30,6 @@ interface ContributorUploadStepCaricatureMetadataProps {
   defaultCredit: string
   hasOriginalFile: boolean
   onSave: (payload: CaricatureAssetMetadataPayload) => Promise<void>
-  onGeneratePreviews?: () => Promise<void>
-  generatePreviewsBusy?: boolean
-  generatePreviewsMessage?: string | null
   submitBusy: boolean
   submitError: string | null
   onDismissSubmitError: () => void
@@ -47,9 +43,6 @@ export function ContributorUploadStepCaricatureMetadata({
   defaultCredit,
   hasOriginalFile,
   onSave,
-  onGeneratePreviews,
-  generatePreviewsBusy = false,
-  generatePreviewsMessage = null,
   submitBusy,
   submitError,
   onDismissSubmitError,
@@ -59,19 +52,16 @@ export function ContributorUploadStepCaricatureMetadata({
   )
   const [error, setError] = useState<string | null>(null)
 
+  const formDefaults = useMemo(
+    () => resolveCaricatureMetadataFormDefaults(asset, defaultCredit),
+    [asset, defaultCredit],
+  )
+
   const showVisibleText = caricatureLanguageRequiresVisibleText(language)
   const showTranslation = caricatureLanguageShowsTranslation(language)
   const showLanguageOther = caricatureLanguageRequiresOther(language)
-  const previewStatus = asset?.previewGenerationStatus ?? (asset?.hasReadyPreviewDerivatives ? "READY" : "NONE")
-  const canQueuePreviews = staffMode && hasOriginalFile && previewStatus !== "READY" && previewStatus !== "GENERATING"
-  const staffOriginalUrl = staffMode && asset?.id && hasOriginalFile ? getStaffCaricatureOriginalUrl(asset.id) : null
-
-  const statusOptions = useMemo(() => {
-    if (!staffMode) return CARICATURE_STATUS_OPTIONS.filter((option) => option.value === "PENDING_REVIEW")
-    return CARICATURE_STATUS_OPTIONS.filter(
-      (option) => option.value === "DRAFT" || option.value === "PENDING_REVIEW",
-    )
-  }, [staffMode])
+  const staffOriginalUrl =
+    staffMode && asset?.id && hasOriginalFile ? getStaffCaricatureOriginalUrl(asset.id) : null
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -99,9 +89,7 @@ export function ContributorUploadStepCaricatureMetadata({
         .map((part) => part.trim())
         .filter(Boolean),
       publishedAt: publishedAtRaw ? new Date(publishedAtRaw).toISOString() : "",
-      status: staffMode
-        ? ((formData.get("status")?.toString().trim() ?? "DRAFT") as CaricatureAssetMetadataPayload["status"])
-        : "PENDING_REVIEW",
+      status: caricatureUploadWizardSaveStatus(),
     }
 
     try {
@@ -124,69 +112,40 @@ export function ContributorUploadStepCaricatureMetadata({
           <div className="rounded border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200">
             Upload the caricature image on the previous step before saving metadata.
           </div>
-        ) : staffMode ? (
-          <div className="rounded border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-            Save as draft or pending review, then approve from the Caricatures queue to publish automatically.
-          </div>
-        ) : (
+        ) : !staffMode ? (
           <div className="rounded border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
             Submitting sends this caricature to staff review. Publishing happens after staff approval.
           </div>
-        )}
+        ) : null}
 
-        {staffMode && hasOriginalFile ? (
-          <section className="space-y-4 rounded-lg border border-border bg-card p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Staff review</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {describePreviewGenerationStatus(previewStatus)}
-                </p>
-              </div>
-              {onGeneratePreviews ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!canQueuePreviews || generatePreviewsBusy}
-                  onClick={() => void onGeneratePreviews()}
-                >
-                  {generatePreviewsBusy ? "Queueing…" : "Generate blurred previews"}
-                </Button>
-              ) : null}
-            </div>
-
-            {generatePreviewsMessage ? (
-              <div className="rounded border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
-                {generatePreviewsMessage}
-              </div>
-            ) : null}
-
-            {staffOriginalUrl ? (
-              <div className="overflow-hidden rounded-md border border-border bg-muted/30">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={staffOriginalUrl}
-                  alt="Clean caricature original for staff review"
-                  className="mx-auto max-h-[420px] w-auto max-w-full object-contain"
-                />
-              </div>
-            ) : null}
-          </section>
+        {staffOriginalUrl ? (
+          <div className="overflow-hidden rounded-md border border-border bg-muted/30">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={staffOriginalUrl}
+              alt="Uploaded caricature original"
+              className="mx-auto max-h-[420px] w-auto max-w-full object-contain"
+            />
+          </div>
         ) : null}
 
         <section className="space-y-4">
-          <h3 className="text-sm font-semibold">Core metadata</h3>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-xs font-medium text-muted-foreground">Headline</label>
-              <Input name="headline" defaultValue={asset?.headline ?? ""} required maxLength={500} disabled={!active} />
+              <CaricatureFieldLabel required>Headline</CaricatureFieldLabel>
+              <Input
+                name="headline"
+                defaultValue={formDefaults.headline}
+                required
+                maxLength={500}
+                disabled={!active}
+              />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-xs font-medium text-muted-foreground">Description</label>
+              <CaricatureFieldLabel required>Description</CaricatureFieldLabel>
               <textarea
                 name="description"
-                defaultValue={asset?.description ?? ""}
+                defaultValue={formDefaults.description}
                 required
                 rows={4}
                 maxLength={5000}
@@ -195,11 +154,17 @@ export function ContributorUploadStepCaricatureMetadata({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Credit</label>
-              <Input name="credit" defaultValue={asset?.credit ?? defaultCredit} required maxLength={500} disabled={!active} />
+              <CaricatureFieldLabel required>Credit</CaricatureFieldLabel>
+              <Input
+                name="credit"
+                defaultValue={formDefaults.credit}
+                required
+                maxLength={500}
+                disabled={!active}
+              />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Category</label>
+              <CaricatureFieldLabel required>Category</CaricatureFieldLabel>
               <select
                 name="categoryId"
                 defaultValue={asset?.categoryId ?? ""}
@@ -218,7 +183,7 @@ export function ContributorUploadStepCaricatureMetadata({
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Published date</label>
+              <CaricatureFieldLabel required>Published date</CaricatureFieldLabel>
               <Input
                 name="publishedAt"
                 type="datetime-local"
@@ -227,21 +192,6 @@ export function ContributorUploadStepCaricatureMetadata({
                 disabled={!active}
               />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Status</label>
-              <select
-                name="status"
-                defaultValue={asset?.status ?? "DRAFT"}
-                disabled={!active}
-                className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
-              >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
         </section>
 
@@ -249,10 +199,11 @@ export function ContributorUploadStepCaricatureMetadata({
           <h3 className="text-sm font-semibold">Language and visible text</h3>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Language</label>
+              <CaricatureFieldLabel required>Language</CaricatureFieldLabel>
               <select
                 name="language"
                 value={language}
+                required
                 disabled={!active}
                 onChange={(event) => setLanguage(event.target.value as CaricatureLanguage)}
                 className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
@@ -266,7 +217,7 @@ export function ContributorUploadStepCaricatureMetadata({
             </div>
             {showLanguageOther ? (
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Specify language</label>
+                <CaricatureFieldLabel required>Specify language</CaricatureFieldLabel>
                 <Input
                   name="languageOther"
                   defaultValue={asset?.languageOther ?? ""}
@@ -278,7 +229,7 @@ export function ContributorUploadStepCaricatureMetadata({
             ) : null}
             {showVisibleText ? (
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-medium text-muted-foreground">Visible text</label>
+                <CaricatureFieldLabel required>Visible text</CaricatureFieldLabel>
                 <textarea
                   name="visibleText"
                   defaultValue={asset?.visibleText ?? ""}
@@ -292,9 +243,7 @@ export function ContributorUploadStepCaricatureMetadata({
             ) : null}
             {showTranslation ? (
               <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-xs font-medium text-muted-foreground">
-                  English translation (optional)
-                </label>
+                <CaricatureFieldLabel>English translation (optional)</CaricatureFieldLabel>
                 <textarea
                   name="visibleTextTranslationEn"
                   defaultValue={asset?.visibleTextTranslationEn ?? ""}
@@ -312,10 +261,10 @@ export function ContributorUploadStepCaricatureMetadata({
           <h3 className="text-sm font-semibold">Search tags</h3>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Keywords (comma-separated)</label>
+              <CaricatureFieldLabel required>Keywords (comma-separated)</CaricatureFieldLabel>
               <textarea
                 name="keywords"
-                defaultValue={formatCaricatureStringList(asset?.keywords ?? [])}
+                defaultValue={formDefaults.keywords}
                 required
                 rows={2}
                 disabled={!active}
@@ -323,12 +272,10 @@ export function ContributorUploadStepCaricatureMetadata({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
-                Depicted subjects (comma-separated)
-              </label>
+              <CaricatureFieldLabel required>Depicted subjects (comma-separated)</CaricatureFieldLabel>
               <textarea
                 name="depictedSubjects"
-                defaultValue={formatCaricatureStringList(asset?.depictedSubjects ?? [])}
+                defaultValue={formDefaults.depictedSubjects}
                 required
                 rows={2}
                 disabled={!active}
@@ -340,7 +287,7 @@ export function ContributorUploadStepCaricatureMetadata({
 
         <div className="flex justify-end">
           <Button type="submit" disabled={!active || submitBusy || !hasOriginalFile}>
-            {submitBusy ? "Saving…" : staffMode ? "Save caricature" : "Submit for review"}
+            {submitBusy ? "Saving…" : staffMode ? "Save & send for review" : "Submit for review"}
           </Button>
         </div>
       </form>
@@ -348,21 +295,17 @@ export function ContributorUploadStepCaricatureMetadata({
   )
 }
 
-function describePreviewGenerationStatus(status: CaricaturePreviewGenerationStatus): string {
-  switch (status) {
-    case "NONE":
-      return "No blurred previews yet. Staff approval will queue preview generation automatically."
-    case "QUEUED":
-      return "Blurred previews are queued. Processing starts automatically after staff approval."
-    case "GENERATING":
-      return "Preview generation is in progress on the jobs worker."
-    case "READY":
-      return "Blurred previews are ready."
-    case "FAILED":
-      return "Preview generation failed. Staff can approve again to retry."
-    default: {
-      const _exhaustive: never = status
-      return _exhaustive
-    }
-  }
+function CaricatureFieldLabel({
+  children,
+  required = false,
+}: {
+  children: ReactNode
+  required?: boolean
+}) {
+  return (
+    <span className="text-xs font-medium text-muted-foreground">
+      {children}
+      {required ? <span className="text-destructive"> *</span> : null}
+    </span>
+  )
 }

@@ -98,6 +98,58 @@ export function toDatetimeLocalValue(iso: string | null | undefined): string {
   return date.toISOString().slice(0, 16)
 }
 
+/** Legacy upload-shell placeholders — hide in metadata forms so staff/contributors start clean. */
+export const CARICATURE_SHELL_PLACEHOLDER_DESCRIPTION = "Draft caricature awaiting metadata completion."
+export const CARICATURE_SHELL_PLACEHOLDER_TAG = "upload-wizard"
+export const CARICATURE_SHELL_PLACEHOLDER_HEADLINE = "Untitled caricature draft"
+
+export interface CaricatureMetadataFormDefaults {
+  headline: string
+  description: string
+  credit: string
+  keywords: string
+  depictedSubjects: string
+}
+
+export function resolveCaricatureMetadataFormDefaults(
+  asset: CaricatureAssetRecord | null,
+  defaultCredit: string,
+): CaricatureMetadataFormDefaults {
+  if (!asset) {
+    return {
+      headline: "",
+      description: "",
+      credit: defaultCredit,
+      keywords: "",
+      depictedSubjects: "",
+    }
+  }
+
+  const keywords = asset.keywords.filter((value) => value !== CARICATURE_SHELL_PLACEHOLDER_TAG)
+  const depictedSubjects = asset.depictedSubjects.filter(
+    (value) => value !== CARICATURE_SHELL_PLACEHOLDER_TAG,
+  )
+
+  return {
+    headline:
+      asset.headline === CARICATURE_SHELL_PLACEHOLDER_HEADLINE || !asset.headline.trim()
+        ? ""
+        : asset.headline,
+    description:
+      asset.description === CARICATURE_SHELL_PLACEHOLDER_DESCRIPTION || !asset.description.trim()
+        ? ""
+        : asset.description,
+    credit: asset.credit?.trim() ? asset.credit : defaultCredit,
+    keywords: formatCaricatureStringList(keywords),
+    depictedSubjects: formatCaricatureStringList(depictedSubjects),
+  }
+}
+
+/** Status applied when saving from the upload wizard metadata step. */
+export function caricatureUploadWizardSaveStatus(): CaricatureAssetStatus {
+  return "PENDING_REVIEW"
+}
+
 export function isCaricatureUpload(assetType: UploadBatchAssetType): boolean {
   return assetType === "CARICATURE"
 }

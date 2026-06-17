@@ -158,11 +158,11 @@ export interface TypesenseCaricatureSearchResponse {
     hasVisibleText: Array<{ value: string; count: number; name: string; assetCount: number }>;
   };
   timing: {
-    backend: "typesense";
+    backend: "typesense" | "postgres";
     tookMs: number;
   };
   meta: {
-    source: "typesense";
+    source: "typesense" | "postgres";
     searchTimeMs?: number;
     outOf?: number;
   };

@@ -3,8 +3,9 @@
 import { CheckCircle, ImageOff, Loader2, XCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useCallback, useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 
+import { StaffCaricatureMetadataDisplay } from "@/components/staff/caricatures/staff-caricature-metadata-display"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { StaffCaricatureDetail, StaffCaricatureListResponse } from "@/lib/api/staff-caricatures-api"
@@ -28,11 +29,57 @@ export function StaffCaricaturesClient({
   const [query, setQuery] = useState(currentQuery)
   const [statusMessage, setStatusMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null)
   const [actionBusy, setActionBusy] = useState<"approve" | "reject" | null>(null)
+  const [detail, setDetail] = useState<StaffCaricatureDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0)
 
   const selected = useMemo(
     () => initialResponse.items.find((item) => item.id === selectedId) ?? null,
     [initialResponse.items, selectedId],
   )
+
+  useEffect(() => {
+    if (!selectedId) {
+      setDetail(null)
+      setDetailError(null)
+      setDetailLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    setDetailLoading(true)
+    setDetailError(null)
+
+    void fetch(`/api/staff/caricatures/${encodeURIComponent(selectedId)}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => null)) as
+          | StaffCaricatureDetail
+          | { error?: { message?: string } }
+          | null
+        if (!response.ok) {
+          throw new Error(
+            body && "error" in body ? body.error?.message ?? "Could not load caricature detail." : "Could not load caricature detail.",
+          )
+        }
+        if (!body || "error" in body) {
+          throw new Error("Could not load caricature detail.")
+        }
+        setDetail(body as StaffCaricatureDetail)
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return
+        setDetail(null)
+        setDetailError(error instanceof Error ? error.message : "Could not load caricature detail.")
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDetailLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [selectedId, detailRefreshKey])
 
   const applyFilters = useCallback(() => {
     const params = new URLSearchParams()
@@ -58,6 +105,7 @@ export function StaffCaricaturesClient({
         throw new Error(body?.error?.message ?? "Could not approve caricature.")
       }
       setStatusMessage({ kind: "ok", text: body?.message ?? "Caricature approved. Processing will run automatically." })
+      setDetailRefreshKey((value) => value + 1)
       startTransition(() => router.refresh())
     } catch (error) {
       setStatusMessage({
@@ -82,6 +130,7 @@ export function StaffCaricaturesClient({
         throw new Error(body?.error?.message ?? "Could not reject caricature.")
       }
       setStatusMessage({ kind: "ok", text: "Caricature rejected." })
+      setDetailRefreshKey((value) => value + 1)
       startTransition(() => router.refresh())
     } catch (error) {
       setStatusMessage({
@@ -188,7 +237,10 @@ export function StaffCaricaturesClient({
           <p className="text-sm text-muted-foreground">Select a caricature to review.</p>
         ) : (
           <CaricatureReviewPanel
-            item={selected}
+            summary={selected}
+            detail={detail}
+            detailLoading={detailLoading}
+            detailError={detailError}
             canReview={Boolean(canReview)}
             actionBusy={actionBusy}
             statusMessage={statusMessage}
@@ -202,40 +254,46 @@ export function StaffCaricaturesClient({
 }
 
 function CaricatureReviewPanel({
-  item,
+  summary,
+  detail,
+  detailLoading,
+  detailError,
   canReview,
   actionBusy,
   statusMessage,
   onApprove,
   onReject,
 }: {
-  item: StaffCaricatureDetail | StaffCaricatureListResponse["items"][number]
+  summary: StaffCaricatureListResponse["items"][number]
+  detail: StaffCaricatureDetail | null
+  detailLoading: boolean
+  detailError: string | null
   canReview: boolean
   actionBusy: "approve" | "reject" | null
   statusMessage: { kind: "ok" | "error"; text: string } | null
   onApprove: () => void
   onReject: () => void
 }) {
-  const originalUrl = item.hasOriginalFile ? getStaffCaricatureOriginalUrl(item.id) : null
+  const headline = detail?.headline.trim() || summary.headline
+  const credit = detail?.credit.trim() || summary.credit
+  const status = detail?.status ?? summary.status
+  const hasOriginalFile = detail?.hasOriginalFile ?? summary.hasOriginalFile
+  const originalUrl = hasOriginalFile ? getStaffCaricatureOriginalUrl(summary.id) : null
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">{item.headline}</h2>
-          <p className="text-sm text-muted-foreground">{item.credit}</p>
+          <h2 className="text-xl font-semibold">{headline}</h2>
+          <p className="text-sm text-muted-foreground">{credit}</p>
         </div>
-        <StatusBadge status={item.status} />
+        <StatusBadge status={status} />
       </div>
-
-      {"description" in item ? (
-        <p className="text-sm leading-relaxed text-foreground">{item.description}</p>
-      ) : null}
 
       {originalUrl ? (
         <div className="overflow-hidden rounded-md border border-border bg-muted/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={originalUrl} alt={`Original caricature: ${item.headline}`} className="max-h-[420px] w-full object-contain" />
+          <img src={originalUrl} alt={`Original caricature: ${headline}`} className="max-h-[420px] w-full object-contain" />
         </div>
       ) : (
         <p className="text-sm text-destructive">Original file is missing. Approval is blocked until upload completes.</p>
@@ -279,9 +337,16 @@ function CaricatureReviewPanel({
         </p>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
-        Approval queues blurred preview generation on the jobs worker, publishes the caricature, and syncs Typesense — same webhook flow as editorial uploads.
-      </p>
+      {detailLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading submission details…
+        </div>
+      ) : null}
+
+      {detailError ? <p className="text-sm text-destructive">{detailError}</p> : null}
+
+      {detail ? <StaffCaricatureMetadataDisplay detail={detail} /> : null}
     </div>
   )
 }
