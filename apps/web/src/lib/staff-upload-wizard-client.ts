@@ -271,3 +271,14 @@ export async function completeStaffCaricatureOriginalUpload(
     },
   )
 }
+
+export async function staffWizardGenerateCaricaturePreviews(assetId: string) {
+  return staffWizardJson<{
+    ok: true
+    assetId: string
+    queuedTypes: string[]
+    message: string
+  }>(`/caricatures/${encodeURIComponent(assetId)}/generate-previews`, {
+    method: "POST",
+  })
+}

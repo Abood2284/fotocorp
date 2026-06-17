@@ -6,6 +6,7 @@ import { useEffect, useState, useTransition } from "react"
 import { fetchAdminAssetAction, updateAdminAssetEditorialAction, updateAdminAssetStateAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
 import type { AdminCatalogAssetItem, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
 import { PreviewImage } from "@/components/assets/preview-image"
+import { formatCatalogFotokeyDisplay, getCatalogImportMatchName } from "@/lib/catalog-asset-identity"
 
 interface StaffCatalogDetailSidebarProps {
   assetId: string
@@ -144,6 +145,14 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
                 <span className="text-sm font-medium text-muted-foreground">Preview missing or processing</span>
               </div>
             )}
+
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fotokey</p>
+              <p className="mt-0.5 font-mono text-sm font-medium text-foreground">{formatCatalogFotokeyDisplay(asset.fotokey)}</p>
+              {getCatalogImportMatchName(asset) ? (
+                <p className="mt-1 text-xs text-muted-foreground">Import match file: {getCatalogImportMatchName(asset)}</p>
+              ) : null}
+            </div>
 
             <div className="flex items-center justify-end">
               <a 

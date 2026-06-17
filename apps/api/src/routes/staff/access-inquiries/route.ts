@@ -195,7 +195,7 @@ staffAccessInquiryRoutes.post(
     const { db } = await requireAccessInquiryStaff(c);
     const { inquiryId } = c.req.valid("param");
     const body = c.req.valid("json");
-    const result = await approveContributorApplicationInquiry(db, inquiryId, { username: body.username ?? null });
+    const result = await approveContributorApplicationInquiry(db, c.env.DATABASE_URL!, inquiryId, { username: body.username ?? null });
     await sendInquiryStatusEmail(c.env, db, inquiryId, "CONTRIBUTOR_APPLICATION_APPROVED_WITH_CREDENTIALS", {
       contributorUsername: result.username,
       temporaryPassword: result.temporaryPassword,

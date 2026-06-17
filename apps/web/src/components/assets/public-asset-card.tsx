@@ -99,7 +99,7 @@ export function PublicAssetCard({
               <PublicAssetSaveButton
                 assetId={asset.id}
                 compact
-                compactLabel="Save as"
+                compactLabel="Fotobox"
                 assetTitle={eventTitle ?? undefined}
                 skipInitialSavedCheck
               />

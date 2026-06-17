@@ -9,6 +9,7 @@ import {
   serializeFetchError,
   upstreamPathOnly,
 } from "@/lib/latency-trace"
+import { buildAuthProxyRequestHeaders } from "@/lib/api/bff-proxy-headers"
 
 interface TracedProxyOptions {
   request: Request
@@ -32,12 +33,29 @@ export async function tracedUpstreamProxy(options: TracedProxyOptions): Promise<
   let upstream: Response | null = null
   let fetchError: ReturnType<typeof serializeFetchError> | null = null
 
-  const upstreamFetchInit: RequestInit & { next?: { revalidate: number } } = {
-    method: "GET",
-    headers: {
-      Accept: options.accept ?? "application/json",
-      ...requestIdHeaders(requestId),
-    },
+  const incomingMethod = options.request.method
+  const upstreamHeaders =
+    incomingMethod === "GET" || incomingMethod === "HEAD"
+      ? new Headers({
+          Accept: options.accept ?? "application/json",
+          ...requestIdHeaders(requestId),
+        })
+      : buildAuthProxyRequestHeaders(options.request.headers)
+
+  for (const [key, value] of Object.entries(requestIdHeaders(requestId))) {
+    upstreamHeaders.set(key, value)
+  }
+  if (!upstreamHeaders.has("Accept")) {
+    upstreamHeaders.set("Accept", options.accept ?? "application/json")
+  }
+
+  const upstreamFetchInit: RequestInit & { next?: { revalidate: number }; duplex?: "half" } = {
+    method: incomingMethod,
+    headers: upstreamHeaders,
+  }
+  if (incomingMethod !== "GET" && incomingMethod !== "HEAD") {
+    upstreamFetchInit.body = options.request.body
+    upstreamFetchInit.duplex = "half"
   }
   if (options.upstreamRevalidateSeconds) {
     upstreamFetchInit.next = { revalidate: options.upstreamRevalidateSeconds }

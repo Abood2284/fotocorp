@@ -18,7 +18,12 @@ import {
   type CaricatureOriginalPresignInput,
   type CaricatureUploadShellInput,
 } from "../../../lib/caricatures/caricature-original-upload"
-import { queueCaricaturePreviewGeneration } from "../../../lib/caricatures/caricature-preview-generation"
+import {
+  approveCaricatureForPublish,
+  enqueueCaricaturePreviewJob,
+  rejectCaricatureAsset,
+} from "../../../lib/caricatures/caricature-publish-job"
+import { getAdminCaricatureOriginalResponse } from "../../../lib/caricatures/caricature-staff-original"
 
 function db(env: Env) {
   if (!env.DATABASE_URL) {
@@ -88,11 +93,47 @@ export async function completeCaricatureOriginalUploadService(
   return json(await completeCaricatureOriginalUpload(db(env), env, assetId, payload))
 }
 
-export async function queueCaricaturePreviewsService(env: Env, assetId: string) {
-  const result = await queueCaricaturePreviewGeneration(db(env), assetId)
+export async function queueCaricaturePreviewsService(
+  env: Env,
+  assetId: string,
+  actorStaffId: string | null,
+  executionCtx?: ExecutionContext,
+) {
+  const result = await enqueueCaricaturePreviewJob(
+    db(env),
+    env,
+    { assetId, staffMemberId: actorStaffId, publishOnSuccess: false },
+    executionCtx,
+  )
   return json({
     ...result,
-    message:
-      "Preview generation queued. Run pnpm --dir apps/api media:generate-caricature-previews to process the queue.",
+    message: "Preview generation queued. Processing starts automatically.",
   })
+}
+
+export async function approveCaricatureAssetService(
+  env: Env,
+  assetId: string,
+  actorStaffId: string | null,
+  executionCtx?: ExecutionContext,
+) {
+  const result = await approveCaricatureForPublish(db(env), env, assetId, actorStaffId, executionCtx)
+  return json({
+    ...result,
+    message: result.alreadyQueued
+      ? "Caricature publish is already queued. Processing continues automatically."
+      : "Caricature approved. Blurred previews and search indexing will run automatically.",
+  })
+}
+
+export async function rejectCaricatureAssetService(
+  env: Env,
+  assetId: string,
+  actorStaffId: string | null,
+) {
+  return json(await rejectCaricatureAsset(db(env), assetId, actorStaffId))
+}
+
+export async function getAdminCaricatureOriginalService(env: Env, assetId: string) {
+  return await getAdminCaricatureOriginalResponse(db(env), env, assetId)
 }

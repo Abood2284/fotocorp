@@ -1,5 +1,7 @@
 import type { JobsEnvConfig } from "./config/env"
+import type { CaricaturePreviewJobService } from "./services/caricaturePreviewJobService"
 import type { ImagePublishJobService } from "./services/imagePublishJobService"
+import type { CaricaturePreviewWorker } from "./workers/caricaturePreviewWorker"
 import type { ImagePublishWorker } from "./workers/imagePublishWorker"
 
 export interface PublishDrainLimits {
@@ -45,9 +47,20 @@ export function readPublishDrainMaxRuntimeMs(): number {
   return parsed * 1000
 }
 
+async function countCombinedPendingJobs(
+  imageJobService: ImagePublishJobService | undefined,
+  caricatureJobService: CaricaturePreviewJobService | undefined,
+): Promise<number> {
+  const imagePending = imageJobService ? await imageJobService.countPendingJobs() : 0
+  const caricaturePending = caricatureJobService ? await caricatureJobService.countPendingJobs() : 0
+  return imagePending + caricaturePending
+}
+
 export async function runPublishDrain(params: {
-  worker: ImagePublishWorker
-  jobService: ImagePublishJobService | undefined
+  imageWorker: ImagePublishWorker
+  caricatureWorker: CaricaturePreviewWorker
+  imageJobService: ImagePublishJobService | undefined
+  caricatureJobService: CaricaturePreviewJobService | undefined
   skipDbAccess: boolean
   processingEnabled: boolean
   jobsEnv: JobsEnvConfig
@@ -56,13 +69,13 @@ export async function runPublishDrain(params: {
   const startedAt = Date.now()
   logStructured({ event: "publish_drain_started" })
 
-  if (params.skipDbAccess || !params.jobService) {
+  if (params.skipDbAccess || !params.imageJobService || !params.caricatureJobService) {
     const error = "DATABASE_URL is required for publish:drain"
     logStructured({ event: "publish_drain_failed", error })
     throw new Error(error)
   }
 
-  const pendingAtStart = await params.jobService.countPendingJobs()
+  const pendingAtStart = await countCombinedPendingJobs(params.imageJobService, params.caricatureJobService)
 
   if (pendingAtStart === 0) {
     logStructured({
@@ -108,25 +121,37 @@ export async function runPublishDrain(params: {
       break
     }
 
-    const pendingNow = await params.jobService.countPendingJobs()
+    const pendingNow = await countCombinedPendingJobs(params.imageJobService, params.caricatureJobService)
     if (pendingNow === 0) {
       stopReason = "empty"
       break
     }
 
-    const iteration = await params.worker.runOnce({
+    const imageIteration = await params.imageWorker.runOnce({
       skipDbAccess: false,
       dryRun: false,
       processingEnabled: true,
       jobsEnv: params.jobsEnv,
     })
 
-    if (iteration.claimedJob) {
+    if (imageIteration.claimedJob) {
       processed += 1
       continue
     }
 
-    if ((iteration.pendingCount ?? 0) > 0) {
+    const caricatureIteration = await params.caricatureWorker.runOnce({
+      skipDbAccess: false,
+      dryRun: false,
+      processingEnabled: true,
+      jobsEnv: params.jobsEnv,
+    })
+
+    if (caricatureIteration.claimedJob) {
+      processed += 1
+      continue
+    }
+
+    if ((imageIteration.pendingCount ?? 0) + (caricatureIteration.pendingCount ?? 0) > 0) {
       stopReason = "no_progress"
       break
     }
@@ -135,7 +160,7 @@ export async function runPublishDrain(params: {
     break
   }
 
-  const pendingAtEnd = await params.jobService.countPendingJobs()
+  const pendingAtEnd = await countCombinedPendingJobs(params.imageJobService, params.caricatureJobService)
   const durationMs = Date.now() - startedAt
 
   logStructured({

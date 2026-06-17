@@ -121,16 +121,11 @@ export function PublicAssetSaveButton({
   }
 
   if (checking || authLoading) {
-    return (
-      <button
-        type="button"
-        disabled
-        className={cn("flex items-center justify-center gap-1.5 bg-black/40 text-sm text-white/60 backdrop-blur-md", compact ? "h-8 rounded-sm px-2.5" : "h-10 px-3")}
-        aria-label="Checking save status"
-      >
-        <Loader2 className="animate-spin" size={16} />
-      </button>
-    )
+    return null
+  }
+
+  if (!isAuthenticated) {
+    return null
   }
 
   if (hasSaved) {
@@ -163,9 +158,8 @@ export function PublicAssetSaveButton({
         )}
         aria-label="Save to Fotobox"
       >
-        {!compact && <Plus strokeWidth={2.5} size={16} />}
+        <Plus strokeWidth={2.5} size={16} />
         <span>{compactLabel}</span>
-        {compact && <Plus strokeWidth={2.5} size={16} />}
       </button>
       {isAuthenticated ? (
         <FotoboxBoardPicker

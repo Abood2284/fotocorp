@@ -289,6 +289,30 @@ export interface PublicCaricatureSearchParams {
   includeFacets?: boolean
 }
 
+export interface PublicCaricatureDetail {
+  id: string
+  headline: string
+  description: string
+  credit: string
+  categoryId: string
+  categoryName: string
+  language: string
+  hasVisibleText: boolean
+  visibleText: string | null
+  visibleTextTranslationEn: string | null
+  keywords: string[]
+  depictedSubjects: string[]
+  publishedAt: string
+  previews: {
+    card: PublicPreview | null
+    detail: PublicPreview | null
+  }
+}
+
+export interface PublicCaricatureDetailResponse {
+  caricature: PublicCaricatureDetail
+}
+
 export type PublicLatestEventsSection = "latest" | "news" | "sports" | "entertainment" | "fashion" | "retro"
 export type PublicEventBrowseSection = Exclude<PublicLatestEventsSection, "latest">
 

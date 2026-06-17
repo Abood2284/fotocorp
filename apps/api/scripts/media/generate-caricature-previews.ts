@@ -13,8 +13,8 @@ import { drizzle } from "drizzle-orm/node-postgres"
 import type { Env } from "../../src/appTypes.js"
 import {
   listQueuedCaricaturePreviewAssetIds,
-  processCaricaturePreviewGeneration,
 } from "../../src/lib/caricatures/caricature-preview-generation.js"
+import { processCaricaturePreviewGeneration } from "../../src/lib/caricatures/caricature-preview-processor.js"
 
 dotenv.config({ path: ".dev.vars" })
 

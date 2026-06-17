@@ -10,9 +10,11 @@ import {
   updateAdminAssetStateBulk,
 } from "@/lib/api/admin-assets-api"
 import type {
+  AdminCatalogAssetItem,
   AdminCatalogEditorialUpdateInput,
   AdminCatalogPublishUpdateInput,
 } from "@/features/assets/admin-catalog-types"
+import { listAllFilteredAdminCatalogAssets } from "@/lib/server/staff-catalog-list"
 
 export async function fetchAdminAssetAction(assetId: string) {
   return getAdminAsset(assetId)
@@ -43,4 +45,10 @@ export async function updateAdminAssetStateBulkAction(payload: { assetIds: strin
   const result = await updateAdminAssetStateBulk(payload)
   revalidatePath("/staff/catalog")
   return result
+}
+
+export async function fetchAdminAssetsForEventBulkEditAction(eventId: string): Promise<AdminCatalogAssetItem[]> {
+  const query = new URLSearchParams({ eventId, sort: "newest" })
+  const result = await listAllFilteredAdminCatalogAssets(query)
+  return result.items
 }

@@ -10,7 +10,7 @@ export const metadata = {
 }
 
 export default async function StaffHomepageHeroPage() {
-  await requireStaffRole(["SUPER_ADMIN", "CATALOG_MANAGER"])
+  await requireStaffRole(["SUPER_ADMIN", "CATALOG_MANAGER", "CAPTION_WRITER"])
 
   const pool = await getHomepageHeroPool().catch(() => null)
   if (!pool) {

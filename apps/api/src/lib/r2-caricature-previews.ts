@@ -24,10 +24,11 @@ function resolveR2SecretAccessKey(env: Env): string | undefined {
   return trimEnv(env.R2_SECRET_ACCESS_KEY) ?? trimEnv(env.CLOUDFLARE_R2_SECRET_ACCESS_KEY)
 }
 
+/** Caricature blurred previews share the general public previews bucket (`fotocorp-2026-previews`). */
 export function resolveCaricaturePreviewsBucketName(env: Env): string {
   return (
-    trimEnv(env.R2_CARICATURE_PREVIEWS_BUCKET) ??
-    trimEnv(env.CLOUDFLARE_R2_CARICATURE_PREVIEWS_BUCKET) ??
+    trimEnv(env.R2_PREVIEWS_BUCKET) ??
+    trimEnv(env.CLOUDFLARE_R2_PREVIEWS_BUCKET) ??
     CARICATURE_PREVIEWS_BUCKET_NAME
   )
 }
@@ -38,7 +39,7 @@ export function listMissingCaricaturePreviewsS3ConfigKeys(env: Env): string[] {
   if (!resolveR2AccessKeyId(env)) missing.push("R2_ACCESS_KEY_ID (or CLOUDFLARE_R2_ACCESS_KEY_ID)")
   if (!resolveR2SecretAccessKey(env)) missing.push("R2_SECRET_ACCESS_KEY (or CLOUDFLARE_R2_SECRET_ACCESS_KEY)")
   if (!resolveCaricaturePreviewsBucketName(env)) {
-    missing.push("R2_CARICATURE_PREVIEWS_BUCKET (or CLOUDFLARE_R2_CARICATURE_PREVIEWS_BUCKET)")
+    missing.push("R2_PREVIEWS_BUCKET (or CLOUDFLARE_R2_PREVIEWS_BUCKET)")
   }
   return missing
 }
@@ -74,7 +75,7 @@ export async function putCaricaturePreviewObject(
   body: Buffer,
   contentType: string,
 ): Promise<void> {
-  const binding = env.MEDIA_CARICATURE_PREVIEWS_BUCKET
+  const binding = env.MEDIA_PREVIEWS_BUCKET
   if (binding) {
     await binding.put(storageKey, body, {
       httpMetadata: { contentType },

@@ -63,6 +63,7 @@ export interface Env {
   /** Contributor browser-upload staging bucket name (same as Worker `MEDIA_CONTRIBUTOR_UPLOADS_BUCKET` / `fotocorp-2026-contributor-uploads`). */
   R2_CONTRIBUTOR_STAGING_BUCKET?: string;
   R2_ORIGINALS_BUCKET?: string;
+  R2_PREVIEWS_BUCKET?: string;
   CLOUDFLARE_R2_ACCOUNT_ID?: string;
   CLOUDFLARE_R2_ACCESS_KEY_ID?: string;
   CLOUDFLARE_R2_SECRET_ACCESS_KEY?: string;
@@ -72,12 +73,7 @@ export interface Env {
   CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET?: string;
   /** Private caricature originals bucket binding (browser PUT via presigned URL). */
   MEDIA_CARICATURE_ORIGINALS_BUCKET?: R2Bucket;
-  /** Public caricature blurred previews bucket binding (server-side PUT only). */
-  MEDIA_CARICATURE_PREVIEWS_BUCKET?: R2Bucket;
   /** Private caricature originals bucket name for S3 API presign/head (same as Worker binding). */
   R2_CARICATURE_ORIGINALS_BUCKET?: string;
   CLOUDFLARE_R2_CARICATURE_ORIGINALS_BUCKET?: string;
-  /** Public caricature previews bucket name for S3 API put/head. */
-  R2_CARICATURE_PREVIEWS_BUCKET?: string;
-  CLOUDFLARE_R2_CARICATURE_PREVIEWS_BUCKET?: string;
 }

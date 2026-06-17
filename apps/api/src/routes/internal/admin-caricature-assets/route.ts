@@ -6,13 +6,16 @@ import { methodNotAllowed } from "../../../lib/route-errors"
 import { internalAuthMiddleware } from "../../../middleware/internalAuth"
 import {
   actorStaffIdFromRequest,
+  approveCaricatureAssetService,
   completeCaricatureOriginalUploadService,
   createAdminCaricatureAssetService,
   createCaricatureUploadShellService,
   getAdminCaricatureAssetByIdService,
+  getAdminCaricatureOriginalService,
   listAdminCaricatureAssetsService,
   presignCaricatureOriginalUploadService,
   queueCaricaturePreviewsService,
+  rejectCaricatureAssetService,
   updateAdminCaricatureAssetService,
 } from "./service"
 import {
@@ -114,10 +117,45 @@ internalAdminCaricatureAssetsRoutes.post(
   zValidator("param", adminCaricatureAssetParamSchema),
   async (c) => {
     const { assetId } = c.req.valid("param")
-    return await queueCaricaturePreviewsService(c.env, assetId)
+    const actorStaffId = actorStaffIdFromRequest(c.req.raw)
+    return await queueCaricaturePreviewsService(c.env, assetId, actorStaffId, c.executionCtx)
   },
 )
 
+internalAdminCaricatureAssetsRoutes.post(
+  `${base}/:assetId/approve`,
+  zValidator("param", adminCaricatureAssetParamSchema),
+  async (c) => {
+    const { assetId } = c.req.valid("param")
+    const actorStaffId = actorStaffIdFromRequest(c.req.raw)
+    return await approveCaricatureAssetService(c.env, assetId, actorStaffId, c.executionCtx)
+  },
+)
+
+internalAdminCaricatureAssetsRoutes.post(
+  `${base}/:assetId/reject`,
+  zValidator("param", adminCaricatureAssetParamSchema),
+  async (c) => {
+    const { assetId } = c.req.valid("param")
+    const actorStaffId = actorStaffIdFromRequest(c.req.raw)
+    return await rejectCaricatureAssetService(c.env, assetId, actorStaffId)
+  },
+)
+
+internalAdminCaricatureAssetsRoutes.all(`${base}/:assetId/approve`, () => methodNotAllowed())
+internalAdminCaricatureAssetsRoutes.all(`${base}/:assetId/reject`, () => methodNotAllowed())
+
 internalAdminCaricatureAssetsRoutes.all(`${base}/:assetId/generate-previews`, () => methodNotAllowed())
+
+internalAdminCaricatureAssetsRoutes.get(
+  `${base}/:assetId/original`,
+  zValidator("param", adminCaricatureAssetParamSchema),
+  async (c) => {
+    const { assetId } = c.req.valid("param")
+    return await getAdminCaricatureOriginalService(c.env, assetId)
+  },
+)
+
+internalAdminCaricatureAssetsRoutes.all(`${base}/:assetId/original`, () => methodNotAllowed())
 
 internalAdminCaricatureAssetsRoutes.all(`${base}/:assetId`, () => methodNotAllowed())

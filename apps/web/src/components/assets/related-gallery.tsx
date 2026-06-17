@@ -19,6 +19,7 @@ interface RelatedGalleryProps {
   label: string
   browseHref: string
   relatedCountLabel: string | null
+  headerLabel?: string
   /** `column` = left column on landscape detail (width stops at sidebar). `full` = below the grid. */
   placement?: "full" | "column"
 }
@@ -34,6 +35,7 @@ export function RelatedGallery({
   label,
   browseHref,
   relatedCountLabel,
+  headerLabel,
   placement = "full",
 }: RelatedGalleryProps) {
   const [assets, setAssets] = useState<PublicAsset[]>(initialAssets)
@@ -41,6 +43,8 @@ export function RelatedGallery({
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(initialCursor !== null && initialAssets.length < totalCount)
   const isColumn = placement === "column"
+  const isEventGallery = label.toLowerCase().includes("event")
+  const displayHeader = headerLabel ?? label
 
   async function handleLoadMore() {
     if (loading || !cursor) return
@@ -76,18 +80,29 @@ export function RelatedGallery({
       )}
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground">{label}</h2>
-        {relatedCountLabel ? (
-          <span className="text-sm font-normal tabular-nums text-muted-foreground">
-            ({relatedCountLabel})
-          </span>
-        ) : null}
-        <Link
-          href={browseHref}
-          className="text-sm font-normal text-primary underline underline-offset-4 hover:text-primary-hover"
-        >
-          View all
-        </Link>
+        {isEventGallery ? (
+          <Link
+            href={browseHref}
+            className="text-2xl font-semibold tracking-tight text-primary underline underline-offset-4 hover:text-primary-hover"
+          >
+            {displayHeader}
+          </Link>
+        ) : (
+          <>
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">{displayHeader}</h2>
+            {relatedCountLabel ? (
+              <span className="text-sm font-normal tabular-nums text-muted-foreground">
+                ({relatedCountLabel})
+              </span>
+            ) : null}
+            <Link
+              href={browseHref}
+              className="text-sm font-normal text-primary underline underline-offset-4 hover:text-primary-hover"
+            >
+              View all
+            </Link>
+          </>
+        )}
       </div>
 
       {assets.length > 0 ? (

@@ -13,6 +13,8 @@ export interface JobsEnvConfig {
   r2ContributorStagingBucket: string | undefined
   r2OriginalsBucket: string | undefined
   r2PreviewsBucket: string | undefined
+  r2CaricatureOriginalsBucket: string | undefined
+  publicPreviewCdnBaseUrl: string | undefined
   imagePublishProcessingEnabled: boolean
   fotocorpApiBaseUrl: string | undefined
   internalApiSecret: string | undefined
@@ -25,6 +27,8 @@ const ENV_R2_SECRET_ACCESS_KEY = "R2_SECRET_ACCESS_KEY"
 const ENV_R2_CONTRIBUTOR_STAGING_BUCKET = "R2_CONTRIBUTOR_STAGING_BUCKET"
 const ENV_R2_ORIGINALS_BUCKET = "R2_ORIGINALS_BUCKET"
 const ENV_R2_PREVIEWS_BUCKET = "R2_PREVIEWS_BUCKET"
+const ENV_R2_CARICATURE_ORIGINALS_BUCKET = "R2_CARICATURE_ORIGINALS_BUCKET"
+const ENV_PUBLIC_PREVIEW_CDN_BASE_URL = "PUBLIC_PREVIEW_CDN_BASE_URL"
 const ENV_IMAGE_PUBLISH_PROCESSING_ENABLED = "IMAGE_PUBLISH_PROCESSING_ENABLED"
 const ENV_FOTOCORP_API_BASE_URL = "FOTOCORP_API_BASE_URL"
 const ENV_INTERNAL_API_SECRET = "INTERNAL_API_SECRET"
@@ -97,6 +101,8 @@ export function loadJobsEnv(dryRun: boolean): JobsEnvConfig {
       r2ContributorStagingBucket: readOptionalEnv(ENV_R2_CONTRIBUTOR_STAGING_BUCKET),
       r2OriginalsBucket: readOptionalEnv(ENV_R2_ORIGINALS_BUCKET),
       r2PreviewsBucket: readOptionalEnv(ENV_R2_PREVIEWS_BUCKET),
+      r2CaricatureOriginalsBucket: readOptionalEnv(ENV_R2_CARICATURE_ORIGINALS_BUCKET),
+      publicPreviewCdnBaseUrl: readOptionalEnv(ENV_PUBLIC_PREVIEW_CDN_BASE_URL),
       imagePublishProcessingEnabled,
       fotocorpApiBaseUrl: readOptionalEnv(ENV_FOTOCORP_API_BASE_URL),
       internalApiSecret: readOptionalEnv(ENV_INTERNAL_API_SECRET),
@@ -126,6 +132,8 @@ export function loadJobsEnv(dryRun: boolean): JobsEnvConfig {
     r2ContributorStagingBucket: requireEnv(ENV_R2_CONTRIBUTOR_STAGING_BUCKET),
     r2OriginalsBucket: requireEnv(ENV_R2_ORIGINALS_BUCKET),
     r2PreviewsBucket: requireEnv(ENV_R2_PREVIEWS_BUCKET),
+    r2CaricatureOriginalsBucket: readOptionalEnv(ENV_R2_CARICATURE_ORIGINALS_BUCKET),
+    publicPreviewCdnBaseUrl: readOptionalEnv(ENV_PUBLIC_PREVIEW_CDN_BASE_URL),
     imagePublishProcessingEnabled,
     fotocorpApiBaseUrl,
     internalApiSecret,

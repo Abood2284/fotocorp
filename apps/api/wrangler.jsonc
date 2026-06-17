@@ -46,11 +46,6 @@
 			"binding": "MEDIA_CARICATURE_ORIGINALS_BUCKET",
 			"bucket_name": "fotocorp-caricature-originals",
 			"remote": true
-		},
-		{
-			"binding": "MEDIA_CARICATURE_PREVIEWS_BUCKET",
-			"bucket_name": "fotocorp-caricature-previews",
-			"remote": true
 		}
 	],
 	"routes": [
