@@ -3,7 +3,13 @@ import { Hono } from "hono";
 import type { Env } from "../../appTypes";
 import { withPublicReadDb } from "../../db";
 import { getPublicAssetCollections, getPublicAssetDetail, getPublicAssetEvents, getPublicAssetFilters, listPublicAssets, parsePreviewTtl } from "../../lib/assets/public-assets";
-import { getPublicCaricatureDetail, listPublicCaricatures, shouldTryCaricatureSqlFallback } from "../../lib/caricatures/public-caricature-assets";
+import {
+  countPublicCaricatures,
+  getPublicCaricatureDetail,
+  isUnfilteredCaricatureBrowseQuery,
+  listPublicCaricatures,
+  shouldUseCaricatureSqlFallback,
+} from "../../lib/caricatures/public-caricature-assets";
 import { json } from "../../lib/http";
 import { resolveRequestId } from "../../lib/latency-trace";
 import { parsePublicPreviewCdnConfig } from "../../lib/media/public-preview-cdn-url";
@@ -227,10 +233,16 @@ publicCatalogRoutes.get("/api/v1/search/caricatures", async (c) => {
 
     let response = await searchTypesenseCaricatures(c.env, query);
 
-    if (shouldTryCaricatureSqlFallback(query, response.total)) {
-      const sqlResponse = await withPublicReadDb(c.env, (readDb) => listPublicCaricatures(readDb, query));
-      if (sqlResponse.total > 0) {
-        response = sqlResponse;
+    if (isUnfilteredCaricatureBrowseQuery(query)) {
+      const sqlFallback = await withPublicReadDb(c.env, async (readDb) => {
+        const postgresTotal = await countPublicCaricatures(readDb, query);
+        if (!shouldUseCaricatureSqlFallback(query, response.total, postgresTotal)) {
+          return null;
+        }
+        return listPublicCaricatures(readDb, query);
+      });
+      if (sqlFallback) {
+        response = sqlFallback;
         backend = "postgres";
       }
     }
@@ -255,7 +267,8 @@ publicCatalogRoutes.get("/api/v1/search/caricatures", async (c) => {
           response.facets.categories.length +
           response.facets.languages.length +
           response.facets.credits.length +
-          response.facets.hasVisibleText.length,
+          response.facets.hasVisibleText.length +
+          response.facets.depictedSubjects.length,
         tookMs: response.timing.tookMs,
         timeout: false,
       }),

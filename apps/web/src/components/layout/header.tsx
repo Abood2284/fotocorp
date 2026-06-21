@@ -63,6 +63,7 @@ interface ShellProps extends HeaderProps {
   sortParam: string | null
   modeParam: string | null
   categoryIdParam: string | null
+  tabParam: string | null
 }
 
 /** Browse nav — title case, Getty-inspired hover panels. */
@@ -78,6 +79,8 @@ const EDITORIAL_LINKS: HeaderLink[] = [
   { label: "Business", href: editorialEventsHref("Business") },
   { label: "Retro", href: editorialEventsHref("Retro") },
 ]
+
+const CARICATURE_LATEST_HREF = "/?tab=caricature#homepage-categories"
 
 type BrowseDropdownId = "editorial" | "video" | "caricature" | "royaltyFree"
 
@@ -103,6 +106,7 @@ function HeaderContent({ userProfile, staffBrief }: HeaderProps) {
       sortParam={searchParams.get("sort")}
       modeParam={searchParams.get("mode")}
       categoryIdParam={searchParams.get("categoryId") ?? searchParams.get("category")}
+      tabParam={searchParams.get("tab")}
     />
   )
 }
@@ -116,6 +120,7 @@ function HeaderStatic({ userProfile, staffBrief }: HeaderProps) {
       sortParam={null}
       modeParam={null}
       categoryIdParam={null}
+      tabParam={null}
     />
   )
 }
@@ -127,6 +132,7 @@ function HeaderShell({
   sortParam,
   modeParam,
   categoryIdParam,
+  tabParam,
 }: ShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<BrowseDropdownId | null>(null)
@@ -172,6 +178,7 @@ function HeaderShell({
   }
 
   const editorialActive = isEditorialNavActive(pathname, categoryIdParam, modeParam)
+  const caricatureActive = isCaricatureNavActive(pathname, tabParam)
 
   return (
     <header
@@ -203,7 +210,7 @@ function HeaderShell({
           />
           <BrowseNavTrigger
             label="Caricature"
-            active={false}
+            active={caricatureActive}
             expanded={openDropdown === "caricature"}
             onOpen={() => openBrowseDropdown("caricature")}
             onCloseSchedule={scheduleCloseDropdown}
@@ -278,7 +285,19 @@ function HeaderShell({
         <BrowseDropdownPanel onMouseEnter={cancelCloseDropdown} onMouseLeave={scheduleCloseDropdown}>
           <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
             <h2 className="font-heading text-lg font-normal text-foreground">Caricature</h2>
-            <p className="mt-1 max-w-md text-sm text-muted-foreground">Caricature licensing is coming soon.</p>
+            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+              Editorial caricatures with protected blurred previews for licensed use.
+            </p>
+            <ul className="mt-4 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+              <li>
+                <Link
+                  href={CARICATURE_LATEST_HREF}
+                  className="block px-2 py-2 font-sans text-sm font-medium text-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  Latest
+                </Link>
+              </li>
+            </ul>
           </div>
         </BrowseDropdownPanel>
       )}
@@ -311,12 +330,14 @@ function HeaderShell({
             sortParam={sortParam}
             modeParam={modeParam}
             categoryIdParam={categoryIdParam}
+            tabParam={tabParam}
           />
           <MobileRoleLinks
             pathname={pathname}
             sortParam={sortParam}
             modeParam={modeParam}
             categoryIdParam={categoryIdParam}
+            tabParam={tabParam}
           />
           <MobileAccountMenu userProfile={userProfile} staffBrief={staffBrief} />
         </nav>
@@ -392,11 +413,13 @@ function MobileBrowseNav({
   sortParam,
   modeParam,
   categoryIdParam,
+  tabParam,
 }: {
   pathname: string
   sortParam: string | null
   modeParam: string | null
   categoryIdParam: string | null
+  tabParam: string | null
 }) {
   return (
     <section>
@@ -413,16 +436,27 @@ function MobileBrowseNav({
                 sortParam={sortParam}
                 modeParam={modeParam}
                 categoryIdParam={categoryIdParam}
+                tabParam={tabParam}
               />
             ))}
+          </div>
+        </div>
+        <div>
+          <h3 className="mb-1 px-3 font-sans text-xs font-semibold uppercase tracking-wider text-foreground">Caricature</h3>
+          <div className="grid gap-1">
+            <MobileNavLink
+              link={{ label: "Latest", href: CARICATURE_LATEST_HREF }}
+              pathname={pathname}
+              sortParam={sortParam}
+              modeParam={modeParam}
+              categoryIdParam={categoryIdParam}
+              tabParam={tabParam}
+            />
           </div>
         </div>
         <div className="grid gap-1">
           <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
             Video — Coming soon
-          </span>
-          <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
-            Caricature — Coming soon
           </span>
           <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
             Royalty Free — Coming soon
@@ -595,12 +629,14 @@ function MobileLinkGroup({
   sortParam,
   modeParam,
   categoryIdParam,
+  tabParam,
 }: {
   group: { title: string; links: HeaderLink[] }
   pathname: string
   sortParam: string | null
   modeParam: string | null
   categoryIdParam: string | null
+  tabParam: string | null
 }) {
   return (
     <section>
@@ -614,6 +650,7 @@ function MobileLinkGroup({
             sortParam={sortParam}
             modeParam={modeParam}
             categoryIdParam={categoryIdParam}
+            tabParam={tabParam}
           />
         ))}
       </div>
@@ -626,11 +663,13 @@ function MobileRoleLinks({
   sortParam,
   modeParam,
   categoryIdParam,
+  tabParam,
 }: {
   pathname: string
   sortParam: string | null
   modeParam: string | null
   categoryIdParam: string | null
+  tabParam: string | null
 }) {
   const { data: session } = useSharedAuthSession()
   const group = getMobileRoleLinksFromSession(session)
@@ -643,6 +682,7 @@ function MobileRoleLinks({
       sortParam={sortParam}
       modeParam={modeParam}
       categoryIdParam={categoryIdParam}
+      tabParam={tabParam}
     />
   )
 }
@@ -721,14 +761,16 @@ function MobileNavLink({
   sortParam,
   modeParam,
   categoryIdParam,
+  tabParam,
 }: {
   link: HeaderLink
   pathname: string
   sortParam: string | null
   modeParam: string | null
   categoryIdParam: string | null
+  tabParam: string | null
 }) {
-  const active = isActivePath(pathname, link.href, sortParam, modeParam, categoryIdParam)
+  const active = isActivePath(pathname, link.href, sortParam, modeParam, categoryIdParam, tabParam)
 
   return (
     <Link
@@ -766,15 +808,28 @@ function isEditorialNavActive(pathname: string, categoryIdParam: string | null, 
   return false
 }
 
+function isCaricatureNavActive(pathname: string, tabParam: string | null) {
+  return pathname === "/" && tabParam?.toLowerCase() === "caricature"
+}
+
 function isActivePath(
   pathname: string,
   href: string,
   sortParam: string | null,
   modeParam: string | null,
   categoryIdParam: string | null = null,
+  tabParam: string | null = null,
 ) {
   const normalizedSort = sortParam?.toLowerCase() ?? null
   const normalizedMode = modeParam?.toLowerCase() ?? null
+
+  if (pathname === "/") {
+    const hrefParams = parseHrefSearchParams(href)
+    const hrefTab = hrefParams?.get("tab")?.toLowerCase()
+    if (hrefTab === "caricature") {
+      return tabParam?.toLowerCase() === "caricature"
+    }
+  }
 
   if (pathname === "/search") {
     const hrefParams = parseHrefSearchParams(href)

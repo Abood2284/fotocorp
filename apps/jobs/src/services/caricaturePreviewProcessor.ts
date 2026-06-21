@@ -37,7 +37,6 @@ export class CaricaturePreviewProcessor {
         const originalsBucket = this.jobsEnv.r2CaricatureOriginalsBucket ?? CARICATURE_ORIGINALS_BUCKET_NAME
         const previewsBucket = this.jobsEnv.r2PreviewsBucket ?? CARICATURE_PREVIEWS_BUCKET_NAME
         const originalBytes = await r2GetObject(r2, originalsBucket, asset.originalObjectKey.trim())
-        const label = asset.headline.trim() || asset.credit.trim() || "Fotocorp"
 
         for (const variant of PREVIEW_VARIANTS) {
           const derivativeType = caricatureDerivativeTypeFromPreviewVariant(variant)
@@ -49,7 +48,6 @@ export class CaricaturePreviewProcessor {
             const generated = await generateCaricatureBlurredPreview({
               source: originalBytes,
               variant,
-              label,
             })
             await r2PutObject(r2, previewsBucket, objectKey, generated.buffer, PREVIEW_MIME_TYPE)
             const publicUrl = buildCaricaturePreviewPublicUrl(

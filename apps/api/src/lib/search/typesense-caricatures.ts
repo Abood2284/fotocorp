@@ -19,7 +19,9 @@ const DEFAULT_COLLECTION_ALIAS = "caricatures_current";
 export const TYPESENSE_CARICATURE_QUERY_BY =
   "headline,keywords,depicted_subjects,description,visible_text,visible_text_translation_en,credit";
 export const TYPESENSE_CARICATURE_QUERY_BY_WEIGHTS = "5,4,4,3,2,2,1";
-const FACET_BY = "category_id,category_name,language,has_visible_text,credit";
+export const TYPESENSE_CARICATURE_FACET_BY =
+  "category_id,category_name,language,has_visible_text,credit,depicted_subjects";
+const FACET_BY = TYPESENSE_CARICATURE_FACET_BY;
 const DEFAULT_SORT_BY = "published_at_ts:desc";
 
 export interface TypesenseCaricatureSearchQuery {
@@ -125,6 +127,7 @@ export interface CaricatureSearchDto {
   categoryName: string | null;
   language: string | null;
   hasVisibleText: boolean | null;
+  hasTranslation: boolean;
   keywords: string[];
   depictedSubjects: string[];
   publishedAt: string | null;
@@ -151,20 +154,43 @@ export interface TypesenseCaricatureSearchResponse {
   limit: number;
   totalPages: number;
   hasMore: boolean;
-  facets: {
-    categories: Array<{ value: string; count: number; name: string; assetCount: number }>;
-    languages: Array<{ value: string; count: number; name: string; assetCount: number }>;
-    credits: Array<{ value: string; count: number; name: string; assetCount: number }>;
-    hasVisibleText: Array<{ value: string; count: number; name: string; assetCount: number }>;
-  };
+  facets: CaricatureSearchFacets;
   timing: {
     backend: "typesense" | "postgres";
     tookMs: number;
   };
-  meta: {
-    source: "typesense" | "postgres";
-    searchTimeMs?: number;
-    outOf?: number;
+  meta: CaricatureSearchMeta;
+}
+
+export interface CaricatureSearchFacetItem {
+  value: string;
+  count: number;
+  name: string;
+  assetCount: number;
+}
+
+export interface CaricatureSearchFacets {
+  categories: CaricatureSearchFacetItem[];
+  languages: CaricatureSearchFacetItem[];
+  credits: CaricatureSearchFacetItem[];
+  hasVisibleText: CaricatureSearchFacetItem[];
+  depictedSubjects: CaricatureSearchFacetItem[];
+}
+
+export interface CaricatureSearchMeta {
+  source: "typesense" | "postgres";
+  searchTimeMs?: number;
+  outOf?: number;
+  popularSortAvailable?: boolean;
+}
+
+export function buildEmptyCaricatureSearchFacets(): CaricatureSearchFacets {
+  return {
+    categories: [],
+    languages: [],
+    credits: [],
+    hasVisibleText: [],
+    depictedSubjects: [],
   };
 }
 
@@ -323,18 +349,14 @@ export function buildEmptyTypesenseCaricatureSearchResponse(
     limit: query.limit,
     totalPages: 0,
     hasMore: false,
-    facets: {
-      categories: [],
-      languages: [],
-      credits: [],
-      hasVisibleText: [],
-    },
+    facets: buildEmptyCaricatureSearchFacets(),
     timing: {
       backend: "typesense",
       tookMs: 0,
     },
     meta: {
       source: "typesense",
+      popularSortAvailable: false,
     },
   };
 }
@@ -410,6 +432,7 @@ export function mapTypesenseCaricatureSearchResponse(
     },
     meta: {
       source: "typesense",
+      popularSortAvailable: resolvePopularSortAvailable(items, payload.facet_counts),
       ...(searchTimeMs !== null ? { searchTimeMs } : {}),
       ...(outOf !== null ? { outOf } : {}),
     },
@@ -458,6 +481,7 @@ function mapCaricatureDocument(document: CaricatureSearchDocument): CaricatureSe
     categoryName: stringOrNull(document.category_name),
     language: stringOrNull(document.language),
     hasVisibleText: toBoolean(document.has_visible_text),
+    hasTranslation: Boolean(stringOrNull(document.visible_text_translation_en)),
     keywords: stringArray(document.keywords),
     depictedSubjects: stringArray(document.depicted_subjects),
     publishedAt: isoFromUnixSeconds(document.published_at_ts),
@@ -484,20 +508,53 @@ function preview(document: CaricatureSearchDocument, variant: "card" | "detail")
   return { url, width, height };
 }
 
-function mapFacets(value: unknown): TypesenseCaricatureSearchResponse["facets"] {
-  const facetCounts = Array.isArray(value) ? value.filter(isRecord) : [];
+function mapFacets(value: unknown): CaricatureSearchFacets {
+  const facetCounts = Array.isArray(value) ? value.filter(isRecord) as TypesenseFacetCount[] : [];
   return {
-    categories: mapFacetField(facetCounts, "category_name"),
-    languages: mapFacetField(facetCounts, "language"),
+    categories: mapCategoryFacets(facetCounts),
+    languages: filterLanguageFacets(mapFacetField(facetCounts, "language")),
     credits: mapFacetField(facetCounts, "credit"),
     hasVisibleText: mapFacetField(facetCounts, "has_visible_text"),
+    depictedSubjects: mapFacetField(facetCounts, "depicted_subjects"),
   };
+}
+
+export function filterLanguageFacets(
+  languages: CaricatureSearchFacetItem[],
+): CaricatureSearchFacetItem[] {
+  return languages.filter((language) => language.value !== "NO_VISIBLE_TEXT");
+}
+
+export function mapCategoryFacets(facetCounts: TypesenseFacetCount[]): CaricatureSearchFacetItem[] {
+  const idFacets = mapFacetField(facetCounts, "category_id");
+  if (idFacets.length === 0) {
+    return mapFacetField(facetCounts, "category_name");
+  }
+
+  const nameFacets = mapFacetField(facetCounts, "category_name");
+  const usedNames = new Set<string>();
+
+  return idFacets.map((idFacet) => {
+    const matches = nameFacets.filter(
+      (nameFacet) => nameFacet.count === idFacet.count && !usedNames.has(nameFacet.value),
+    );
+    const resolvedName = matches.length === 1
+      ? matches[0].name
+      : nameFacets.find((nameFacet) => nameFacet.count === idFacet.count)?.name ?? idFacet.value;
+
+    if (matches.length === 1) usedNames.add(matches[0].value);
+
+    return {
+      ...idFacet,
+      name: resolvedName,
+    };
+  });
 }
 
 function mapFacetField(
   facetCounts: TypesenseFacetCount[],
   fieldName: string,
-): Array<{ value: string; count: number; name: string; assetCount: number }> {
+): CaricatureSearchFacetItem[] {
   const field = facetCounts.find((facet) => facet.field_name === fieldName);
   const counts = Array.isArray(field?.counts) ? field.counts.filter(isRecord) : [];
   return counts
@@ -511,6 +568,25 @@ function mapFacetField(
       name: count.value,
       assetCount: count.count,
     }));
+}
+
+function resolvePopularSortAvailable(
+  items: CaricatureSearchDto[],
+  facetCounts: unknown,
+): boolean {
+  if (items.some((item) => (item.popularityScore ?? 0) > 0 || (item.downloadCount ?? 0) > 0)) {
+    return true;
+  }
+
+  const facetList = Array.isArray(facetCounts) ? facetCounts.filter(isRecord) as TypesenseFacetCount[] : [];
+  const popularityFacets = mapFacetField(facetList, "popularity_score");
+  const downloadFacets = mapFacetField(facetList, "download_count");
+
+  return popularityFacets.some((facet) => facet.count > 0)
+    || downloadFacets.some((facet) => {
+      const parsed = Number(facet.value);
+      return Number.isFinite(parsed) && parsed > 0;
+    });
 }
 
 function dropUndefined(input: Record<string, unknown>): TypesenseCaricatureDocument {

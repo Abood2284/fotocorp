@@ -1,72 +1,167 @@
-import Link from "next/link"
+"use client"
 
-import { PreviewImage } from "@/components/assets/preview-image"
+import { useEffect, useMemo, useRef, useState } from "react"
+
+import { PublicCaricatureCard } from "@/components/caricatures/public-caricature-card"
+import {
+  computeJustifiedRows,
+  getPreviewAspectRatio,
+  type JustifiedRowsOptions,
+} from "@/lib/layout/justified-rows"
 import type { CaricatureSearchGridItem } from "@/lib/search/caricature-search"
-import { buildCaricatureDetailHref } from "@/lib/search/caricature-search"
 import { cn } from "@/lib/utils"
+
+const MOBILE_CONTAINER_BREAKPOINT = 640
+
+export const CARICATURES_JUSTIFIED_OPTIONS: JustifiedRowsOptions = {
+  gap: 2,
+  targetRowHeight: 320,
+  minRowHeight: 220,
+  maxRowHeight: 500,
+  justifyLastRow: false,
+  minTileWidth: 200,
+}
+
+function resolveCaricaturesJustifiedOptions(containerWidth: number): JustifiedRowsOptions {
+  if (containerWidth >= MOBILE_CONTAINER_BREAKPOINT) return CARICATURES_JUSTIFIED_OPTIONS
+
+  return {
+    ...CARICATURES_JUSTIFIED_OPTIONS,
+    targetRowHeight: 260,
+    minRowHeight: 180,
+    maxRowHeight: 400,
+    minTileWidth: 150,
+  }
+}
 
 interface CaricatureSearchResultGridProps {
   items: CaricatureSearchGridItem[]
   priorityCount?: number
   className?: string
+  justifiedOptions?: JustifiedRowsOptions
 }
 
 export function CaricatureSearchResultGrid({
   items,
   priorityCount = 8,
   className,
+  justifiedOptions,
 }: CaricatureSearchResultGridProps) {
-  return (
-    <div
-      className={cn(
-        "grid grid-cols-2 border-l border-t border-border bg-background sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5",
-        className,
-      )}
-    >
-      {items.map((item, index) => (
-        <Link
-          key={item.id}
-          href={buildCaricatureDetailHref(item.id)}
-          className="group relative overflow-hidden border-b border-r border-border bg-muted text-white transition-all duration-300 hover:-translate-y-[2px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <article>
-          <div
-            className="relative min-h-[220px] overflow-hidden bg-background"
-            style={item.preview ? { aspectRatio: getPreviewAspectRatio(item.preview) } : undefined}
-          >
-            {item.preview ? (
-              <PreviewImage
-                src={item.preview.url}
-                alt={item.headline}
-                className="block h-full w-full object-contain transition-transform duration-700 ease-out group-hover:scale-[1.025]"
-                loading={index < priorityCount ? "eager" : "lazy"}
-              />
-            ) : (
-              <div className="flex h-full min-h-[220px] items-center justify-center px-5 text-center text-sm text-muted-foreground">
-                Preview is being prepared.
-              </div>
-            )}
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
 
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/75 via-black/15 to-black/70 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100" />
-            <div className="pointer-events-none absolute bottom-3 left-3 right-3 z-10 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
-              <p className="line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]">
-                {item.headline}
-              </p>
-              {(item.credit || item.categoryName) && (
-                <p className="mt-1 line-clamp-1 text-sm text-white/90">
-                  {[item.credit, item.categoryName].filter(Boolean).join(" · ")}
-                </p>
-              )}
-            </div>
+  useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const nextWidth = Math.floor(entry.contentRect.width)
+      setContainerWidth((current) => (current === nextWidth ? current : nextWidth))
+    })
+
+    observer.observe(element)
+    setContainerWidth(Math.floor(element.getBoundingClientRect().width))
+
+    return () => observer.disconnect()
+  }, [])
+
+  const layoutOptions = useMemo(
+    () => justifiedOptions ?? resolveCaricaturesJustifiedOptions(containerWidth),
+    [justifiedOptions, containerWidth],
+  )
+  const gap = layoutOptions.gap
+
+  const layoutItems = useMemo(
+    () =>
+      items.map((item) => ({
+        id: item.id,
+        aspectRatio: getPreviewAspectRatio(item.preview?.width, item.preview?.height),
+      })),
+    [items],
+  )
+
+  const rows = useMemo(
+    () => computeJustifiedRows(layoutItems, containerWidth, layoutOptions),
+    [layoutItems, containerWidth, layoutOptions],
+  )
+
+  const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
+  const priorityIds = useMemo(
+    () => new Set(items.slice(0, priorityCount).map((item) => item.id)),
+    [items, priorityCount],
+  )
+
+  if (!items || items.length === 0) return null
+
+  const showPlaceholder = containerWidth <= 0
+
+  return (
+    <div ref={containerRef} className={cn("w-full min-w-0", className)}>
+      {showPlaceholder ? (
+        <CaricaturesGridPlaceholder />
+      ) : (
+        rows.map((row) => (
+          <div
+            key={row.key}
+            className="flex w-full"
+            style={{
+              gap,
+              height: row.height,
+              marginBottom: gap,
+            }}
+          >
+            {row.items.map((tile) => {
+              const item = itemById.get(tile.id)
+              if (!item) return null
+
+              return (
+                <div
+                  key={tile.id}
+                  className="shrink-0 overflow-hidden"
+                  style={{
+                    width: tile.width,
+                    flex: `0 0 ${tile.width}px`,
+                    height: row.height,
+                  }}
+                >
+                  <PublicCaricatureCard
+                    item={item}
+                    priority={priorityIds.has(tile.id)}
+                    className="h-full w-full"
+                  />
+                </div>
+              )
+            })}
           </div>
-          </article>
-        </Link>
-      ))}
+        ))
+      )}
     </div>
   )
 }
 
-function getPreviewAspectRatio(preview: NonNullable<CaricatureSearchGridItem["preview"]>) {
-  if (preview.width > 0 && preview.height > 0) return `${preview.width} / ${preview.height}`
-  return "4 / 5"
+function CaricaturesGridPlaceholder() {
+  const gap = CARICATURES_JUSTIFIED_OPTIONS.gap
+  const rowHeight = CARICATURES_JUSTIFIED_OPTIONS.targetRowHeight
+
+  return (
+    <div className="w-full animate-pulse" aria-hidden>
+      {[0, 1, 2].map((rowIndex) => (
+        <div
+          key={rowIndex}
+          className="flex w-full"
+          style={{ gap, height: rowHeight, marginBottom: gap }}
+        >
+          {[1.3, 0.85, 1.1].map((flexGrow, tileIndex) => (
+            <div
+              key={tileIndex}
+              className="h-full bg-muted"
+              style={{ flex: flexGrow }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
 }

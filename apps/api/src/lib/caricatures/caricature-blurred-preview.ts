@@ -34,7 +34,6 @@ export const CARICATURE_BLURRED_PREVIEW_PROFILES: Record<CaricaturePreviewVarian
 export interface GenerateCaricatureBlurredPreviewInput {
   source: Buffer
   variant: CaricaturePreviewVariant
-  label: string
 }
 
 export interface GeneratedCaricatureBlurredPreview {
@@ -52,7 +51,6 @@ export async function generateCaricatureBlurredPreview(
   input: GenerateCaricatureBlurredPreviewInput,
 ): Promise<GeneratedCaricatureBlurredPreview> {
   const profile = CARICATURE_BLURRED_PREVIEW_PROFILES[input.variant]
-  const label = input.label.trim() || "Fotocorp"
 
   const resized = await sharp(input.source, {
     failOn: "none",
@@ -72,7 +70,7 @@ export async function generateCaricatureBlurredPreview(
   let bestCandidate: GeneratedCaricatureBlurredPreview | undefined
 
   for (const quality of profile.qualities) {
-    const overlay = Buffer.from(buildCaricatureStripSvg({ width, height, label }))
+    const overlay = Buffer.from(buildCaricatureStripSvg({ width, height }))
     const encoded = await sharp(resized.data, { failOn: "none" })
       .composite([{ input: overlay, top: 0, left: 0 }])
       .webp({ quality, effort: 6, smartSubsample: true })
@@ -104,11 +102,11 @@ export async function generateCaricatureBlurredPreview(
   return bestCandidate
 }
 
-function buildCaricatureStripSvg(input: { width: number; height: number; label: string }) {
+function buildCaricatureStripSvg(input: { width: number; height: number }) {
   const stripHeight = clamp(Math.round(input.width * 0.05), 32, 48)
   const fontSize = clamp(Math.round(stripHeight * 0.44), 12, 20)
   const paddingLeft = clamp(Math.round(input.width * 0.042), 18, 28)
-  const badgeText = `© Fotocorp · ${escapeXml(input.label)}`
+  const badgeText = "© Fotocorp · Protected Preview"
   const stripWidth = Math.min(input.width, estimateBadgeTextWidth(badgeText, fontSize) + paddingLeft)
   const x = input.width - stripWidth
   const y = input.height - stripHeight

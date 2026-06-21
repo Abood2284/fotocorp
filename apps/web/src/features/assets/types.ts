@@ -185,6 +185,29 @@ export interface PublicLatestEventsResponse {
   generatedAt: string
 }
 
+export interface PublicHomepageCaricature {
+  id: string
+  headline: string
+  description: string
+  credit: string
+  categoryName: string
+  language: string
+  hasVisibleText: boolean
+  hasTranslation: boolean
+  depictedSubjects: string[]
+  publishedAt: string
+  previewUrl: string
+  previewWidth: number
+  previewHeight: number
+}
+
+export interface PublicLatestCaricaturesResponse {
+  items: PublicHomepageCaricature[]
+  nextCursor: string | null
+  hasMore: boolean
+  generatedAt: string
+}
+
 export interface PublicHomepageFeed {
   latestEventsPreview: {
     items: PublicHomepageEvent[]
@@ -241,6 +264,7 @@ export interface PublicCaricatureSearchItem {
   categoryName: string | null
   language: string | null
   hasVisibleText: boolean | null
+  hasTranslation: boolean | null
   keywords: string[]
   depictedSubjects: string[]
   publishedAt: string | null
@@ -268,10 +292,17 @@ export interface PublicCaricatureSearchResponse {
     languages: Array<{ value: string; count: number; name: string; assetCount: number }>
     credits: Array<{ value: string; count: number; name: string; assetCount: number }>
     hasVisibleText: Array<{ value: string; count: number; name: string; assetCount: number }>
+    depictedSubjects: Array<{ value: string; count: number; name: string; assetCount: number }>
   }
   timing?: {
-    backend: "typesense"
+    backend: "typesense" | "postgres"
     tookMs: number
+  }
+  meta?: {
+    source?: "typesense" | "postgres"
+    searchTimeMs?: number
+    outOf?: number
+    popularSortAvailable?: boolean
   }
 }
 

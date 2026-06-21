@@ -19,7 +19,7 @@ import {
   resolveCaricatureMetadataFormDefaults,
   toDatetimeLocalValue,
 } from "@/lib/caricatures/caricature-upload-metadata"
-import { getStaffCaricatureOriginalUrl } from "@/lib/search/caricature-search"
+import { getCaricatureUploadWizardOriginalUrl } from "@/lib/search/caricature-search"
 import { ContributorUploadStepCard } from "@/components/contributor/upload/contributor-upload-layout"
 
 interface ContributorUploadStepCaricatureMetadataProps {
@@ -60,8 +60,8 @@ export function ContributorUploadStepCaricatureMetadata({
   const showVisibleText = caricatureLanguageRequiresVisibleText(language)
   const showTranslation = caricatureLanguageShowsTranslation(language)
   const showLanguageOther = caricatureLanguageRequiresOther(language)
-  const staffOriginalUrl =
-    staffMode && asset?.id && hasOriginalFile ? getStaffCaricatureOriginalUrl(asset.id) : null
+  const originalPreviewUrl =
+    asset?.id && hasOriginalFile ? getCaricatureUploadWizardOriginalUrl(asset.id, staffMode) : null
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -74,7 +74,7 @@ export function ContributorUploadStepCaricatureMetadata({
     const payload: CaricatureAssetMetadataPayload = {
       headline: formData.get("headline")?.toString().trim() ?? "",
       description: formData.get("description")?.toString().trim() ?? "",
-      credit: formData.get("credit")?.toString().trim() ?? defaultCredit,
+      credit: formDefaults.credit,
       categoryId: formData.get("categoryId")?.toString().trim() ?? "",
       language,
       languageOther: formData.get("languageOther")?.toString().trim() || null,
@@ -118,11 +118,11 @@ export function ContributorUploadStepCaricatureMetadata({
           </div>
         ) : null}
 
-        {staffOriginalUrl ? (
+        {originalPreviewUrl ? (
           <div className="overflow-hidden rounded-md border border-border bg-muted/30">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={staffOriginalUrl}
+              src={originalPreviewUrl}
               alt="Uploaded caricature original"
               className="mx-auto max-h-[420px] w-auto max-w-full object-contain"
             />
@@ -151,16 +151,6 @@ export function ContributorUploadStepCaricatureMetadata({
                 maxLength={5000}
                 disabled={!active}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <CaricatureFieldLabel required>Credit</CaricatureFieldLabel>
-              <Input
-                name="credit"
-                defaultValue={formDefaults.credit}
-                required
-                maxLength={500}
-                disabled={!active}
               />
             </div>
             <div className="space-y-1.5">

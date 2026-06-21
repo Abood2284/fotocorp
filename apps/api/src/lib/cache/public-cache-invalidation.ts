@@ -9,13 +9,36 @@ interface PublicAssetCacheInvalidationInput {
 const EVENT_FEED_PATHS = [
   "/api/public/events/latest",
   "/api/v1/public/events/latest",
-];
+]
+
+const CARICATURE_LATEST_FEED_PATHS = [
+  "/api/public/caricatures/latest",
+  "/api/v1/public/caricatures/latest",
+]
+
+export async function invalidatePublicCaricatureFeedCache(env: Env) {
+  await purgePublicCachePaths(env, CARICATURE_LATEST_FEED_PATHS, {
+    event: "public_caricature_feed_cache_invalidation",
+  })
+}
 
 export async function invalidatePublicAssetCache(
   env: Env,
   input: PublicAssetCacheInvalidationInput,
 ) {
-  const relativePaths = buildPublicAssetInvalidationPaths(input);
+  const relativePaths = buildPublicAssetInvalidationPaths(input)
+  await purgePublicCachePaths(env, relativePaths, {
+    event: "public_cache_invalidation_purged",
+    assetId: input.assetId,
+    eventId: input.eventId ?? null,
+  })
+}
+
+async function purgePublicCachePaths(
+  env: Env,
+  relativePaths: string[],
+  logContext: Record<string, unknown>,
+) {
   const origin = normalizeOrigin(env.PUBLIC_WEB_ORIGIN);
   const zoneId = env.CLOUDFLARE_CACHE_PURGE_ZONE_ID?.trim();
   const token = env.CLOUDFLARE_CACHE_PURGE_API_TOKEN?.trim();
@@ -24,10 +47,8 @@ export async function invalidatePublicAssetCache(
     console.info(JSON.stringify({
       event: "public_cache_invalidation_skipped",
       reason: "cloudflare_purge_not_configured",
-      assetId: input.assetId,
-      eventId: input.eventId ?? null,
       paths: relativePaths,
-      todo: "Configure PUBLIC_WEB_ORIGIN, CLOUDFLARE_CACHE_PURGE_ZONE_ID, and CLOUDFLARE_CACHE_PURGE_API_TOKEN to enable targeted public cache purge.",
+      ...logContext,
     }));
     return;
   }
@@ -47,19 +68,17 @@ export async function invalidatePublicAssetCache(
     console.warn(JSON.stringify({
       event: "public_cache_invalidation_failed",
       status: response.status,
-      assetId: input.assetId,
-      eventId: input.eventId ?? null,
       fileCount: files.length,
       body: body.slice(0, 500),
+      ...logContext,
     }));
     return;
   }
 
   console.info(JSON.stringify({
     event: "public_cache_invalidation_purged",
-    assetId: input.assetId,
-    eventId: input.eventId ?? null,
     fileCount: files.length,
+    ...logContext,
   }));
 }
 

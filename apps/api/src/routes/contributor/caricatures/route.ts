@@ -18,6 +18,7 @@ import {
   createCaricatureUploadShell,
   presignCaricatureOriginalUpload,
 } from "../../../lib/caricatures/caricature-original-upload"
+import { getAdminCaricatureOriginalResponse } from "../../../lib/caricatures/caricature-staff-original"
 import {
   adminCaricatureAssetMetadataSchema,
   adminCaricatureAssetParamSchema,
@@ -117,8 +118,20 @@ contributorCaricatureRoutes.post(
   },
 )
 
+contributorCaricatureRoutes.get(
+  `${base}/:assetId/original`,
+  zValidator("param", adminCaricatureAssetParamSchema),
+  async (c) => {
+    const database = db(c.env)
+    await requirePhotographerSession(database, getCookie(c, CONTRIBUTOR_SESSION_COOKIE))
+    const { assetId } = c.req.valid("param")
+    return await getAdminCaricatureOriginalResponse(database, c.env, assetId)
+  },
+)
+
 contributorCaricatureRoutes.all(`${base}/:assetId/original/presign`, () => methodNotAllowed())
 contributorCaricatureRoutes.all(`${base}/:assetId/original/complete`, () => methodNotAllowed())
+contributorCaricatureRoutes.all(`${base}/:assetId/original`, () => methodNotAllowed())
 
 contributorCaricatureRoutes.all(base, () => methodNotAllowed())
 contributorCaricatureRoutes.all(`${base}/:assetId`, () => methodNotAllowed())

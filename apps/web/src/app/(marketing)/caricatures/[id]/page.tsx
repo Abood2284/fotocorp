@@ -2,10 +2,30 @@ import { ChevronLeft } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { PreviewImage } from "@/components/assets/preview-image"
-import { getPublicCaricature } from "@/lib/api/fotocorp-api"
-import { buildCaricatureSearchBackHref, formatCaricatureLanguageLabel } from "@/lib/search/caricature-search"
-import { cn } from "@/lib/utils"
+import { CaricatureDetailActions } from "@/components/caricatures/caricature-detail-actions"
+import {
+  CaricatureArtworkTextSection,
+  CaricatureDetailChipSection,
+  CaricatureDetailMetadataSection,
+  CaricatureDetailPanel,
+} from "@/components/caricatures/caricature-detail-sections"
+import { CaricatureProtectedPreview } from "@/components/caricatures/caricature-protected-preview"
+import { CaricatureSearchResultGrid } from "@/components/search/caricature-search-result-grid"
+import type { PublicCaricatureDetail } from "@/features/assets/types"
+import { getPublicCaricature, searchPublicCaricatures } from "@/lib/api/fotocorp-api"
+import {
+  formatPublicCaricatureLanguageLabel,
+  formatPublicCaricaturePublishedDate,
+  isRecentlyPublishedCaricature,
+  resolvePublicCaricatureHeadline,
+  sanitizePublicCaricatureTags,
+  sanitizePublicCaricatureText,
+} from "@/lib/caricatures/caricature-public-display"
+import {
+  buildCaricatureDetailHref,
+  buildCaricatureSearchBackHref,
+  mapCaricatureSearchItemToGridItem,
+} from "@/lib/search/caricature-search"
 
 interface CaricatureDetailPageProps {
   params: Promise<{ id: string }>
@@ -21,15 +41,17 @@ export async function generateMetadata({ params }: CaricatureDetailPageProps) {
     return { title: "Caricature Not Found — Fotocorp" }
   }
 
-  const { caricature } = result
-  const preview = caricature.previews.detail ?? caricature.previews.card
+  const headline = resolvePublicCaricatureHeadline(result.caricature.headline)
+  const description = sanitizePublicCaricatureText(result.caricature.description)
+  const preview = result.caricature.previews.detail ?? result.caricature.previews.card
+
   return {
-    title: `${caricature.headline} — Fotocorp`,
-    description: caricature.description,
+    title: `${headline} — Fotocorp`,
+    description: description ?? `Protected caricature preview for ${headline}.`,
     openGraph: {
-      title: `${caricature.headline} — Fotocorp`,
-      description: caricature.description,
-      images: preview?.url ? [{ url: preview.url, alt: caricature.headline }] : [],
+      title: `${headline} — Fotocorp`,
+      description: description ?? `Protected caricature preview for ${headline}.`,
+      images: preview?.url ? [{ url: preview.url, alt: headline }] : [],
     },
   }
 }
@@ -41,126 +63,200 @@ export default async function CaricatureDetailPage({ params, searchParams }: Car
   if (!result) notFound()
 
   const { caricature } = result
-  const preview = caricature.previews.detail ?? caricature.previews.card
+  const detailHref = buildCaricatureDetailHref(id)
   const backHref = buildCaricatureSearchBackHref(resolvedSearchParams?.q)
-  const publishedDate = formatPublishedDate(caricature.publishedAt)
+  const preview = caricature.previews.detail ?? caricature.previews.card
+  const categorySearchHref = `/search?${new URLSearchParams({
+    segment: "caricature",
+    categoryId: caricature.categoryId,
+  }).toString()}`
+
+  const headline = resolvePublicCaricatureHeadline(caricature.headline)
+  const description = sanitizePublicCaricatureText(caricature.description)
+  const credit = sanitizePublicCaricatureText(caricature.credit)
+  const categoryName = sanitizePublicCaricatureText(caricature.categoryName)
+  const languageLabel = formatPublicCaricatureLanguageLabel(caricature.language)
+  const publishedDate = formatPublicCaricaturePublishedDate(caricature.publishedAt)
+  const keywords = sanitizePublicCaricatureTags(caricature.keywords)
+  const depictedSubjects = sanitizePublicCaricatureTags(caricature.depictedSubjects)
+  const visibleText = sanitizePublicCaricatureText(caricature.visibleText)
+  const visibleTextTranslation = sanitizePublicCaricatureText(caricature.visibleTextTranslationEn)
+  const showVisibleText = Boolean(visibleText) && caricature.language !== "NO_VISIBLE_TEXT"
+  const showTranslation = Boolean(visibleTextTranslation)
+  const isNew = isRecentlyPublishedCaricature(caricature.publishedAt)
+
+  const hasAboutContent =
+    Boolean(credit || categoryName || languageLabel || publishedDate)
+    || keywords.length > 0
+    || depictedSubjects.length > 0
+  const hasArtworkText = showVisibleText || showTranslation
+
+  const related = await loadRelatedCaricatures(caricature, id)
 
   return (
-    <div className="bg-background pb-20">
-      <div className="border-b border-border bg-surface-warm/70">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4 sm:px-6">
-          <Link
-            href={backHref}
-            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ChevronLeft size={16} aria-hidden />
-            Back to caricatures
-          </Link>
+    <div className="bg-background pb-20 lg:pb-0">
+      <div className="bg-surface-warm/70">
+        <div className="mx-auto w-full max-w-[1600px] px-3 py-3 sm:px-5 lg:px-8">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <Link
+              href={backHref}
+              className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+            >
+              <ChevronLeft size={16} aria-hidden />
+              Back to caricatures
+            </Link>
+            {categoryName ? (
+              <>
+                <span aria-hidden>/</span>
+                <Link href={categorySearchHref} className="hover:text-foreground">
+                  {categoryName}
+                </Link>
+              </>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:px-6">
-        <section className="space-y-4">
-          <div
-            className={cn(
-              "overflow-hidden rounded-lg border border-border bg-muted",
-              preview ? "mx-auto w-full" : "flex min-h-[320px] items-center justify-center",
-            )}
-            style={preview ? { aspectRatio: `${preview.width} / ${preview.height}` } : undefined}
-          >
-            {preview ? (
-              <PreviewImage
-                src={preview.url}
-                alt={caricature.headline}
-                className="h-full w-full object-contain"
-                loading="eager"
-              />
-            ) : (
-              <p className="px-6 text-center text-sm text-muted-foreground">
-                Preview is being prepared.
-              </p>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Public preview only. Licensed downloads require an active caricature entitlement.
-          </p>
-        </section>
-
-        <aside className="space-y-6">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Caricature</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{caricature.headline}</h1>
-            <p className="text-sm text-muted-foreground">{caricature.description}</p>
-          </div>
-
-          <dl className="grid gap-4 text-sm">
-            <DetailRow label="Credit" value={caricature.credit} />
-            <DetailRow label="Category" value={caricature.categoryName} />
-            <DetailRow label="Language" value={formatCaricatureLanguageLabel(caricature.language)} />
-            <DetailRow label="Published" value={publishedDate} />
-          </dl>
-
-          {caricature.hasVisibleText && caricature.visibleText ? (
-            <section className="space-y-2 rounded-lg border border-border bg-card p-4">
-              <h2 className="text-sm font-semibold text-foreground">Visible text</h2>
-              <p className="whitespace-pre-wrap text-sm text-foreground">{caricature.visibleText}</p>
-              {caricature.visibleTextTranslationEn ? (
-                <div className="border-t border-border pt-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">English translation</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
-                    {caricature.visibleTextTranslationEn}
-                  </p>
-                </div>
+      <div className="mx-auto w-full max-w-[1600px] px-3 pt-3 pb-5 sm:px-5 lg:px-8 lg:pt-4 lg:pb-7">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.62fr)_minmax(340px,0.58fr)] lg:items-start lg:gap-7">
+          <section className="min-w-0 space-y-4">
+            <header className="space-y-2 lg:hidden">
+              <h1 className="fc-heading-1 text-2xl font-normal tracking-tight text-foreground sm:text-3xl">
+                {headline}
+              </h1>
+              {description ? (
+                <p className="max-w-5xl text-sm leading-relaxed text-muted-foreground">{description}</p>
               ) : null}
-            </section>
-          ) : null}
+            </header>
 
-          {caricature.keywords.length > 0 ? (
-            <TagSection label="Keywords" values={caricature.keywords} />
-          ) : null}
+            <CaricatureProtectedPreview preview={preview} alt={headline} />
+          </section>
 
-          {caricature.depictedSubjects.length > 0 ? (
-            <TagSection label="Depicted subjects" values={caricature.depictedSubjects} />
-          ) : null}
-        </aside>
+          <aside className="flex flex-col gap-5 bg-surface-stone px-4 py-5 sm:px-5 lg:px-6 lg:py-6">
+            <div className="hidden space-y-2 lg:block">
+              <h1 className="fc-heading-1 text-2xl font-normal tracking-tight text-foreground lg:text-[2.45rem] lg:leading-[1.08]">
+                {headline}
+              </h1>
+              {description ? (
+                <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+              ) : null}
+            </div>
+
+            <CaricatureDetailActions assetId={id} detailHref={detailHref} />
+
+            {hasAboutContent ? (
+              <CaricatureDetailPanel title="About this work">
+                <CaricatureDetailMetadataSection
+                  showTitle={false}
+                  rows={[
+                    { label: "Credit", value: credit },
+                    { label: "Category", value: categoryName },
+                    { label: "Language", value: languageLabel },
+                    {
+                      label: "Published",
+                      value: publishedDate
+                        ? isNew
+                          ? `${publishedDate} · New`
+                          : publishedDate
+                        : null,
+                    },
+                  ]}
+                />
+
+                {keywords.length > 0 ? (
+                  <CaricatureDetailChipSection
+                    title="Keywords"
+                    values={keywords}
+                    embedded
+                  />
+                ) : null}
+
+                {depictedSubjects.length > 0 ? (
+                  <CaricatureDetailChipSection
+                    title="Depicted subjects"
+                    values={depictedSubjects}
+                    variant="subjects"
+                    embedded
+                  />
+                ) : null}
+              </CaricatureDetailPanel>
+            ) : null}
+
+            {hasArtworkText ? (
+              <CaricatureArtworkTextSection
+                originalText={visibleText}
+                translation={visibleTextTranslation}
+                languageLabel={languageLabel}
+                showOriginal={showVisibleText}
+              />
+            ) : null}
+          </aside>
+        </div>
+
+        {related ? (
+          <section className="mt-8">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight text-foreground">{related.label}</h2>
+              </div>
+              {related.browseHref ? (
+                <Link
+                  href={related.browseHref}
+                  className="text-sm font-medium text-primary underline underline-offset-4 hover:text-primary-hover"
+                >
+                  View all
+                </Link>
+              ) : null}
+            </div>
+            <CaricatureSearchResultGrid items={related.items} priorityCount={4} />
+          </section>
+        ) : null}
       </div>
     </div>
   )
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-foreground">{value}</dd>
-    </div>
-  )
-}
+async function loadRelatedCaricatures(caricature: PublicCaricatureDetail, currentId: string) {
+  if (caricature.credit.trim()) {
+    try {
+      const byCredit = await searchPublicCaricatures({ credit: caricature.credit, limit: 8 })
+      const items = byCredit.items
+        .filter((item) => item.id !== currentId)
+        .slice(0, 5)
+        .map(mapCaricatureSearchItemToGridItem)
+      if (items.length > 0) {
+        const params = new URLSearchParams({ segment: "caricature", credit: caricature.credit })
+        return {
+          label: `More from ${caricature.credit.trim()}`,
+          items,
+          browseHref: `/search?${params.toString()}`,
+        }
+      }
+    } catch {
+      // Related section is optional; omit when search is unavailable.
+    }
+  }
 
-function TagSection({ label, values }: { label: string; values: string[] }) {
-  return (
-    <section className="space-y-2">
-      <h2 className="text-sm font-semibold text-foreground">{label}</h2>
-      <ul className="flex flex-wrap gap-2">
-        {values.map((value) => (
-          <li
-            key={value}
-            className="rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-foreground"
-          >
-            {value}
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
+  try {
+    const byCategory = await searchPublicCaricatures({ categoryId: caricature.categoryId, limit: 8 })
+    const items = byCategory.items
+      .filter((item) => item.id !== currentId)
+      .slice(0, 5)
+      .map(mapCaricatureSearchItemToGridItem)
+    if (items.length > 0) {
+      const params = new URLSearchParams({
+        segment: "caricature",
+        categoryId: caricature.categoryId,
+      })
+      return {
+        label: "More caricatures",
+        items,
+        browseHref: `/search?${params.toString()}`,
+      }
+    }
+  } catch {
+    // Related section is optional; omit when search is unavailable.
+  }
 
-function formatPublishedDate(iso: string) {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date)
+  return null
 }

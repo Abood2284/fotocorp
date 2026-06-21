@@ -73,7 +73,6 @@ export async function processCaricaturePreviewGeneration(
   }
 
   const bucketName = resolveCaricaturePreviewsBucketName(env) || CARICATURE_PREVIEWS_BUCKET_NAME
-  const label = asset.headline.trim() || asset.credit.trim() || "Fotocorp"
   const processedTypes: string[] = []
   const readyTypes: string[] = []
 
@@ -96,7 +95,6 @@ export async function processCaricaturePreviewGeneration(
       const generated = await generateCaricatureBlurredPreview({
         source: originalBytes,
         variant,
-        label,
       })
 
       await putCaricaturePreviewObject(env, objectKey, generated.buffer, PREVIEW_MIME_TYPE)

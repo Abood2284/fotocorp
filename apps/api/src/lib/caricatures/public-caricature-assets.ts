@@ -7,8 +7,13 @@ import {
 } from "../search/typesense-caricature-text"
 import type {
   CaricatureSearchDto,
+  CaricatureSearchFacets,
   TypesenseCaricatureSearchQuery,
   TypesenseCaricatureSearchResponse,
+} from "../search/typesense-caricatures"
+import {
+  buildEmptyCaricatureSearchFacets,
+  filterLanguageFacets,
 } from "../search/typesense-caricatures"
 
 const UUID_PATTERN =
@@ -185,11 +190,7 @@ interface PublicCaricatureSearchRow extends PublicCaricatureDetailRow {
   created_at: Date | string
 }
 
-export function shouldTryCaricatureSqlFallback(
-  query: TypesenseCaricatureSearchQuery,
-  typesenseTotal: number,
-): boolean {
-  if (typesenseTotal > 0) return false
+export function isUnfilteredCaricatureBrowseQuery(query: TypesenseCaricatureSearchQuery): boolean {
   if (query.q !== "*") return false
   if (query.categoryId || query.category) return false
   if (query.language) return false
@@ -199,15 +200,29 @@ export function shouldTryCaricatureSqlFallback(
   return true
 }
 
-export async function listPublicCaricatures(
+export function shouldUseCaricatureSqlFallback(
+  query: TypesenseCaricatureSearchQuery,
+  typesenseTotal: number,
+  postgresTotal: number,
+): boolean {
+  if (!isUnfilteredCaricatureBrowseQuery(query)) return false
+  if (postgresTotal === 0) return false
+  return typesenseTotal === 0 || postgresTotal > typesenseTotal
+}
+
+/** @deprecated Use shouldUseCaricatureSqlFallback with a Postgres count. */
+export function shouldTryCaricatureSqlFallback(
+  query: TypesenseCaricatureSearchQuery,
+  typesenseTotal: number,
+): boolean {
+  return isUnfilteredCaricatureBrowseQuery(query) && typesenseTotal === 0
+}
+
+export async function countPublicCaricatures(
   db: PublicReadQueryClient,
   query: TypesenseCaricatureSearchQuery,
-): Promise<TypesenseCaricatureSearchResponse> {
-  const startedAt = Date.now()
+): Promise<number> {
   const filters = buildPublicCaricatureSearchFilters(query)
-  const orderBy = buildPublicCaricatureSearchOrderBy(query)
-  const offset = (query.page - 1) * query.limit
-
   const countRows = await executeRows<{ count: string }>(
     db,
     sql`
@@ -226,7 +241,19 @@ export async function listPublicCaricatures(
     `,
   )
 
-  const total = Number.parseInt(countRows[0]?.count ?? "0", 10)
+  return Number.parseInt(countRows[0]?.count ?? "0", 10)
+}
+
+export async function listPublicCaricatures(
+  db: PublicReadQueryClient,
+  query: TypesenseCaricatureSearchQuery,
+): Promise<TypesenseCaricatureSearchResponse> {
+  const startedAt = Date.now()
+  const filters = buildPublicCaricatureSearchFilters(query)
+  const orderBy = buildPublicCaricatureSearchOrderBy(query)
+  const offset = (query.page - 1) * query.limit
+
+  const total = await countPublicCaricatures(db, query)
   const rows = total === 0
     ? []
     : await executeRows<PublicCaricatureSearchRow>(
@@ -280,6 +307,9 @@ export async function listPublicCaricatures(
   const items = rows.map(mapPublicCaricatureSearchRow)
   const totalPages = query.limit > 0 ? Math.ceil(total / query.limit) : 0
   const durationMs = Date.now() - startedAt
+  const facets = query.includeFacets
+    ? await buildPublicCaricatureSearchFacets(db, query)
+    : buildEmptyCaricatureSearchFacets()
 
   return {
     items,
@@ -290,19 +320,133 @@ export async function listPublicCaricatures(
     limit: query.limit,
     totalPages,
     hasMore: query.page * query.limit < total,
-    facets: {
-      categories: [],
-      languages: [],
-      credits: [],
-      hasVisibleText: [],
-    },
+    facets,
     timing: {
       backend: "postgres",
       tookMs: durationMs,
     },
     meta: {
       source: "postgres",
+      popularSortAvailable: false,
     },
+  }
+}
+
+export async function buildPublicCaricatureSearchFacets(
+  db: PublicReadQueryClient,
+  query: TypesenseCaricatureSearchQuery,
+): Promise<CaricatureSearchFacets> {
+  const filters = buildPublicCaricatureSearchFilters(query)
+  const baseFromWhere = sql`
+    from caricature_assets ca
+    join caricature_categories cc on cc.id = ca.category_id
+    join caricature_derivatives card
+      on card.caricature_id = ca.id
+     and card.derivative_type = 'BLURRED_CARD'
+     and card.status = 'READY'
+     and card.public_url is not null
+    where ca.status = 'PUBLISHED'
+      and ca.visibility = 'PUBLIC'
+      and ca.deleted_at is null
+      ${filters}
+  `
+
+  const [
+    categoryRows,
+    languageRows,
+    creditRows,
+    hasVisibleTextRows,
+    depictedSubjectRows,
+  ] = await Promise.all([
+    executeRows<{ category_id: string; category_name: string; asset_count: string }>(
+      db,
+      sql`
+        select
+          ca.category_id::text as category_id,
+          cc.name as category_name,
+          count(*)::text as asset_count
+        ${baseFromWhere}
+        group by ca.category_id, cc.name
+        order by count(*) desc, cc.name asc
+      `,
+    ),
+    executeRows<{ language: string; asset_count: string }>(
+      db,
+      sql`
+        select
+          ca.language,
+          count(*)::text as asset_count
+        ${baseFromWhere}
+          and ca.language <> 'NO_VISIBLE_TEXT'
+        group by ca.language
+        order by count(*) desc, ca.language asc
+      `,
+    ),
+    executeRows<{ credit: string; asset_count: string }>(
+      db,
+      sql`
+        select
+          ca.credit,
+          count(*)::text as asset_count
+        ${baseFromWhere}
+          and btrim(ca.credit) <> ''
+        group by ca.credit
+        order by count(*) desc, ca.credit asc
+        limit 50
+      `,
+    ),
+    executeRows<{ has_visible_text: boolean; asset_count: string }>(
+      db,
+      sql`
+        select
+          ca.has_visible_text,
+          count(*)::text as asset_count
+        ${baseFromWhere}
+        group by ca.has_visible_text
+        order by ca.has_visible_text desc
+      `,
+    ),
+    executeRows<{ subject: string; asset_count: string }>(
+      db,
+      sql`
+        select
+          subject,
+          count(*)::text as asset_count
+        from (
+          select unnest(ca.depicted_subjects) as subject
+          ${baseFromWhere}
+        ) subjects
+        where btrim(subject) <> ''
+        group by subject
+        order by count(*) desc, subject asc
+        limit 50
+      `,
+    ),
+  ])
+
+  return {
+    categories: categoryRows.map((row) => mapPostgresFacetItem(row.category_id, row.category_name, row.asset_count)),
+    languages: filterLanguageFacets(
+      languageRows.map((row) => mapPostgresFacetItem(row.language, row.language, row.asset_count)),
+    ),
+    credits: creditRows.map((row) => mapPostgresFacetItem(row.credit, row.credit, row.asset_count)),
+    hasVisibleText: hasVisibleTextRows.map((row) => mapPostgresFacetItem(
+      String(row.has_visible_text),
+      String(row.has_visible_text),
+      row.asset_count,
+    )),
+    depictedSubjects: depictedSubjectRows.map((row) => mapPostgresFacetItem(row.subject, row.subject, row.asset_count)),
+  }
+}
+
+export function mapPostgresFacetItem(value: string, name: string, assetCount: string | number) {
+  const count = typeof assetCount === "number" ? assetCount : Number.parseInt(assetCount, 10)
+  const normalizedCount = Number.isFinite(count) ? count : 0
+  return {
+    value,
+    name,
+    count: normalizedCount,
+    assetCount: normalizedCount,
   }
 }
 
@@ -369,6 +513,7 @@ function buildPublicCaricatureSearchOrderBy(query: TypesenseCaricatureSearchQuer
 function mapPublicCaricatureSearchRow(row: PublicCaricatureSearchRow): CaricatureSearchDto {
   const cardPreview = mapPreview(row.preview_card_url, row.preview_card_width, row.preview_card_height)
   const detailPreview = mapPreview(row.preview_detail_url, row.preview_detail_width, row.preview_detail_height)
+  const translation = sanitizeCaricatureSearchableText(row.visible_text_translation_en)
 
   return {
     id: row.id,
@@ -379,6 +524,7 @@ function mapPublicCaricatureSearchRow(row: PublicCaricatureSearchRow): Caricatur
     categoryName: row.category_name.trim(),
     language: row.language,
     hasVisibleText: row.has_visible_text,
+    hasTranslation: Boolean(translation),
     keywords: sanitizeCaricatureSearchableStringList(row.keywords),
     depictedSubjects: sanitizeCaricatureSearchableStringList(row.depicted_subjects),
     publishedAt: toIsoString(row.published_at),

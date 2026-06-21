@@ -12,11 +12,16 @@ import {
   updateAdminAssetStateBulkAction,
 } from "@/app/(staff)/staff/(workspace)/catalog/actions"
 import { PreviewImage } from "@/components/assets/preview-image"
+import { CursorImagePreview } from "@/components/shared/cursor-image-preview"
 import { StaffCatalogDetailSidebar } from "./staff-catalog-detail-sidebar"
 import { StaffCatalogBulkMetadataEditor } from "./staff-catalog-bulk-metadata-editor"
 import { ConfirmDialog } from "@/components/staff/shared/confirm-dialog"
 import { formatCatalogFotokeyDisplay, getCatalogImportMatchName } from "@/lib/catalog-asset-identity"
-import { getStaffCatalogPreviewUrl, getStaffCatalogPreviewVariant } from "@/lib/staff-catalog-preview"
+import {
+  getStaffCatalogHoverPreviewUrl,
+  getStaffCatalogPreviewUrl,
+  getStaffCatalogPreviewVariant,
+} from "@/lib/staff-catalog-preview"
 import { resolveCatalogBulkEditScope } from "@/lib/staff-catalog-metadata"
 import { cn } from "@/lib/utils"
 
@@ -372,13 +377,18 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
                   </td>
                   <td className="px-3 py-2">
                     {getStaffCatalogPreviewVariant(asset) ? (
-                      <div className="h-12 w-20 overflow-hidden rounded border border-border bg-muted">
-                        <PreviewImage
-                          src={getStaffCatalogPreviewUrl(asset) ?? ""}
-                          alt={asset.whoIsInPicture || asset.caption || "Preview"}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
+                      <CursorImagePreview
+                        src={getStaffCatalogHoverPreviewUrl(asset) ?? getStaffCatalogPreviewUrl(asset) ?? ""}
+                        alt={asset.whoIsInPicture || asset.caption || "Preview"}
+                      >
+                        <div className="h-12 w-20 overflow-hidden rounded border border-border bg-muted">
+                          <PreviewImage
+                            src={getStaffCatalogPreviewUrl(asset) ?? ""}
+                            alt={asset.whoIsInPicture || asset.caption || "Preview"}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      </CursorImagePreview>
                     ) : (
                       <div className="h-12 w-20 flex items-center justify-center rounded border border-border bg-muted text-muted-foreground">
                         <FileImage size={20} />
