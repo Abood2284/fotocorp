@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import type { TrackedFile } from "@/components/contributor/contributor-upload-types"
 import { getTrackedDisplayName } from "@/lib/upload-wizard-resume"
 import { uploadFieldLabelClass, uploadInputClass } from "@/components/contributor/upload/contributor-upload-field-styles"
+import { applyMetadataDraftPatch } from "@/lib/upload-metadata-sync-mode"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { Link2 } from "lucide-react"
@@ -17,15 +18,20 @@ export interface MetadataDraft {
 interface ContributorUploadMetadataItemProps {
   row: TrackedFile
   onSave: (draft: MetadataDraft) => Promise<void>
-  /** When true, the editor shows a visual indicator that sync mode is active */
+  /** Keeps parent tracked state in sync so remounting after asset switch preserves edits */
+  onDraftChange?: (draft: MetadataDraft) => void
+  /** When true, editing one field mirrors its value to all fields on this image only */
   syncMode?: boolean
-  /** Called immediately on keystroke (before debounce) to propagate full draft to other images in sync mode */
-  onImmediateDraftChange?: (draft: MetadataDraft) => void
 }
 
 const SAVE_DEBOUNCE_MS = 800
 
-export function ContributorUploadMetadataItem({ row, onSave, syncMode = false, onImmediateDraftChange }: ContributorUploadMetadataItemProps) {
+export function ContributorUploadMetadataItem({
+  row,
+  onSave,
+  onDraftChange,
+  syncMode = false,
+}: ContributorUploadMetadataItemProps) {
   const [whoIsInPicture, setWhoIsInPicture] = useState(row.whoIsInPicture)
   const [caption, setCaption] = useState(row.caption)
   const [keywords, setKeywords] = useState(row.keywords)
@@ -55,7 +61,10 @@ export function ContributorUploadMetadataItem({ row, onSave, syncMode = false, o
 
   useEffect(() => {
     return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      if (!saveTimerRef.current) return
+      clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+      void flushSave()
     }
   }, [])
 
@@ -88,11 +97,15 @@ export function ContributorUploadMetadataItem({ row, onSave, syncMode = false, o
   }
 
   function patchDraft(patch: Partial<MetadataDraft>) {
-    const next = { ...latestDraftRef.current, ...patch }
-    if (patch.whoIsInPicture !== undefined) setWhoIsInPicture(patch.whoIsInPicture)
-    if (patch.caption !== undefined) setCaption(patch.caption)
-    if (patch.keywords !== undefined) setKeywords(patch.keywords)
-    if (syncMode && onImmediateDraftChange) onImmediateDraftChange(next)
+    const next = applyMetadataDraftPatch({
+      syncMode,
+      current: latestDraftRef.current,
+      patch,
+    })
+    setWhoIsInPicture(next.whoIsInPicture)
+    setCaption(next.caption)
+    setKeywords(next.keywords)
+    onDraftChange?.(next)
     scheduleSave(next)
   }
 
@@ -204,4 +217,3 @@ function SyncBadge() {
     </span>
   )
 }
-

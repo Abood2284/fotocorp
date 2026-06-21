@@ -8,17 +8,17 @@ interface MetadataEditorPanelProps {
   selectedRow: TrackedFile | null
   /** Called by the metadata item on save (debounced) */
   onSave: (draft: MetadataDraft) => Promise<void>
-  /** Whether sync mode is active */
+  /** Called on every edit so parent tracked state survives asset switches */
+  onDraftChange?: (draft: MetadataDraft) => void
+  /** When true, editing one field mirrors its value to all fields on the selected image */
   syncMode: boolean
-  /** Called immediately on keystroke when sync mode is active */
-  onImmediateDraftChange?: (draft: MetadataDraft) => void
 }
 
 export function MetadataEditorPanel({
   selectedRow,
   onSave,
+  onDraftChange,
   syncMode,
-  onImmediateDraftChange,
 }: MetadataEditorPanelProps) {
   if (!selectedRow) {
     return (
@@ -39,8 +39,8 @@ export function MetadataEditorPanel({
         key={selectedRow.key}
         row={selectedRow}
         onSave={onSave}
+        onDraftChange={onDraftChange}
         syncMode={syncMode}
-        onImmediateDraftChange={onImmediateDraftChange}
       />
     </div>
   )

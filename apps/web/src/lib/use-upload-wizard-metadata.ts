@@ -4,6 +4,7 @@ import { useCallback, type Dispatch, type RefObject, type SetStateAction } from 
 import type { TrackedFile } from "@/components/contributor/contributor-upload-types"
 import type { MetadataDraft } from "@/components/contributor/upload/contributor-upload-metadata-item"
 import { keywordsToTags, normalizeWhoIsInPicture, tagsToKeywords } from "@/lib/contributor-upload-metadata"
+import { refreshStoredPreviewUrlVersion } from "@/lib/upload-wizard-resume"
 import {
   executeMetadataImport,
   type ImportOverwriteOptions,
@@ -88,7 +89,11 @@ export function useUploadWizardMetadata({
           keywords: tagsToKeywords(keywordsToTags(draft.keywords)),
         })
         updateTracked(key, {
+          whoIsInPicture: draft.whoIsInPicture,
+          caption: draft.caption,
+          keywords: draft.keywords,
           assetUpdatedAt: res.updatedAt,
+          previewUrl: refreshStoredPreviewUrlVersion(row.previewUrl, row.imageAssetId, res.updatedAt),
           saveState: "saved",
           saveHint: null,
         })

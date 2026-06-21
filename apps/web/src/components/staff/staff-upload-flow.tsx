@@ -64,6 +64,7 @@ import {
   getTrackedSizeBytes,
   persistBatchIdInBrowserUrl,
   readUploadWizardDraft,
+  resolveUploadWizardPreviewUrl,
   toUploadBatchDetailLike,
   writeUploadWizardDraft,
 } from "@/lib/upload-wizard-resume"
@@ -640,11 +641,29 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
           updateTracked(key, { status: "finalizing", uploadProgress: null })
           try {
             const doneRes = await staffWizardCompleteFile(currentBatchId!, instruction.itemId)
-            updateTracked(key, {
-              status: "done",
-              uploadProgress: null,
-              imageAssetId: doneRes.imageAssetId ?? null,
-            })
+            setTracked((prev) =>
+              prev.map((row) => {
+                if (row.key !== key) return row
+                const imageAssetId = doneRes.imageAssetId ?? null
+                const previewUrl = resolveUploadWizardPreviewUrl({
+                  flow: "staff",
+                  imageAssetId,
+                  cacheKey: row.key,
+                  existingPreviewUrl: row.previewUrl,
+                  preferServerPreview: true,
+                })
+                if (row.previewUrl?.startsWith("blob:") && previewUrl && previewUrl !== row.previewUrl) {
+                  URL.revokeObjectURL(row.previewUrl)
+                }
+                return {
+                  ...row,
+                  status: "done",
+                  uploadProgress: null,
+                  imageAssetId,
+                  previewUrl: previewUrl ?? row.previewUrl,
+                }
+              }),
+            )
             completed += 1
           } catch (e) {
             const msg = e instanceof StaffWizardApiError ? e.message : humanizeContributorNetworkError(e)

@@ -190,7 +190,7 @@ export function MetadataStickyToolbar({
       {syncMode && imageCount > 0 ? (
         <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm text-primary">
           <Link2 size={14} />
-          Sync mode active — editing any field copies caption, keywords, and who is in picture to all {imageCount} images
+          Sync mode active — editing any field copies its value to caption, keywords, and who is in picture on the selected image only
         </div>
       ) : null}
     </div>
