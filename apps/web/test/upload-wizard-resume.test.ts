@@ -35,6 +35,32 @@ describe("upload wizard resume helpers", () => {
     assert.equal(row?.previewUrl, "/api/contributor/images/asset-1/preview/card")
   })
 
+  it("builds staff original preview URLs when resuming upload batches", () => {
+    const row = mapBatchItemToTrackedFile(
+      {
+        id: "item-2",
+        fileName: "photo.jpg",
+        uploadStatus: "ASSET_CREATED",
+        mimeType: "image/jpeg",
+        sizeBytes: 2048,
+        imageAssetId: "asset-2",
+        whoIsInPicture: null,
+        caption: null,
+        keywords: null,
+        assetUpdatedAt: "2026-06-12T10:00:00.000Z",
+        failureCode: null,
+        failureMessage: null,
+      },
+      "staff",
+    )
+
+    assert.ok(row)
+    assert.equal(
+      row?.previewUrl,
+      "/staff/contributor-uploads/asset-2/original?v=2026-06-12T10%3A00%3A00.000Z",
+    )
+  })
+
   it("derives metadata step when uploaded assets exist", () => {
     const result = deriveWizardStepFromBatch(
       [{ uploadStatus: "ASSET_CREATED" }, { uploadStatus: "FAILED" }],

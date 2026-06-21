@@ -75,7 +75,7 @@ export async function createCaricatureUploadShell(
     .insert(caricatureAssets)
     .values({
       headline,
-      description: "Draft caricature awaiting metadata completion.",
+      description: "",
       credit,
       categoryId,
       language: "NO_VISIBLE_TEXT",
@@ -83,8 +83,8 @@ export async function createCaricatureUploadShell(
       visibleText: null,
       visibleTextTranslationEn: null,
       hasVisibleText: false,
-      keywords: ["upload-wizard"],
-      depictedSubjects: ["upload-wizard"],
+      keywords: [],
+      depictedSubjects: [],
       publishedAt: now,
       status: "DRAFT",
       visibility: "PRIVATE",
@@ -256,10 +256,10 @@ async function resolveDefaultCaricatureCategoryId(db: DrizzleClient): Promise<st
 }
 
 function headlineFromUploadFileName(fileName: string | undefined): string {
-  if (!fileName?.trim()) return "Untitled caricature draft"
+  if (!fileName?.trim()) return ""
   const base = fileName.trim().split(/[/\\]/).pop() ?? ""
   const withoutExt = base.replace(/\.[^.]+$/, "").trim()
-  if (!withoutExt || isCaricatureSearchPlaceholder(withoutExt)) return "Untitled caricature draft"
+  if (!withoutExt || isCaricatureSearchPlaceholder(withoutExt)) return ""
   return withoutExt.slice(0, 500)
 }
 

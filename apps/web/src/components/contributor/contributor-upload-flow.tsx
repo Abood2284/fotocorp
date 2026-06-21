@@ -305,7 +305,13 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     setCurrentStep(3)
   }, [markStepComplete])
 
-  const caricatureDefaultCredit = initialSession.contributor.displayName.trim() || "Contributor upload"
+  const caricatureDefaultCredit = useMemo(() => {
+    if (isPortalAdmin) {
+      const contributor = contributors.find((entry) => entry.id === targetContributorId)
+      return contributor?.displayName?.trim() || initialSession.contributor.displayName.trim() || "Contributor upload"
+    }
+    return initialSession.contributor.displayName.trim() || "Contributor upload"
+  }, [contributors, initialSession.contributor.displayName, isPortalAdmin, targetContributorId])
 
   const handleCaricatureUploadContinue = useCallback(async () => {
     const row = tracked[0]
@@ -706,6 +712,8 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
         <CaricatureUploadWizardPanel
           currentStep={currentStep}
           staffMode={false}
+          isPortalAdmin={isPortalAdmin}
+          session={initialSession}
           contributors={contributors}
           targetContributorId={targetContributorId}
           onTargetContributorIdChange={setTargetContributorId}

@@ -1,6 +1,7 @@
 import type { TrackedFile, UploadBatchAssetType, UploadWizardStep } from "@/components/contributor/contributor-upload-types"
 import type { ContributorUploadBatchItemDto } from "@/lib/api/contributor-api"
 import type { StaffWizardUploadBatchItemDto } from "@/lib/staff-upload-wizard-client"
+import { getStaffContributorUploadOriginalUrl } from "@/lib/staff-contributor-upload-metadata"
 
 export type UploadWizardFlowKind = "contributor" | "staff"
 
@@ -111,6 +112,49 @@ function contributorPreviewUrl(imageAssetId: string | null, flow: UploadWizardFl
   return `/api/contributor/images/${encodeURIComponent(imageAssetId)}/preview/card`
 }
 
+/** Preview URL for upload-wizard metadata thumbnails and editor. */
+export function resolveUploadWizardPreviewUrl(input: {
+  flow: UploadWizardFlowKind
+  imageAssetId: string | null
+  assetUpdatedAt?: string | null
+  cacheKey?: string
+  existingPreviewUrl?: string | null
+  /** After upload completes, prefer a durable staff original URL over a local blob. */
+  preferServerPreview?: boolean
+}): string | null {
+  const {
+    flow,
+    imageAssetId,
+    assetUpdatedAt,
+    cacheKey,
+    existingPreviewUrl,
+    preferServerPreview = false,
+  } = input
+
+  if (existingPreviewUrl?.startsWith("blob:") && !preferServerPreview) return existingPreviewUrl
+  if (!imageAssetId) return existingPreviewUrl ?? null
+
+  const version = assetUpdatedAt ?? cacheKey ?? imageAssetId
+  if (flow === "staff") {
+    return `${getStaffContributorUploadOriginalUrl(imageAssetId)}?v=${encodeURIComponent(version)}`
+  }
+  return contributorPreviewUrl(imageAssetId, flow) ?? existingPreviewUrl ?? null
+}
+
+/** Refresh cache-buster on staff original preview URLs after metadata save. */
+export function refreshStoredPreviewUrlVersion(
+  previewUrl: string | null,
+  imageAssetId: string | null,
+  version: string,
+): string | null {
+  if (!previewUrl || previewUrl.startsWith("blob:")) return previewUrl
+  if (!imageAssetId) return previewUrl
+  if (!previewUrl.includes("/staff/contributor-uploads/") || !previewUrl.includes("/original")) {
+    return previewUrl
+  }
+  return `${getStaffContributorUploadOriginalUrl(imageAssetId)}?v=${encodeURIComponent(version)}`
+}
+
 export function mapBatchItemToTrackedFile(
   item: UploadBatchItemLike,
   flow: UploadWizardFlowKind,
@@ -128,7 +172,12 @@ export function mapBatchItemToTrackedFile(
     imageAssetId: item.imageAssetId,
     instruction: null,
     uploadProgress: null,
-    previewUrl: contributorPreviewUrl(item.imageAssetId, flow),
+    previewUrl: resolveUploadWizardPreviewUrl({
+      flow,
+      imageAssetId: item.imageAssetId,
+      assetUpdatedAt: item.assetUpdatedAt,
+      cacheKey: item.id,
+    }),
     whoIsInPicture: item.whoIsInPicture ?? "",
     caption: item.caption ?? "",
     keywords: item.keywords ?? "",

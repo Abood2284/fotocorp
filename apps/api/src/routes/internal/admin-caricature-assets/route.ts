@@ -83,7 +83,7 @@ internalAdminCaricatureAssetsRoutes.patch(
     const { assetId } = c.req.valid("param")
     const payload = c.req.valid("json")
     const actorStaffId = actorStaffIdFromRequest(c.req.raw)
-    return await updateAdminCaricatureAssetService(c.env, assetId, payload, actorStaffId)
+    return await updateAdminCaricatureAssetService(c.env, assetId, payload, actorStaffId, c.executionCtx)
   },
 )
 

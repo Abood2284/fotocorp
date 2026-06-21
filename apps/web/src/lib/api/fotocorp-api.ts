@@ -16,6 +16,8 @@ import type {
   PublicHomepageHeroSetResponse,
   PublicLatestEventsResponse,
   PublicLatestEventsSection,
+  PublicLatestCaricaturesResponse,
+  PublicHomepageCaricature,
   PublicSearchEventsResponse,
   PublicSearchEventResult,
 } from "@/features/assets/types"
@@ -355,6 +357,30 @@ export async function fetchPublicLatestEvents(params: {
   })
 }
 
+export async function fetchPublicLatestCaricatures(params: {
+  windowDays?: number
+  limit?: number
+  cursor?: string | null
+} = {}): Promise<PublicLatestCaricaturesResponse> {
+  const searchParams = new URLSearchParams()
+  appendParam(searchParams, "windowDays", params.windowDays)
+  appendParam(searchParams, "limit", params.limit)
+  appendParam(searchParams, "cursor", params.cursor ?? undefined)
+  const query = searchParams.toString()
+  const path = `${resolveLatestCaricaturesPath()}${query ? `?${query}` : ""}`
+
+  const response = await getJson<PublicLatestCaricaturesResponse>(path, {
+    cachePolicy: "public-short",
+    traceRoute: "/api/public/caricatures/latest",
+    layer: typeof window === "undefined" ? "web" : "browser",
+  })
+
+  return {
+    ...response,
+    items: response.items.map(normalizeHomepageCaricature),
+  }
+}
+
 export async function fetchPublicEventCategoryBrowse(params: {
   limit?: number
   cursor?: string | null
@@ -639,6 +665,12 @@ function resolveLatestEventsPath() {
   return typeof window === "undefined" ? "/api/v1/public/events/latest" : "/api/public/events/latest"
 }
 
+function resolveLatestCaricaturesPath() {
+  return typeof window === "undefined"
+    ? "/api/v1/public/caricatures/latest"
+    : "/api/public/caricatures/latest"
+}
+
 function resolveEventCategoryBrowsePath() {
   return typeof window === "undefined" ? "/api/v1/public/events/browse" : "/api/public/events/browse"
 }
@@ -667,6 +699,13 @@ async function readApiError(response: Response) {
       code: undefined,
       message: `Fotocorp API request failed with ${response.status}.`,
     }
+  }
+}
+
+function normalizeHomepageCaricature(item: PublicHomepageCaricature): PublicHomepageCaricature {
+  return {
+    ...item,
+    previewUrl: buildApiAssetUrl(item.previewUrl),
   }
 }
 
@@ -811,9 +850,16 @@ function normalizeCaricatureSearchResponse(response: PublicCaricatureSearchRespo
       languages: response.facets?.languages ?? [],
       credits: response.facets?.credits ?? [],
       hasVisibleText: response.facets?.hasVisibleText ?? [],
+      depictedSubjects: response.facets?.depictedSubjects ?? [],
+    },
+    meta: {
+      source: response.meta?.source,
+      searchTimeMs: response.meta?.searchTimeMs,
+      outOf: response.meta?.outOf,
+      popularSortAvailable: response.meta?.popularSortAvailable ?? false,
     },
     timing: {
-      backend: "typesense",
+      backend: response.timing?.backend ?? response.meta?.source ?? "typesense",
       tookMs: response.timing?.tookMs ?? 0,
     },
   }
@@ -832,6 +878,7 @@ function normalizeCaricatureSearchItem(
     ...item,
     keywords: Array.isArray(item.keywords) ? item.keywords : [],
     depictedSubjects: Array.isArray(item.depictedSubjects) ? item.depictedSubjects : [],
+    hasTranslation: item.hasTranslation ?? false,
     previews: {
       card: cardPreview ? normalizePreview(cardPreview) : null,
       detail: detailPreview ? normalizePreview(detailPreview) : null,

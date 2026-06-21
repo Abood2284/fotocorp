@@ -6,6 +6,7 @@ import {
   sanitizeCaricatureSearchableText,
 } from "../src/lib/search/typesense-caricature-text";
 import {
+  TYPESENSE_CARICATURE_FACET_BY,
   TYPESENSE_CARICATURE_QUERY_BY,
   TYPESENSE_CARICATURE_QUERY_BY_WEIGHTS,
   buildCaricaturesCollectionSchema,
@@ -14,6 +15,8 @@ import {
   buildTypesenseCaricatureFilterSummary,
   buildTypesenseCaricatureSearchUrl,
   buildTypesenseCaricatureSortBy,
+  filterLanguageFacets,
+  mapCategoryFacets,
   mapTypesenseCaricatureSearchResponse,
   parseTypesenseCaricatureSearchQuery,
 } from "../src/lib/search/typesense-caricatures";
@@ -108,6 +111,7 @@ describe("Typesense caricature search mapping", () => {
     assert.equal(url.searchParams.get("query_by_weights"), TYPESENSE_CARICATURE_QUERY_BY_WEIGHTS);
     assert.equal(url.searchParams.get("per_page"), "25");
     assert.equal(url.searchParams.get("page"), "2");
+    assert.equal(url.searchParams.get("facet_by"), TYPESENSE_CARICATURE_FACET_BY);
     assert.equal(buildTypesenseCaricatureSortBy(query), "published_at_ts:asc");
     assert.equal(
       buildTypesenseCaricatureFilterSummary(query),
@@ -151,8 +155,10 @@ describe("Typesense caricature search mapping", () => {
           },
         ],
         facet_counts: [
+          { field_name: "category_id", counts: [{ value: "category-1", count: 1 }] },
           { field_name: "category_name", counts: [{ value: "Politics", count: 1 }] },
-          { field_name: "language", counts: [{ value: "MARATHI", count: 1 }] },
+          { field_name: "language", counts: [{ value: "MARATHI", count: 1 }, { value: "NO_VISIBLE_TEXT", count: 2 }] },
+          { field_name: "depicted_subjects", counts: [{ value: "politician", count: 1 }] },
         ],
       },
       query,
@@ -161,7 +167,28 @@ describe("Typesense caricature search mapping", () => {
     assert.equal(response.total, 1);
     assert.equal(response.items[0]?.headline, "Election satire");
     assert.equal(response.items[0]?.previews.card?.url, "https://cdn.example.test/card.webp");
-    assert.equal(response.facets.categories[0]?.value, "Politics");
+    assert.equal(response.facets.categories[0]?.value, "category-1");
+    assert.equal(response.facets.categories[0]?.name, "Politics");
     assert.equal(response.facets.languages[0]?.value, "MARATHI");
+    assert.equal(response.facets.languages.some((language) => language.value === "NO_VISIBLE_TEXT"), false);
+    assert.equal(response.facets.depictedSubjects[0]?.value, "politician");
+    assert.equal(response.meta.popularSortAvailable, false);
+  });
+
+  it("filters NO_VISIBLE_TEXT from language facets", () => {
+    const filtered = filterLanguageFacets([
+      { value: "NO_VISIBLE_TEXT", count: 2, name: "NO_VISIBLE_TEXT", assetCount: 2 },
+      { value: "MARATHI", count: 1, name: "MARATHI", assetCount: 1 },
+    ]);
+    assert.deepEqual(filtered.map((item) => item.value), ["MARATHI"]);
+  });
+
+  it("maps category facets by id and resolves display names", () => {
+    const categories = mapCategoryFacets([
+      { field_name: "category_id", counts: [{ value: "category-1", count: 3 }] },
+      { field_name: "category_name", counts: [{ value: "Politics", count: 3 }] },
+    ]);
+    assert.equal(categories[0]?.value, "category-1");
+    assert.equal(categories[0]?.name, "Politics");
   });
 });

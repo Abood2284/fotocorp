@@ -10,7 +10,7 @@ import { MetadataStickyToolbar } from "@/components/contributor/upload/contribut
 import { MetadataGridPanel } from "@/components/contributor/upload/contributor-upload-metadata-grid"
 import { MetadataEditorPanel } from "@/components/contributor/upload/contributor-upload-metadata-editor"
 
-/** Max concurrent API saves for bulk operations (fill-all / sync propagation). */
+/** Max concurrent API saves for bulk operations (fill-all). */
 const BULK_SAVE_CONCURRENCY = 5
 
 interface ContributorUploadStepMetadataProps {
@@ -73,7 +73,7 @@ export function ContributorUploadStepMetadata({
     return set
   }, [completed])
 
-  /* ---- editor remount key: bumped when Fill All / sync targets the selected image ---- */
+  /* ---- editor remount key: bumped when Fill All targets the selected image ---- */
   const [editorResetKey, setEditorResetKey] = useState(0)
 
   /* ---- selection ---- */
@@ -102,51 +102,24 @@ export function ContributorUploadStepMetadata({
     [completed, selectedKey],
   )
 
-  /* ---- sync mode ---- */
+  /* ---- sync mode (mirrors fields on the selected image only) ---- */
   const [syncMode, setSyncMode] = useState(false)
 
-  const bulkSaveItems = useCallback(
-    async (keys: string[], draft: MetadataDraft) => {
-      const tasks = keys.map((key) => async () => {
-        try {
-          await onSaveItem(key, draft)
-        } catch {
-          // Surfaces via saveState per item
-        }
-      })
-      await runWithConcurrency(tasks, BULK_SAVE_CONCURRENCY)
-    },
-    [onSaveItem],
-  )
-
-  /** Called by the metadata item on keystroke when sync mode is active. */
-  const handleSyncDraftChange = useCallback(
+  const handleSelectedDraftChange = useCallback(
     (draft: MetadataDraft) => {
       if (!selectedKey) return
-
-      const otherKeys = completed
-        .filter((r) => r.key !== selectedKey)
-        .map((r) => r.key)
-
-      if (otherKeys.length === 0) return
-
-      const patches: Array<{ key: string; patch: Partial<TrackedFile> }> = otherKeys.map((key) => {
-        const row = completed.find((r) => r.key === key)
-        return {
-          key,
+      onBulkUpdate([
+        {
+          key: selectedKey,
           patch: {
             caption: draft.caption,
             keywords: draft.keywords,
             whoIsInPicture: draft.whoIsInPicture,
-            metadataRevision: (row?.metadataRevision ?? 0) + 1,
           },
-        }
-      })
-
-      onBulkUpdate(patches)
-      void bulkSaveItems(otherKeys, draft)
+        },
+      ])
     },
-    [bulkSaveItems, completed, onBulkUpdate, selectedKey],
+    [onBulkUpdate, selectedKey],
   )
 
   /* ---- fill-all ---- */
@@ -314,8 +287,8 @@ export function ContributorUploadStepMetadata({
               key={`${selectedRow?.key ?? 'none'}--r${editorResetKey}`}
               selectedRow={selectedRow}
               onSave={(draft) => onSaveItem(selectedRow!.key, draft)}
+              onDraftChange={handleSelectedDraftChange}
               syncMode={syncMode}
-              onImmediateDraftChange={syncMode ? handleSyncDraftChange : undefined}
             />
           </div>
         </div>

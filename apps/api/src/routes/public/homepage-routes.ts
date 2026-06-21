@@ -11,6 +11,11 @@ import {
   parseLatestEventsQuery,
 } from "../../lib/assets/public-homepage"
 import {
+  buildLatestCaricaturesResponse,
+  fetchPublicLatestCaricaturesRows,
+  parseLatestCaricaturesQuery,
+} from "../../lib/caricatures/public-homepage-caricatures"
+import {
   getPublicHomepageHeroSet,
   PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL,
 } from "../../lib/assets/public-homepage-hero-set"
@@ -106,6 +111,97 @@ publicHomepageRoutes.get("/api/v1/public/events/latest", async (c) => {
     const { rows, dbTrace } = await withPublicReadDb(c.env, (readDb) => fetchPublicLatestEventsRows(readDb, query))
     tracker.mark("db")
     const response = buildLatestEventsResponse(rows, query, cdn)
+    tracker.mark("map")
+    tracker.mark("response_build")
+
+    const durationMs = tracker.total()
+    const segmentTimings = {
+      parse: tracker.elapsed("parse"),
+      db: dbTrace.dbMs,
+      map: tracker.elapsed("map"),
+      response_build: tracker.elapsed("response_build"),
+    }
+    const timings = { ...segmentTimings, total: durationMs }
+
+    logLatencyTrace({
+      event: "latency_trace",
+      requestId,
+      layer: "api",
+      route,
+      status: "ok",
+      statusCode: 200,
+      durationMs,
+      timings,
+      cache: {
+        mode: "public-feed",
+        hit: false,
+        cacheControl: PUBLIC_HOMEPAGE_FEED_CACHE_CONTROL,
+      },
+      db: dbTrace,
+    })
+
+    return json(response, 200, {
+      headers: {
+        "Cache-Control": PUBLIC_HOMEPAGE_FEED_CACHE_CONTROL,
+        "X-Content-Type-Options": "nosniff",
+        [FOTOCORP_REQUEST_ID_HEADER]: requestId,
+        "Server-Timing": formatServerTiming(segmentTimings, durationMs),
+        [PUBLIC_READ_DB_PATH_HEADER]: PUBLIC_READ_DB_PATH,
+      },
+    })
+  } catch (error) {
+    const durationMs = tracker.total()
+    const timings = {
+      parse: tracker.elapsed("parse"),
+      db: tracker.elapsed("db"),
+      map: tracker.elapsed("map"),
+      response_build: tracker.elapsed("response_build"),
+      total: durationMs,
+    }
+    const serialized = error instanceof Error
+      ? { name: error.name, message: error.message }
+      : { name: "UnknownError", message: String(error) }
+
+    logLatencyTrace({
+      event: "latency_trace",
+      requestId,
+      layer: "api",
+      route,
+      status: "error",
+      statusCode: error instanceof AppError ? error.status : 500,
+      durationMs,
+      timings,
+      cache: {
+        mode: "public-feed",
+        hit: false,
+        cacheControl: PUBLIC_HOMEPAGE_FEED_CACHE_CONTROL,
+      },
+      error: serialized,
+    })
+
+    throw error
+  }
+})
+
+publicHomepageRoutes.get("/api/v1/public/caricatures/latest", async (c) => {
+  const requestId = c.get("requestId")
+  const route = "/api/v1/public/caricatures/latest"
+  const tracker = createTimingTracker()
+  const searchParams = new URL(c.req.url).searchParams
+  const input = {
+    windowDays: searchParams.get("windowDays"),
+    limit: searchParams.get("limit"),
+    cursor: searchParams.get("cursor"),
+  }
+
+  try {
+    const query = parseLatestCaricaturesQuery(input)
+    tracker.mark("parse")
+    const { rows, dbTrace } = await withPublicReadDb(c.env, (readDb) =>
+      fetchPublicLatestCaricaturesRows(readDb, query),
+    )
+    tracker.mark("db")
+    const response = buildLatestCaricaturesResponse(rows, query)
     tracker.mark("map")
     tracker.mark("response_build")
 
@@ -356,6 +452,7 @@ publicHomepageRoutes.get("/api/v1/public/creative/featured", (c) =>
 publicHomepageRoutes.all("/api/v1/public/homepage", () => methodNotAllowed())
 publicHomepageRoutes.all("/api/v1/public/homepage/hero-set", () => methodNotAllowed())
 publicHomepageRoutes.all("/api/v1/public/events/latest", () => methodNotAllowed())
+publicHomepageRoutes.all("/api/v1/public/caricatures/latest", () => methodNotAllowed())
 publicHomepageRoutes.all("/api/v1/public/events/browse", () => methodNotAllowed())
 publicHomepageRoutes.all("/api/v1/public/royalty-free/featured", () => methodNotAllowed())
 publicHomepageRoutes.all("/api/v1/public/creative/featured", () => methodNotAllowed())

@@ -12,11 +12,14 @@ import type {
   CaricatureCategoryOption,
 } from "@/lib/caricatures/caricature-upload-metadata"
 import type { TrackedFile } from "@/components/contributor/contributor-upload-types"
+import type { ContributorAuthResponse } from "@/lib/api/contributor-api"
 import { caricatureUploadActionTitle } from "@/lib/upload-wizard-caricature"
 
 interface CaricatureUploadWizardPanelProps {
   currentStep: UploadWizardStep
   staffMode: boolean
+  isPortalAdmin?: boolean
+  session?: ContributorAuthResponse
   contributors: Array<{ id: string; displayName: string }>
   targetContributorId: string
   onTargetContributorIdChange: (value: string) => void
@@ -33,9 +36,6 @@ interface CaricatureUploadWizardPanelProps {
   onSetupContinue: () => void
   onUploadContinue: () => void | Promise<void>
   onSaveMetadata: (payload: CaricatureAssetMetadataPayload) => Promise<void>
-  onGeneratePreviews?: () => Promise<void>
-  generatePreviewsBusy?: boolean
-  generatePreviewsMessage?: string | null
   submitBusy: boolean
   submitError: string | null
   onDismissSubmitError: () => void
@@ -44,6 +44,8 @@ interface CaricatureUploadWizardPanelProps {
 export function CaricatureUploadWizardPanel({
   currentStep,
   staffMode,
+  isPortalAdmin = false,
+  session,
   contributors,
   targetContributorId,
   onTargetContributorIdChange,
@@ -60,9 +62,6 @@ export function CaricatureUploadWizardPanel({
   onSetupContinue,
   onUploadContinue,
   onSaveMetadata,
-  onGeneratePreviews,
-  generatePreviewsBusy = false,
-  generatePreviewsMessage = null,
   submitBusy,
   submitError,
   onDismissSubmitError,
@@ -80,9 +79,6 @@ export function CaricatureUploadWizardPanel({
         defaultCredit={defaultCredit}
         hasOriginalFile={hasOriginalFile || Boolean(caricatureAsset?.hasOriginalFile)}
         onSave={onSaveMetadata}
-        onGeneratePreviews={onGeneratePreviews}
-        generatePreviewsBusy={generatePreviewsBusy}
-        generatePreviewsMessage={generatePreviewsMessage}
         submitBusy={submitBusy}
         submitError={submitError}
         onDismissSubmitError={onDismissSubmitError}
@@ -102,6 +98,8 @@ export function CaricatureUploadWizardPanel({
             <ContributorUploadStepCaricatureSetup
               active
               staffMode={staffMode}
+              isPortalAdmin={isPortalAdmin}
+              session={session}
               contributors={contributors}
               targetContributorId={targetContributorId}
               onTargetContributorIdChange={onTargetContributorIdChange}

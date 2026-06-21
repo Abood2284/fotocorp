@@ -43,8 +43,6 @@ import {
   staffWizardSubmitBatch,
   staffWizardListCaricatureCategories,
   staffWizardCreateCaricatureAsset,
-  staffWizardGenerateCaricaturePreviews,
-  staffWizardGetCaricatureAsset,
   staffWizardUpdateCaricatureAsset,
 } from "@/lib/staff-upload-wizard-client"
 import { isCaricatureUpload, validateCaricatureUploadFile } from "@/lib/caricatures/caricature-upload-metadata"
@@ -66,6 +64,7 @@ import {
   getTrackedSizeBytes,
   persistBatchIdInBrowserUrl,
   readUploadWizardDraft,
+  resolveUploadWizardPreviewUrl,
   toUploadBatchDetailLike,
   writeUploadWizardDraft,
 } from "@/lib/upload-wizard-resume"
@@ -139,8 +138,6 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
   const [caricatureCategories, setCaricatureCategories] = useState<CaricatureCategoryOption[]>([])
   const [caricatureUploadBusy, setCaricatureUploadBusy] = useState(false)
   const [caricatureUploadProgress, setCaricatureUploadProgress] = useState<number | null>(null)
-  const [generatePreviewsBusy, setGeneratePreviewsBusy] = useState(false)
-  const [generatePreviewsMessage, setGeneratePreviewsMessage] = useState<string | null>(null)
 
   const isCaricature = isCaricatureUpload(batchAssetType)
   const wizardSteps = useMemo(() => [...uploadStepsForAssetType(batchAssetType)], [batchAssetType])
@@ -414,24 +411,6 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
     [caricatureAssetId, router],
   )
 
-  const generateCaricaturePreviews = useCallback(async () => {
-    if (!caricatureAssetId || generatePreviewsBusy) return
-    setGeneratePreviewsBusy(true)
-    setGeneratePreviewsMessage(null)
-    try {
-      const result = await staffWizardGenerateCaricaturePreviews(caricatureAssetId)
-      const refreshed = await staffWizardGetCaricatureAsset(caricatureAssetId)
-      setCaricatureAsset(refreshed)
-      setGeneratePreviewsMessage(result.message)
-    } catch (e) {
-      const msg = e instanceof StaffWizardApiError ? e.message : humanizeContributorNetworkError(e)
-      setGeneratePreviewsMessage(msg)
-      throw new Error(msg)
-    } finally {
-      setGeneratePreviewsBusy(false)
-    }
-  }, [caricatureAssetId, generatePreviewsBusy])
-
   const onFilesPicked = useCallback((list: FileList | null) => {
     if (!list?.length) return
     const incoming = Array.from(list)
@@ -662,11 +641,29 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
           updateTracked(key, { status: "finalizing", uploadProgress: null })
           try {
             const doneRes = await staffWizardCompleteFile(currentBatchId!, instruction.itemId)
-            updateTracked(key, {
-              status: "done",
-              uploadProgress: null,
-              imageAssetId: doneRes.imageAssetId ?? null,
-            })
+            setTracked((prev) =>
+              prev.map((row) => {
+                if (row.key !== key) return row
+                const imageAssetId = doneRes.imageAssetId ?? null
+                const previewUrl = resolveUploadWizardPreviewUrl({
+                  flow: "staff",
+                  imageAssetId,
+                  cacheKey: row.key,
+                  existingPreviewUrl: row.previewUrl,
+                  preferServerPreview: true,
+                })
+                if (row.previewUrl?.startsWith("blob:") && previewUrl && previewUrl !== row.previewUrl) {
+                  URL.revokeObjectURL(row.previewUrl)
+                }
+                return {
+                  ...row,
+                  status: "done",
+                  uploadProgress: null,
+                  imageAssetId,
+                  previewUrl: previewUrl ?? row.previewUrl,
+                }
+              }),
+            )
             completed += 1
           } catch (e) {
             const msg = e instanceof StaffWizardApiError ? e.message : humanizeContributorNetworkError(e)
@@ -805,9 +802,6 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
           onSetupContinue={handleCaricatureSetupContinue}
           onUploadContinue={handleCaricatureUploadContinue}
           onSaveMetadata={saveCaricatureMetadata}
-          onGeneratePreviews={caricatureAssetId ? generateCaricaturePreviews : undefined}
-          generatePreviewsBusy={generatePreviewsBusy}
-          generatePreviewsMessage={generatePreviewsMessage}
           submitBusy={submitting}
           submitError={submitError}
           onDismissSubmitError={() => setSubmitError(null)}

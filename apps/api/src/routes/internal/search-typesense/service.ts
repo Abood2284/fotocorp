@@ -1,6 +1,7 @@
 import type { Env } from "../../../appTypes"
 import { createHttpDb } from "../../../db"
 import { AppError } from "../../../lib/errors"
+import { invalidatePublicCaricatureFeedCache } from "../../../lib/cache/public-cache-invalidation"
 import { json } from "../../../lib/http"
 import {
   scheduleTypesenseDeleteForEvent,
@@ -43,5 +44,6 @@ export async function syncTypesenseCaricatureService(
   body: { assetId: string; critical?: boolean },
 ) {
   await scheduleTypesenseSyncForCaricature(db(env), env, body.assetId, { critical: body.critical })
+  await invalidatePublicCaricatureFeedCache(env)
   return json({ ok: true, assetId: body.assetId })
 }

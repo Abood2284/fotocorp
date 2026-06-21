@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { hasActiveCatalogFilters } from "../src/lib/staff-catalog-filters"
-import { getStaffCatalogPreviewUrl } from "../src/lib/staff-catalog-preview"
+import { getStaffCatalogHoverPreviewUrl, getStaffCatalogPreviewUrl } from "../src/lib/staff-catalog-preview"
 import type { AdminCatalogAssetItem } from "../src/features/assets/admin-catalog-types"
 
 describe("staff catalog list helpers", () => {
@@ -27,6 +27,19 @@ describe("staff catalog preview helpers", () => {
     assert.equal(
       getStaffCatalogPreviewUrl(asset),
       "/staff/catalog/asset-1/preview-image?variant=card&v=2026-01-02T00%3A00%3A00.000Z",
+    )
+  })
+
+  it("prefers detail variant for hover preview URLs", () => {
+    const asset = {
+      id: "asset-1",
+      updatedAt: "2026-01-02T00:00:00.000Z",
+      readyPreviewVariants: ["thumb", "card", "detail"],
+    } as AdminCatalogAssetItem
+
+    assert.equal(
+      getStaffCatalogHoverPreviewUrl(asset),
+      "/staff/catalog/asset-1/preview-image?variant=detail&v=2026-01-02T00%3A00%3A00.000Z",
     )
   })
 })

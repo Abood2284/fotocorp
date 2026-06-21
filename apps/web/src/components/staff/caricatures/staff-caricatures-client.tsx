@@ -3,12 +3,15 @@
 import { CheckCircle, ImageOff, Loader2, XCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useCallback, useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 
+import { StaffCaricatureMetadataDisplay } from "@/components/staff/caricatures/staff-caricature-metadata-display"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { StaffCaricatureDetail, StaffCaricatureListResponse } from "@/lib/api/staff-caricatures-api"
+import type { StaffCaricatureDetail, StaffCaricatureListItem, StaffCaricatureListResponse } from "@/lib/api/staff-caricatures-api"
 import { getStaffCaricatureOriginalUrl } from "@/lib/search/caricature-search"
+
+type ReviewAction = "approved" | "rejected"
 
 interface StaffCaricaturesClientProps {
   initialResponse: StaffCaricatureListResponse
@@ -23,16 +26,125 @@ export function StaffCaricaturesClient({
 }: StaffCaricaturesClientProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+  const [items, setItems] = useState(initialResponse.items)
+  const [total, setTotal] = useState(initialResponse.total)
   const [selectedId, setSelectedId] = useState<string | null>(initialResponse.items[0]?.id ?? null)
   const [statusFilter, setStatusFilter] = useState(currentStatus)
   const [query, setQuery] = useState(currentQuery)
   const [statusMessage, setStatusMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null)
   const [actionBusy, setActionBusy] = useState<"approve" | "reject" | null>(null)
+  const [detail, setDetail] = useState<StaffCaricatureDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [reviewActionById, setReviewActionById] = useState<Record<string, ReviewAction>>({})
+
+  useEffect(() => {
+    setItems(initialResponse.items)
+    setTotal(initialResponse.total)
+    setReviewActionById((current) => {
+      const next = { ...current }
+      for (const assetId of Object.keys(next)) {
+        const item = initialResponse.items.find((entry) => entry.id === assetId)
+        if (!item || item.status === "PUBLISHED" || item.status === "REJECTED") {
+          delete next[assetId]
+        }
+      }
+      return next
+    })
+  }, [initialResponse])
 
   const selected = useMemo(
-    () => initialResponse.items.find((item) => item.id === selectedId) ?? null,
-    [initialResponse.items, selectedId],
+    () => items.find((item) => item.id === selectedId) ?? null,
+    [items, selectedId],
   )
+
+  const loadDetail = useCallback(async (assetId: string, options?: { quiet?: boolean }) => {
+    if (!options?.quiet) {
+      setDetailLoading(true)
+      setDetailError(null)
+    }
+
+    try {
+      const response = await fetch(`/api/staff/caricatures/${encodeURIComponent(assetId)}`, {
+        cache: "no-store",
+      })
+      const body = (await response.json().catch(() => null)) as
+        | StaffCaricatureDetail
+        | { error?: { message?: string } }
+        | null
+      if (!response.ok) {
+        throw new Error(
+          body && "error" in body ? body.error?.message ?? "Could not load caricature detail." : "Could not load caricature detail.",
+        )
+      }
+      if (!body || "error" in body) {
+        throw new Error("Could not load caricature detail.")
+      }
+      setDetail(body)
+      return body
+    } catch (error) {
+      if (!options?.quiet) {
+        setDetail(null)
+        setDetailError(error instanceof Error ? error.message : "Could not load caricature detail.")
+      }
+      return null
+    } finally {
+      if (!options?.quiet) setDetailLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!selectedId) {
+      setDetail(null)
+      setDetailError(null)
+      setDetailLoading(false)
+      return
+    }
+
+    void loadDetail(selectedId)
+  }, [loadDetail, selectedId])
+
+  useEffect(() => {
+    if (!selectedId) return
+    if (reviewActionById[selectedId] !== "approved") return
+    const status = detail?.status
+    if (status === "PUBLISHED" || status === "REJECTED") return
+    if (detail?.previewGenerationStatus === "FAILED") return
+
+    const timer = window.setInterval(() => {
+      void loadDetail(selectedId, { quiet: true }).then((nextDetail) => {
+        if (nextDetail?.status === "PUBLISHED" || nextDetail?.status === "REJECTED") {
+          startTransition(() => router.refresh())
+        }
+      })
+    }, 3000)
+
+    return () => window.clearInterval(timer)
+  }, [detail?.previewGenerationStatus, detail?.status, loadDetail, reviewActionById, router, selectedId, startTransition])
+
+  const applyLocalListAfterReview = useCallback((assetId: string, action: ReviewAction) => {
+    setReviewActionById((current) => ({ ...current, [assetId]: action }))
+
+    const shouldRemoveFromList =
+      (action === "approved" && (statusFilter === "PENDING_REVIEW" || statusFilter === "DRAFT")) ||
+      (action === "rejected" && statusFilter === "PENDING_REVIEW")
+
+    if (shouldRemoveFromList) {
+      setItems((current) => {
+        const next = current.filter((item) => item.id !== assetId)
+        setSelectedId((selected) => (selected === assetId ? next[0]?.id ?? null : selected))
+        return next
+      })
+      setTotal((count) => Math.max(0, count - 1))
+      return
+    }
+
+    if (action === "rejected") {
+      setItems((current) =>
+        current.map((item) => (item.id === assetId ? { ...item, status: "REJECTED" } : item)),
+      )
+    }
+  }, [statusFilter])
 
   const applyFilters = useCallback(() => {
     const params = new URLSearchParams()
@@ -58,6 +170,9 @@ export function StaffCaricaturesClient({
         throw new Error(body?.error?.message ?? "Could not approve caricature.")
       }
       setStatusMessage({ kind: "ok", text: body?.message ?? "Caricature approved. Processing will run automatically." })
+      const removesFromList = statusFilter === "PENDING_REVIEW" || statusFilter === "DRAFT"
+      applyLocalListAfterReview(selectedId, "approved")
+      if (!removesFromList) await loadDetail(selectedId)
       startTransition(() => router.refresh())
     } catch (error) {
       setStatusMessage({
@@ -82,6 +197,9 @@ export function StaffCaricaturesClient({
         throw new Error(body?.error?.message ?? "Could not reject caricature.")
       }
       setStatusMessage({ kind: "ok", text: "Caricature rejected." })
+      const removesFromList = statusFilter === "PENDING_REVIEW"
+      applyLocalListAfterReview(selectedId, "rejected")
+      if (!removesFromList) await loadDetail(selectedId)
       startTransition(() => router.refresh())
     } catch (error) {
       setStatusMessage({
@@ -93,10 +211,8 @@ export function StaffCaricaturesClient({
     }
   }
 
-  const canReview =
-    selected &&
-    selected.hasOriginalFile &&
-    (selected.status === "PENDING_REVIEW" || selected.status === "DRAFT")
+  const selectedReviewAction = selectedId ? reviewActionById[selectedId] : undefined
+  const canReview = canReviewCaricature(selected, detail, selectedReviewAction)
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col gap-4 lg:flex-row">
@@ -144,15 +260,16 @@ export function StaffCaricaturesClient({
         </div>
 
         <div className="rounded-lg border border-border">
-          {initialResponse.items.length === 0 ? (
+          {items.length === 0 ? (
             <div className="flex flex-col items-center gap-2 px-6 py-12 text-center text-sm text-muted-foreground">
               <ImageOff className="size-8 opacity-60" />
               <p>No caricatures match these filters.</p>
             </div>
           ) : (
             <ul className="divide-y divide-border">
-              {initialResponse.items.map((item) => {
+              {items.map((item) => {
                 const active = item.id === selectedId
+                const displayStatus = resolveCaricatureDisplayStatus(item, item.id === selectedId ? detail : null, reviewActionById[item.id])
                 return (
                   <li key={item.id}>
                     <button
@@ -165,7 +282,7 @@ export function StaffCaricaturesClient({
                           <p className="font-medium text-foreground">{item.headline}</p>
                           <p className="text-xs text-muted-foreground">{item.credit}</p>
                         </div>
-                        <StatusBadge status={item.status} />
+                        <StatusBadge status={displayStatus} />
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {item.categoryName} · {item.hasOriginalFile ? "Original attached" : "Missing original"}
@@ -179,7 +296,7 @@ export function StaffCaricaturesClient({
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Showing {initialResponse.items.length} of {initialResponse.total}
+          Showing {items.length} of {total}
         </p>
       </section>
 
@@ -188,7 +305,11 @@ export function StaffCaricaturesClient({
           <p className="text-sm text-muted-foreground">Select a caricature to review.</p>
         ) : (
           <CaricatureReviewPanel
-            item={selected}
+            summary={selected}
+            detail={detail}
+            detailLoading={detailLoading}
+            detailError={detailError}
+            displayStatus={resolveCaricatureDisplayStatus(selected, detail, selectedReviewAction)}
             canReview={Boolean(canReview)}
             actionBusy={actionBusy}
             statusMessage={statusMessage}
@@ -202,40 +323,47 @@ export function StaffCaricaturesClient({
 }
 
 function CaricatureReviewPanel({
-  item,
+  summary,
+  detail,
+  detailLoading,
+  detailError,
+  displayStatus,
   canReview,
   actionBusy,
   statusMessage,
   onApprove,
   onReject,
 }: {
-  item: StaffCaricatureDetail | StaffCaricatureListResponse["items"][number]
+  summary: StaffCaricatureListResponse["items"][number]
+  detail: StaffCaricatureDetail | null
+  detailLoading: boolean
+  detailError: string | null
+  displayStatus: string
   canReview: boolean
   actionBusy: "approve" | "reject" | null
   statusMessage: { kind: "ok" | "error"; text: string } | null
   onApprove: () => void
   onReject: () => void
 }) {
-  const originalUrl = item.hasOriginalFile ? getStaffCaricatureOriginalUrl(item.id) : null
+  const headline = detail?.headline.trim() || summary.headline
+  const credit = detail?.credit.trim() || summary.credit
+  const hasOriginalFile = detail?.hasOriginalFile ?? summary.hasOriginalFile
+  const originalUrl = hasOriginalFile ? getStaffCaricatureOriginalUrl(summary.id) : null
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">{item.headline}</h2>
-          <p className="text-sm text-muted-foreground">{item.credit}</p>
+          <h2 className="text-xl font-semibold">{headline}</h2>
+          <p className="text-sm text-muted-foreground">{credit}</p>
         </div>
-        <StatusBadge status={item.status} />
+        <StatusBadge status={displayStatus} />
       </div>
-
-      {"description" in item ? (
-        <p className="text-sm leading-relaxed text-foreground">{item.description}</p>
-      ) : null}
 
       {originalUrl ? (
         <div className="overflow-hidden rounded-md border border-border bg-muted/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={originalUrl} alt={`Original caricature: ${item.headline}`} className="max-h-[420px] w-full object-contain" />
+          <img src={originalUrl} alt={`Original caricature: ${headline}`} className="max-h-[420px] w-full object-contain" />
         </div>
       ) : (
         <p className="text-sm text-destructive">Original file is missing. Approval is blocked until upload completes.</p>
@@ -279,9 +407,16 @@ function CaricatureReviewPanel({
         </p>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
-        Approval queues blurred preview generation on the jobs worker, publishes the caricature, and syncs Typesense — same webhook flow as editorial uploads.
-      </p>
+      {detailLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Loading submission details…
+        </div>
+      ) : null}
+
+      {detailError ? <p className="text-sm text-destructive">{detailError}</p> : null}
+
+      {detail ? <StaffCaricatureMetadataDisplay detail={detail} /> : null}
     </div>
   )
 }
@@ -290,6 +425,8 @@ function StatusBadge({ status }: { status: string }) {
   const tone =
     status === "PUBLISHED"
       ? "bg-emerald-100 text-emerald-800"
+      : status === "PROCESSING"
+        ? "bg-sky-100 text-sky-900"
       : status === "PENDING_REVIEW"
         ? "bg-amber-100 text-amber-900"
         : status === "REJECTED"
@@ -297,4 +434,44 @@ function StatusBadge({ status }: { status: string }) {
           : "bg-muted text-muted-foreground"
 
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${tone}`}>{status.replaceAll("_", " ")}</span>
+}
+
+function isCaricaturePublishProcessing(
+  detail: StaffCaricatureDetail | null,
+  reviewAction?: ReviewAction,
+): boolean {
+  if (reviewAction === "approved") {
+    const status = detail?.status
+    if (status === "PUBLISHED" || status === "REJECTED") return false
+    const previewStatus = detail?.previewGenerationStatus
+    if (previewStatus === "READY" || previewStatus === "FAILED") return false
+    return true
+  }
+
+  return detail?.previewGenerationStatus === "QUEUED" || detail?.previewGenerationStatus === "GENERATING"
+}
+
+function resolveCaricatureDisplayStatus(
+  summary: StaffCaricatureListItem,
+  detail: StaffCaricatureDetail | null,
+  reviewAction?: ReviewAction,
+): string {
+  const status = detail?.status ?? summary.status
+  if (reviewAction === "rejected" || status === "REJECTED") return "REJECTED"
+  if (status === "PUBLISHED") return "PUBLISHED"
+  if (reviewAction === "approved" || isCaricaturePublishProcessing(detail, reviewAction)) return "PROCESSING"
+  return status
+}
+
+function canReviewCaricature(
+  summary: StaffCaricatureListItem | null,
+  detail: StaffCaricatureDetail | null,
+  reviewAction?: ReviewAction,
+): boolean {
+  if (!summary?.hasOriginalFile) return false
+  if (reviewAction) return false
+  const status = detail?.status ?? summary.status
+  if (status !== "PENDING_REVIEW" && status !== "DRAFT") return false
+  if (isCaricaturePublishProcessing(detail)) return false
+  return true
 }

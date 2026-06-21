@@ -45,6 +45,13 @@ export async function enqueueCaricaturePreviewJob(
     .limit(1)
 
   if (activeJob[0]) {
+    if (input.publishOnSuccess) {
+      await db
+        .update(caricaturePreviewJobs)
+        .set({ publishOnSuccess: true, updatedAt: new Date() })
+        .where(eq(caricaturePreviewJobs.id, activeJob[0].id))
+    }
+
     schedulePublishDrainWebhook(
       env,
       { publishJobId: activeJob[0].id, approvedCount: 1 },

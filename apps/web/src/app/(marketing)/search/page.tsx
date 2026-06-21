@@ -24,6 +24,7 @@ interface SearchPageProps {
     language?: string
     credit?: string
     hasVisibleText?: string
+    depictedSubject?: string
   }>
 }
 
@@ -62,6 +63,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     language: normalized(params.language),
     credit: normalized(params.credit),
     hasVisibleText: parseOptionalBoolean(params.hasVisibleText),
+    depictedSubject: normalized(params.depictedSubject),
   }
 
   return (

@@ -24,6 +24,7 @@ import {
   rejectCaricatureAsset,
 } from "../../../lib/caricatures/caricature-publish-job"
 import { getAdminCaricatureOriginalResponse } from "../../../lib/caricatures/caricature-staff-original"
+import { scheduleTypesenseSyncForCaricature } from "../../../lib/search/typesense-public-caricature-sync"
 
 function db(env: Env) {
   if (!env.DATABASE_URL) {
@@ -60,8 +61,23 @@ export async function updateAdminCaricatureAssetService(
   assetId: string,
   payload: CaricatureMetadataInput,
   actorStaffId: string | null,
+  executionCtx?: ExecutionContext,
 ) {
-  return json(await updateAdminCaricatureAsset(db(env), assetId, payload, actorStaffId))
+  const database = db(env)
+  const before = await getAdminCaricatureAssetById(database, assetId)
+  const result = await updateAdminCaricatureAsset(database, assetId, payload, actorStaffId)
+  const becamePublished = before?.status !== "PUBLISHED" && result.status === "PUBLISHED"
+
+  if (becamePublished && result.hasReadyPreviewDerivatives) {
+    const syncPromise = scheduleTypesenseSyncForCaricature(database, env, assetId)
+    if (executionCtx) {
+      executionCtx.waitUntil(syncPromise)
+    } else {
+      await syncPromise
+    }
+  }
+
+  return json(result)
 }
 
 export function actorStaffIdFromRequest(request: Request): string | null {

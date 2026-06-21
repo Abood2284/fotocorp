@@ -21,6 +21,7 @@ export interface SearchSegmentParams {
   language?: string
   credit?: string
   hasVisibleText?: boolean
+  depictedSubject?: string
 }
 
 export function parseSearchSegment(value: string | undefined): SearchSegment {
@@ -90,6 +91,7 @@ export function buildSearchPageHref(params: SearchSegmentParams) {
   if (params.credit) searchParams.set("credit", params.credit)
   if (params.hasVisibleText === true) searchParams.set("hasVisibleText", "true")
   if (params.hasVisibleText === false) searchParams.set("hasVisibleText", "false")
+  if (params.depictedSubject) searchParams.set("depictedSubject", params.depictedSubject)
 
   const query = searchParams.toString()
   return query ? `/search?${query}` : "/search"
