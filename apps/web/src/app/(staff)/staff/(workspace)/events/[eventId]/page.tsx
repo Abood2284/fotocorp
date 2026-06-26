@@ -1,13 +1,14 @@
-import { AlertTriangle, ChevronLeft, Upload, Calendar as Calendar, ExternalLink } from "lucide-react"
+import { AlertTriangle, ChevronLeft, Upload, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-import { getAdminEvent } from "@/lib/api/admin-events-api"
+import { getAdminEvent, getAdminEventSearchIndexStatus } from "@/lib/api/admin-events-api"
 import { EmptyState } from "@/components/shared/empty-state"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StaffEventEditForm } from "@/components/staff/events/staff-event-edit-form"
 import { StaffEventPurgeModal } from "@/components/staff/events/staff-event-purge-modal"
+import { StaffEventSearchIndexPanel } from "@/components/staff/events/staff-event-search-index-panel"
 
 interface StaffEventDetailPageProps {
   params: Promise<{ eventId: string }>
@@ -34,6 +35,7 @@ export default async function StaffEventDetailPage({ params }: StaffEventDetailP
   if (response === null) notFound()
 
   const { event, assetStats } = response
+  const searchIndexStatus = await getAdminEventSearchIndexStatus(eventId).catch(() => null)
 
   return (
     <div className="space-y-6">
@@ -95,6 +97,17 @@ export default async function StaffEventDetailPage({ params }: StaffEventDetailP
               </div>
             </CardContent>
           </Card>
+
+          {searchIndexStatus ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Public search index</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StaffEventSearchIndexPanel eventId={event.id} initialStatus={searchIndexStatus} />
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card className="border-destructive/50">
             <CardHeader>

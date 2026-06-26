@@ -4,6 +4,8 @@ import type {
   AdminEventListResponse,
   AdminEventDetail,
   AdminEventPurgeResult,
+  AdminEventSearchIndexStatus,
+  AdminEventSearchIndexSyncResult,
 } from "@/features/events/admin-events-types"
 import { getStaffInternalAdminActorHeaders } from "@/lib/staff-session"
 import {
@@ -48,6 +50,19 @@ export async function purgeAdminEvent(
     path: internalApiRoutes.adminEventPurge(eventId),
     method: "POST",
     body: payload,
+  })
+}
+
+export async function getAdminEventSearchIndexStatus(eventId: string) {
+  return adminJson<AdminEventSearchIndexStatus>({
+    path: internalApiRoutes.adminEventSearchIndex(eventId),
+  })
+}
+
+export async function syncAdminEventSearchIndex(eventId: string) {
+  return adminJson<AdminEventSearchIndexSyncResult>({
+    path: internalApiRoutes.adminEventSearchIndexSync(eventId),
+    method: "POST",
   })
 }
 

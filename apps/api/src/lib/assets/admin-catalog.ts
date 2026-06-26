@@ -99,6 +99,13 @@ interface AdminAssetRow {
   detail_watermarked: boolean | null;
   detail_mime_type: string | null;
   detail_updated_at: Date | string | null;
+  preview_regeneration_job_id: string | null;
+  preview_regeneration_status: string | null;
+  preview_regeneration_failure_code: string | null;
+  preview_regeneration_failure_message: string | null;
+  preview_regeneration_created_at: Date | string | null;
+  preview_regeneration_started_at: Date | string | null;
+  preview_regeneration_completed_at: Date | string | null;
   image_sort_at: Date | string;
   sort_group_rank: number;
 }
@@ -800,6 +807,13 @@ function adminSelectSql(sort: AdminSort): SQL {
       detail.is_watermarked as detail_watermarked,
       detail.mime_type as detail_mime_type,
       detail.updated_at as detail_updated_at,
+      regen_job.preview_regeneration_job_id,
+      regen_job.preview_regeneration_status,
+      regen_job.preview_regeneration_failure_code,
+      regen_job.preview_regeneration_failure_message,
+      regen_job.preview_regeneration_created_at,
+      regen_job.preview_regeneration_started_at,
+      regen_job.preview_regeneration_completed_at,
       coalesce(a.image_date, a.created_at) as image_sort_at,
       ${sortGroupRankSql(sort)} as sort_group_rank
   `;
@@ -824,6 +838,20 @@ function adminFromSql(): SQL {
       on card.image_asset_id = a.id and card.variant = 'CARD'
     left join image_derivatives detail
       on detail.image_asset_id = a.id and detail.variant = 'DETAIL'
+    left join lateral (
+      select
+        j.id as preview_regeneration_job_id,
+        j.status as preview_regeneration_status,
+        j.failure_code as preview_regeneration_failure_code,
+        j.failure_message as preview_regeneration_failure_message,
+        j.created_at as preview_regeneration_created_at,
+        j.started_at as preview_regeneration_started_at,
+        j.completed_at as preview_regeneration_completed_at
+      from image_preview_regeneration_jobs j
+      where j.image_asset_id = a.id
+      order by j.created_at desc
+      limit 1
+    ) regen_job on true
   `;
 }
 
@@ -914,6 +942,8 @@ async function mapAdminAssetRow(row: AdminAssetRow, secret: string | undefined, 
     hasPreview: safePreviewUrl !== null,
     previewReady,
     previewState,
+    previewRegenerationStatus: normalizePreviewRegenerationStatus(row.preview_regeneration_status),
+    previewRegenerationJob: mapPreviewRegenerationJob(row),
     readyPreviewVariants,
     missingPreviewVariants,
     preview: safePreviewUrl
@@ -955,6 +985,35 @@ function mapDerivativeState(status: string | null): DerivativeState {
   if (status === "READY") return "READY";
   if (status === "FAILED") return "FAILED";
   return "PROCESSING";
+}
+
+function normalizePreviewRegenerationStatus(
+  status: string | null | undefined,
+): "QUEUED" | "RUNNING" | null {
+  if (status === "QUEUED" || status === "RUNNING") return status;
+  return null;
+}
+
+function mapPreviewRegenerationJob(row: AdminAssetRow) {
+  if (!row.preview_regeneration_job_id || !row.preview_regeneration_status) return null;
+  const status = row.preview_regeneration_status;
+  if (
+    status !== "QUEUED"
+    && status !== "RUNNING"
+    && status !== "COMPLETED"
+    && status !== "FAILED"
+  ) {
+    return null;
+  }
+  return {
+    id: row.preview_regeneration_job_id,
+    status,
+    createdAt: toIso(row.preview_regeneration_created_at),
+    startedAt: toIso(row.preview_regeneration_started_at),
+    completedAt: toIso(row.preview_regeneration_completed_at),
+    failureCode: row.preview_regeneration_failure_code,
+    failureMessage: row.preview_regeneration_failure_message,
+  };
 }
 
 function overallDerivativeStateSql(): SQL {

@@ -54,4 +54,23 @@ describe("staff-route-access", () => {
     assert.equal(staffRoleIsWorkspaceOnly("CAPTION_WRITER"), true)
     assert.equal(staffRoleIsWorkspaceOnly("SUPER_ADMIN"), false)
   })
+
+  it("all staff roles can access Help Center routes", () => {
+    for (const role of ["CAPTION_WRITER", "CATALOG_MANAGER", "REVIEWER", "SUPPORT", "FINANCE"] as const) {
+      assert.equal(staffRoleCanAccessPath(role, "/staff/help"), true)
+      assert.equal(staffRoleCanAccessPath(role, "/staff/help/how-to-edit-an-asset-caption"), true)
+    }
+  })
+
+  it("only help managers can access help management routes", () => {
+    assert.equal(staffRoleCanAccessPath("SUPER_ADMIN", "/staff/help/manage"), true)
+    assert.equal(staffRoleCanAccessPath("SUPER_ADMIN", "/staff/help/manage/new"), true)
+    assert.equal(staffRoleCanAccessPath("CATALOG_MANAGER", "/staff/help/manage"), true)
+    assert.equal(staffRoleCanAccessPath("CATALOG_MANAGER", "/staff/help/manage/categories"), true)
+
+    for (const role of ["REVIEWER", "CAPTION_WRITER", "SUPPORT", "FINANCE", "CAPTION_MANAGER"] as const) {
+      assert.equal(staffRoleCanAccessPath(role, "/staff/help/manage"), false)
+      assert.equal(staffRoleCanAccessPath(role, "/staff/help/manage/new"), false)
+    }
+  })
 })

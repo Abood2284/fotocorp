@@ -76,4 +76,9 @@ export interface Env {
   /** Private caricature originals bucket name for S3 API presign/head (same as Worker binding). */
   R2_CARICATURE_ORIGINALS_BUCKET?: string;
   CLOUDFLARE_R2_CARICATURE_ORIGINALS_BUCKET?: string;
+  /** Private help center media bucket binding. */
+  MEDIA_HELP_CENTER_BUCKET?: R2Bucket;
+  /** Private help center media bucket name for S3 API presign/head (same as Worker binding). */
+  R2_HELP_CENTER_BUCKET?: string;
+  CLOUDFLARE_R2_HELP_CENTER_BUCKET?: string;
 }

@@ -6,9 +6,15 @@ import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 
 import { StaffCaricatureMetadataDisplay } from "@/components/staff/caricatures/staff-caricature-metadata-display"
+import { ContextualHelpPanelClient } from "@/components/staff/help/contextual-help-panel-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { StaffCaricatureDetail, StaffCaricatureListItem, StaffCaricatureListResponse } from "@/lib/api/staff-caricatures-api"
+import type { StaffCaricatureDetail, StaffCaricatureListItem, StaffCaricatureListResponse } from "@/lib/api/staff-caricatures-types"
+import {
+  approveStaffCaricatureClient,
+  fetchStaffCaricatureDetail,
+  rejectStaffCaricatureClient,
+} from "@/lib/api/staff-caricatures-client"
 import { getStaffCaricatureOriginalUrl } from "@/lib/search/caricature-search"
 
 type ReviewAction = "approved" | "rejected"
@@ -65,21 +71,7 @@ export function StaffCaricaturesClient({
     }
 
     try {
-      const response = await fetch(`/api/staff/caricatures/${encodeURIComponent(assetId)}`, {
-        cache: "no-store",
-      })
-      const body = (await response.json().catch(() => null)) as
-        | StaffCaricatureDetail
-        | { error?: { message?: string } }
-        | null
-      if (!response.ok) {
-        throw new Error(
-          body && "error" in body ? body.error?.message ?? "Could not load caricature detail." : "Could not load caricature detail.",
-        )
-      }
-      if (!body || "error" in body) {
-        throw new Error("Could not load caricature detail.")
-      }
+      const body = await fetchStaffCaricatureDetail(assetId)
       setDetail(body)
       return body
     } catch (error) {
@@ -160,16 +152,8 @@ export function StaffCaricaturesClient({
     setActionBusy("approve")
     setStatusMessage(null)
     try {
-      const response = await fetch(`/api/staff/caricatures/${encodeURIComponent(selectedId)}/approve`, {
-        method: "POST",
-      })
-      const body = (await response.json().catch(() => null)) as
-        | { message?: string; error?: { message?: string } }
-        | null
-      if (!response.ok) {
-        throw new Error(body?.error?.message ?? "Could not approve caricature.")
-      }
-      setStatusMessage({ kind: "ok", text: body?.message ?? "Caricature approved. Processing will run automatically." })
+      const body = await approveStaffCaricatureClient(selectedId)
+      setStatusMessage({ kind: "ok", text: body.message ?? "Caricature approved. Processing will run automatically." })
       const removesFromList = statusFilter === "PENDING_REVIEW" || statusFilter === "DRAFT"
       applyLocalListAfterReview(selectedId, "approved")
       if (!removesFromList) await loadDetail(selectedId)
@@ -189,13 +173,7 @@ export function StaffCaricaturesClient({
     setActionBusy("reject")
     setStatusMessage(null)
     try {
-      const response = await fetch(`/api/staff/caricatures/${encodeURIComponent(selectedId)}/reject`, {
-        method: "POST",
-      })
-      const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null
-      if (!response.ok) {
-        throw new Error(body?.error?.message ?? "Could not reject caricature.")
-      }
+      await rejectStaffCaricatureClient(selectedId)
       setStatusMessage({ kind: "ok", text: "Caricature rejected." })
       const removesFromList = statusFilter === "PENDING_REVIEW"
       applyLocalListAfterReview(selectedId, "rejected")
@@ -217,11 +195,14 @@ export function StaffCaricaturesClient({
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col gap-4 lg:flex-row">
       <section className="flex w-full flex-col gap-4 lg:w-[min(420px,100%)]">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Caricatures</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Review contributor submissions, approve to generate blurred previews, publish, and index search automatically.
-          </p>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_min(320px,100%)] lg:items-start">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Caricatures</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Review contributor submissions, approve to generate blurred previews, publish, and index search automatically.
+            </p>
+          </div>
+          <ContextualHelpPanelClient contextKey="staff.caricatures.upload" compact />
         </div>
 
         <div className="flex flex-wrap items-end gap-2">

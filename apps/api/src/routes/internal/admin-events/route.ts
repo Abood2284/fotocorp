@@ -15,6 +15,8 @@ import {
   getAdminEventByIdService,
   updateAdminEventService,
   purgeAdminEventService,
+  getAdminEventSearchIndexStatusService,
+  syncAdminEventSearchIndexService,
 } from "./service"
 
 export const internalAdminEventsRoutes = new Hono<{ Bindings: Env }>()
@@ -56,3 +58,23 @@ internalAdminEventsRoutes.post(
   }
 )
 internalAdminEventsRoutes.all("/api/v1/internal/admin/events/:eventId/purge", () => methodNotAllowed())
+
+internalAdminEventsRoutes.get(
+  "/api/v1/internal/admin/events/:eventId/search-index",
+  zValidator("param", adminEventParamSchema),
+  async (c) => {
+    const { eventId } = c.req.valid("param")
+    return await getAdminEventSearchIndexStatusService(c.env, eventId)
+  },
+)
+internalAdminEventsRoutes.all("/api/v1/internal/admin/events/:eventId/search-index", () => methodNotAllowed())
+
+internalAdminEventsRoutes.post(
+  "/api/v1/internal/admin/events/:eventId/search-index/sync",
+  zValidator("param", adminEventParamSchema),
+  async (c) => {
+    const { eventId } = c.req.valid("param")
+    return await syncAdminEventSearchIndexService(c.env, eventId)
+  },
+)
+internalAdminEventsRoutes.all("/api/v1/internal/admin/events/:eventId/search-index/sync", () => methodNotAllowed())

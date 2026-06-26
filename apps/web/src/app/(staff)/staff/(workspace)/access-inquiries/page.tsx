@@ -9,6 +9,7 @@ import { getStaffCookieHeader } from "@/lib/staff-session"
 import { EmptyState } from "@/components/shared/empty-state"
 import { AccessInquiriesTabs } from "./access-inquiries-tabs"
 import { AccessInquiriesFilters } from "./access-inquiries-filters"
+import { ContextualHelpPanel } from "@/components/staff/help/contextual-help-panel"
 
 export const metadata = {
   title: "Access inquiries — Fotocorp",
@@ -66,6 +67,11 @@ export default async function StaffAccessInquiriesPage({ searchParams }: PagePro
             : "Review signup interest and generate entitlement drafts."}
         </p>
       </div>
+      <ContextualHelpPanel
+        contextKey={isContributor ? "staff.contributors.applications" : "staff.customer-access.inquiries"}
+        cookieHeader={await getStaffCookieHeader()}
+        compact
+      />
       <Suspense fallback={null}>
         <AccessInquiriesTabs />
       </Suspense>

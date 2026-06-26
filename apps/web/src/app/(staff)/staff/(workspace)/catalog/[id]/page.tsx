@@ -13,6 +13,8 @@ import { PreviewImage } from "@/components/assets/preview-image"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EmptyState } from "@/components/shared/empty-state"
+import { ContextualHelpPanel } from "@/components/staff/help/contextual-help-panel"
+import { getStaffCookieHeader } from "@/lib/staff-session"
 
 interface AdminAssetDetailPageProps {
   params: Promise<{ id: string }>
@@ -96,12 +98,15 @@ export default async function AdminAssetDetailPage({ params, searchParams }: Adm
 
   return (
     <div className="space-y-5">
-      <div>
-        <Link href="/staff/catalog" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ChevronLeft size={16} />
-          Back to assets
-        </Link>
-        <h2 className="mt-2 text-xl font-semibold tracking-tight">Asset: {asset.legacyImageCode ?? asset.id}</h2>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_min(320px,100%)] lg:items-start">
+        <div>
+          <Link href="/staff/catalog" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ChevronLeft size={16} />
+            Back to assets
+          </Link>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight">Asset: {asset.legacyImageCode ?? asset.id}</h2>
+        </div>
+        <ContextualHelpPanel contextKey="staff.assets.detail" cookieHeader={await getStaffCookieHeader()} compact />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.2fr_1fr]">

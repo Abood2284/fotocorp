@@ -5,6 +5,7 @@ import { methodNotAllowed } from "../../../lib/route-errors";
 import { internalAuthMiddleware } from "../../../middleware/internalAuth";
 import {
   actorFromRequest,
+  actorStaffIdFromRequest,
   adminAssetDetailService,
   adminAssetOriginalService,
   adminAssetPreviewService,
@@ -24,6 +25,9 @@ import {
   listAdminAssetsService,
   normalizeKeywords,
   nullable,
+  queueImagePreviewRegenerationService,
+  jobsPipelineSnapshotService,
+  jobsPipelineWakeService,
 } from "./service";
 import {
   adminAssetParamSchema,
@@ -108,6 +112,18 @@ internalAdminRoutes.get(
 
 internalAdminRoutes.all("/api/v1/internal/admin/assets/:assetId/preview", () => methodNotAllowed());
 
+internalAdminRoutes.post(
+  "/api/v1/internal/admin/assets/:assetId/generate-previews",
+  zValidator("param", adminAssetParamSchema),
+  async (c) => {
+    const params = c.req.valid("param");
+    const actorStaffId = actorStaffIdFromRequest(c.req.raw);
+    return await queueImagePreviewRegenerationService(c.env, params.assetId, actorStaffId, c.executionCtx);
+  },
+);
+
+internalAdminRoutes.all("/api/v1/internal/admin/assets/:assetId/generate-previews", () => methodNotAllowed());
+
 internalAdminRoutes.get(
   "/api/v1/internal/admin/assets/:assetId",
   zValidator("param", adminAssetParamSchema),
@@ -155,6 +171,18 @@ internalAdminRoutes.get("/api/v1/internal/admin/dashboard/summary", async (c) =>
 });
 
 internalAdminRoutes.all("/api/v1/internal/admin/dashboard/summary", () => methodNotAllowed());
+
+internalAdminRoutes.get("/api/v1/internal/admin/jobs-pipeline/snapshot", async (c) => {
+  return await jobsPipelineSnapshotService(c.env);
+});
+
+internalAdminRoutes.all("/api/v1/internal/admin/jobs-pipeline/snapshot", () => methodNotAllowed());
+
+internalAdminRoutes.post("/api/v1/internal/admin/jobs-pipeline/wake", async (c) => {
+  return await jobsPipelineWakeService(c.env);
+});
+
+internalAdminRoutes.all("/api/v1/internal/admin/jobs-pipeline/wake", () => methodNotAllowed());
 
 internalAdminRoutes.get("/api/v1/internal/admin/filters", async (c) => {
   return await adminFiltersService(c.env);

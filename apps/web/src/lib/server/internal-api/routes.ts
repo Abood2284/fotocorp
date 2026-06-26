@@ -37,6 +37,13 @@ export const internalApiRoutes = {
   adminAssetPreview: (assetId: string) =>
     `/api/v1/internal/admin/assets/${encodeURIComponent(assetId)}/preview`,
 
+  adminAssetGeneratePreviews: (assetId: string) =>
+    `/api/v1/internal/admin/assets/${encodeURIComponent(assetId)}/generate-previews`,
+
+  adminJobsPipelineSnapshot: () => "/api/v1/internal/admin/jobs-pipeline/snapshot",
+
+  adminJobsPipelineWake: () => "/api/v1/internal/admin/jobs-pipeline/wake",
+
   adminCatalogStats: () => "/api/v1/internal/admin/catalog/stats",
   adminDashboardSummary: () => "/api/v1/internal/admin/dashboard/summary",
 
@@ -106,6 +113,12 @@ export const internalApiRoutes = {
 
   adminEventPurge: (eventId: string) =>
     `/api/v1/internal/admin/events/${encodeURIComponent(eventId)}/purge`,
+
+  adminEventSearchIndex: (eventId: string) =>
+    `/api/v1/internal/admin/events/${encodeURIComponent(eventId)}/search-index`,
+
+  adminEventSearchIndexSync: (eventId: string) =>
+    `/api/v1/internal/admin/events/${encodeURIComponent(eventId)}/search-index/sync`,
 
   adminHomepageHeroPool: () => "/api/v1/internal/admin/homepage-hero-pool",
 

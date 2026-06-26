@@ -44,10 +44,10 @@ export async function getStaffMe(options: { cookieHeader?: string } = {}) {
   })
 }
 
-async function staffJson<T>(
+export async function staffJson<T>(
   path: string,
   input: {
-    method: "GET" | "POST" | "PATCH"
+    method: "GET" | "POST" | "PATCH" | "DELETE"
     body?: unknown
     cookieHeader?: string
   },

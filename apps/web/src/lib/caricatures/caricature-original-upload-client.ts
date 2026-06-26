@@ -112,7 +112,7 @@ async function uploadCaricatureOriginalCore(input: {
   }
 
   const dimensions = await readLocalImageDimensions(input.file)
-  await input.complete(assetId, dimensions)
+  await input.complete(assetId, dimensions ?? {})
   const asset = await input.loadAsset(assetId)
   return { assetId, asset }
 }

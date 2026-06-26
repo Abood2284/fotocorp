@@ -3,6 +3,7 @@
 import { ArrowDown, ArrowUp, CheckCircle, ChevronLeft, ChevronRight, Download, CircleHelp, ImageOff, Loader2, Upload, X, XCircle } from "lucide-react"
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import Link from "next/link"
+import { ContextualHelpPanelClient } from "@/components/staff/help/contextual-help-panel-client"
 import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
@@ -581,13 +582,14 @@ export function StaffContributorUploadsClient({
 
   return (
     <div className="space-y-5 pb-24">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="fc-heading-2 text-xl font-semibold tracking-tight">Contributor Uploads</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Review submitted contributor assets before publishing.
           </p>
         </div>
+        <ContextualHelpPanelClient contextKey="staff.uploads.review" compact className="max-w-sm" />
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href="/staff/contributor-uploads/new">

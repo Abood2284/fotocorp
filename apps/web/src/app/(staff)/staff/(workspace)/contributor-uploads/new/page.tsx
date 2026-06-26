@@ -3,7 +3,8 @@ import Link from "next/link"
 import { Suspense } from "react"
 
 import { StaffUploadFlow } from "@/components/staff/staff-upload-flow"
-import { assertStaffRouteAccess, requireStaff } from "@/lib/staff-session"
+import { ContextualHelpPanel } from "@/components/staff/help/contextual-help-panel"
+import { assertStaffRouteAccess, getStaffCookieHeader, requireStaff } from "@/lib/staff-session"
 
 export const metadata = {
   title: "New contributor upload — Staff",
@@ -14,21 +15,25 @@ export const dynamic = "force-dynamic"
 export default async function StaffNewContributorUploadPage() {
   const staff = await requireStaff()
   await assertStaffRouteAccess(staff.role)
+  const cookieHeader = await getStaffCookieHeader()
 
   return (
     <div className="space-y-8">
-      <div>
-        <Link
-          href="/staff/contributor-uploads"
-          className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft size={16} />
-          Back to contributor uploads
-        </Link>
-        <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">New upload batch</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Create an event, upload JPEGs on behalf of a photographer, then submit for review — same flow as the contributor portal.
-        </p>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_min(320px,100%)] lg:items-start">
+        <div>
+          <Link
+            href="/staff/contributor-uploads"
+            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft size={16} />
+            Back to contributor uploads
+          </Link>
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">New upload batch</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Create an event, upload JPEGs on behalf of a photographer, then submit for review — same flow as the contributor portal.
+          </p>
+        </div>
+        <ContextualHelpPanel contextKey="staff.assets.upload" cookieHeader={cookieHeader} compact />
       </div>
 
       <Suspense

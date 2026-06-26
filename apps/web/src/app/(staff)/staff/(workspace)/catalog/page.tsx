@@ -3,6 +3,8 @@ import { AlertTriangle } from "lucide-react"
 import { listAdminAssets } from "@/lib/api/admin-assets-api"
 import { EmptyState } from "@/components/shared/empty-state"
 import { StaffCatalogClient } from "@/components/staff/catalog/staff-catalog-client"
+import { ContextualHelpPanel } from "@/components/staff/help/contextual-help-panel"
+import { getStaffCookieHeader } from "@/lib/staff-session"
 import type { AdminCatalogAssetsResponse, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
 import {
   hasActiveCatalogFilters,
@@ -48,13 +50,20 @@ export default async function StaffCatalogPage({ searchParams }: StaffCatalogPag
   }
 
   return (
-    <StaffCatalogClient
+    <div className="space-y-4">
+      <ContextualHelpPanel
+        contextKey="staff.assets.list"
+        cookieHeader={await getStaffCookieHeader()}
+        compact
+      />
+      <StaffCatalogClient
       initialResponse={response}
       filters={fallbackFilters}
       filtersDeferred
       filtersActive={filtersActive}
       initialQuery={Object.fromEntries(query.entries())}
     />
+    </div>
   )
 }
 

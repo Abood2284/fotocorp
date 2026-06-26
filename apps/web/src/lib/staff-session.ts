@@ -74,6 +74,10 @@ export async function requireStaffRole(allowedRoles: string[]) {
   redirect(getDefaultStaffLandingPath(staff.role))
 }
 
+export async function requireStaffHelpManager() {
+  return requireStaffRole(["SUPER_ADMIN", "CATALOG_MANAGER"])
+}
+
 /** Caption writers and other workspace-only roles cannot browse public client routes. */
 export async function redirectWorkspaceOnlyStaffAwayFromPublicSite() {
   const session = await getOptionalStaffSession()

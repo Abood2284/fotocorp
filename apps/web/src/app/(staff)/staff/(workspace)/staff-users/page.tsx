@@ -1,6 +1,7 @@
 import { AlertTriangle } from "lucide-react"
 
 import { StaffMembersClient } from "@/components/staff/staff-members/staff-members-client"
+import { ContextualHelpPanel } from "@/components/staff/help/contextual-help-panel"
 import { getStaffMembers, StaffApiError } from "@/lib/api/staff-api"
 import { getStaffCookieHeader, requireStaffRole } from "@/lib/staff-session"
 
@@ -33,5 +34,14 @@ export default async function StaffUsersPage() {
     )
   }
 
-  return <StaffMembersClient initialItems={items} />
+  return (
+    <div className="space-y-4">
+      <ContextualHelpPanel
+        contextKey="staff.staff-management"
+        cookieHeader={await getStaffCookieHeader()}
+        compact
+      />
+      <StaffMembersClient initialItems={items} />
+    </div>
+  )
 }

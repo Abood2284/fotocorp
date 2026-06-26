@@ -13,6 +13,7 @@ import { staffAccessInquiryRoutes } from "./routes/staff/access-inquiries/route"
 import { staffMemberRoutes } from "./routes/staff/members/route";
 import { staffAuditLogRoutes } from "./routes/staff/audit-logs/route";
 import { staffProductivityRoutes } from "./routes/staff/productivity/route";
+import { staffHelpRoutes } from "./routes/staff/help/route";
 import { internalAccountRoutes } from "./routes/internal/account-downloads/route";
 import { internalAdminRoutes } from "./routes/internal/admin/route";
 import { internalAdminContributorUploadRoutes } from "./routes/internal/admin-contributor-uploads/route";
@@ -80,6 +81,7 @@ honoApp.route("/", staffAccessInquiryRoutes);
 honoApp.route("/", staffMemberRoutes);
 honoApp.route("/", staffAuditLogRoutes);
 honoApp.route("/", staffProductivityRoutes);
+honoApp.route("/", staffHelpRoutes);
 honoApp.route("/", photographerAuthRoutes);
 honoApp.route("/", photographerImageRoutes);
 honoApp.route("/", photographerEventRoutes);
