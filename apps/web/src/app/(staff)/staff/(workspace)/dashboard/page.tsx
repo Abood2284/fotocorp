@@ -1,9 +1,11 @@
 import Link from "next/link"
 import { Suspense } from "react"
 import { ArrowRight, Upload } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StaffHelpHint } from "@/components/staff/staff-help-hint"
-import { staffNavItemsForRole } from "@/lib/staff/staff-navigation"
+import { getAdminDashboardSummary } from "@/lib/api/staff-dashboard-api"
+import { STAFF_ACCESS_INQUIRIES_HREF, staffNavItemsForRole } from "@/lib/staff/staff-navigation"
 import { staffRoleCanAccessPath } from "@/lib/staff/staff-route-access"
 import { STAFF_HELP } from "@/lib/staff/staff-help-content"
 import { requireStaff } from "@/lib/staff-session"
@@ -17,17 +19,25 @@ export default async function StaffDashboardPage() {
   const staff = await requireStaff()
   const modules = staffNavItemsForRole(staff.role).filter((item) => item.href !== "/staff/dashboard")
 
+  let summary: Awaited<ReturnType<typeof getAdminDashboardSummary>> | null = null
+  try {
+    summary = await getAdminDashboardSummary()
+  } catch {
+    summary = null
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="inline-flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-staff-950">
             Dashboard
+            <Badge variant="secondary" className="rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+              {formatStaffRole(staff.role)}
+            </Badge>
             <StaffHelpHint label="Dashboard help" body={STAFF_HELP.dashboardIntro} />
           </h2>
-          <p className="mt-1.5 text-sm text-staff-500">
-            Operational snapshot — assets, subscribers, and inquiry queues.
-          </p>
+          <p className="mt-1.5 text-sm text-staff-500">Operational view for your role.</p>
         </div>
         {staffRoleCanAccessPath(staff.role, "/staff/contributor-uploads/new") ? (
           <Link
@@ -41,7 +51,7 @@ export default async function StaffDashboardPage() {
       </div>
 
       <Suspense fallback={<DashboardStatsSkeleton />}>
-        <DashboardStats />
+        <DashboardStats role={staff.role} />
       </Suspense>
 
       {modules.length === 0 ? (
@@ -67,7 +77,12 @@ export default async function StaffDashboardPage() {
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-wash text-primary-muted transition-colors group-hover:bg-primary/10 group-hover:text-primary">
                     <Icon className="h-5 w-5" aria-hidden />
                   </div>
-                  <span className="text-sm font-semibold text-staff-900">{label}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-staff-900">{label}</span>
+                      {resolveModuleBadge({ href, role: staff.role, summary })}
+                    </div>
+                  </div>
                 </div>
                 <div className="mt-4 flex items-center justify-between border-t border-staff-100 pt-3">
                   <span className="text-xs font-medium text-staff-500 transition-colors group-hover:text-staff-950">
@@ -82,4 +97,48 @@ export default async function StaffDashboardPage() {
       )}
     </div>
   )
+}
+
+function formatStaffRole(role: string) {
+  return role.replaceAll("_", " ")
+}
+
+function resolveModuleBadge({
+  href,
+  role,
+  summary,
+}: {
+  href: string
+  role: string
+  summary: Awaited<ReturnType<typeof getAdminDashboardSummary>> | null
+}) {
+  if (!summary) return null
+
+  if (href === "/staff/contributor-uploads" && summary.pendingContributorUploads > 0) {
+    return (
+      <Badge variant="warning" className="rounded-md px-1.5 py-0 text-[10px]">
+        {summary.pendingContributorUploads.toLocaleString()} pending
+      </Badge>
+    )
+  }
+
+  if (href === "/staff/caricatures" && role === "SUPER_ADMIN") {
+    return (
+      <Badge variant="success" className="rounded-md px-1.5 py-0 text-[10px]">
+        NEW
+      </Badge>
+    )
+  }
+
+  if (href === STAFF_ACCESS_INQUIRIES_HREF) {
+    const openCount = summary.pendingUserAccessInquiries + summary.pendingContributorApplications
+    if (openCount <= 0) return null
+    return (
+      <Badge variant="warning" className="rounded-md px-1.5 py-0 text-[10px]">
+        {openCount.toLocaleString()} open
+      </Badge>
+    )
+  }
+
+  return null
 }

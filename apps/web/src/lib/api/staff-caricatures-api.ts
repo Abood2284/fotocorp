@@ -1,41 +1,17 @@
 import "server-only"
 
 import { getStaffInternalAdminActorHeaders } from "@/lib/staff-session"
+import type {
+  StaffCaricatureDetail,
+  StaffCaricatureListResponse,
+} from "@/lib/api/staff-caricatures-types"
 import { internalApiJson, internalApiRoutes, withQuery } from "@/lib/server/internal-api"
 
-export interface StaffCaricatureListItem {
-  id: string
-  headline: string
-  credit: string
-  categoryId: string
-  categoryName: string
-  language: string
-  status: string
-  hasVisibleText: boolean
-  hasOriginalFile: boolean
-  publishedAt: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface StaffCaricatureListResponse {
-  items: StaffCaricatureListItem[]
-  total: number
-  page: number
-  limit: number
-}
-
-export interface StaffCaricatureDetail extends StaffCaricatureListItem {
-  description: string
-  languageOther: string | null
-  visibleText: string | null
-  visibleTextTranslationEn: string | null
-  keywords: string[]
-  depictedSubjects: string[]
-  visibility: string
-  hasReadyPreviewDerivatives: boolean
-  previewGenerationStatus: string
-}
+export type {
+  StaffCaricatureDetail,
+  StaffCaricatureListItem,
+  StaffCaricatureListResponse,
+} from "@/lib/api/staff-caricatures-types"
 
 export async function listStaffCaricatures(params: {
   q?: string

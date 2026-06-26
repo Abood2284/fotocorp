@@ -20,8 +20,15 @@ import {
 } from "./typesense-public-assets"
 
 const POST_PUBLISH_SYNC_ATTEMPTS = 3
-const POST_PUBLISH_SYNC_BASE_DELAY_MS = 250
+const POST_PUBLISH_SYNC_BASE_DELAY_MS = 500
 const EVENT_SYNC_UPSERT_CHUNK_SIZE = 100
+
+export class TypesenseSyncEligibilityPendingError extends Error {
+  constructor(public readonly assetId: string) {
+    super(`Typesense sync eligibility row is not visible yet for asset ${assetId}.`)
+    this.name = "TypesenseSyncEligibilityPendingError"
+  }
+}
 
 export interface TypesensePublicAssetRow {
   id: string
@@ -239,6 +246,31 @@ export async function loadTypesensePublicAssetRowsForEvent(
     db,
     sql`${typesenseEligibleAssetSelectSql()} and a.event_id = ${eventId}::uuid order by a.id asc`,
   )
+}
+
+export async function countTypesenseEligiblePublicAssetsForEvent(
+  db: DrizzleClient,
+  eventId: string,
+): Promise<number> {
+  const rows = await executeRows<{ count: string }>(
+    db,
+    sql`
+      select count(*)::text as count
+      from image_assets a
+      join image_derivatives card
+        on card.image_asset_id = a.id
+       and card.variant = 'CARD'
+       and card.generation_status = 'READY'
+       and card.is_watermarked = true
+       and card.watermark_profile = ${CARD_LIGHT_PREVIEW_PROFILE}
+      where a.event_id = ${eventId}::uuid
+        and a.status = 'ACTIVE'
+        and a.visibility = 'PUBLIC'
+        and a.media_type = 'IMAGE'
+        and a.original_exists_in_storage = true
+    `,
+  )
+  return Number.parseInt(rows[0]?.count ?? "0", 10)
 }
 
 export async function loadTypesensePublicAssetIdsForEvent(
@@ -492,6 +524,10 @@ export async function syncTypesensePublicAsset(
     await upsertTypesensePublicAssetDocuments(config, [buildTypesensePublicAssetDocument(row, cdn)])
     console.info(JSON.stringify({ event: "typesense_public_asset_sync", assetId, action: "upserted", status: "ok" }))
     return { assetId, action: "upserted" }
+  }
+
+  if (options?.critical && (await isPublicAssetPendingTypesenseIndex(db, assetId))) {
+    throw new TypesenseSyncEligibilityPendingError(assetId)
   }
 
   await deleteTypesensePublicAssetById(config, assetId)
@@ -780,6 +816,23 @@ async function runTypesenseEventSyncWithRetries(
       }),
     )
   }
+}
+
+async function isPublicAssetPendingTypesenseIndex(db: DrizzleClient, assetId: string): Promise<boolean> {
+  const rows = await executeRows<{ id: string }>(
+    db,
+    sql`
+      select a.id::text as id
+      from image_assets a
+      where a.id = ${assetId}::uuid
+        and a.status = 'ACTIVE'
+        and a.visibility = 'PUBLIC'
+        and a.media_type = 'IMAGE'
+        and a.original_exists_in_storage = true
+      limit 1
+    `,
+  )
+  return rows.length > 0
 }
 
 async function executeRows<T>(db: DrizzleClient, query: SQL): Promise<T[]> {

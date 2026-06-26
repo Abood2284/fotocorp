@@ -4,8 +4,9 @@ import { notFound } from "next/navigation"
 import { Suspense } from "react"
 
 import { getAdminEvent } from "@/lib/api/admin-events-api"
-import { assertStaffRouteAccess, requireStaff } from "@/lib/staff-session"
+import { assertStaffRouteAccess, getStaffCookieHeader, requireStaff } from "@/lib/staff-session"
 import { EmptyState } from "@/components/shared/empty-state"
+import { ContextualHelpPanel } from "@/components/staff/help/contextual-help-panel"
 import { StaffUploadFlow } from "@/components/staff/staff-upload-flow"
 
 interface StaffEventUploadPageProps {
@@ -38,21 +39,25 @@ export default async function StaffEventUploadPage({ params }: StaffEventUploadP
   if (response === null) notFound()
 
   const { event } = response
+  const cookieHeader = await getStaffCookieHeader()
 
   return (
     <div className="space-y-8">
-      <div>
-        <Link
-          href={`/staff/events/${event.id}`}
-          className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-        >
-          <ChevronLeft size={16} />
-          Back to {event.name}
-        </Link>
-        <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">Upload assets</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Add JPEG images to <strong>{event.name}</strong>. Select a photographer, upload files, then submit the batch for review.
-        </p>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_min(320px,100%)] lg:items-start">
+        <div>
+          <Link
+            href={`/staff/events/${event.id}`}
+            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft size={16} />
+            Back to {event.name}
+          </Link>
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">Upload assets</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Add JPEG images to <strong>{event.name}</strong>. Select a photographer, upload files, then submit the batch for review.
+          </p>
+        </div>
+        <ContextualHelpPanel contextKey="staff.assets.upload" cookieHeader={cookieHeader} compact />
       </div>
 
       <Suspense

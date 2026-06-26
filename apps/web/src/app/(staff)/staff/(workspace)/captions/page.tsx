@@ -2,6 +2,8 @@
 import { AlertTriangle } from "lucide-react"
 import { getAdminCatalogFilters, listAdminCatalogAssets } from "@/lib/api/admin-catalog-api"
 import { EmptyState } from "@/components/shared/empty-state"
+import { ContextualHelpPanel } from "@/components/staff/help/contextual-help-panel"
+import { getStaffCookieHeader } from "@/lib/staff-session"
 import { StaffCaptionsClient } from "./staff-captions-client"
 
 interface StaffCaptionsPageProps {
@@ -46,9 +48,16 @@ export default async function StaffCaptionsPage({ searchParams }: StaffCaptionsP
   }
 
   return (
-    <StaffCaptionsClient 
-      initialAssets={assetsResponse} 
-      filters={filtersResponse} 
-    />
+    <div className="space-y-4">
+      <ContextualHelpPanel
+        contextKey="staff.assets.caption-edit"
+        cookieHeader={await getStaffCookieHeader()}
+        compact
+      />
+      <StaffCaptionsClient
+        initialAssets={assetsResponse}
+        filters={filtersResponse}
+      />
+    </div>
   )
 }

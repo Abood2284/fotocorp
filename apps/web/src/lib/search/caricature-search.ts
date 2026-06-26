@@ -166,6 +166,7 @@ export interface CaricatureSearchFilterParams {
   hasVisibleText?: boolean
   depictedSubject?: string
   sort?: PublicAssetSort
+  page?: number
 }
 
 export interface CaricatureFilterListItem {

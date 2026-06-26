@@ -7,6 +7,16 @@ export interface AdminCatalogDerivativeSummary {
   updatedAt?: string | null
 }
 
+export interface AdminCatalogPreviewRegenerationJob {
+  id: string
+  status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED"
+  createdAt: string | null
+  startedAt: string | null
+  completedAt: string | null
+  failureCode: string | null
+  failureMessage: string | null
+}
+
 export interface AdminCatalogAssetItem {
   id: string
   fotokey: string | null
@@ -31,6 +41,8 @@ export interface AdminCatalogAssetItem {
   hasPreview: boolean
   previewState?: "READY" | "PARTIAL" | "MISSING"
   previewReady?: boolean
+  previewRegenerationStatus?: "QUEUED" | "RUNNING" | null
+  previewRegenerationJob?: AdminCatalogPreviewRegenerationJob | null
   readyPreviewVariants?: Array<"thumb" | "card" | "detail">
   missingPreviewVariants?: string[]
   preview: { url: string; width: number | null; height: number | null } | null

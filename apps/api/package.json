@@ -42,6 +42,8 @@
     "db:backfill:image-assets-category-gaps": "tsx scripts/db/backfill-image-assets-category-gaps.ts",
     "db:merge:asset-categories": "tsx scripts/db/merge-asset-categories.ts",
     "db:seed:caricature-categories": "tsx scripts/db/seed-caricature-categories.ts",
+    "db:seed:help-center": "tsx scripts/db/seed-help-center.ts",
+    "db:seed:help-contextual-links": "tsx scripts/db/seed-help-contextual-links.ts",
     "db:rename:travel-to-royalty-free": "tsx scripts/db/rename-travel-category-to-royalty-free.ts",
     "smoke:fotokey-publish": "tsx scripts/smoke/check-fotokey-publish-pipeline.ts",
     "smoke:photographer-auth": "tsx scripts/smoke/check-photographer-auth.ts",

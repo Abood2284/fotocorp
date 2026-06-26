@@ -1,12 +1,30 @@
 "use client"
 
-import { ExternalLink, X, Loader2, ZoomIn } from "lucide-react"
-import { useEffect, useState, useTransition } from "react"
+import { ExternalLink, X, Loader2, ZoomIn, RefreshCw } from "lucide-react"
+import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 
 import { fetchAdminAssetAction, updateAdminAssetEditorialAction, updateAdminAssetStateAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
-import type { AdminCatalogAssetItem, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
+import type { AdminCatalogAssetItem, AdminCatalogDerivativeSummary, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
 import { PreviewImage } from "@/components/assets/preview-image"
+import { Badge } from "@/components/ui/badge"
 import { formatCatalogFotokeyDisplay, getCatalogImportMatchName } from "@/lib/catalog-asset-identity"
+import {
+  getStaffCatalogHoverPreviewVariant,
+  getStaffCatalogPreviewUrl,
+  getStaffCatalogPreviewVariant,
+} from "@/lib/staff-catalog-preview"
+import {
+  pollCatalogAssetPreview,
+  queueCatalogPreviewRegeneration,
+} from "@/lib/staff-catalog-preview-client"
+import { CatalogPreviewRegenerationProgress } from "@/components/staff/catalog/catalog-preview-regeneration-progress"
+import {
+  canRegenerateCatalogPreviews,
+  getCatalogPreviewPlaceholderMessage,
+  isCatalogPreviewRegenerationActive,
+  isCatalogPreviewRegenerationFailed,
+  shouldStopCatalogPreviewPolling,
+} from "@/lib/staff-catalog-preview-status"
 
 interface StaffCatalogDetailSidebarProps {
   assetId: string
@@ -20,16 +38,25 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
   const [isLoading, setIsLoading] = useState(true)
   const [isZoomed, setIsZoomed] = useState(false)
   const [isSaving, startTransition] = useTransition()
+  const [isRegenerating, setIsRegenerating] = useState(false)
+  const [regenMessage, setRegenMessage] = useState<string | null>(null)
+  const [regenError, setRegenError] = useState<string | null>(null)
+  const pollAbortRef = useRef(false)
 
   const [whoIsInPicture, setWhoIsInPicture] = useState("")
   const [caption, setCaption] = useState("")
   const [eventId, setEventId] = useState("")
   const [keywords, setKeywords] = useState("")
 
+  const loadAsset = useCallback(async (id: string) => {
+    return fetchAdminAssetAction(id)
+  }, [])
+
   useEffect(() => {
+    pollAbortRef.current = false
     let mounted = true
     setIsLoading(true)
-    fetchAdminAssetAction(assetId).then(res => {
+    loadAsset(assetId).then(res => {
       if (mounted && res?.asset) {
         setAsset(res.asset)
         setWhoIsInPicture(res.asset.whoIsInPicture || "")
@@ -41,8 +68,11 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
     }).catch(() => {
       if (mounted) setIsLoading(false)
     })
-    return () => { mounted = false }
-  }, [assetId])
+    return () => {
+      mounted = false
+      pollAbortRef.current = true
+    }
+  }, [assetId, loadAsset])
 
   const handleSaveMetadata = () => {
     if (!asset) return
@@ -59,7 +89,7 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
           contributorId: asset.contributor?.id || null,
         })
         onUpdate()
-      } catch (e) {
+      } catch {
         alert("Failed to save metadata")
       }
     })
@@ -72,13 +102,57 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
         await updateAdminAssetStateAction(asset.id, { status, visibility })
         setAsset(prev => prev ? { ...prev, status, visibility } : null)
         onUpdate()
-      } catch (e) {
+      } catch {
         alert("Failed to update state. Ensure preview is ready if publishing.")
       }
     })
   }
 
+  const handleRegeneratePreviews = async () => {
+    if (!asset || !canRegenerateCatalogPreviews(asset)) return
+    setIsRegenerating(true)
+    setRegenError(null)
+    setRegenMessage(null)
+    try {
+      const result = await queueCatalogPreviewRegeneration(asset.id)
+      setRegenMessage(result.message ?? "Queued for jobs worker. Use Start worker if it stays queued.")
+      setAsset(prev => prev ? {
+        ...prev,
+        previewRegenerationStatus: "QUEUED",
+        previewRegenerationJob: {
+          id: "pending",
+          status: "QUEUED",
+          createdAt: new Date().toISOString(),
+          startedAt: null,
+          completedAt: null,
+          failureCode: null,
+          failureMessage: null,
+        },
+      } : null)
+
+      const updated = await pollCatalogAssetPreview(
+        asset.id,
+        loadAsset,
+        shouldStopCatalogPreviewPolling,
+      )
+      if (!pollAbortRef.current && updated) {
+        setAsset(updated)
+        setWhoIsInPicture(updated.whoIsInPicture || "")
+        setCaption(updated.caption || "")
+        setEventId(updated.event?.id || "")
+        setKeywords(updated.keywords || "")
+        onUpdate()
+      }
+    } catch (error) {
+      setRegenError(error instanceof Error ? error.message : "Could not queue preview regeneration.")
+    } finally {
+      setIsRegenerating(false)
+    }
+  }
+
   const previewAlt = asset?.whoIsInPicture || asset?.caption || "Preview"
+  const previewVariant = asset ? getStaffCatalogPreviewVariant(asset) : null
+  const zoomVariant = asset ? (getStaffCatalogHoverPreviewVariant(asset) ?? previewVariant) : null
   const eventOptions = (() => {
     if (!asset?.event?.id) return filters.events
     const hasCurrentEvent = filters.events.some((eventOption) => eventOption.id === asset.event?.id)
@@ -96,19 +170,19 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
 
   return (
     <>
-      {isZoomed && asset?.previewReady && (
+      {isZoomed && zoomVariant && asset ? (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm" onClick={() => setIsZoomed(false)}>
           <button className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors" onClick={() => setIsZoomed(false)}>
             <X size={32} />
           </button>
-          <img 
-            src={`/staff/catalog/${asset.id}/preview-image?variant=detail`} 
-            alt="Zoomed" 
+          <img
+            src={`/staff/catalog/${asset.id}/preview-image?variant=${zoomVariant}`}
+            alt="Zoomed"
             className="max-h-full max-w-full object-contain rounded-md"
             onClick={e => e.stopPropagation()}
           />
         </div>
-      )}
+      ) : null}
       <div className="max-h-[calc(100vh-3rem)] w-full overflow-y-auto border-l border-border bg-card p-5 lg:max-h-[calc(100vh-4rem)]">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold tracking-tight">Edit Asset</h3>
@@ -125,14 +199,14 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
           <div className="p-4 text-center text-muted-foreground">Asset not found.</div>
         ) : (
           <div className="space-y-6">
-            {asset.previewReady ? (
+            {asset.previewReady && previewVariant ? (
               <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg border border-border bg-muted group">
                 <PreviewImage
-                  src={`/staff/catalog/${asset.id}/preview-image?variant=detail`}
+                  src={`/staff/catalog/${asset.id}/preview-image?variant=${previewVariant}`}
                   alt={previewAlt}
                   className="h-full w-full object-contain"
                 />
-                <button 
+                <button
                   onClick={() => setIsZoomed(true)}
                   className="absolute top-2 right-2 rounded-md bg-black/50 p-1.5 text-white opacity-0 transition-all hover:bg-black/70 group-hover:opacity-100 backdrop-blur-sm"
                   title="Zoom image"
@@ -140,11 +214,68 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
                   <ZoomIn size={18} />
                 </button>
               </div>
+            ) : previewVariant ? (
+              <div className="space-y-2">
+                <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg border border-border bg-muted group">
+                  <PreviewImage
+                    src={getStaffCatalogPreviewUrl(asset) ?? ""}
+                    alt={previewAlt}
+                    className="h-full w-full object-contain"
+                  />
+                  <button
+                    onClick={() => setIsZoomed(true)}
+                    className="absolute top-2 right-2 rounded-md bg-black/50 p-1.5 text-white opacity-0 transition-all hover:bg-black/70 group-hover:opacity-100 backdrop-blur-sm"
+                    title="Zoom image"
+                  >
+                    <ZoomIn size={18} />
+                  </button>
+                </div>
+                <p className="text-xs font-medium text-amber-700">Partial preview — not all variants are ready.</p>
+              </div>
             ) : (
-              <div className="flex aspect-[3/2] w-full items-center justify-center rounded-lg border border-border bg-muted">
-                <span className="text-sm font-medium text-muted-foreground">Preview missing or processing</span>
+              <div className="flex aspect-[3/2] w-full flex-col items-center justify-center gap-2 rounded-lg border border-border bg-muted px-4 text-center">
+                <span className="text-sm font-medium text-muted-foreground">
+                  {getCatalogPreviewPlaceholderMessage(asset)}
+                </span>
+                {isCatalogPreviewRegenerationActive(asset) && !isCatalogPreviewRegenerationFailed(asset) ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Loader2 className="animate-spin" size={14} />
+                    {asset.previewRegenerationJob?.status === "QUEUED" ? "Queued for worker" : "Regeneration in progress"}
+                  </span>
+                ) : null}
               </div>
             )}
+
+            <CatalogDerivativeStatusPanel asset={asset} />
+
+            <CatalogPreviewRegenerationProgress asset={asset} />
+
+            {!asset.previewReady ? (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={handleRegeneratePreviews}
+                  disabled={isRegenerating || isSaving || !canRegenerateCatalogPreviews(asset)}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-4 py-2.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
+                >
+                  {isRegenerating || isCatalogPreviewRegenerationActive(asset) ? (
+                    <Loader2 className="animate-spin" size={16} />
+                  ) : (
+                    <RefreshCw size={16} />
+                  )}
+                  Regenerate previews
+                </button>
+                {regenMessage ? (
+                  <p className="text-xs text-muted-foreground">{regenMessage}</p>
+                ) : null}
+                {regenError ? (
+                  <p className="text-xs text-rose-600">{regenError}</p>
+                ) : null}
+                {!asset.r2Exists ? (
+                  <p className="text-xs text-muted-foreground">Original must be verified in R2 before previews can be generated.</p>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
               <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fotokey</p>
@@ -155,9 +286,9 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
             </div>
 
             <div className="flex items-center justify-end">
-              <a 
-                href={`/assets/${asset.id}`} 
-                target="_blank" 
+              <a
+                href={`/assets/${asset.id}`}
+                target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
               >
@@ -168,21 +299,21 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground">Who is in picture?</label>
-                <input 
-                  type="text" 
-                  value={whoIsInPicture} 
-                  onChange={e => setWhoIsInPicture(e.target.value)} 
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" 
+                <input
+                  type="text"
+                  value={whoIsInPicture}
+                  onChange={e => setWhoIsInPicture(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground">Caption</label>
-                <textarea 
-                  value={caption} 
-                  onChange={e => setCaption(e.target.value)} 
+                <textarea
+                  value={caption}
+                  onChange={e => setCaption(e.target.value)}
                   rows={4}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none" 
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none"
                 />
               </div>
 
@@ -196,8 +327,8 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-foreground">Event</label>
-                  <select 
-                    value={eventId} 
+                  <select
+                    value={eventId}
                     onChange={e => setEventId(e.target.value)}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                   >
@@ -209,17 +340,17 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
 
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-foreground">Keywords (comma separated)</label>
-                <input 
-                  type="text" 
-                  value={keywords} 
-                  onChange={e => setKeywords(e.target.value)} 
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary" 
+                <input
+                  type="text"
+                  value={keywords}
+                  onChange={e => setKeywords(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                 />
               </div>
 
               <div className="pt-2">
-                <button 
-                  onClick={handleSaveMetadata} 
+                <button
+                  onClick={handleSaveMetadata}
                   disabled={isSaving}
                   className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
@@ -229,9 +360,9 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
 
               <div className="border-t border-border pt-4 mt-6">
                 <h4 className="text-sm font-medium mb-3">Publish State</h4>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   {asset.status !== "ACTIVE" || asset.visibility !== "PUBLIC" ? (
-                    <button 
+                    <button
                       onClick={() => handlePublishState("APPROVED", "PUBLIC")}
                       disabled={isSaving || !asset.previewReady}
                       className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
@@ -240,7 +371,7 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
                     </button>
                   ) : null}
                   {asset.visibility !== "PRIVATE" ? (
-                    <button 
+                    <button
                       onClick={() => handlePublishState("APPROVED", "PRIVATE")}
                       disabled={isSaving}
                       className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
@@ -248,7 +379,7 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
                       Make Private
                     </button>
                   ) : null}
-                  <button 
+                  <button
                     onClick={() => handlePublishState("REJECTED", "PRIVATE")}
                     disabled={isSaving || asset.status === "REJECTED"}
                     className="rounded-md border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50"
@@ -262,5 +393,41 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
         )}
       </div>
     </>
+  )
+}
+
+function CatalogDerivativeStatusPanel({ asset }: { asset: AdminCatalogAssetItem }) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Derivative status</p>
+      <DerivativeStateRow name="thumb" state={asset.derivatives.thumb.state} />
+      <DerivativeStateRow name="card" state={asset.derivatives.card.state} />
+      <DerivativeStateRow name="detail" state={asset.derivatives.detail.state} />
+      <p className="pt-1 text-xs text-muted-foreground">
+        {asset.r2Exists ? "Original verified in R2" : "Original missing in R2"}
+      </p>
+      {asset.missingPreviewVariants && asset.missingPreviewVariants.length > 0 ? (
+        <p className="text-xs text-amber-700">
+          Missing variants: {asset.missingPreviewVariants.join(", ")}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+function DerivativeStateRow({ name, state }: { name: string; state: AdminCatalogDerivativeSummary["state"] }) {
+  const badge = state === "READY"
+    ? <Badge variant="success">{state}</Badge>
+    : state === "FAILED"
+      ? <Badge variant="destructive">{state}</Badge>
+      : state === "PROCESSING"
+        ? <Badge variant="warning">{state}</Badge>
+        : <Badge variant="muted">{state}</Badge>
+
+  return (
+    <div className="flex items-center justify-between rounded border border-border bg-background px-2.5 py-1.5">
+      <span className="text-xs font-medium uppercase tracking-wide">{name}</span>
+      {badge}
+    </div>
   )
 }

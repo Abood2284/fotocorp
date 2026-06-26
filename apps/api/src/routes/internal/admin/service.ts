@@ -13,7 +13,10 @@ import {
   updateInternalAdminAssetPublish,
   updateInternalAdminAssetPublishBulk,
 } from "../../../lib/assets/admin-catalog"
+import { enqueueImagePreviewRegeneration } from "../../../lib/assets/image-preview-regeneration"
 import { getInternalAdminDashboardSummary } from "../../../lib/assets/admin-dashboard-summary"
+import { getJobsPipelineSnapshot } from "../../../lib/jobs/jobs-pipeline-snapshot"
+import { requestPublishDrainWake } from "../../../lib/jobs/publish-drain-webhook"
 import { AppError } from "../../../lib/errors"
 import { json } from "../../../lib/http"
 import { parsePreviewTtl } from "../../../lib/assets/public-assets"
@@ -81,9 +84,38 @@ export async function adminAssetUpdateBulkService(env: Env, payload: { assetIds:
 export async function adminAssetPublishStateBulkService(env: Env, payload: { assetIds: string[], status: "APPROVED" | "REVIEW" | "REJECTED"; visibility: "PUBLIC" | "PRIVATE" }, actor: AdminActor) {
   return json(await updateInternalAdminAssetPublishBulk(db(env), env, payload.assetIds, payload, actor, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env)))
 }
+export async function queueImagePreviewRegenerationService(
+  env: Env,
+  assetId: string,
+  staffMemberId: string | null,
+  executionCtx?: ExecutionContext,
+) {
+  const result = await enqueueImagePreviewRegeneration(
+    db(env),
+    env,
+    { assetId, staffMemberId },
+    executionCtx,
+  )
+  return json({
+    ...result,
+    message: result.alreadyQueued
+      ? "Preview regeneration is already queued. The jobs worker generates derivatives asynchronously — use Pipeline or Start worker if it stays queued."
+      : "Preview regeneration queued. The jobs worker generates derivatives asynchronously — use Start worker below if it stays queued.",
+  })
+}
+export function actorStaffIdFromRequest(request: Request): string | null {
+  const staffId = request.headers.get("x-admin-auth-user-id")?.trim()
+  return staffId || null
+}
 export async function adminStatsService(env: Env) { return json(await getInternalAdminCatalogStats(db(env))) }
 export async function adminDashboardSummaryService(env: Env) {
   return json(await getInternalAdminDashboardSummary(db(env)))
+}
+export async function jobsPipelineSnapshotService(env: Env) {
+  return json(await getJobsPipelineSnapshot(db(env), env))
+}
+export async function jobsPipelineWakeService(env: Env) {
+  return json(await requestPublishDrainWake(env))
 }
 export async function adminFiltersService(env: Env) { return json(await getInternalAdminFilters(db(env))) }
 export async function adminUsersService(env: Env, request: Request) { return json(await listInternalAdminUsers(db(env), request)) }

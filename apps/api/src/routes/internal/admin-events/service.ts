@@ -6,6 +6,10 @@ import {
   updateInternalAdminEvent,
   purgeInternalAdminEvent,
 } from "../../../lib/events/admin-events"
+import {
+  getAdminEventSearchIndexStatus,
+  syncAdminEventSearchIndex,
+} from "../../../lib/search/typesense-event-search-index"
 import { AppError } from "../../../lib/errors"
 import { json } from "../../../lib/http"
 import type { AdminEventListFilters } from "../../../lib/events/admin-events"
@@ -38,6 +42,18 @@ export async function purgeAdminEventService(
   actor: AdminActor
 ) {
   return json(await purgeInternalAdminEvent(db(env), env, eventId, payload, actor))
+}
+
+export async function getAdminEventSearchIndexStatusService(env: Env, eventId: string) {
+  const event = await getInternalAdminEventById(db(env), eventId)
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event not found.")
+  return json(await getAdminEventSearchIndexStatus(db(env), env, eventId))
+}
+
+export async function syncAdminEventSearchIndexService(env: Env, eventId: string) {
+  const event = await getInternalAdminEventById(db(env), eventId)
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event not found.")
+  return json(await syncAdminEventSearchIndex(db(env), env, eventId))
 }
 
 export function actorFromRequest(request: Request): AdminActor {

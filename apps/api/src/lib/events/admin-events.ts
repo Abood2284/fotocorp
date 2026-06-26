@@ -123,10 +123,12 @@ export async function updateInternalAdminEvent(
   eventId: string,
   payload: Partial<typeof photoEvents.$inferInsert>
 ) {
+  const normalizedPayload = normalizeAdminEventUpdatePayload(payload)
+
   const [updated] = await db
     .update(photoEvents)
     .set({
-      ...payload,
+      ...normalizedPayload,
       updatedAt: new Date(),
     })
     .where(eq(photoEvents.id, eventId))
@@ -286,5 +288,17 @@ export async function purgeInternalAdminEvent(
       derivatives: previewKeysToDelete.length,
     },
     r2Results,
+  }
+}
+
+function normalizeAdminEventUpdatePayload(
+  payload: Partial<typeof photoEvents.$inferInsert>,
+): Partial<typeof photoEvents.$inferInsert> {
+  if (payload.eventDate === undefined || payload.eventDate === null) return payload
+  if (payload.eventDate instanceof Date) return payload
+
+  return {
+    ...payload,
+    eventDate: new Date(payload.eventDate as string),
   }
 }

@@ -1,7 +1,9 @@
 import type { JobsEnvConfig } from "./config/env"
 import type { CaricaturePreviewJobService } from "./services/caricaturePreviewJobService"
+import type { ImagePreviewRegenerationJobService } from "./services/imagePreviewRegenerationJobService"
 import type { ImagePublishJobService } from "./services/imagePublishJobService"
 import type { CaricaturePreviewWorker } from "./workers/caricaturePreviewWorker"
+import type { ImagePreviewRegenerationWorker } from "./workers/imagePreviewRegenerationWorker"
 import type { ImagePublishWorker } from "./workers/imagePublishWorker"
 
 export interface PublishDrainLimits {
@@ -50,17 +52,23 @@ export function readPublishDrainMaxRuntimeMs(): number {
 async function countCombinedPendingJobs(
   imageJobService: ImagePublishJobService | undefined,
   caricatureJobService: CaricaturePreviewJobService | undefined,
+  catalogPreviewRegenJobService: ImagePreviewRegenerationJobService | undefined,
 ): Promise<number> {
   const imagePending = imageJobService ? await imageJobService.countPendingJobs() : 0
   const caricaturePending = caricatureJobService ? await caricatureJobService.countPendingJobs() : 0
-  return imagePending + caricaturePending
+  const catalogRegenPending = catalogPreviewRegenJobService
+    ? await catalogPreviewRegenJobService.countPendingJobs()
+    : 0
+  return imagePending + caricaturePending + catalogRegenPending
 }
 
 export async function runPublishDrain(params: {
   imageWorker: ImagePublishWorker
   caricatureWorker: CaricaturePreviewWorker
+  catalogPreviewRegenWorker: ImagePreviewRegenerationWorker
   imageJobService: ImagePublishJobService | undefined
   caricatureJobService: CaricaturePreviewJobService | undefined
+  catalogPreviewRegenJobService: ImagePreviewRegenerationJobService | undefined
   skipDbAccess: boolean
   processingEnabled: boolean
   jobsEnv: JobsEnvConfig
@@ -69,13 +77,17 @@ export async function runPublishDrain(params: {
   const startedAt = Date.now()
   logStructured({ event: "publish_drain_started" })
 
-  if (params.skipDbAccess || !params.imageJobService || !params.caricatureJobService) {
+  if (params.skipDbAccess || !params.imageJobService || !params.caricatureJobService || !params.catalogPreviewRegenJobService) {
     const error = "DATABASE_URL is required for publish:drain"
     logStructured({ event: "publish_drain_failed", error })
     throw new Error(error)
   }
 
-  const pendingAtStart = await countCombinedPendingJobs(params.imageJobService, params.caricatureJobService)
+  const pendingAtStart = await countCombinedPendingJobs(
+    params.imageJobService,
+    params.caricatureJobService,
+    params.catalogPreviewRegenJobService,
+  )
 
   if (pendingAtStart === 0) {
     logStructured({
@@ -121,7 +133,11 @@ export async function runPublishDrain(params: {
       break
     }
 
-    const pendingNow = await countCombinedPendingJobs(params.imageJobService, params.caricatureJobService)
+    const pendingNow = await countCombinedPendingJobs(
+      params.imageJobService,
+      params.caricatureJobService,
+      params.catalogPreviewRegenJobService,
+    )
     if (pendingNow === 0) {
       stopReason = "empty"
       break
@@ -151,7 +167,24 @@ export async function runPublishDrain(params: {
       continue
     }
 
-    if ((imageIteration.pendingCount ?? 0) + (caricatureIteration.pendingCount ?? 0) > 0) {
+    const catalogRegenIteration = await params.catalogPreviewRegenWorker.runOnce({
+      skipDbAccess: false,
+      dryRun: false,
+      processingEnabled: true,
+      jobsEnv: params.jobsEnv,
+    })
+
+    if (catalogRegenIteration.claimedJob) {
+      processed += 1
+      continue
+    }
+
+    if (
+      (imageIteration.pendingCount ?? 0)
+      + (caricatureIteration.pendingCount ?? 0)
+      + (catalogRegenIteration.pendingCount ?? 0)
+      > 0
+    ) {
       stopReason = "no_progress"
       break
     }
@@ -160,7 +193,11 @@ export async function runPublishDrain(params: {
     break
   }
 
-  const pendingAtEnd = await countCombinedPendingJobs(params.imageJobService, params.caricatureJobService)
+  const pendingAtEnd = await countCombinedPendingJobs(
+    params.imageJobService,
+    params.caricatureJobService,
+    params.catalogPreviewRegenJobService,
+  )
   const durationMs = Date.now() - startedAt
 
   logStructured({

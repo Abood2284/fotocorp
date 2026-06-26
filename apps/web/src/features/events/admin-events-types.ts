@@ -45,3 +45,19 @@ export interface AdminEventPurgeResult {
     uploadsFailed: number
   }
 }
+
+export interface AdminEventSearchIndexStatus {
+  eventId: string
+  catalogSearchEligibleCount: number
+  typesenseIndexedCount: number | null
+  missingCount: number | null
+  inSync: boolean
+  typesenseConfigured: boolean
+}
+
+export interface AdminEventSearchIndexSyncResult {
+  eventId: string
+  upsertedCount: number
+  deletedCount: number
+  status: AdminEventSearchIndexStatus
+}

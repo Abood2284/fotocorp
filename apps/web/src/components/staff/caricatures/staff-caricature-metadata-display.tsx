@@ -6,7 +6,7 @@ import {
   CARICATURE_SHELL_PLACEHOLDER_HEADLINE,
   CARICATURE_SHELL_PLACEHOLDER_TAG,
 } from "@/lib/caricatures/caricature-upload-metadata"
-import type { StaffCaricatureDetail } from "@/lib/api/staff-caricatures-api"
+import type { StaffCaricatureDetail } from "@/lib/api/staff-caricatures-types"
 
 interface StaffCaricatureMetadataDisplayProps {
   detail: StaffCaricatureDetail

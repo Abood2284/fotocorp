@@ -127,5 +127,25 @@ export function staffRoleCanAccessPath(role: string, pathname: string): boolean 
     return OPS_ONLY.includes(r)
   }
 
+  if (normalized === "/staff/pipeline" || normalized.startsWith("/staff/pipeline/")) {
+    return ["SUPER_ADMIN", "CATALOG_MANAGER"].includes(r)
+  }
+
+  if (normalized === "/staff/help/manage" || normalized.startsWith("/staff/help/manage/")) {
+    return ["SUPER_ADMIN", "CATALOG_MANAGER"].includes(r)
+  }
+
+  if (normalized === "/staff/help" || normalized.startsWith("/staff/help/")) {
+    return [
+      "SUPER_ADMIN",
+      "CATALOG_MANAGER",
+      "REVIEWER",
+      "CAPTION_MANAGER",
+      "CAPTION_WRITER",
+      "FINANCE",
+      "SUPPORT",
+    ].includes(r)
+  }
+
   return false
 }

@@ -139,6 +139,18 @@ function normalizeOptions(options: number | MediaPipelineStatusOptions): MediaPi
   }
 }
 
+export async function getRecentDerivativeUpdates(
+  db: DrizzleClient,
+  limit = 20,
+): Promise<PipelineRecentDerivativeRow[]> {
+  if (limit <= 0) return []
+  const recentRows = await executeRows<RecentRow>(
+    db,
+    buildPipelineRecentDerivativeUpdatesQuery(limit),
+  )
+  return mapRecentDerivativeRows(recentRows)
+}
+
 export async function getMediaPipelineStatus(
   db: DrizzleClient,
   policy: DerivativeProfilePolicyInput,
@@ -224,22 +236,26 @@ export async function getMediaPipelineStatus(
       storageKeyMasked: maskStorageKey(row.storage_key),
       hasErrorData: false,
     })),
-    recentDerivativeUpdates: recentRows.map((row) => ({
-      assetId: row.asset_id,
-      fotokey: row.fotokey,
-      legacyImageCode: row.legacy_image_code,
-      variant: row.variant,
-      generationStatus: row.generation_status,
-      watermarkProfile: row.watermark_profile,
-      isWatermarked: row.is_watermarked,
-      width: row.width,
-      height: row.height,
-      sizeBytes: toInt(row.size_bytes),
-      profileMatchesPolicy: row.profile_matches_policy,
-      updatedAt: toIso(row.updated_at),
-      generatedAt: toIso(row.generated_at),
-    })),
+    recentDerivativeUpdates: mapRecentDerivativeRows(recentRows),
   }
+}
+
+function mapRecentDerivativeRows(recentRows: RecentRow[]): PipelineRecentDerivativeRow[] {
+  return recentRows.map((row) => ({
+    assetId: row.asset_id,
+    fotokey: row.fotokey,
+    legacyImageCode: row.legacy_image_code,
+    variant: row.variant,
+    generationStatus: row.generation_status,
+    watermarkProfile: row.watermark_profile,
+    isWatermarked: row.is_watermarked,
+    width: row.width,
+    height: row.height,
+    sizeBytes: toInt(row.size_bytes),
+    profileMatchesPolicy: row.profile_matches_policy,
+    updatedAt: toIso(row.updated_at),
+    generatedAt: toIso(row.generated_at),
+  }))
 }
 
 function buildSummaryQuery(policy: DerivativeProfilePolicyInput): SQL {
@@ -411,6 +427,46 @@ function buildRecentDerivativeUpdatesQuery(policy: DerivativeProfilePolicyInput,
       and d.updated_at is not null
     order by d.updated_at desc
     limit ${limit}
+  `
+}
+
+/** Lightweight recent-activity query for read-only pipeline observability (no migration aggregates). */
+function buildPipelineRecentDerivativeUpdatesQuery(limit: number): SQL {
+  return sql`
+    with recent as (
+      select
+        d.image_asset_id,
+        d.variant,
+        d.generation_status,
+        d.watermark_profile,
+        d.is_watermarked,
+        d.width,
+        d.height,
+        d.size_bytes,
+        d.updated_at,
+        d.generated_at
+      from image_derivatives d
+      where d.updated_at is not null
+      order by d.updated_at desc
+      limit ${limit}
+    )
+    select
+      a.id as asset_id,
+      a.fotokey,
+      a.legacy_image_code,
+      lower(r.variant) as variant,
+      r.generation_status,
+      r.watermark_profile,
+      r.is_watermarked,
+      r.width,
+      r.height,
+      r.size_bytes,
+      false as profile_matches_policy,
+      r.updated_at,
+      r.generated_at
+    from recent r
+    join image_assets a on a.id = r.image_asset_id
+    order by r.updated_at desc
   `
 }
 

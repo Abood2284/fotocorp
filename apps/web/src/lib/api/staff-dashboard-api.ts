@@ -5,11 +5,12 @@ import { unstable_cache } from "next/cache"
 import { internalApiJson, internalApiRoutes } from "@/lib/server/internal-api"
 
 export interface AdminDashboardSummary {
-  totalAssets: number
-  approvedPublicAssets: number
-  platformUsers: number
+  liveImages: number
+  activeSubscribers: number
   pendingUserAccessInquiries: number
   pendingContributorApplications: number
+  pendingContributorUploads: number
+  pendingCaricatureReviews: number
 }
 
 /** Global aggregates — no per-staff inputs; safe inside unstable_cache (no cookies/headers). */
@@ -21,7 +22,7 @@ async function fetchAdminDashboardSummaryUncached(): Promise<AdminDashboardSumma
 
 const getCrossRequestDashboardSummary = unstable_cache(
   fetchAdminDashboardSummaryUncached,
-  ["staff-dashboard-summary-v1"],
+  ["staff-dashboard-summary-v2"],
   { revalidate: 120, tags: ["staff-dashboard-summary"] },
 )
 

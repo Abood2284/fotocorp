@@ -8,6 +8,7 @@ import {
   parseTypesenseSyncConfig,
   syncTypesensePublicAsset,
   syncTypesensePublicAssetsForEvent,
+  TypesenseSyncEligibilityPendingError,
   type TypesensePublicAssetRow,
 } from "../src/lib/search/typesense-public-asset-sync"
 
@@ -170,6 +171,37 @@ describe("Typesense public asset sync", () => {
       assert.equal(result.deletedCount, 1)
       assert.equal(requests.filter((request) => request.url.includes("/import")).length, 1)
       assert.equal(requests.filter((request) => request.method === "DELETE").length, 1)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it("throws on critical sync when the asset is public but the eligibility join row is not visible yet", async () => {
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = mock.fn(async () => new Response("", { status: 200 })) as typeof fetch
+
+    const assetId = eligibleRow().id
+    const db = {
+      callCount: 0,
+      async execute() {
+        this.callCount += 1
+        if (this.callCount === 1) return []
+        if (this.callCount === 2) return [{ id: assetId }]
+        return [eligibleRow()]
+      },
+    }
+
+    const env = {
+      TYPESENSE_HOST: "https://search.example.test",
+      TYPESENSE_API_KEY: "test-key",
+      TYPESENSE_COLLECTION_ALIAS: "public_assets_current",
+    } as Env
+
+    try {
+      await assert.rejects(
+        () => syncTypesensePublicAsset(db as never, env, assetId, { critical: true }),
+        TypesenseSyncEligibilityPendingError,
+      )
     } finally {
       globalThis.fetch = originalFetch
     }
