@@ -64,6 +64,21 @@ pnpm --dir apps/api run media:scan-original-metadata -- --dry-run --limit 10
 
 Reads `image_assets.original_storage_key` from the R2 originals bucket, extracts Sharp metadata, and logs the `image_assets_metadata` row that would be written.
 
+**Publish pipeline:** New FOTOCORP approvals populate `image_assets_metadata` automatically in `apps/jobs` (`ImagePublishProcessor`) when publish completes. The scanner remains the backfill/repair tool for legacy imports and failed rows.
+
+**Backfill after deploy:**
+
+```bash
+# Assets never scanned
+pnpm --dir apps/api run media:scan-original-metadata -- --write --only-missing --limit 500
+
+# ACTIVE assets with FAILED metadata (e.g. scanned before canonical original existed)
+pnpm --dir apps/api run media:scan-original-metadata -- --write --retry-failed --limit 500
+
+# Single asset repair
+pnpm --dir apps/api run media:scan-original-metadata -- --write --asset-id <uuid>
+```
+
 ## R2 safety
 
 Originals: `FC0101072.jpg` at bucket root. Derivatives:

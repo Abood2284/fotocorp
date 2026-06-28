@@ -7,6 +7,7 @@ import {
   schedulePublicEventFeedSync,
   schedulePublicEventFeedSyncForAsset,
 } from "./public-event-feed-projection";
+import { canDeleteIncompleteCatalogUpload } from "./catalog-incomplete-upload-delete";
 import { scheduleTypesenseSyncForAsset } from "../search/typesense-public-asset-sync";
 import { createPreviewUrl } from "../media/preview-token";
 import { getR2Object } from "../r2";
@@ -106,6 +107,9 @@ interface AdminAssetRow {
   preview_regeneration_created_at: Date | string | null;
   preview_regeneration_started_at: Date | string | null;
   preview_regeneration_completed_at: Date | string | null;
+  original_storage_key: string | null;
+  asset_source: string | null;
+  upload_linked: boolean;
   image_sort_at: Date | string;
   sort_group_rank: number;
 }
@@ -598,9 +602,8 @@ export async function getInternalAdminFilters(db: DrizzleClient) {
       { status: "APPROVED", assetCount: 0 },
       { status: "ACTIVE", assetCount: 0 },
       { status: "ARCHIVED", assetCount: 0 },
-      { status: "DELETED", assetCount: 0 },
-      { status: "MISSING_ORIGINAL", assetCount: 0 },
-      { status: "UNKNOWN", assetCount: 0 },
+      { status: "MISSING_CAPTION", assetCount: 0 },
+      { status: "MISSING_WHO_IS_IN_PICTURE", assetCount: 0 },
     ];
     const [categories, events, contributors] = await Promise.all([
       executeRows<FilterRow>(db, sql`
@@ -729,7 +732,15 @@ function buildWhere(query: AdminAssetQuery): SQL[] {
       )
     `);
   }
-  if (query.status) where.push(sql`a.status = ${toCleanAssetStatusFilter(query.status)}`);
+  if (query.status) {
+    if (query.status === "MISSING_CAPTION") {
+      where.push(missingCaptionConditionSql());
+    } else if (query.status === "MISSING_WHO_IS_IN_PICTURE") {
+      where.push(missingWhoIsInPictureConditionSql());
+    } else {
+      where.push(sql`a.status = ${toCleanAssetStatusFilter(query.status)}`);
+    }
+  }
   if (query.visibility) where.push(sql`a.visibility = ${query.visibility}`);
   if (query.categoryId) where.push(sql`a.category_id = ${query.categoryId}`);
   if (query.eventId) where.push(sql`a.event_id = ${query.eventId}`);
@@ -749,8 +760,8 @@ function buildWhere(query: AdminAssetQuery): SQL[] {
     where.push(sql`${previewStateSql()} = 'MISSING'`);
   }
   
-  if (query.missingWhoIsInPicture) where.push(sql`(a.who_is_in_picture is null or trim(a.who_is_in_picture) = '')`);
-  if (query.missingCaption) where.push(sql`(a.caption is null or trim(a.caption) = '')`);
+  if (query.missingWhoIsInPicture) where.push(missingWhoIsInPictureConditionSql());
+  if (query.missingCaption) where.push(missingCaptionConditionSql());
   if (query.noEvent) where.push(sql`a.event_id is null`);
   if (query.noCategory) where.push(sql`a.category_id is null`);
   if (query.contributorUploads) where.push(sql`a.source = 'CONTRIBUTOR_UPLOAD'`);
@@ -814,6 +825,14 @@ function adminSelectSql(sort: AdminSort): SQL {
       regen_job.preview_regeneration_created_at,
       regen_job.preview_regeneration_started_at,
       regen_job.preview_regeneration_completed_at,
+      a.original_storage_key,
+      a.source as asset_source,
+      exists (
+        select 1
+        from contributor_upload_items pui_link
+        where pui_link.image_asset_id = a.id
+          and pui_link.upload_status = 'ASSET_CREATED'
+      ) as upload_linked,
       coalesce(a.image_date, a.created_at) as image_sort_at,
       ${sortGroupRankSql(sort)} as sort_group_rank
   `;
@@ -954,6 +973,12 @@ async function mapAdminAssetRow(row: AdminAssetRow, secret: string | undefined, 
         }
       : null,
     derivatives: { thumb, card, detail },
+    canDeleteIncompleteUpload: canDeleteIncompleteCatalogUpload({
+      fotokey: row.fotokey,
+      source: row.asset_source,
+      originalStorageKey: row.original_storage_key,
+      uploadLinked: Boolean(row.upload_linked),
+    }),
   };
 }
 
@@ -1142,6 +1167,14 @@ function toCleanAssetStatusFilter(status: string): string {
   if (status === "REJECTED") return "ARCHIVED";
   if (status === "REVIEW") return "DRAFT";
   return status;
+}
+
+function missingWhoIsInPictureConditionSql(): SQL {
+  return sql`(a.who_is_in_picture is null or trim(a.who_is_in_picture) = '' or trim(a.who_is_in_picture) = '.')`;
+}
+
+function missingCaptionConditionSql(): SQL {
+  return sql`(a.caption is null or trim(a.caption) = '')`;
 }
 
 function toCleanDerivativeVariant(variant: "thumb" | "card" | "detail"): CleanDerivativeVariant {

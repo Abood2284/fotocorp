@@ -7,6 +7,7 @@ import {
   actorFromRequest,
   actorStaffIdFromRequest,
   adminAssetDetailService,
+  adminAssetDeleteService,
   adminAssetOriginalService,
   adminAssetPreviewService,
   adminAssetPublishStateService,
@@ -155,6 +156,15 @@ internalAdminRoutes.patch(
       },
       actorFromRequest(c.req.raw),
     );
+  },
+);
+
+internalAdminRoutes.delete(
+  "/api/v1/internal/admin/assets/:assetId",
+  zValidator("param", adminAssetParamSchema),
+  async (c) => {
+    const params = c.req.valid("param");
+    return await adminAssetDeleteService(c.env, params.assetId);
   },
 );
 

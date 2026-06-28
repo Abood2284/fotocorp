@@ -421,6 +421,20 @@
       "when": 1782600000000,
       "tag": "0059_image_preview_regeneration_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1782478896203,
+      "tag": "0060_long_sleeper",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1782479500000,
+      "tag": "0061_help_contextual_links",
+      "breakpoints": true
     }
   ]
 }

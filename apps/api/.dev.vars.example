@@ -96,6 +96,9 @@ CLOUDFLARE_R2_CONTRIBUTOR_UPLOADS_BUCKET=fotocorp-2026-contributor-uploads
 # should include `PUT`; AllowedHeaders must allow `Content-Type`. Without CORS, presigned PUT succeeds from curl/Node
 # but fails in the browser. Paste JSON in R2 → bucket → Settings → CORS policy. Example file:
 #   apps/api/docs/r2-contributor-staging-cors.example.json
+# Staff Help Center media uploads use same-origin BFF PUT (`/api/staff/help/articles/:id/media/:mediaId/upload`) and do **not**
+# require R2 CORS on `fotocorp-help-center`. Optional presigned-PUT fallback CORS example:
+#   apps/api/docs/r2-help-center-cors.example.json
 # (duplicate each production origin in AllowedOrigins; do not use `*` for production if you can avoid it).
 # See ../../docs/db-revamp/reports/photographer-bulk-upload-backend-report.md for context.
 

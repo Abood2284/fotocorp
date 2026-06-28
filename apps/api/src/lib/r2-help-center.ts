@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, S3Client } from "@aws-sdk/client-s3"
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import type { Env } from "../appTypes"
 import { HELP_CENTER_BUCKET_NAME } from "./help-center/help-media-storage-key"
 
@@ -120,6 +120,35 @@ export async function headHelpCenterObject(env: Env, storageKey: string): Promis
     if (isNotFoundError(error)) return null
     throw error
   }
+}
+
+export async function putHelpCenterObject(
+  env: Env,
+  storageKey: string,
+  body: ArrayBuffer | Buffer | Uint8Array,
+  contentType: string,
+): Promise<void> {
+  const binding = env.MEDIA_HELP_CENTER_BUCKET
+  if (binding) {
+    await binding.put(storageKey, body, {
+      httpMetadata: { contentType },
+    })
+    return
+  }
+
+  const ctx = getHelpCenterS3Context(env)
+  if (!ctx) {
+    throw new Error("Help center media storage is not configured.")
+  }
+
+  await ctx.client.send(
+    new PutObjectCommand({
+      Bucket: ctx.bucket,
+      Key: storageKey,
+      Body: body,
+      ContentType: contentType,
+    }),
+  )
 }
 
 export async function deleteHelpCenterObject(env: Env, storageKey: string): Promise<void> {

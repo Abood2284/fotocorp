@@ -35,6 +35,13 @@ import pg from "pg";
 import type { Pool as PgPool, QueryResultRow } from "pg";
 import { expectedWatermarkProfile, variantIsWatermarked } from "@fotocorp/media-preview/profiles";
 import { decodePreviewSource, generateProtectedPreview } from "@fotocorp/media-preview/generate";
+import {
+  computeOriginalImageMetadata,
+  conciseMetadataError,
+  upsertImageAssetsMetadata,
+  upsertImageAssetsMetadataFailed,
+  type OriginalImageMetadataRow,
+} from "@fotocorp/original-image-metadata";
 import { createHttpDb } from "../../src/db";
 import type { Env } from "../../src/appTypes";
 import { schedulePublicEventFeedSyncForAsset } from "../../src/lib/assets/public-event-feed-projection";
@@ -213,6 +220,23 @@ async function processSingleItem(pool: PgPool, r2: R2Config, item: JobItemRow): 
   try {
     const original = await r2GetObject(r2, r2.originalsBucket, item.canonical_original_key);
 
+    let technicalMetadata: OriginalImageMetadataRow | null = null;
+    let technicalMetadataError: string | null = null;
+    try {
+      technicalMetadata = await computeOriginalImageMetadata({
+        imageAssetId: item.image_asset_id,
+        buffer: original,
+      });
+    } catch (error) {
+      technicalMetadataError = `publish_metadata_failed: ${conciseMetadataError(error)}`;
+      console.warn("[publish-jobs.metadata-failed]", {
+        itemId: item.item_id,
+        imageAssetId: item.image_asset_id,
+        fotokey: item.fotokey,
+        error: conciseMetadataError(error),
+      });
+    }
+
     const generated: Record<Variant, GeneratedPreview> = {
       THUMB: await generateDerivative(original, "THUMB", item.fotokey),
       CARD: await generateDerivative(original, "CARD", item.fotokey),
@@ -224,6 +248,15 @@ async function processSingleItem(pool: PgPool, r2: R2Config, item: JobItemRow): 
       const previewKey = buildDerivativeKey(variant, item.fotokey);
       await r2PutObject(r2, r2.previewsBucket, previewKey, built.buffer, PREVIEW_MIME_TYPE);
       await upsertDerivative(pool, item.image_asset_id, variant, previewKey, built, "READY");
+    }
+
+    if (technicalMetadata) {
+      await upsertImageAssetsMetadata(pool, technicalMetadata);
+    } else if (technicalMetadataError) {
+      await upsertImageAssetsMetadataFailed(pool, {
+        imageAssetId: item.image_asset_id,
+        error: technicalMetadataError,
+      });
     }
 
     await pool.query(

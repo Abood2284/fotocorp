@@ -13,6 +13,7 @@ import {
   updateInternalAdminAssetPublish,
   updateInternalAdminAssetPublishBulk,
 } from "../../../lib/assets/admin-catalog"
+import { deleteInternalAdminIncompleteUploadAsset } from "../../../lib/assets/catalog-incomplete-upload-delete"
 import { enqueueImagePreviewRegeneration } from "../../../lib/assets/image-preview-regeneration"
 import { getInternalAdminDashboardSummary } from "../../../lib/assets/admin-dashboard-summary"
 import { getJobsPipelineSnapshot } from "../../../lib/jobs/jobs-pipeline-snapshot"
@@ -60,6 +61,11 @@ export async function adminAssetUpdateService(env: Env, assetId: string, payload
     eventId: result.asset.event?.id ?? payload.eventId,
     includeEventFeeds: true,
   })
+  return json(result)
+}
+export async function adminAssetDeleteService(env: Env, assetId: string) {
+  const result = await deleteInternalAdminIncompleteUploadAsset(db(env), env, assetId)
+  await invalidatePublicAssetCache(env, { assetId, includeEventFeeds: true })
   return json(result)
 }
 export async function adminAssetPublishStateService(env: Env, assetId: string, payload: { status: "APPROVED" | "REVIEW" | "REJECTED"; visibility: "PUBLIC" | "PRIVATE" }, actor: AdminActor) {

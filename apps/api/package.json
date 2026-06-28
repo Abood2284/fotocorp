@@ -63,6 +63,7 @@
     "@aws-sdk/client-s3": "^3.1045.0",
     "@aws-sdk/s3-request-presigner": "^3.1045.0",
     "@fotocorp/media-preview": "workspace:*",
+    "@fotocorp/original-image-metadata": "workspace:*",
     "@fotocorp/shared": "workspace:*",
     "@hono/zod-validator": "^0.7.6",
     "@neondatabase/serverless": "^1.0.2",

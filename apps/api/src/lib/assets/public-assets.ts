@@ -90,6 +90,15 @@ interface AssetRow {
   detail_width: number | null;
   detail_height: number | null;
   detail_storage_key: string | null;
+  meta_scan_status?: string | null;
+  meta_display_width?: number | null;
+  meta_display_height?: number | null;
+  meta_original_long_edge?: number | null;
+  meta_original_dpi?: number | null;
+  meta_original_megapixels?: string | number | null;
+  meta_can_generate_low?: boolean | null;
+  meta_can_generate_medium?: boolean | null;
+  meta_download_quality_ceiling?: string | null;
 }
 
 interface FilterRow {
@@ -126,6 +135,18 @@ interface PreviewDto {
   height: number;
 }
 
+interface PublicAssetTechnicalMetadataDto {
+  scanStatus: string | null;
+  displayWidth: number | null;
+  displayHeight: number | null;
+  originalLongEdge: number | null;
+  originalDpi: number | null;
+  originalMegapixels: string | null;
+  canGenerateLow: boolean;
+  canGenerateMedium: boolean;
+  downloadQualityCeiling: string | null;
+}
+
 interface AssetDto {
   id: string;
   fotokey: string | null;
@@ -149,6 +170,7 @@ interface AssetDto {
     card: PreviewDto | null;
     detail?: PreviewDto | null;
   };
+  technicalMetadata?: PublicAssetTechnicalMetadataDto | null;
 }
 
 export async function listPublicAssets(
@@ -607,8 +629,8 @@ function buildListSql(query: PublicAssetQuery): SQL {
 
 function buildDetailSql(assetId: string): SQL {
   return sql`
-    ${selectAssetSql(undefined)}
-    ${fromAssetSql()}
+    ${selectAssetSql(undefined, { includeTechnicalMetadata: true })}
+    ${fromAssetSql(false, { includeTechnicalMetadata: true })}
     where ${publicAssetPredicate("a")}
       and a.id = ${assetId}
     limit 1
@@ -640,10 +662,24 @@ function assetSearchVectorSql(): SQL {
   return sql`to_tsvector('english', coalesce(a.search_text, '') || ' ' || coalesce(a.who_is_in_picture, ''))`;
 }
 
-function selectAssetSql(q: string | undefined): SQL {
+function selectAssetSql(
+  q: string | undefined,
+  options: { includeTechnicalMetadata?: boolean } = {},
+): SQL {
   const rank = q
     ? sql`ts_rank_cd(${assetSearchVectorSql()}, plainto_tsquery('english', ${q}))`
     : sql`0`;
+  const metadataColumns = options.includeTechnicalMetadata
+    ? sql`, iam.metadata_scan_status as meta_scan_status,
+      iam.display_width as meta_display_width,
+      iam.display_height as meta_display_height,
+      iam.original_long_edge as meta_original_long_edge,
+      iam.original_dpi as meta_original_dpi,
+      iam.original_megapixels as meta_original_megapixels,
+      iam.can_generate_low as meta_can_generate_low,
+      iam.can_generate_medium as meta_can_generate_medium,
+      iam.download_quality_ceiling as meta_download_quality_ceiling`
+    : sql``;
 
   return sql`
     select
@@ -683,11 +719,21 @@ function selectAssetSql(q: string | undefined): SQL {
       detail.width as detail_width,
       detail.height as detail_height,
       detail.storage_key as detail_storage_key
+      ${metadataColumns}
   `;
 }
 
-function fromAssetSql(requireDetail = false): SQL {
+function fromAssetSql(
+  requireDetail = false,
+  options: { includeTechnicalMetadata?: boolean } = {},
+): SQL {
   const detailJoin = requireDetail ? sql`join` : sql`left join`;
+  const metadataJoin = options.includeTechnicalMetadata
+    ? sql`
+    left join image_assets_metadata iam
+      on iam.image_asset_id = a.id
+  `
+    : sql``;
 
   return sql`
     from image_assets a
@@ -713,6 +759,7 @@ function fromAssetSql(requireDetail = false): SQL {
     left join photo_events e on e.id = a.event_id
     left join asset_categories ec on ec.id = e.category_id
     left join contributors p on p.id = a.contributor_id
+    ${metadataJoin}
   `;
 }
 
@@ -791,7 +838,47 @@ async function toAssetDto(
       card: await preview(row, "card", secret, ttlSeconds, cdn),
       ...(includeDetail ? { detail: await preview(row, "detail", secret, ttlSeconds, cdn) } : {}),
     },
+    ...(includeDetail ? { technicalMetadata: mapTechnicalMetadata(row) } : {}),
   };
+}
+
+function mapTechnicalMetadata(row: AssetRow): PublicAssetTechnicalMetadataDto | null {
+  if (
+    row.meta_scan_status == null
+    && row.meta_display_width == null
+    && row.meta_display_height == null
+    && row.meta_original_long_edge == null
+    && row.meta_original_dpi == null
+    && row.meta_original_megapixels == null
+    && row.meta_can_generate_low == null
+    && row.meta_can_generate_medium == null
+    && row.meta_download_quality_ceiling == null
+  ) {
+    return null;
+  }
+
+  return {
+    scanStatus: row.meta_scan_status ?? null,
+    displayWidth: toNullableInt(row.meta_display_width),
+    displayHeight: toNullableInt(row.meta_display_height),
+    originalLongEdge: toNullableInt(row.meta_original_long_edge),
+    originalDpi: toNullableInt(row.meta_original_dpi),
+    originalMegapixels: toNullableNumericString(row.meta_original_megapixels),
+    canGenerateLow: row.meta_can_generate_low === true,
+    canGenerateMedium: row.meta_can_generate_medium === true,
+    downloadQualityCeiling: row.meta_download_quality_ceiling ?? null,
+  };
+}
+
+function toNullableInt(value: number | null | undefined): number | null {
+  if (value === null || value === undefined || !Number.isFinite(value)) return null;
+  return Math.round(value);
+}
+
+function toNullableNumericString(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  return normalized.length > 0 ? normalized : null;
 }
 
 async function preview(

@@ -7,12 +7,16 @@ import { setTimeout as sleep } from "node:timers/promises"
 import { fileURLToPath } from "node:url"
 import pg from "pg"
 import type { Pool as PgPool } from "pg"
-import sharp from "sharp"
-import type {
-  DownloadQualityCeiling,
-  MetadataScanStatus,
-  SourceQualityBucket,
-} from "../../src/db/schema/image-assets-metadata.js"
+import {
+  computeOriginalImageMetadata,
+  conciseMetadataError,
+  upsertImageAssetsMetadata,
+  upsertImageAssetsMetadataFailed,
+  type DownloadQualityCeiling,
+  type MetadataScanStatus,
+  type OriginalImageMetadataRow,
+  type SourceQualityBucket,
+} from "@fotocorp/original-image-metadata"
 
 interface CliOptions {
   dryRun: boolean
@@ -21,6 +25,7 @@ interface CliOptions {
   batchSize: number
   offset: number
   onlyMissing: boolean
+  retryFailed: boolean
   assetId?: string
   r2RetryAttempts: number
   r2RetryBaseMs: number
@@ -43,36 +48,7 @@ interface CandidateRow {
   metadata_id: string | null
 }
 
-interface ComputedMetadataRow {
-  imageAssetId: string
-  originalWidth: number | null
-  originalHeight: number | null
-  displayWidth: number | null
-  displayHeight: number | null
-  originalLongEdge: number | null
-  originalShortEdge: number | null
-  originalMegapixels: string | null
-  originalDpi: number | null
-  originalResolutionUnit: string | null
-  originalFormat: string | null
-  originalSizeBytes: number | null
-  originalColorSpace: string | null
-  originalChannels: number | null
-  originalBitDepth: number | null
-  originalHasAlpha: boolean
-  originalOrientation: number | null
-  originalHasProfile: boolean
-  originalHasExif: boolean
-  originalHasIptc: boolean
-  originalHasXmp: boolean
-  sourceQualityBucket: SourceQualityBucket
-  downloadQualityCeiling: DownloadQualityCeiling
-  canGenerateMedium: boolean
-  canGenerateLow: boolean
-  technicalMetadataScannedAt: string
-  metadataScanStatus: MetadataScanStatus
-  metadataScanError: string | null
-}
+type ComputedMetadataRow = OriginalImageMetadataRow
 
 interface DistributionCounts {
   sourceQualityBucket: Record<SourceQualityBucket, number>
@@ -139,7 +115,6 @@ const TRANSIENT_DB_ERROR_CODES = new Set([
   "53300",
 ])
 const RETRYABLE_R2_STATUSES = new Set([408, 429, 500, 502, 503, 504])
-const ORIENTATION_SWAP_VALUES = new Set([5, 6, 7, 8])
 const FAILED_ASSET_SAMPLE_LIMIT = 25
 
 function createEmptyDistributionCounts(): DistributionCounts {
@@ -296,7 +271,7 @@ async function processCandidate(
 
   let computed: ComputedMetadataRow
   try {
-    computed = await computeMetadataFromBuffer(row.id, buffer)
+    computed = await computeOriginalImageMetadata({ imageAssetId: row.id, buffer })
   } catch (error) {
     summary.assetsSkipped += 1
     summary.sharpMetadataFailures += 1
@@ -355,24 +330,7 @@ async function maybeWriteFailedMetadata(
   if (!options.write) return
 
   await withDbRetry("writeFailedMetadata", () =>
-    pool.query(
-      `
-        insert into image_assets_metadata (
-          image_asset_id,
-          technical_metadata_scanned_at,
-          metadata_scan_status,
-          metadata_scan_error,
-          updated_at
-        )
-        values ($1::uuid, now(), 'FAILED', $2, now())
-        on conflict (image_asset_id) do update set
-          technical_metadata_scanned_at = excluded.technical_metadata_scanned_at,
-          metadata_scan_status = excluded.metadata_scan_status,
-          metadata_scan_error = excluded.metadata_scan_error,
-          updated_at = now()
-      `,
-      [row.id, truncateMetadataScanError(error)],
-    ),
+    upsertImageAssetsMetadataFailed(pool, { imageAssetId: row.id, error }),
   )
 
   recordDbWrite(summary, row.metadata_id)
@@ -385,129 +343,7 @@ async function writeSuccessMetadata(
   summary: Summary,
 ) {
   await withDbRetry("writeSuccessMetadata", () =>
-    pool.query(
-      `
-        insert into image_assets_metadata (
-          image_asset_id,
-          original_width,
-          original_height,
-          display_width,
-          display_height,
-          original_long_edge,
-          original_short_edge,
-          original_megapixels,
-          original_dpi,
-          original_resolution_unit,
-          original_format,
-          original_size_bytes,
-          original_color_space,
-          original_channels,
-          original_bit_depth,
-          original_has_alpha,
-          original_orientation,
-          original_has_profile,
-          original_has_exif,
-          original_has_iptc,
-          original_has_xmp,
-          source_quality_bucket,
-          download_quality_ceiling,
-          can_generate_medium,
-          can_generate_low,
-          technical_metadata_scanned_at,
-          metadata_scan_status,
-          metadata_scan_error,
-          updated_at
-        )
-        values (
-          $1::uuid,
-          $2,
-          $3,
-          $4,
-          $5,
-          $6,
-          $7,
-          $8::numeric,
-          $9,
-          $10,
-          $11,
-          $12,
-          $13,
-          $14,
-          $15,
-          $16,
-          $17,
-          $18,
-          $19,
-          $20,
-          $21,
-          $22,
-          $23,
-          $24,
-          $25,
-          $26::timestamptz,
-          'SUCCESS',
-          null,
-          now()
-        )
-        on conflict (image_asset_id) do update set
-          original_width = excluded.original_width,
-          original_height = excluded.original_height,
-          display_width = excluded.display_width,
-          display_height = excluded.display_height,
-          original_long_edge = excluded.original_long_edge,
-          original_short_edge = excluded.original_short_edge,
-          original_megapixels = excluded.original_megapixels,
-          original_dpi = excluded.original_dpi,
-          original_resolution_unit = excluded.original_resolution_unit,
-          original_format = excluded.original_format,
-          original_size_bytes = excluded.original_size_bytes,
-          original_color_space = excluded.original_color_space,
-          original_channels = excluded.original_channels,
-          original_bit_depth = excluded.original_bit_depth,
-          original_has_alpha = excluded.original_has_alpha,
-          original_orientation = excluded.original_orientation,
-          original_has_profile = excluded.original_has_profile,
-          original_has_exif = excluded.original_has_exif,
-          original_has_iptc = excluded.original_has_iptc,
-          original_has_xmp = excluded.original_has_xmp,
-          source_quality_bucket = excluded.source_quality_bucket,
-          download_quality_ceiling = excluded.download_quality_ceiling,
-          can_generate_medium = excluded.can_generate_medium,
-          can_generate_low = excluded.can_generate_low,
-          technical_metadata_scanned_at = excluded.technical_metadata_scanned_at,
-          metadata_scan_status = excluded.metadata_scan_status,
-          metadata_scan_error = excluded.metadata_scan_error,
-          updated_at = now()
-      `,
-      [
-        computed.imageAssetId,
-        computed.originalWidth,
-        computed.originalHeight,
-        computed.displayWidth,
-        computed.displayHeight,
-        computed.originalLongEdge,
-        computed.originalShortEdge,
-        computed.originalMegapixels,
-        computed.originalDpi,
-        computed.originalResolutionUnit,
-        computed.originalFormat,
-        computed.originalSizeBytes,
-        computed.originalColorSpace,
-        computed.originalChannels,
-        computed.originalBitDepth,
-        computed.originalHasAlpha,
-        computed.originalOrientation,
-        computed.originalHasProfile,
-        computed.originalHasExif,
-        computed.originalHasIptc,
-        computed.originalHasXmp,
-        computed.sourceQualityBucket,
-        computed.downloadQualityCeiling,
-        computed.canGenerateMedium,
-        computed.canGenerateLow,
-        computed.technicalMetadataScannedAt,
-      ],
-    ),
+    upsertImageAssetsMetadata(pool, computed),
   )
 
   recordDbWrite(summary, row.metadata_id)
@@ -517,101 +353,6 @@ function recordDbWrite(summary: Summary, hadExistingRow: string | null) {
   if (hadExistingRow) summary.dbRowsUpdated += 1
   else summary.dbRowsInserted += 1
   summary.dbWritesPerformed += 1
-}
-
-async function computeMetadataFromBuffer(imageAssetId: string, buffer: Buffer): Promise<ComputedMetadataRow> {
-  const metadata = await sharp(buffer, { failOn: "none" }).metadata()
-  const originalWidth = toPositiveInt(metadata.width)
-  const originalHeight = toPositiveInt(metadata.height)
-  const orientation = toPositiveInt(metadata.orientation)
-  const { displayWidth, displayHeight } = resolveDisplayDimensions(originalWidth, originalHeight, orientation)
-  const { longEdge, shortEdge } = resolveEdges(displayWidth, displayHeight)
-  const sourceQualityBucket = computeSourceQualityBucket(longEdge)
-  const downloadQualityCeiling = computeDownloadQualityCeiling(longEdge)
-
-  return {
-    imageAssetId,
-    originalWidth,
-    originalHeight,
-    displayWidth,
-    displayHeight,
-    originalLongEdge: longEdge,
-    originalShortEdge: shortEdge,
-    originalMegapixels: computeMegapixels(displayWidth, displayHeight),
-    originalDpi: toPositiveInt(metadata.density),
-    originalResolutionUnit: mapResolutionUnit(metadata.resolutionUnit),
-    originalFormat: metadata.format ?? null,
-    originalSizeBytes: metadata.size ?? buffer.byteLength,
-    originalColorSpace: metadata.space ?? null,
-    originalChannels: toPositiveInt(metadata.channels),
-    originalBitDepth: mapBitDepth(metadata.depth),
-    originalHasAlpha: metadata.hasAlpha === true,
-    originalOrientation: orientation,
-    originalHasProfile: Boolean(metadata.icc) || metadata.hasProfile === true,
-    originalHasExif: Boolean(metadata.exif),
-    originalHasIptc: Boolean(metadata.iptc),
-    originalHasXmp: Boolean(metadata.xmp),
-    sourceQualityBucket,
-    downloadQualityCeiling,
-    canGenerateMedium: longEdge !== null && longEdge >= 1600,
-    canGenerateLow: longEdge !== null && longEdge >= 900,
-    technicalMetadataScannedAt: new Date().toISOString(),
-    metadataScanStatus: "SUCCESS",
-    metadataScanError: null,
-  }
-}
-
-function resolveDisplayDimensions(
-  width: number | null,
-  height: number | null,
-  orientation: number | null,
-): { displayWidth: number | null; displayHeight: number | null } {
-  if (width === null || height === null) {
-    return { displayWidth: null, displayHeight: null }
-  }
-
-  if (orientation !== null && ORIENTATION_SWAP_VALUES.has(orientation)) {
-    return { displayWidth: height, displayHeight: width }
-  }
-
-  return { displayWidth: width, displayHeight: height }
-}
-
-function resolveEdges(
-  width: number | null,
-  height: number | null,
-): { longEdge: number | null; shortEdge: number | null } {
-  if (width === null || height === null) return { longEdge: null, shortEdge: null }
-  return {
-    longEdge: Math.max(width, height),
-    shortEdge: Math.min(width, height),
-  }
-}
-
-function computeMegapixels(width: number | null, height: number | null): string | null {
-  if (width === null || height === null) return null
-  return (Math.round(((width * height) / 1_000_000) * 10_000) / 10_000).toFixed(4)
-}
-
-function computeSourceQualityBucket(longEdge: number | null): SourceQualityBucket {
-  if (longEdge === null) return "UNKNOWN"
-  if (longEdge < 1200) return "LOW_SOURCE"
-  if (longEdge < 2500) return "STANDARD_SOURCE"
-  if (longEdge < 4000) return "HIGH_SOURCE"
-  return "VERY_HIGH_SOURCE"
-}
-
-function computeDownloadQualityCeiling(longEdge: number | null): DownloadQualityCeiling {
-  if (longEdge === null) return "UNKNOWN"
-  if (longEdge < 1600) return "LOW"
-  if (longEdge < 2500) return "MEDIUM"
-  return "HIGH"
-}
-
-function mapResolutionUnit(value: string | undefined): string | null {
-  if (!value) return null
-  if (value === "inch" || value === "cm") return value
-  return null
 }
 
 function recordDistributionCounts(distributions: DistributionCounts, computed: ComputedMetadataRow) {
@@ -629,31 +370,19 @@ function recordFailedAssetSample(summary: Summary, sample: FailedAssetSample) {
   summary.failedAssetSamples.push(sample)
 }
 
-function mapBitDepth(depth: string | undefined): number | null {
-  if (!depth) return null
-  const normalized = depth.toLowerCase()
-  if (normalized.includes("uchar") || normalized === "char") return 8
-  if (normalized.includes("ushort")) return 16
-  if (normalized.includes("uint")) return 32
-  if (normalized.includes("float")) return 32
-  if (normalized.includes("double")) return 64
-  const parsed = Number.parseInt(normalized, 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
-}
-
-function toPositiveInt(value: number | undefined): number | null {
-  if (value === undefined || !Number.isFinite(value)) return null
-  const rounded = Math.round(value)
-  return rounded > 0 ? rounded : null
-}
-
 async function selectCandidates(pool: PgPool, options: CliOptions): Promise<CandidateRow[]> {
-  const shouldOnlySelectMissing = options.onlyMissing && !options.assetId
+  const shouldOnlySelectMissing = options.onlyMissing && !options.assetId && !options.retryFailed
   const params: unknown[] = [shouldOnlySelectMissing]
   const filters = [
     "ia.media_type = 'IMAGE'",
     "($1::boolean = false or iam.id is null)",
   ]
+
+  if (options.retryFailed) {
+    filters.push("iam.metadata_scan_status = 'FAILED'")
+    filters.push("ia.status = 'ACTIVE'")
+    filters.push("ia.original_exists_in_storage = true")
+  }
 
   if (options.assetId) {
     params.push(options.assetId)
@@ -703,6 +432,7 @@ function printStartup(options: CliOptions, selected: number) {
         offset: options.offset,
         batchSize: options.batchSize,
         onlyMissing: options.onlyMissing,
+        retryFailed: options.retryFailed,
         assetId: options.assetId ?? null,
         originalsBucket: maskBucketName(getR2Config().originalsBucket),
       },
@@ -758,6 +488,7 @@ function parseArgs(args: string[]): CliOptions {
     batchSize: 25,
     offset: 0,
     onlyMissing: true,
+    retryFailed: false,
     r2RetryAttempts: 3,
     r2RetryBaseMs: 250,
     r2TimeoutMs: 60_000,
@@ -779,6 +510,10 @@ function parseArgs(args: string[]): CliOptions {
     else if (arg === "--offset") options.offset = parseNonNegativeInteger(next(), "offset")
     else if (arg === "--only-missing") options.onlyMissing = true
     else if (arg === "--include-existing") options.onlyMissing = false
+    else if (arg === "--retry-failed") {
+      options.retryFailed = true
+      options.onlyMissing = false
+    }
     else if (arg === "--asset-id") options.assetId = parseUuid(next(), "asset-id")
     else if (arg === "--r2-retry-attempts") options.r2RetryAttempts = parsePositiveInteger(next(), "r2-retry-attempts")
     else if (arg === "--r2-retry-base-ms") options.r2RetryBaseMs = parsePositiveInteger(next(), "r2-retry-base-ms")
@@ -823,6 +558,7 @@ Options:
   --offset <n>              Default: 0
   --only-missing            Default behavior: only assets without image_assets_metadata
   --include-existing        Scan assets even when metadata row exists
+  --retry-failed            Re-scan ACTIVE assets with FAILED metadata and verified originals
   --asset-id <uuid>
   --r2-retry-attempts <n>   Default: 3
   --r2-retry-base-ms <n>    Default: 250
@@ -1151,12 +887,7 @@ function r2ErrorInfo(error: unknown) {
 }
 
 function conciseError(error: unknown) {
-  const message = errorMessage(error)
-  return message.length > 240 ? `${message.slice(0, 237)}...` : message
-}
-
-function truncateMetadataScanError(error: string) {
-  return error.length > 500 ? `${error.slice(0, 497)}...` : error
+  return conciseMetadataError(error)
 }
 
 function errorMessage(error: unknown) {

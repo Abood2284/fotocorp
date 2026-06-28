@@ -17,6 +17,7 @@ import {
   getHelpMediaDeliveryResponse,
   reorderHelpMedia,
   updateHelpMediaMetadata,
+  uploadHelpMediaBytes,
 } from "../../../lib/help-center/help-media-service"
 import {
   createHelpArticle,
@@ -118,8 +119,6 @@ staffHelpRoutes.get("/api/v1/staff/help/categories", async (c) => {
   return json({ ok: true as const, items })
 })
 
-staffHelpRoutes.all("/api/v1/staff/help/categories", () => methodNotAllowed())
-
 staffHelpRoutes.post(
   "/api/v1/staff/help/categories",
   zValidator("json", createHelpCategoryBodySchema),
@@ -130,6 +129,8 @@ staffHelpRoutes.post(
     return json({ ok: true as const, category }, 201)
   },
 )
+
+staffHelpRoutes.all("/api/v1/staff/help/categories", () => methodNotAllowed())
 
 staffHelpRoutes.patch(
   "/api/v1/staff/help/categories/:categoryId",
@@ -150,8 +151,6 @@ staffHelpRoutes.get("/api/v1/staff/help/tags", async (c) => {
   return json({ ok: true as const, items })
 })
 
-staffHelpRoutes.all("/api/v1/staff/help/tags", () => methodNotAllowed())
-
 staffHelpRoutes.post(
   "/api/v1/staff/help/tags",
   zValidator("json", createHelpTagBodySchema),
@@ -162,6 +161,8 @@ staffHelpRoutes.post(
     return json({ ok: true as const, tag }, 201)
   },
 )
+
+staffHelpRoutes.all("/api/v1/staff/help/tags", () => methodNotAllowed())
 
 staffHelpRoutes.get(
   "/api/v1/staff/help/articles",
@@ -183,8 +184,6 @@ staffHelpRoutes.get(
     return json({ ok: true as const, items: result.items, nextCursor: result.nextCursor })
   },
 )
-
-staffHelpRoutes.all("/api/v1/staff/help/articles", () => methodNotAllowed())
 
 staffHelpRoutes.get(
   "/api/v1/staff/help/articles/:slug",
@@ -247,6 +246,8 @@ staffHelpRoutes.post(
     )
   },
 )
+
+staffHelpRoutes.all("/api/v1/staff/help/articles", () => methodNotAllowed())
 
 staffHelpRoutes.patch(
   "/api/v1/staff/help/articles/:articleId",
@@ -326,6 +327,18 @@ staffHelpRoutes.post(
     const body = c.req.valid("json")
     const media = await confirmHelpMediaUpload(db, c.env, articleId, mediaId, body, staff.id)
     return json({ ok: true as const, media })
+  },
+)
+
+staffHelpRoutes.put(
+  "/api/v1/staff/help/articles/:articleId/media/:mediaId/upload",
+  zValidator("param", helpArticleMediaParamsSchema),
+  async (c) => {
+    const { db, staff } = await requireHelpManager(c)
+    const { articleId, mediaId } = c.req.valid("param")
+    const body = await c.req.arrayBuffer()
+    await uploadHelpMediaBytes(db, c.env, articleId, mediaId, body, c.req.header("content-type") ?? null, staff.id)
+    return json({ ok: true as const })
   },
 )
 

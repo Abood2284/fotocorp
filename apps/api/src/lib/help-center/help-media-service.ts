@@ -10,6 +10,7 @@ import {
   headHelpCenterObject,
   HelpCenterObjectNotFoundError,
   listMissingHelpCenterS3ConfigKeys,
+  putHelpCenterObject,
   verifyHelpCenterObjectExists,
 } from "../r2-help-center"
 import {
@@ -272,6 +273,70 @@ export async function createHelpMediaUploadIntent(
     requiredHeaders: { "Content-Type": mimeType },
     expiresAt,
   }
+}
+
+export async function uploadHelpMediaBytes(
+  db: DrizzleClient,
+  env: Env,
+  articleId: string,
+  mediaId: string,
+  body: ArrayBuffer,
+  contentTypeHeader: string | null,
+  staffId: string,
+): Promise<void> {
+  assertHelpCenterStorageConfigured(env)
+  const row = await requireHelpMediaForArticle(db, articleId, mediaId)
+  const storageKey = row.storageKey?.trim()
+  if (!storageKey) {
+    throw new AppError(400, "HELP_MEDIA_INCOMPLETE", "Help media upload is missing a storage key.")
+  }
+
+  if (row.uploadStatus !== "PENDING") {
+    throw new AppError(409, "HELP_MEDIA_UPLOAD_NOT_PENDING", "Help media upload is no longer pending.")
+  }
+
+  const byteLength = body.byteLength
+  if (byteLength < 1) {
+    throw new AppError(400, "INVALID_HELP_MEDIA_FILE", "Uploaded file is empty.")
+  }
+
+  const expectedMime = row.mimeType?.trim().toLowerCase() ?? ""
+  const contentType = (contentTypeHeader?.trim().toLowerCase() || expectedMime || "application/octet-stream").split(";")[0]!
+  if (expectedMime && contentType !== expectedMime) {
+    throw new AppError(400, "INVALID_HELP_MEDIA_TYPE", "Uploaded content type does not match the upload intent.")
+  }
+
+  const resolvedType = resolveHelpMediaType(expectedMime || contentType)
+  if (!resolvedType || resolvedType !== row.mediaType) {
+    throw new AppError(400, "INVALID_HELP_MEDIA_TYPE", "Only PNG, JPG, WEBP, MP4, and WEBM files are supported.")
+  }
+
+  if (resolvedType === "IMAGE" && byteLength > HELP_IMAGE_MAX_BYTES) {
+    throw new AppError(400, "INVALID_HELP_MEDIA_FILE", "Image files must be under 10 MB.")
+  }
+
+  if (resolvedType === "VIDEO" && byteLength > HELP_VIDEO_MAX_BYTES) {
+    throw new AppError(400, "INVALID_HELP_MEDIA_FILE", "Video files must be under 100 MB.")
+  }
+
+  if (row.fileSizeBytes != null && byteLength > row.fileSizeBytes * 1.1) {
+    throw new AppError(400, "INVALID_HELP_MEDIA_FILE", "Uploaded file is larger than declared size.")
+  }
+
+  try {
+    await putHelpCenterObject(env, storageKey, body, expectedMime || contentType)
+  } catch {
+    throw new AppError(502, "HELP_MEDIA_UPLOAD_FAILED", "Could not store help media in cloud storage.")
+  }
+
+  await db
+    .update(helpArticleMedia)
+    .set({
+      fileSizeBytes: byteLength,
+      updatedAt: new Date(),
+      updatedByStaffId: staffId,
+    })
+    .where(eq(helpArticleMedia.id, mediaId))
 }
 
 export async function confirmHelpMediaUpload(
