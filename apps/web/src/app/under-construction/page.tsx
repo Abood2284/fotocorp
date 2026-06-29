@@ -17,6 +17,7 @@ export default function UnderConstructionPage() {
           width={1400}
           height={425}
           priority
+          loading="eager"
           className="mb-10 h-8 w-auto sm:h-9"
         />
 

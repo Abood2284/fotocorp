@@ -28,6 +28,7 @@ export function FotocorpLogoLink({
         width={1400}
         height={425}
         priority={priority}
+        loading={priority ? "eager" : "lazy"}
         className={cn("h-7 w-auto sm:h-8", imageClassName)}
       />
     </Link>

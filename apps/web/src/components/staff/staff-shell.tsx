@@ -62,6 +62,7 @@ function Sidebar({
             height={425}
             className="h-6 w-auto"
             priority
+            loading="eager"
           />
         </Link>
         <button onClick={() => setCollapsed(!collapsed)} className="flex h-8 w-8 items-center justify-center rounded-md text-staff-500 hover:bg-staff-200 hover:text-staff-950 transition-colors">

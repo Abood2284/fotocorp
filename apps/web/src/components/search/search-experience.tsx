@@ -671,7 +671,7 @@ export function SearchExperience({
                 <CatalogSearchActiveChips chips={filterChips} onClearAll={clearAll} />
               </div>
 
-              {(searchActive || isBrowseLatest) && !isCaricatureSegment && (
+              {searchActive && !isCaricatureSegment && (
                 <div className="flex shrink-0 items-center gap-6 sm:border-l sm:border-border sm:pl-4">
                   <ResultMetric
                     compact

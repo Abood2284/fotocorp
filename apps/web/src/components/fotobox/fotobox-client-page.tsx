@@ -229,6 +229,8 @@ export function FotoboxClientPage({ initialServerBoards, isSubscriber }: Fotobox
                 alt="Fotocorp"
                 width={140}
                 height={42}
+                priority
+                loading="eager"
                 className="h-6 w-auto sm:h-7"
               />
             </Link>
