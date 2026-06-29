@@ -28,6 +28,7 @@ FC + DD + MM + YY + sequence
 - An image becomes **`ACTIVE` + `PUBLIC`** only after required derivatives (`THUMB`, `CARD`, `DETAIL`) are **`READY`** in `image_derivatives`.
 - **Categories (PR-16I):** `photo_events.category_id` is the event default; `image_assets.category_id` is the canonical asset category. Approve + publish completion set asset `category_id` from the event when still null (never overwrite non-null). Public catalog resolves **asset → event → unavailable** for display and category facets.
 - **Admin approval alone does not go-live an asset.** Approval assigns Fotokey, copies the staging original to the canonical originals bucket, and enqueues publish job rows; visibility flips only after derivative generation completes successfully.
+- **Original technical metadata:** After the publish worker loads the canonical original, it runs Sharp metadata extraction (shared `@fotocorp/original-image-metadata`) and upserts `image_assets_metadata` in the same DB transaction as derivative upserts and `ACTIVE`/`PUBLIC` promotion. Metadata extraction failure is non-blocking (asset still goes live; row is recorded as `FAILED` for ops backfill).
 
 ## Runtime: API processor vs Node `apps/jobs`
 

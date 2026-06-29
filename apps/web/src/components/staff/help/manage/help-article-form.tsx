@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 import { HelpCategorySelector } from "@/components/staff/help/manage/help-category-selector"
-import { HelpMarkdownEditor } from "@/components/staff/help/manage/help-markdown-editor"
+import { HelpRichTextEditor } from "@/components/staff/help/manage/help-rich-text-editor"
 import { HelpRoleSelector } from "@/components/staff/help/manage/help-role-selector"
 import { HelpTagSelector } from "@/components/staff/help/manage/help-tag-selector"
 import { HelpMediaManager } from "@/components/staff/help/manage/help-media-manager"
@@ -185,9 +185,10 @@ export function HelpArticleForm({
 
       <section className="space-y-4 rounded-lg border border-border bg-card p-5">
         <h2 className="font-serif text-lg font-semibold text-foreground">Content</h2>
-        <HelpMarkdownEditor
+        <HelpRichTextEditor
           value={values.bodyMarkdown}
           onChange={(bodyMarkdown) => updateValues({ bodyMarkdown })}
+          articleId={articleId}
           error={errors.bodyMarkdown}
         />
       </section>

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { getHelpMediaDisplayUrl } from "../src/lib/staff/help-media"
-import { validateHelpMediaFile } from "../src/lib/staff/help-media-validation"
+import {
+  inferHelpMediaMimeType,
+  normalizeHelpMediaUploadFile,
+  validateHelpMediaFile,
+} from "../src/lib/staff/help-media-validation"
 
 describe("help media web helpers", () => {
   it("builds same-origin media display URLs", () => {
@@ -32,5 +36,15 @@ describe("help media web helpers", () => {
     const result = validateHelpMediaFile({ type: "image/png", size: 11 * 1024 * 1024, name: "a.png" } as File)
     assert.equal(result.ok, false)
     if (!result.ok) assert.match(result.message, /10 MB/)
+  })
+
+  it("normalizes clipboard screenshots without filename or mime type", () => {
+    const clipboardFile = { type: "", size: 2048, name: "" } as File
+    const normalized = normalizeHelpMediaUploadFile(clipboardFile, { fallbackMimeType: "image/png" })
+
+    assert.equal(normalized.type, "image/png")
+    assert.match(normalized.name, /^pasted-\d+\.png$/)
+    assert.equal(inferHelpMediaMimeType(normalized), "image/png")
+    assert.deepEqual(validateHelpMediaFile(normalized), { ok: true, mediaType: "IMAGE" })
   })
 })

@@ -19,13 +19,13 @@ export interface CaricatureBlurredPreviewProfile {
 export const CARICATURE_BLURRED_PREVIEW_PROFILES: Record<CaricaturePreviewVariant, CaricatureBlurredPreviewProfile> = {
   card: {
     maxWidth: 480,
-    blurSigma: 28,
+    blurSigma: 22,
     qualities: [62, 58, 54],
     targetMaxBytes: 180 * 1024,
   },
   detail: {
     maxWidth: 900,
-    blurSigma: 22,
+    blurSigma: 17,
     qualities: [68, 64, 60],
     targetMaxBytes: 320 * 1024,
   },

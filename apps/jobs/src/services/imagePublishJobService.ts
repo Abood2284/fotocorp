@@ -20,6 +20,11 @@
 import { PREVIEW_MIME_TYPE } from "../media/publishImageDerivatives"
 import type { PoolClient, QueryResultRow } from "../db/client"
 import { getJobsPool, withJobsTransaction } from "../db/client"
+import type { OriginalImageMetadataRow } from "@fotocorp/original-image-metadata"
+import {
+  upsertImageAssetsMetadata,
+  upsertImageAssetsMetadataFailed,
+} from "@fotocorp/original-image-metadata/persist"
 
 export interface PublishJobRow {
   id: string
@@ -79,6 +84,8 @@ export interface CompletePublishItemInput {
   itemId: string
   imageAssetId: string
   derivatives: PublishDerivativeRowInput[]
+  technicalMetadata?: OriginalImageMetadataRow | null
+  technicalMetadataError?: string | null
 }
 
 export interface MarkFailureInput {
@@ -380,6 +387,15 @@ export class ImagePublishJobService {
 
   async completeSuccessfulPublishItem(input: CompletePublishItemInput): Promise<void> {
     await withJobsTransaction(this.databaseUrl, async (client) => {
+      if (input.technicalMetadata) {
+        await upsertImageAssetsMetadata(client, input.technicalMetadata)
+      } else if (input.technicalMetadataError) {
+        await upsertImageAssetsMetadataFailed(client, {
+          imageAssetId: input.imageAssetId,
+          error: input.technicalMetadataError,
+        })
+      }
+
       for (const derivative of input.derivatives) {
         await client.query(
           `

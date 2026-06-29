@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@fotocorp/media-preview": "workspace:*",
+    "@fotocorp/original-image-metadata": "workspace:*",
     "pg": "^8.20.0",
     "sharp": "^0.34.5"
   },

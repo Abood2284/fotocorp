@@ -7,7 +7,8 @@ import { messageForDownloadRedirectError } from "@/lib/download-error-messages"
 import type { PublicAsset } from "@/features/assets/types"
 import { AssetPreviewChrome } from "@/components/assets/asset-preview-chrome"
 import { parseWhoIsInPicture } from "@/lib/who-is-in-picture"
-import { AssetDetailActions, type AssetDetailAccessState, type AssetSizeOption } from "@/components/assets/asset-detail-actions"
+import { AssetDetailActions, type AssetDetailAccessState } from "@/components/assets/asset-detail-actions"
+import { buildPublicAssetSizeOptions } from "@/lib/assets/public-asset-size-options"
 import { RelatedGallery } from "@/components/assets/related-gallery"
 import { ExpandableCaption } from "@/components/assets/expandable-caption"
 import { isLandscapePreview } from "@/lib/asset-preview-orientation"
@@ -22,33 +23,6 @@ export const dynamic = "force-dynamic"
 
 const FOTOCORP_EDITORIAL_RESTRICTIONS =
   "Contact Fotocorp for all commercial or promotional uses. Full editorial rights apply in India; additional territories are available under licence. Restricted editorial use may apply outside approved regions—please contact our Mumbai office for clearance."
-
-const SIZE_OPTIONS: AssetSizeOption[] = [
-  {
-    id: "web",
-    label: "Low",
-    dimensions: "1200 px max edge • 72 dpi",
-    description: "Best for web and screen preview",
-    selectable: true,
-    downloadAvailable: true,
-  },
-  {
-    id: "medium",
-    label: "Medium",
-    dimensions: "2400 px max edge • 300 dpi",
-    description: "Best for editorial and digital publishing",
-    selectable: true,
-    downloadAvailable: true,
-  },
-  {
-    id: "large",
-    label: "High",
-    dimensions: "Maximum available resolution • 300 dpi",
-    description: "Best for print and archive delivery",
-    selectable: true,
-    downloadAvailable: true,
-  },
-]
 
 export async function generateMetadata({ params }: AssetDetailPageProps) {
   const { id } = await params
@@ -97,6 +71,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
   const relatedHeaderLabel = formatRelatedHeaderLabel(relatedResult.source, relatedResult.totalCount, asset)
   const searchDefaultValue = resolvedSearchParams?.q ?? ""
   const actionMetadataRows = getActionMetadataRows(asset)
+  const sizeOptions = buildPublicAssetSizeOptions(asset.technicalMetadata)
 
   // Build back button destination (takes the user back to the active event/category context)
   let backHref = "/search"
@@ -336,7 +311,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
               accessState={accessState}
               assetHref={assetHref}
               downloadHref={`/api/assets/${asset.id}/download`}
-              sizeOptions={SIZE_OPTIONS}
+              sizeOptions={sizeOptions}
               restrictions={FOTOCORP_EDITORIAL_RESTRICTIONS}
               metadataRows={actionMetadataRows}
               whoIsInPictureNames={whoIsInPictureNames}

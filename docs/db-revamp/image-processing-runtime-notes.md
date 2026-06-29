@@ -39,6 +39,6 @@ Schema-only support (Drizzle table `image_assets_metadata`, FK → `image_assets
 
 - Stores **original file technical metadata** (pixel dimensions, DPI, format, file size, orientation, color space, embedded profile flags, scan status, computed quality fields).
 - **Separate from catalog/search metadata** on `image_assets` (`who_is_in_picture`, `caption`, `keywords`, etc.).
-- Will be populated later by a **Sharp-based metadata scanner** (Node/`apps/jobs` context — not Worker request path).
-- Will later drive **dynamic Medium/Low download generation** via `source_quality_bucket`, `download_quality_ceiling`, `can_generate_medium`, and `can_generate_low`.
+- Populated automatically when **FOTOCORP publish jobs** complete (`apps/jobs` `ImagePublishProcessor` reads the canonical original buffer and upserts `image_assets_metadata` in the same transaction as go-live). The ops scanner (`media:scan-original-metadata`) remains for legacy backfill and `--retry-failed` repair.
+- Drives **dynamic Medium/Low download generation** via `source_quality_bucket`, `download_quality_ceiling`, `can_generate_medium`, and `can_generate_low`.
 - **Pixel dimensions** (`original_width` / `original_height`, long/short edge, megapixels) are the primary quality basis for bucket/ceiling computation; **DPI is stored** (`original_dpi`, `original_resolution_unit`) as supporting metadata.

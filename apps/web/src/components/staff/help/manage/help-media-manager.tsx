@@ -8,15 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import type { HelpArticleMediaItem } from "@/lib/api/staff-help-api"
 import { StaffApiError } from "@/lib/api/staff-api"
-import { putContributorFileToSignedUrl } from "@/lib/api/contributor-api"
 import { getHelpMediaDisplayUrl } from "@/lib/staff/help-media"
 import {
   defaultHelpMediaTitle,
   nextHelpMediaSortOrder,
-  readHelpImageDimensions,
-  readHelpVideoMetadata,
   validateHelpMediaFile,
 } from "@/lib/staff/help-media-validation"
+import { uploadHelpArticleMedia } from "@/lib/staff/help-media-upload-client"
 import { staffHelpClientJson } from "@/lib/staff/help-client"
 
 interface HelpMediaManagerProps {
@@ -84,55 +82,23 @@ export function HelpMediaManager({ articleId, initialItems }: HelpMediaManagerPr
 
     startTransition(async () => {
       try {
-        const intent = await staffHelpClientJson<{
-          ok: true
-          mediaId: string
-          uploadUrl: string
-          requiredHeaders: { "Content-Type": string }
-        }>(`/articles/${articleId}/media/upload-intent`, {
-          method: "POST",
-          body: {
-            filename: selectedFile.name,
-            mimeType: selectedFile.type,
-            fileSizeBytes: selectedFile.size,
-            mediaType: validation.mediaType,
-            title: uploadForm.title.trim() || defaultHelpMediaTitle(selectedFile),
-            description: uploadForm.description.trim() || null,
-            sortOrder: Number.parseInt(uploadForm.sortOrder || "0", 10),
-          },
+        const media = await uploadHelpArticleMedia({
+          articleId,
+          file: selectedFile,
+          title: uploadForm.title.trim() || defaultHelpMediaTitle(selectedFile),
+          description: uploadForm.description.trim() || null,
+          sortOrder: Number.parseInt(uploadForm.sortOrder || "0", 10),
+          existingSortOrders: items,
+          onProgress: (percent) => setUploadProgress(percent),
         })
 
-        const putResult = await putContributorFileToSignedUrl(
-          intent.uploadUrl,
-          selectedFile,
-          intent.requiredHeaders["Content-Type"],
-          (percent) => setUploadProgress(percent),
-        )
-
-        if (!putResult.ok) {
-          throw new StaffApiError(putResult.status, "HELP_MEDIA_UPLOAD_FAILED", "Upload to storage failed.")
-        }
-
-        const confirmBody =
-          validation.mediaType === "IMAGE"
-            ? await readHelpImageDimensions(selectedFile)
-            : await readHelpVideoMetadata(selectedFile)
-
-        const confirmResponse = await staffHelpClientJson<{ ok: true; media: HelpArticleMediaItem }>(
-          `/articles/${articleId}/media/${intent.mediaId}/confirm`,
-          {
-            method: "POST",
-            body: confirmBody,
-          },
-        )
-
         toast({ message: "Media uploaded.", variant: "success" })
-        refreshList([...items, confirmResponse.media])
+        refreshList([...items, media])
         setSelectedFile(null)
         setUploadForm({
           title: "",
           description: "",
-          sortOrder: String(nextHelpMediaSortOrder([...items, confirmResponse.media])),
+          sortOrder: String(nextHelpMediaSortOrder([...items, media])),
         })
         setUploadProgress(null)
       } catch (caught) {

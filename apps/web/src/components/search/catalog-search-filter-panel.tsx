@@ -5,6 +5,7 @@ import type React from "react"
 
 import type { PublicAssetFiltersResponse, PublicAssetSort } from "@/features/assets/types"
 import { filterVisibleCatalogCategories } from "@/lib/catalog/visible-categories"
+import { PaginationPageInput } from "@/components/shared/pagination-page-input"
 import { cn, formatInteger } from "@/lib/utils"
 
 export interface CatalogSearchParams {
@@ -252,6 +253,7 @@ export function CatalogSearchPagination({
   disabled,
   onPrev,
   onNext,
+  onGoToPage,
 }: {
   currentPage: number
   totalPages: number
@@ -260,6 +262,7 @@ export function CatalogSearchPagination({
   disabled?: boolean
   onPrev: () => void
   onNext: () => void
+  onGoToPage: (page: number) => void
 }) {
   return (
     <div className="flex flex-wrap items-center justify-center gap-3 py-6 md:gap-4">
@@ -275,9 +278,12 @@ export function CatalogSearchPagination({
       ) : null}
 
       <div className="inline-flex items-center gap-3 px-2">
-        <div className="inline-flex h-10 w-10 items-center justify-center border border-border bg-background text-base font-medium text-foreground">
-          {currentPage}
-        </div>
+        <PaginationPageInput
+          currentPage={currentPage}
+          totalPages={totalPages}
+          disabled={disabled}
+          onGoToPage={onGoToPage}
+        />
         <span className="text-base font-medium text-foreground">of {totalPages}</span>
       </div>
 

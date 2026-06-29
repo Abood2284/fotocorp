@@ -30,6 +30,11 @@ import type { ClaimedPublishJob, PublishJobItemRow } from "./imagePublishJobServ
 import { ImagePublishJobService } from "./imagePublishJobService"
 import { schedulePublicEventFeedSyncForAsset } from "../lib/public-event-feed-projection"
 import { notifyTypesenseSyncAsset } from "../lib/typesense-sync-client"
+import {
+  computeOriginalImageMetadata,
+  conciseMetadataError,
+  type OriginalImageMetadataRow,
+} from "@fotocorp/original-image-metadata"
 
 function guessOriginalContentType(canonicalKey: string): string {
   const lower = canonicalKey.toLowerCase()
@@ -182,6 +187,23 @@ export class ImagePublishProcessor {
       await r2PutCanonicalOriginal(r2, canonicalKey, original, guessOriginalContentType(canonicalKey))
     }
 
+    let technicalMetadata: OriginalImageMetadataRow | null = null
+    let technicalMetadataError: string | null = null
+    try {
+      technicalMetadata = await computeOriginalImageMetadata({
+        imageAssetId: item.imageAssetId,
+        buffer: original,
+      })
+    } catch (error: unknown) {
+      technicalMetadataError = `publish_metadata_failed: ${conciseMetadataError(error)}`
+      console.warn("[fotocorp-jobs.publish-metadata-failed]", {
+        itemId: item.id,
+        imageAssetId: item.imageAssetId,
+        fotokey: item.fotokey,
+        error: conciseMetadataError(error),
+      })
+    }
+
     const generated: Record<PublishVariant, GeneratedPublishPreview> = {
       THUMB: await generatePublishDerivative(original, "THUMB", item.fotokey),
       CARD: await generatePublishDerivative(original, "CARD", item.fotokey),
@@ -211,7 +233,9 @@ export class ImagePublishProcessor {
     await this.jobService.completeSuccessfulPublishItem({
       itemId: item.id,
       imageAssetId: item.imageAssetId,
-      derivatives
+      derivatives,
+      technicalMetadata,
+      technicalMetadataError,
     })
 
     if (this.jobsEnv.databaseUrl) {

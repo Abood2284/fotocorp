@@ -14,6 +14,7 @@ import type {
 import { PublicAssetCard } from "@/components/assets/public-asset-card"
 import { PublicAssetGrid } from "@/components/assets/public-asset-grid"
 import { EmptyState } from "@/components/shared/empty-state"
+import { PaginationPageInput } from "@/components/shared/pagination-page-input"
 import {
   CATALOG_MONTH_OPTIONS,
   CatalogSearchActiveChips,
@@ -559,6 +560,13 @@ export function SearchExperience({
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
+  function goToPage(page: number) {
+    if (!isPagePagination) return
+
+    updateParams({ page: page > 1 ? page : undefined }, false)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
   const currentIndex = history.indexOf(initialParams.cursor)
   const displayPage = isPagePagination
     ? (isEventsMode
@@ -741,6 +749,7 @@ export function SearchExperience({
                     disabled={isPending}
                     onPrev={goToPrev}
                     onNext={goToNext}
+                    onGoToPage={isPagePagination ? goToPage : undefined}
                   />
                 </>
               ) : isCaricatureFetching ? (
@@ -779,6 +788,7 @@ export function SearchExperience({
                     disabled={isPending}
                     onPrev={goToPrev}
                     onNext={goToNext}
+                    onGoToPage={isPagePagination ? goToPage : undefined}
                   />
                 </>
               ) : isResultsFetching ? (
@@ -826,6 +836,7 @@ export function SearchExperience({
                   disabled={isPending}
                   onPrev={goToPrev}
                   onNext={goToNext}
+                  onGoToPage={isPagePagination ? goToPage : undefined}
                 />
               </>
             ) : isResultsFetching ? (
@@ -919,6 +930,7 @@ function Pagination({
   disabled,
   onPrev,
   onNext,
+  onGoToPage,
 }: {
   currentPage: number
   totalPages: number
@@ -927,6 +939,7 @@ function Pagination({
   disabled?: boolean
   onPrev: () => void
   onNext: () => void
+  onGoToPage?: (page: number) => void
 }) {
   return (
     <div className="flex flex-wrap items-center justify-center gap-3 py-8 md:gap-4 md:py-10">
@@ -943,9 +956,18 @@ function Pagination({
       )}
 
       <div className="inline-flex items-center gap-3 px-2">
-        <div className="inline-flex h-10 w-10 items-center justify-center border border-border bg-background text-base font-medium text-foreground">
-          {currentPage}
-        </div>
+        {onGoToPage ? (
+          <PaginationPageInput
+            currentPage={currentPage}
+            totalPages={totalPages}
+            disabled={disabled}
+            onGoToPage={onGoToPage}
+          />
+        ) : (
+          <div className="inline-flex h-10 w-10 items-center justify-center border border-border bg-background text-base font-medium text-foreground">
+            {currentPage}
+          </div>
+        )}
         <span className="text-base font-medium text-foreground">of {totalPages}</span>
       </div>
 

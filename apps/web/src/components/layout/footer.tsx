@@ -34,7 +34,10 @@ export function Footer() {
           <div className="max-w-sm">
             <FotocorpLogoLink imageClassName="h-8 sm:h-9" />
             <p className="mt-4 text-sm leading-6 text-neutral-500">
-              Authentic editorial archive — preview watermarked assets, then license clean files when you are ready.
+              India&apos;s Premier news photo agency, with a collection of 1 million editorial images
+            </p>
+            <p className="mt-2 text-sm leading-6 text-neutral-500">
+              Commissioned Assignments, Event Photography, Corporate Shoots
             </p>
           </div>
 

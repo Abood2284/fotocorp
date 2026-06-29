@@ -1,9 +1,9 @@
 "use client"
 
-import { ExternalLink, X, Loader2, ZoomIn, RefreshCw } from "lucide-react"
+import { ExternalLink, X, Loader2, ZoomIn, RefreshCw, Trash2 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 
-import { fetchAdminAssetAction, updateAdminAssetEditorialAction, updateAdminAssetStateAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
+import { fetchAdminAssetAction, updateAdminAssetEditorialAction, updateAdminAssetStateAction, deleteAdminAssetAction } from "@/app/(staff)/staff/(workspace)/catalog/actions"
 import type { AdminCatalogAssetItem, AdminCatalogDerivativeSummary, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
 import { PreviewImage } from "@/components/assets/preview-image"
 import { Badge } from "@/components/ui/badge"
@@ -104,6 +104,21 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
         onUpdate()
       } catch {
         alert("Failed to update state. Ensure preview is ready if publishing.")
+      }
+    })
+  }
+
+  const handleDeleteIncompleteUpload = () => {
+    if (!asset?.canDeleteIncompleteUpload) return
+    const label = getCatalogImportMatchName(asset) ?? asset.originalFileName ?? "this asset"
+    if (!window.confirm(`Delete ${label}? This removes the failed upload record so the file can be uploaded again.`)) return
+    startTransition(async () => {
+      try {
+        await deleteAdminAssetAction(asset.id)
+        onUpdate()
+        onClose()
+      } catch {
+        alert("Could not delete this asset. It may no longer be eligible for removal.")
       }
     })
   }
@@ -386,6 +401,17 @@ export function StaffCatalogDetailSidebar({ assetId, onClose, onUpdate, filters 
                   >
                     Reject / Archive
                   </button>
+                  {asset.canDeleteIncompleteUpload ? (
+                    <button
+                      type="button"
+                      onClick={handleDeleteIncompleteUpload}
+                      disabled={isSaving}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-800 hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      <Trash2 size={15} />
+                      Delete upload
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>

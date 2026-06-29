@@ -6,10 +6,7 @@ import { StaffCatalogClient } from "@/components/staff/catalog/staff-catalog-cli
 import { ContextualHelpPanel } from "@/components/staff/help/contextual-help-panel"
 import { getStaffCookieHeader } from "@/lib/staff-session"
 import type { AdminCatalogAssetsResponse, AdminCatalogFilters } from "@/features/assets/admin-catalog-types"
-import {
-  hasActiveCatalogFilters,
-  listAllFilteredAdminCatalogAssets,
-} from "@/lib/server/staff-catalog-list"
+import { hasActiveCatalogFilters } from "@/lib/staff-catalog-filters"
 
 interface StaffCatalogPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>
@@ -26,10 +23,7 @@ export default async function StaffCatalogPage({ searchParams }: StaffCatalogPag
 
   let response: AdminCatalogAssetsResponse | null = null
   try {
-    response = await timeStaffCatalogPageCall(
-      filtersActive ? "listAllFilteredAdminCatalogAssets" : "listAdminAssets",
-      () => (filtersActive ? listAllFilteredAdminCatalogAssets(query) : listAdminAssets(query)),
-    )
+    response = await timeStaffCatalogPageCall("listAdminAssets", () => listAdminAssets(query))
   } catch (error) {
     console.error(JSON.stringify({
       event: "staff_catalog_page_data_call_failed",
@@ -110,9 +104,8 @@ const fallbackFilters: AdminCatalogFilters = {
     { status: "APPROVED", assetCount: 0 },
     { status: "ACTIVE", assetCount: 0 },
     { status: "ARCHIVED", assetCount: 0 },
-    { status: "DELETED", assetCount: 0 },
-    { status: "MISSING_ORIGINAL", assetCount: 0 },
-    { status: "UNKNOWN", assetCount: 0 },
+    { status: "MISSING_CAPTION", assetCount: 0 },
+    { status: "MISSING_WHO_IS_IN_PICTURE", assetCount: 0 },
   ],
   categories: [],
   events: [],

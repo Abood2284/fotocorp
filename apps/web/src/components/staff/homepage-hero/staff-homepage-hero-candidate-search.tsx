@@ -269,6 +269,7 @@ export function StaffHomepageHeroCandidateSearch({
               disabled={isFetching || disabled}
               onPrev={() => updateParams({ page: Math.max((params.page ?? 1) - 1, 1) })}
               onNext={() => updateParams({ page: (params.page ?? 1) + 1 })}
+              onGoToPage={(page) => updateParams({ page })}
             />
           ) : null}
 

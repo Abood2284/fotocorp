@@ -23,6 +23,7 @@ import {
   getStaffCatalogPreviewVariant,
 } from "@/lib/staff-catalog-preview"
 import { resolveCatalogBulkEditScope } from "@/lib/staff-catalog-metadata"
+import { formatCatalogStatusFilterLabel, isMissingWhoIsInPicture, buildCaptionQueueHrefFromCatalogQuery, catalogQueryHasMetadataGapFilter } from "@/lib/staff-catalog-filters"
 import { cn } from "@/lib/utils"
 
 interface StaffCatalogClientProps {
@@ -231,9 +232,7 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {activeEvent.assetCount.toLocaleString()} assets in this event
-                    {filtersActive
-                      ? ` · showing all ${catalogItems.length.toLocaleString()} filtered results`
-                      : ` · showing ${catalogItems.length} on this page`}
+                    {` · showing ${catalogItems.length.toLocaleString()} on this page`}
                   </p>
                   {eventBulkEditError ? (
                     <p className="mt-1 text-xs text-destructive">{eventBulkEditError}</p>
@@ -316,7 +315,13 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
                 <HeaderSelectFilter 
                   query={queryParams} 
                   name="status" 
-                  options={[{value:"",label:"All"}, ...activeFilters.statuses.map(s => ({value: s.status, label: s.status}))]} 
+                  options={[
+                    { value: "", label: "All" },
+                    ...activeFilters.statuses.map((statusOption) => ({
+                      value: statusOption.status,
+                      label: formatCatalogStatusFilterLabel(statusOption.status),
+                    })),
+                  ]} 
                 />
               }>Status</Th>
               <Th filterControl={
@@ -364,6 +369,10 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
             ) : (
               catalogItems.map(asset => {
                 const importFileName = getCatalogImportMatchName(asset)
+                const whoIsInPictureMissing = isMissingWhoIsInPicture(asset.whoIsInPicture)
+                const displayTitle = whoIsInPictureMissing
+                  ? (asset.event?.name || asset.headline || "Untitled")
+                  : (asset.whoIsInPicture || asset.event?.name || asset.headline || "Untitled")
                 return (
                 <tr 
                   key={asset.id} 
@@ -404,8 +413,8 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
                         File: {importFileName}
                       </p>
                     ) : null}
-                    <p className="mt-0.5 truncate font-medium" title={asset.whoIsInPicture || asset.event?.name || asset.headline || "Untitled"}>{asset.whoIsInPicture || asset.event?.name || asset.headline || "Untitled"}</p>
-                    {!asset.whoIsInPicture && <span className="text-[10px] text-amber-600 font-medium">Missing who is in picture</span>}
+                    <p className="mt-0.5 truncate font-medium" title={displayTitle}>{displayTitle}</p>
+                    {whoIsInPictureMissing && <span className="text-[10px] text-amber-600 font-medium">Missing who is in picture</span>}
                     {!asset.caption && <span className="text-[10px] text-amber-600 font-medium ml-2">Missing caption</span>}
                   </td>
                   <td className="px-3 py-2"><StatusBadge tone="neutral">{asset.status}</StatusBadge></td>
@@ -421,26 +430,38 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
         </table>
       </div>
 
-          {filtersActive ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-muted-foreground">
-              Showing all {catalogItems.length.toLocaleString()} assets matching the current filters.
+              {filtersActive
+                ? `Showing ${catalogItems.length.toLocaleString()} assets matching the current filters on this page.`
+                : `Showing ${catalogItems.length.toLocaleString()} assets on this page.`}
+              {filtersActive && catalogQueryHasMetadataGapFilter(queryParams) ? (
+                <>
+                  {" "}
+                  <Link href={buildCaptionQueueHrefFromCatalogQuery(queryParams)} className="font-medium text-primary hover:underline">
+                    Open Caption Queue
+                  </Link>
+                  {" "}to work through metadata in bulk.
+                </>
+              ) : null}
             </p>
-          ) : (
-          <div className="flex items-center justify-between gap-3">
-            <Link href={`/staff/catalog?${previousQuery.toString()}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-              <ChevronLeft size={14} />
-              Reset cursor
-            </Link>
-            {initialResponse.nextCursor ? (
-              <Link href={`/staff/catalog?${nextQuery.toString()}`} className="inline-flex items-center gap-1 rounded border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
-                Load more
-                <ChevronRight size={14} />
-              </Link>
-            ) : (
-              <span className="text-xs text-muted-foreground">End of results</span>
-            )}
+            <div className="flex items-center gap-3">
+              {queryParams.has("cursor") ? (
+                <Link href={`/staff/catalog?${previousQuery.toString()}`} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                  <ChevronLeft size={14} />
+                  Reset cursor
+                </Link>
+              ) : null}
+              {initialResponse.nextCursor ? (
+                <Link href={`/staff/catalog?${nextQuery.toString()}`} className="inline-flex items-center gap-1 rounded border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+                  Load more
+                  <ChevronRight size={14} />
+                </Link>
+              ) : (
+                <span className="text-xs text-muted-foreground">End of results</span>
+              )}
+            </div>
           </div>
-          )}
         </div>
 
         {inspectAssetId && (
@@ -600,7 +621,7 @@ function buildCatalogFilterChips(query: URLSearchParams, filters: AdminCatalogFi
   if (search) chips.push({ key: "q", label: "Search", value: search })
 
   const status = query.get("status")
-  if (status) chips.push({ key: "status", label: "Status", value: status })
+  if (status) chips.push({ key: "status", label: "Status", value: formatCatalogStatusFilterLabel(status) })
 
   const visibility = query.get("visibility")
   if (visibility) chips.push({ key: "visibility", label: "Visibility", value: visibility })

@@ -11,8 +11,67 @@ export type HelpMediaValidationResult =
   | { ok: true; mediaType: "IMAGE" | "VIDEO" }
   | { ok: false; message: string }
 
-export function validateHelpMediaFile(file: File): HelpMediaValidationResult {
+interface NormalizeHelpMediaUploadFileOptions {
+  fallbackMimeType?: string
+}
+
+export function extensionForHelpMediaMime(mimeType: string) {
+  switch (mimeType.trim().toLowerCase()) {
+    case "image/png":
+      return "png"
+    case "image/jpeg":
+      return "jpg"
+    case "image/webp":
+      return "webp"
+    case "video/mp4":
+      return "mp4"
+    case "video/webm":
+      return "webm"
+    default:
+      return null
+  }
+}
+
+export function inferHelpMediaMimeType(file: Pick<File, "name" | "type">, fallbackMimeType?: string) {
   const mimeType = file.type.trim().toLowerCase()
+  if (mimeType) return mimeType
+
+  const extension = file.name.trim().toLowerCase().split(".").pop() ?? ""
+  switch (extension) {
+    case "png":
+      return "image/png"
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg"
+    case "webp":
+      return "image/webp"
+    case "mp4":
+      return "video/mp4"
+    case "webm":
+      return "video/webm"
+    default:
+      return fallbackMimeType?.trim().toLowerCase() || null
+  }
+}
+
+export function normalizeHelpMediaUploadFile(file: File, options: NormalizeHelpMediaUploadFileOptions = {}) {
+  const resolvedMime = inferHelpMediaMimeType(file, options.fallbackMimeType)
+  if (!resolvedMime) return file
+
+  const extension = extensionForHelpMediaMime(resolvedMime) ?? "bin"
+  const resolvedName = file.name.trim() || `pasted-${Date.now()}.${extension}`
+  const currentMime = file.type.trim().toLowerCase()
+
+  if (file.name.trim() === resolvedName && currentMime === resolvedMime) return file
+
+  return new File([file], resolvedName, {
+    type: resolvedMime,
+    lastModified: file.lastModified || Date.now(),
+  })
+}
+
+export function validateHelpMediaFile(file: File): HelpMediaValidationResult {
+  const mimeType = inferHelpMediaMimeType(file) ?? ""
 
   if (HELP_IMAGE_MIME_TYPES.has(mimeType)) {
     if (file.size > HELP_IMAGE_MAX_BYTES) {

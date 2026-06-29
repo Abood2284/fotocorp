@@ -2,8 +2,7 @@ import Link from "next/link"
 import { ChevronLeft } from "lucide-react"
 import { notFound } from "next/navigation"
 import { HelpArticleFeedback } from "@/components/staff/help/help-article-feedback"
-import { HelpArticleMarkdown } from "@/components/staff/help/help-article-markdown"
-import { HelpArticleMediaSection } from "@/components/staff/help/help-article-media-section"
+import { HelpArticleBody } from "@/components/staff/help/help-article-body"
 import { HelpContentLoadError } from "@/components/staff/help/help-empty-state"
 import { HelpRelatedArticles } from "@/components/staff/help/help-related-articles"
 import { getStaffHelpArticleBySlug, StaffApiError } from "@/lib/api/staff-help-api"
@@ -77,9 +76,7 @@ export default async function StaffHelpArticlePage({ params, searchParams }: Pag
           {metaLine ? <p className="text-sm text-muted-foreground">{metaLine}</p> : null}
         </header>
 
-        <HelpArticleMarkdown content={article.bodyMarkdown} />
-
-        <HelpArticleMediaSection media={article.media} />
+        <HelpArticleBody content={article.bodyMarkdown} />
 
         <HelpRelatedArticles articles={article.relatedArticles} />
 

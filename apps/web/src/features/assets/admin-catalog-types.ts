@@ -52,6 +52,8 @@ export interface AdminCatalogAssetItem {
     card: AdminCatalogDerivativeSummary
     detail: AdminCatalogDerivativeSummary
   }
+  /** True when this is an orphan contributor staging upload safe to hard-delete. */
+  canDeleteIncompleteUpload?: boolean
 }
 
 export interface AdminCatalogAssetsResponse {

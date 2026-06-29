@@ -1,4 +1,5 @@
 import type { HelpArticleManageDetail } from "@/lib/api/staff-help-api"
+import { hasHelpArticleBodyContent } from "@/lib/staff/help-article-content"
 
 export const STAFF_HELP_ROLES = [
   "SUPER_ADMIN",
@@ -107,8 +108,9 @@ export function validateHelpArticleForm(values: HelpArticleFormValues): HelpArti
   if (!values.summary.trim()) errors.summary = "Summary is required."
   else if (values.summary.trim().length > 500) errors.summary = "Summary must be at most 500 characters."
 
-  if (!values.bodyMarkdown.trim()) errors.bodyMarkdown = "Body is required."
-  else if (values.bodyMarkdown.trim().length > 100_000) {
+  if (!hasHelpArticleBodyContent(values.bodyMarkdown)) {
+    errors.bodyMarkdown = "Body is required. Add text, an image, or a video."
+  } else if (values.bodyMarkdown.trim().length > 100_000) {
     errors.bodyMarkdown = "Body must be at most 100,000 characters."
   }
 

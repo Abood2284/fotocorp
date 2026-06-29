@@ -24,6 +24,18 @@ export interface PublicAssetContributor {
   displayName: string
 }
 
+export interface PublicAssetTechnicalMetadata {
+  scanStatus: string | null
+  displayWidth: number | null
+  displayHeight: number | null
+  originalLongEdge: number | null
+  originalDpi: number | null
+  originalMegapixels: string | null
+  canGenerateLow: boolean
+  canGenerateMedium: boolean
+  downloadQualityCeiling: string | null
+}
+
 export interface PublicAsset {
   id: string
   whoIsInPicture: string | null
@@ -48,6 +60,7 @@ export interface PublicAsset {
     card: PublicPreview | null
     detail?: PublicPreview | null
   }
+  technicalMetadata?: PublicAssetTechnicalMetadata | null
 }
 
 export interface PublicAssetListResponse {

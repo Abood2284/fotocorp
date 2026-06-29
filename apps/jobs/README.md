@@ -45,6 +45,8 @@ IMAGE_PUBLISH_PROCESSING_ENABLED=true      # VPS — claim and run Sharp + R2 pu
 
 **Invariant:** assets stay `APPROVED+PRIVATE` until all required derivatives are written to R2 and `completeSuccessfulPublishItem` commits `ACTIVE+PUBLIC`. Leave `IMAGE_PUBLISH_PROCESSING_ENABLED=false` until Neon + R2 credentials on the VPS match production buckets.
 
+**Original metadata:** After loading the canonical original buffer, `ImagePublishProcessor` runs `@fotocorp/original-image-metadata` and upserts `image_assets_metadata` in the same transaction as derivative upserts and go-live. Extraction failure is non-blocking (row recorded as `FAILED`; asset still publishes). Use `media:scan-original-metadata --retry-failed` to repair older assets.
+
 ### Concurrency and duplicate claims
 
 Claiming uses an explicit transaction with `SELECT … FOR UPDATE SKIP LOCKED LIMIT 1` followed by an `UPDATE … SET status = 'RUNNING'`. Running multiple worker instances against the same DB will not double-claim a job. Items are processed sequentially (concurrency env reserved for future use).

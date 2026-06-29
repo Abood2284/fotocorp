@@ -285,8 +285,11 @@ function HeaderShell({
         <BrowseDropdownPanel onMouseEnter={cancelCloseDropdown} onMouseLeave={scheduleCloseDropdown}>
           <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
             <h2 className="font-heading text-lg font-normal text-foreground">Caricature</h2>
-            <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              Editorial caricatures with protected blurred previews for licensed use.
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Welcome to India&apos;s first online platform for cartoons and caricatures. If a picture can say a thousand
+              words, a cartoon can tell the entire story. From individual politicians and business tycoons to public
+              parodies and animated illustrations, the works of the country&apos;s finest artists, representing uniquely
+              Indian expressions, are just a click away.
             </p>
             <ul className="mt-4 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
               <li>

@@ -8,6 +8,7 @@ export const FILTERED_CATALOG_MAX_ASSETS = 1000
 
 export { hasActiveCatalogFilters } from "@/lib/staff-catalog-filters"
 
+/** Loads every matching asset for scoped server actions (e.g. event bulk edit). Not for catalog page SSR. */
 export async function listAllFilteredAdminCatalogAssets(
   query: URLSearchParams,
 ): Promise<AdminCatalogAssetsResponse> {

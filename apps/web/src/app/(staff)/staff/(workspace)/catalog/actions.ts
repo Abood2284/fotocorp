@@ -8,6 +8,7 @@ import {
   updateAdminAssetState,
   updateAdminAssetEditorialBulk,
   updateAdminAssetStateBulk,
+  deleteAdminAsset,
 } from "@/lib/api/admin-assets-api"
 import type {
   AdminCatalogAssetItem,
@@ -31,6 +32,12 @@ export async function updateAdminAssetEditorialAction(assetId: string, payload: 
 
 export async function updateAdminAssetStateAction(assetId: string, payload: AdminCatalogPublishUpdateInput) {
   const result = await updateAdminAssetState(assetId, payload)
+  revalidatePath("/staff/catalog")
+  return result
+}
+
+export async function deleteAdminAssetAction(assetId: string) {
+  const result = await deleteAdminAsset(assetId)
   revalidatePath("/staff/catalog")
   return result
 }

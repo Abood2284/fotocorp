@@ -72,6 +72,13 @@ export async function updateAdminAssetPublishState(assetId: string, payload: Adm
   })
 }
 
+export async function deleteAdminCatalogAsset(assetId: string) {
+  return adminJson<{ ok: true; deletedAssetId: string }>({
+    path: internalApiRoutes.adminAsset(assetId),
+    method: "DELETE",
+  })
+}
+
 export async function updateAdminAssetBulk(payload: { assetIds: string[], categoryId?: string | null, eventId?: string | null }) {
   return adminJson<AdminCatalogAssetsResponse>({
     path: "/api/v1/internal/admin/assets/bulk/editorial",
@@ -150,7 +157,7 @@ export async function updateAdminUserSubscription(authUserId: string, payload: {
 
 async function adminJson<T>(input: {
   path: string
-  method?: "GET" | "PATCH" | "POST"
+  method?: "GET" | "PATCH" | "POST" | "DELETE"
   body?: unknown
 }): Promise<T> {
   return internalApiJson<T>({
@@ -161,7 +168,7 @@ async function adminJson<T>(input: {
 
 async function adminFetch(input: {
   path: string
-  method?: "GET" | "PATCH" | "POST"
+  method?: "GET" | "PATCH" | "POST" | "DELETE"
   body?: unknown
 }) {
   return internalApiFetch({
