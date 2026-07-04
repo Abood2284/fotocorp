@@ -46,6 +46,19 @@ export const adminUserSubscriptionDetailSchema = z.object({
   downloadQuotaLimit: z.number().int().min(0).nullable().optional(),
 })
 
+export const adminUserDownloadsQuerySchema = z.object({
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "from must be yyyy-mm-dd")
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "to must be yyyy-mm-dd")
+    .optional(),
+  limit: z.string().trim().optional(),
+  cursor: z.string().trim().optional(),
+})
+
 export const adminBulkEditorialSchema = z.object({
   assetIds: z.array(z.uuid()).min(1).max(500),
   categoryId: z.uuid().nullable().optional(),

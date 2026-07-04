@@ -22,6 +22,7 @@ import {
   adminUserRoleService,
   adminUserStatusService,
   adminUserSubscriptionDetailService,
+  adminUserDownloadsService,
   adminUsersService,
   listAdminAssetsService,
   normalizeKeywords,
@@ -40,6 +41,7 @@ import {
   adminUserStatusSchema,
   adminUserSubscriptionDetailSchema,
   adminUserSubscriptionSchema,
+  adminUserDownloadsQuerySchema,
   adminBulkEditorialSchema,
   adminBulkPublishStateSchema,
 } from "./validators";
@@ -268,3 +270,16 @@ internalAdminRoutes.patch(
 );
 
 internalAdminRoutes.all("/api/v1/internal/admin/users/:authUserId/subscription-detail", () => methodNotAllowed());
+
+internalAdminRoutes.get(
+  "/api/v1/internal/admin/users/:authUserId/downloads",
+  zValidator("param", adminUserParamSchema),
+  zValidator("query", adminUserDownloadsQuerySchema),
+  async (c) => {
+    const params = c.req.valid("param");
+    const query = c.req.valid("query");
+    return await adminUserDownloadsService(c.env, params.authUserId, query);
+  },
+);
+
+internalAdminRoutes.all("/api/v1/internal/admin/users/:authUserId/downloads", () => methodNotAllowed());

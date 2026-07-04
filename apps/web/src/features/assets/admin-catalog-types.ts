@@ -131,7 +131,10 @@ export interface AdminCatalogUserItem {
   id: string
   authUserId: string
   email: string
+  username: string | null
   displayName: string | null
+  companyName: string | null
+  jobTitle: string | null
   role: "USER" | "CONTRIBUTOR" | "ADMIN" | "SUPER_ADMIN"
   status: "ACTIVE" | "SUSPENDED"
   isSubscriber: boolean
@@ -153,6 +156,27 @@ export interface AdminCatalogUsersResponse {
 
 export interface AdminCatalogUserResponse {
   user: AdminCatalogUserItem
+}
+
+export interface AdminUserDownloadItem {
+  downloadId: string
+  assetId: string | null
+  downloadedAt: string | null
+  downloadSize: string
+  status: string
+  headline: string | null
+  whoIsInPicture: string | null
+  caption: string | null
+  fotokey: string | null
+  previewUrl: { url: string; width: number; height: number } | null
+  thumbUrl: { url: string; width: number; height: number } | null
+}
+
+export interface AdminUserDownloadsResponse {
+  ok: true
+  items: AdminUserDownloadItem[]
+  nextCursor: string | null
+  total: number
 }
 
 export type AdminCatalogSort =

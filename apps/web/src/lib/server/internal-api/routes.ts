@@ -66,6 +66,9 @@ export const internalApiRoutes = {
   adminUserSubscription: (authUserId: string) =>
     `/api/v1/internal/admin/users/${encodeURIComponent(authUserId)}/subscription`,
 
+  adminUserDownloads: (authUserId: string) =>
+    `/api/v1/internal/admin/users/${encodeURIComponent(authUserId)}/downloads`,
+
   adminContributorUploads: () => "/api/v1/internal/admin/contributor-uploads",
 
   adminContributorUploadBatches: () =>

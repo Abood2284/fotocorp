@@ -8,6 +8,7 @@ import {
   getAdminCatalogFilters,
   getAdminCatalogStats,
   listAdminUsers,
+  listAdminUserDownloads,
   listAdminCatalogAssets,
   updateAdminUserRole,
   updateAdminUserStatus,
@@ -32,6 +33,7 @@ export const updateAdminAssetEditorialBulk = updateAdminAssetBulk
 export const updateAdminAssetStateBulk = updateAdminAssetPublishStateBulk
 export const listInternalAdminUsers = listAdminUsers
 export const getInternalAdminUser = getAdminUser
+export const listInternalAdminUserDownloads = listAdminUserDownloads
 export const updateInternalAdminUserRole = updateAdminUserRole
 export const updateInternalAdminUserStatus = updateAdminUserStatus
 export const updateInternalAdminUserSubscription = updateAdminUserSubscription

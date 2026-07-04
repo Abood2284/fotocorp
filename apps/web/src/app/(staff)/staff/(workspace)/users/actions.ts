@@ -2,12 +2,17 @@
 
 import { revalidatePath } from "next/cache"
 import {
-  getAdminUser,
+  listAdminUserDownloads,
   updateAdminUserRole,
   updateAdminUserStatus,
   updateAdminUserSubscription,
   updateAdminUserSubscriptionDetail,
 } from "@/lib/api/admin-catalog-api"
+
+function revalidateUserPaths(authUserId: string) {
+  revalidatePath("/staff/users")
+  revalidatePath(`/staff/users/${authUserId}`)
+}
 
 export async function toggleSubscriptionAction(formData: FormData) {
   const authUserId = String(formData.get("authUserId") ?? "").trim()
@@ -15,7 +20,7 @@ export async function toggleSubscriptionAction(formData: FormData) {
 
   if (!authUserId) return
   await updateAdminUserSubscription(authUserId, { isSubscriber: nextState })
-  revalidatePath("/staff/users")
+  revalidateUserPaths(authUserId)
 }
 
 export async function updateUserRoleAction(formData: FormData) {
@@ -24,7 +29,7 @@ export async function updateUserRoleAction(formData: FormData) {
 
   if (!authUserId || !role) return
   await updateAdminUserRole(authUserId, { role })
-  revalidatePath("/staff/users")
+  revalidateUserPaths(authUserId)
 }
 
 export async function updateUserStatusAction(formData: FormData) {
@@ -33,7 +38,7 @@ export async function updateUserStatusAction(formData: FormData) {
 
   if (!authUserId || !nextStatus) return
   await updateAdminUserStatus(authUserId, { status: nextStatus })
-  revalidatePath("/staff/users")
+  revalidateUserPaths(authUserId)
 }
 
 export async function bulkUpdateUserStatusAction(formData: FormData) {
@@ -64,12 +69,16 @@ export async function bulkToggleSubscriptionAction(formData: FormData) {
   revalidatePath("/staff/users")
 }
 
-export async function fetchAdminUserAction(authUserId: string) {
-  try {
-    return await getAdminUser(authUserId)
-  } catch {
-    return null
-  }
+export async function fetchAdminUserDownloadsForExportAction(
+  authUserId: string,
+  input: { limit: number; cursor?: string; from?: string; to?: string },
+) {
+  const params = new URLSearchParams()
+  params.set("limit", String(input.limit))
+  if (input.cursor) params.set("cursor", input.cursor)
+  if (input.from) params.set("from", input.from)
+  if (input.to) params.set("to", input.to)
+  return listAdminUserDownloads(authUserId, params)
 }
 
 export async function updateUserSubscriptionDetailAction(
@@ -79,7 +88,7 @@ export async function updateUserSubscriptionDetailAction(
   if (!authUserId) return { success: false, error: "Missing user ID" }
   try {
     await updateAdminUserSubscriptionDetail(authUserId, payload)
-    revalidatePath("/staff/users")
+    revalidateUserPaths(authUserId)
     return { success: true }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" }

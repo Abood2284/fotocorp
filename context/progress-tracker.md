@@ -23,6 +23,8 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Staff users table + detail:** `/staff/users` table shows User (name, email, `@username`), Company, Job title, and Used/Allocated (`used/limit`); row click opens `/staff/users/[authUserId]`. Detail page includes access/subscription management, registration profile, downloads list with from/to filters, cursor pagination, and PDF export. API: `GET /api/v1/internal/admin/users/:authUserId/downloads`; user list/search now includes `username`.
+
 - **Publish pipeline original metadata:** Added `@fotocorp/original-image-metadata` (Sharp compute + shared SQL upsert). `ImagePublishProcessor` and `media:process-image-publish-jobs` scan the canonical original buffer during publish and upsert `image_assets_metadata` atomically with go-live (non-blocking on extraction failure). Scanner refactored to shared module; added `--retry-failed` for ACTIVE assets with failed scans. Backfill: `media:scan-original-metadata --write --only-missing` and `--retry-failed`.
 
 - **Public asset download tier metadata:** Public asset detail API (`getPublicAssetDetail`) now joins `image_assets_metadata` and returns `technicalMetadata` (dimensions, DPI, megapixels, scan flags). Asset detail download sidebar builds Low/Medium/High labels from that data via `buildPublicAssetSizeOptions`; missing scanned fields render empty instead of hardcoded placeholders.

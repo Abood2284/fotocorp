@@ -23,6 +23,7 @@ import { json } from "../../../lib/http"
 import { parsePreviewTtl } from "../../../lib/assets/public-assets"
 import { invalidatePublicAssetCache } from "../../../lib/cache/public-cache-invalidation"
 import { listInternalAdminUsers, updateInternalAdminUserSubscription, updateInternalAdminUserSubscriptionDetail, getInternalAdminUser, updateInternalAdminUserRole, updateInternalAdminUserStatus } from "../../../lib/users/internal-admin-users"
+import { adminUserDownloadsDb, listAdminUserDownloads, parseAdminUserDownloadsQuery } from "../../../lib/users/admin-user-downloads"
 interface AdminActor { authUserId: string | null; email: string | null }
 
 export async function listAdminAssetsService(env: Env, request: Request) { return json(await listInternalAdminAssets(db(env), request, env.MEDIA_PREVIEW_TOKEN_SECRET, ttl(env))) }
@@ -130,6 +131,18 @@ export async function adminUserDetailService(env: Env, authUserId: string) { ret
 export async function adminUserRoleService(env: Env, authUserId: string, role: "USER" | "PHOTOGRAPHER" | "ADMIN" | "SUPER_ADMIN", actor: AdminActor) { return json(await updateInternalAdminUserRole(db(env), authUserId, role, actor)) }
 export async function adminUserStatusService(env: Env, authUserId: string, status: "ACTIVE" | "SUSPENDED", actor: AdminActor) { return json(await updateInternalAdminUserStatus(db(env), authUserId, status, actor)) }
 export async function adminUserSubscriptionDetailService(env: Env, authUserId: string, payload: { subscriptionPlanId?: string | null; subscriptionEndsAt?: string | null; downloadQuotaLimit?: number | null }, actor: AdminActor) { return json(await updateInternalAdminUserSubscriptionDetail(db(env), authUserId, payload, actor)) }
+export async function adminUserDownloadsService(
+  env: Env,
+  authUserId: string,
+  query: { from?: string; to?: string; limit?: string; cursor?: string },
+) {
+  const params = new URLSearchParams()
+  if (query.from) params.set("from", query.from)
+  if (query.to) params.set("to", query.to)
+  if (query.limit) params.set("limit", query.limit)
+  if (query.cursor) params.set("cursor", query.cursor)
+  return json(await listAdminUserDownloads(adminUserDownloadsDb(env), env, authUserId, parseAdminUserDownloadsQuery(params)))
+}
 export function normalizeKeywords(input: string[] | null | undefined): string[] | null { if (!input) return null; const dedup = new Map<string, string>(); for (const keyword of input) { const normalized = keyword.trim(); if (!normalized) continue; const token = normalized.toLowerCase(); if (!dedup.has(token)) { dedup.set(token, normalized); if (dedup.size >= 50) break } } return dedup.size > 0 ? [...dedup.values()] : null }
 export function nullable(value: string | null | undefined) { if (value === null || value === undefined) return null; const trimmed = value.trim(); return trimmed ? trimmed : null }
 export function actorFromRequest(request: Request): AdminActor { return { authUserId: request.headers.get("x-admin-auth-user-id")?.trim() || null, email: request.headers.get("x-admin-email")?.trim() || null } }

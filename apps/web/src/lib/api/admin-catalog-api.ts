@@ -9,6 +9,7 @@ import type {
   AdminCatalogStats,
   AdminCatalogUserResponse,
   AdminCatalogUsersResponse,
+  AdminUserDownloadsResponse,
 } from "@/features/assets/admin-catalog-types"
 import { getStaffInternalAdminActorHeaders } from "@/lib/staff-session"
 import {
@@ -117,6 +118,15 @@ export async function listAdminUsers(searchParams: URLSearchParams) {
 export async function getAdminUser(authUserId: string) {
   return adminJson<AdminCatalogUserResponse>({
     path: internalApiRoutes.adminUser(authUserId),
+  })
+}
+
+export async function listAdminUserDownloads(
+  authUserId: string,
+  searchParams: URLSearchParams,
+) {
+  return adminJson<AdminUserDownloadsResponse>({
+    path: withQuery(internalApiRoutes.adminUserDownloads(authUserId), searchParams),
   })
 }
 

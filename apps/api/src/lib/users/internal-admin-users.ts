@@ -34,7 +34,11 @@ interface AdminUserRow {
   id: string;
   auth_user_id: string;
   email: string;
+  username: string | null;
   display_name: string | null;
+  company_name: string | null;
+  job_title: string | null;
+  custom_job_title: string | null;
   role: UserRole;
   status: UserStatus;
   is_subscriber: boolean;
@@ -189,6 +193,9 @@ function buildListUsersSql(query: AdminUsersQuery) {
       sql`(
         lower(u.email) like lower(${term}) escape '\\'
         or lower(coalesce(u.display_name, '')) like lower(${term}) escape '\\'
+        or lower(coalesce(u.username, '')) like lower(${term}) escape '\\'
+        or lower(coalesce(u.company_name, '')) like lower(${term}) escape '\\'
+        or lower(coalesce(u.job_title, '')) like lower(${term}) escape '\\'
         or u.id::text like ${term} escape '\\'
       )`,
     );
@@ -209,7 +216,11 @@ function buildListUsersSql(query: AdminUsersQuery) {
       u.id,
       u.id as auth_user_id,
       u.email,
+      u.username,
       u.display_name,
+      u.company_name,
+      u.job_title,
+      u.custom_job_title,
       u.role,
       u.status,
       u.is_subscriber,
@@ -234,7 +245,11 @@ async function getUserByAuthId(db: DrizzleClient, authUserId: string) {
       id,
       id as auth_user_id,
       email,
+      username,
       display_name,
+      company_name,
+      job_title,
+      custom_job_title,
       role,
       status,
       is_subscriber,
@@ -259,7 +274,11 @@ async function getUserWithProfileByAuthId(db: DrizzleClient, authUserId: string)
       u.id,
       u.id as auth_user_id,
       u.email,
+      u.username,
       u.display_name,
+      u.company_name,
+      u.job_title,
+      u.custom_job_title,
       u.role,
       u.status,
       u.is_subscriber,
@@ -531,12 +550,22 @@ async function insertUserAuditLog(
   `);
 }
 
+function formatJobTitle(jobTitle: string | null | undefined, customJobTitle: string | null | undefined) {
+  const title = jobTitle?.trim();
+  if (!title) return null;
+  const custom = customJobTitle?.trim();
+  return custom ? `${title} (${custom})` : title;
+}
+
 function mapUserRow(row: AdminUserRow) {
   return {
     id: row.id,
     authUserId: row.auth_user_id,
     email: row.email,
+    username: row.username,
     displayName: row.display_name,
+    companyName: row.company_name,
+    jobTitle: formatJobTitle(row.job_title, row.custom_job_title),
     role: row.role,
     status: row.status,
     isSubscriber: row.is_subscriber,
