@@ -30,20 +30,55 @@ For questions, reply to this email.
 
 ## STAFF_NEW_ACCESS_INQUIRY
 
-Internal staff notification sent when a customer completes registration. Recipient is `STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL` (env-configured).
+Internal staff notification sent when a customer completes registration. Recipients are hardcoded in `STAFF_INQUIRY_NOTIFY_EMAILS` (one email, all addresses in `To`). Reply-To remains `subscription@fotocorp.com`. No staff UI link.
 
-Subject: `New Fotocorp access inquiry submitted`
+Subject: `You have a new customer access inquiry`
 
 ```text
 Hello Team,
 
-A new user has submitted an access inquiry on Fotocorp.
+You have a new customer access inquiry on Fotocorp.
 
 Name: {inquiryApplicantName}
+Username: {inquiryUsername}
 Company: {inquiryCompanyName}
+Company type: {inquiryCompanyType}
+Job title: {inquiryJobTitle}
 Email: {inquiryApplicantEmail}
+Phone: {inquiryPhone}
+Editorial: quantity {range} · quality {preference}
+Video: quantity {range}
+Submitted at: {inquirySubmittedAt}
+Country: {inquiryCountry}
+City: {inquiryCity}
+Region: {inquiryRegion}
+IP: {inquiryIpAddress}
 
-Review inquiry: {staffInquiryReviewUrl}
+Fotocorp News Photo Agency
+For questions, reply to this email.
+```
+
+## STAFF_NEW_CONTRIBUTOR_APPLICATION
+
+Internal staff notification sent when a public contributor application is submitted. Same hardcoded recipients and Reply-To as customer access staff mail. No staff UI link.
+
+Subject: `You have a new contributor application inquiry`
+
+```text
+Hello Team,
+
+You have a new contributor application inquiry on Fotocorp.
+
+Name: {inquiryApplicantName}
+Proposed username: {inquiryProposedUsername}
+Email: {inquiryApplicantEmail}
+Phone: {inquiryPhone}
+Application notes: {inquiryApplicationNotes}
+Submitted at: {inquirySubmittedAt}
+Country: {inquiryCountry}
+City: {inquiryCity}
+Region: {inquiryRegion}
+IP: {inquiryIpAddress}
 
 Fotocorp News Photo Agency
 For questions, reply to this email.

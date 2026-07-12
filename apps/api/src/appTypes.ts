@@ -31,8 +31,6 @@ export interface Env {
   EMAIL_FROM_NAME?: string;
   EMAIL_FROM_ADDRESS?: string;
   EMAIL_REPLY_TO?: string;
-  /** Internal staff inbox for new customer access inquiry notifications. */
-  STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL?: string;
   TYPESENSE_HOST?: string;
   TYPESENSE_API_KEY?: string;
   TYPESENSE_COLLECTION_ALIAS?: string;

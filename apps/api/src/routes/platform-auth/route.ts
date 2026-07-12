@@ -32,10 +32,10 @@ import {
   platformSignUpSchema,
 } from "./validators"
 import {
-  resolveStaffAccessInquiryNotifyEmail,
-  resolveStaffInquiryReviewUrl,
   safeSendAccessInquiryEmail,
+  safeSendStaffInquiryEmail,
 } from "../../lib/email/email-service"
+import { buildStaffAccessInquiryEmailData } from "../../lib/email/staff-inquiry-email-data"
 import { isSubscriberAccessInquiryApproved } from "../../lib/access/platform-user-access"
 import { findLatestInquiryForPlatformUser } from "../../lib/users/platform-user"
 
@@ -151,31 +151,15 @@ platformAuthRoutes.post(
         relatedEntity: { type: "customer_access_inquiry", id: inquiry.id },
       })
 
-      const staffNotifyEmail = resolveStaffAccessInquiryNotifyEmail(c.env)
-      if (staffNotifyEmail) {
-        await safeSendAccessInquiryEmail(database, c.env, {
-          templateKey: "STAFF_NEW_ACCESS_INQUIRY",
-          recipient: {
-            email: staffNotifyEmail,
-            firstName: "Team",
-            displayName: "Fotocorp Staff",
-          },
-          relatedEntity: { type: "customer_access_inquiry", id: inquiry.id },
-          data: {
-            inquiryApplicantName: `${profile.firstName} ${profile.lastName}`.trim(),
-            inquiryCompanyName: profile.companyName,
-            inquiryApplicantEmail: profile.companyEmail,
-            staffInquiryReviewUrl: resolveStaffInquiryReviewUrl(c.env, inquiry.id),
-          },
-        })
-      } else {
-        console.info("email_delivery_skipped", {
-          reason: "staff_notify_email_missing",
-          templateKey: "STAFF_NEW_ACCESS_INQUIRY",
-          relatedEntityType: "customer_access_inquiry",
-          relatedEntityId: inquiry.id,
-        })
-      }
+      await safeSendStaffInquiryEmail(database, c.env, {
+        templateKey: "STAFF_NEW_ACCESS_INQUIRY",
+        relatedEntity: { type: "customer_access_inquiry", id: inquiry.id },
+        data: buildStaffAccessInquiryEmailData({
+          profile,
+          requestAudit,
+          submittedAt: inquiry.createdAt,
+        }),
+      })
     }
   }
 

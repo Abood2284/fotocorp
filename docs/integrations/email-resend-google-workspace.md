@@ -27,17 +27,17 @@ Optional:
 
 ```sh
 PUBLIC_WEB_ORIGIN=https://fotocorp.com
-STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL=abdulraheemsayyed22@gmail.com
 ```
 
 When `PUBLIC_WEB_ORIGIN` is set, customer and contributor approval emails link to `/sign-in` on that origin. If it is not set, emails use `https://fotocorp.com/sign-in`.
 
-When `STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL` is set, customer registration also sends `STAFF_NEW_ACCESS_INQUIRY` to that address with a link to `/staff/access-inquiries/{inquiryId}`. If unset, the staff notification is skipped (registration still succeeds).
+Staff inquiry notifications always go to the hardcoded `STAFF_INQUIRY_NOTIFY_EMAILS` list in `apps/api/src/lib/email/email-service.ts` (one Resend message with all addresses in `To`) whenever Resend is configured. No env recipient gate.
 
 ## Templates
 
 - `CUSTOMER_ACCESS_REQUEST_RECEIVED`: sent after customer registration/access inquiry creation.
-- `STAFF_NEW_ACCESS_INQUIRY`: sent to `STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL` after customer registration when that env var is set; includes applicant name, company, email, and staff review link.
+- `STAFF_NEW_ACCESS_INQUIRY`: sent to hardcoded staff recipients after customer registration; full lead details (contact, interest, geo/IP); no staff UI link.
+- `STAFF_NEW_CONTRIBUTOR_APPLICATION`: sent to the same hardcoded staff recipients after a public contributor application; full lead details (contact, notes, geo/IP); no staff UI link.
 - `CUSTOMER_ACCESS_APPROVED`: sent when staff activates one or more subscriber entitlements; includes download limits per asset type (separate email per individual activation; one consolidated email for bulk activate).
 - `CUSTOMER_ENTITLEMENT_UPDATED`: sent when staff adjusts an active entitlement's download limit or quality cap.
 - `CUSTOMER_ACCESS_REJECTED`: sent after staff closes a customer inquiry without granting access.

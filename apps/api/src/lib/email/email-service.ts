@@ -19,10 +19,27 @@ const DEFAULT_FROM_ADDRESS = "subscription@fotocorp.com"
 const DEFAULT_REPLY_TO = "subscription@fotocorp.com"
 const DEFAULT_LOGIN_URL = "https://fotocorp.com"
 const DEFAULT_CONTRIBUTOR_LOGIN_PATH = "/sign-in"
+const STAFF_NOTIFY_IDEMPOTENCY_TOKEN = "staff-notify"
+
+export const STAFF_INQUIRY_NOTIFY_EMAILS = [
+  "abdulraheemsayyed22@gmail.com",
+  "hammaadsheikh151@gmail.com",
+  "shailesh@fotocorp.com",
+] as const
+
+export type StaffInquiryEmailTemplateKey =
+  | "STAFF_NEW_ACCESS_INQUIRY"
+  | "STAFF_NEW_CONTRIBUTOR_APPLICATION"
 
 export interface DeliverAccessEmailInput {
   templateKey: EmailTemplateKey
   recipient: EmailRecipient
+  relatedEntity: EmailRelatedEntity
+  data?: EmailTemplateData
+}
+
+export interface DeliverStaffInquiryEmailInput {
+  templateKey: StaffInquiryEmailTemplateKey
   relatedEntity: EmailRelatedEntity
   data?: EmailTemplateData
 }
@@ -73,6 +90,44 @@ export async function safeSendAccessInquiryEmail(
   }
 }
 
+export async function sendStaffInquiryEmail(
+  db: DrizzleClient,
+  env: Env,
+  input: DeliverStaffInquiryEmailInput,
+  options: DeliverAccessEmailOptions = {},
+): Promise<EmailSendResult> {
+  return deliverStaffInquiryEmail(db, env, input, {
+    ...options,
+    loginUrl: options.loginUrl ?? resolveLoginUrl(env),
+  })
+}
+
+export async function safeSendStaffInquiryEmail(
+  db: DrizzleClient,
+  env: Env,
+  input: DeliverStaffInquiryEmailInput,
+  options: DeliverAccessEmailOptions = {},
+): Promise<EmailSendResult> {
+  try {
+    return await sendStaffInquiryEmail(db, env, input, options)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Email delivery failed."
+    console.warn("email_delivery_unhandled_failure", {
+      templateKey: input.templateKey,
+      to: formatRecipientLog(STAFF_INQUIRY_NOTIFY_EMAILS),
+      relatedEntityType: input.relatedEntity.type,
+      relatedEntityId: input.relatedEntity.id,
+      errorMessage: message,
+    })
+    return {
+      status: "FAILED",
+      provider: "unknown",
+      providerMessageId: null,
+      errorMessage: message,
+    }
+  }
+}
+
 export async function deliverTemplatedEmail(
   db: DrizzleClient,
   env: EmailEnv,
@@ -89,25 +144,77 @@ export async function deliverTemplatedEmail(
     }
   }
 
-  const existing = await hasSuccessfulDelivery(db, input.relatedEntity, input.templateKey)
+  return deliverRenderedEmail(db, env, {
+    templateKey: input.templateKey,
+    recipient: input.recipient,
+    relatedEntity: input.relatedEntity,
+    data: input.data,
+    to,
+    recipientLog: to,
+    idempotencyRecipient: to,
+    options,
+  })
+}
+
+export async function deliverStaffInquiryEmail(
+  db: DrizzleClient,
+  env: EmailEnv,
+  input: DeliverStaffInquiryEmailInput,
+  options: DeliverAccessEmailOptions = {},
+): Promise<EmailSendResult> {
+  const recipients = STAFF_INQUIRY_NOTIFY_EMAILS.map((email) => email.trim().toLowerCase())
+  const recipientLog = formatRecipientLog(recipients)
+  return deliverRenderedEmail(db, env, {
+    templateKey: input.templateKey,
+    recipient: {
+      email: recipients[0]!,
+      firstName: "Team",
+      displayName: "Fotocorp Staff",
+    },
+    relatedEntity: input.relatedEntity,
+    data: input.data,
+    to: recipients,
+    recipientLog,
+    idempotencyRecipient: STAFF_NOTIFY_IDEMPOTENCY_TOKEN,
+    options,
+  })
+}
+
+async function deliverRenderedEmail(
+  db: DrizzleClient,
+  env: EmailEnv,
+  input: {
+    templateKey: EmailTemplateKey
+    recipient: EmailRecipient
+    relatedEntity: EmailRelatedEntity
+    data?: EmailTemplateData
+    to: string | string[]
+    recipientLog: string
+    idempotencyRecipient: string
+    options: DeliverAccessEmailOptions
+  },
+): Promise<EmailSendResult> {
+  const { templateKey, recipient, relatedEntity, data, to, recipientLog, idempotencyRecipient, options } = input
+
+  const existing = await hasSuccessfulDelivery(db, relatedEntity, templateKey)
   if (existing) {
-    const rendered = renderAccessEmailTemplate(input.templateKey, {
-      recipient: input.recipient,
+    const rendered = renderAccessEmailTemplate(templateKey, {
+      recipient,
       loginUrl: options.loginUrl ?? DEFAULT_LOGIN_URL,
       data: {
-        ...input.data,
-        contributorLoginUrl: input.data?.contributorLoginUrl ?? options.contributorLoginUrl,
+        ...data,
+        contributorLoginUrl: data?.contributorLoginUrl ?? options.contributorLoginUrl,
       },
     })
     await logEmailDelivery(db, {
-      recipientEmail: to,
-      templateKey: input.templateKey,
+      recipientEmail: recipientLog,
+      templateKey,
       subject: rendered.subject,
       provider: "console",
       providerMessageId: null,
       status: "SKIPPED",
       errorMessage: "duplicate_successful_delivery",
-      relatedEntity: input.relatedEntity,
+      relatedEntity,
     })
     return {
       status: "SKIPPED",
@@ -117,18 +224,18 @@ export async function deliverTemplatedEmail(
     }
   }
 
-  const rendered = renderAccessEmailTemplate(input.templateKey, {
-    recipient: input.recipient,
+  const rendered = renderAccessEmailTemplate(templateKey, {
+    recipient,
     loginUrl: options.loginUrl ?? DEFAULT_LOGIN_URL,
     data: {
-      ...input.data,
-      contributorLoginUrl: input.data?.contributorLoginUrl ?? options.contributorLoginUrl,
+      ...data,
+      contributorLoginUrl: data?.contributorLoginUrl ?? options.contributorLoginUrl,
     },
   })
   const idempotencyKey = buildEmailIdempotencyKey({
-    templateKey: input.templateKey,
-    relatedEntity: input.relatedEntity,
-    recipientEmail: to,
+    templateKey,
+    relatedEntity,
+    recipientEmail: idempotencyRecipient,
   })
   const config = resolveEmailConfig(env)
   const provider = options.provider ?? createEmailProvider(env, options.fetchImpl)
@@ -142,24 +249,24 @@ export async function deliverTemplatedEmail(
 
   const result = await provider.send(envelope)
   await logEmailDelivery(db, {
-    recipientEmail: to,
-    templateKey: input.templateKey,
+    recipientEmail: recipientLog,
+    templateKey,
     subject: rendered.subject,
     provider: result.provider || provider.name,
     providerMessageId: result.providerMessageId,
     status: result.status,
     errorMessage: result.errorMessage,
-    relatedEntity: input.relatedEntity,
+    relatedEntity,
   })
 
   if (result.status !== "SENT") {
     console.warn("email_delivery_failed", {
       provider: result.provider || provider.name,
-      templateKey: input.templateKey,
-      to,
+      templateKey,
+      to: recipientLog,
       status: result.status,
-      relatedEntityType: input.relatedEntity.type,
-      relatedEntityId: input.relatedEntity.id,
+      relatedEntityType: relatedEntity.type,
+      relatedEntityId: relatedEntity.id,
       errorMessage: result.errorMessage,
     })
   }
@@ -197,17 +304,6 @@ export function resolveContributorLoginUrl(env: EmailEnv): string {
   return origin ? `${origin}${DEFAULT_CONTRIBUTOR_LOGIN_PATH}` : `${DEFAULT_LOGIN_URL}${DEFAULT_CONTRIBUTOR_LOGIN_PATH}`
 }
 
-export function resolveStaffAccessInquiryNotifyEmail(env: EmailEnv): string | null {
-  const email = env.STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL?.trim().toLowerCase()
-  return email || null
-}
-
-export function resolveStaffInquiryReviewUrl(env: EmailEnv, inquiryId: string): string {
-  const origin = env.PUBLIC_WEB_ORIGIN?.trim().replace(/\/+$/, "")
-  const base = origin || DEFAULT_LOGIN_URL.replace(/\/sign-in$/, "")
-  return `${base}/staff/access-inquiries/${encodeURIComponent(inquiryId)}`
-}
-
 export function resolvePasswordResetUrl(env: EmailEnv, rawToken: string): string {
   const origin = env.PUBLIC_WEB_ORIGIN?.trim().replace(/\/+$/, "")
   const base = origin || DEFAULT_LOGIN_URL.replace(/\/sign-in$/, "")
@@ -225,6 +321,10 @@ export function buildEmailIdempotencyKey(input: {
     input.relatedEntity.id,
     input.recipientEmail.trim().toLowerCase(),
   ].join(":")
+}
+
+export function formatRecipientLog(recipients: readonly string[]): string {
+  return [...recipients].map((email) => email.trim().toLowerCase()).sort().join(",")
 }
 
 async function hasSuccessfulDelivery(

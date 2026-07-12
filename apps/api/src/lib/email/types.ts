@@ -10,6 +10,7 @@ export const EMAIL_TEMPLATE_KEYS = [
   "CONTRIBUTOR_APPLICATION_REJECTED",
   "CUSTOMER_PASSWORD_RESET",
   "STAFF_NEW_ACCESS_INQUIRY",
+  "STAFF_NEW_CONTRIBUTOR_APPLICATION",
 ] as const
 
 export type EmailTemplateKey = (typeof EMAIL_TEMPLATE_KEYS)[number]
@@ -31,7 +32,7 @@ export interface RenderedEmail {
 
 export interface EmailEnvelope extends RenderedEmail {
   from: string
-  to: string
+  to: string | string[]
   replyTo: string
   idempotencyKey?: string | null
 }
@@ -56,8 +57,13 @@ export type EmailEnv = Pick<
   | "EMAIL_FROM_ADDRESS"
   | "EMAIL_REPLY_TO"
   | "PUBLIC_WEB_ORIGIN"
-  | "STAFF_ACCESS_INQUIRY_NOTIFY_EMAIL"
 >
+
+export interface StaffInquiryInterestLine {
+  assetLabel: string
+  quantityRange?: string | null
+  qualityPreference?: string | null
+}
 
 export interface EmailRelatedEntity {
   type: string
@@ -89,7 +95,18 @@ export interface EmailTemplateData {
   resetPasswordUrl?: string | null
   resetLinkExpiresMinutes?: number | null
   inquiryApplicantName?: string | null
+  inquiryUsername?: string | null
+  inquiryProposedUsername?: string | null
   inquiryCompanyName?: string | null
+  inquiryCompanyType?: string | null
+  inquiryJobTitle?: string | null
   inquiryApplicantEmail?: string | null
-  staffInquiryReviewUrl?: string | null
+  inquiryPhone?: string | null
+  inquiryInterestLines?: StaffInquiryInterestLine[]
+  inquiryApplicationNotes?: string | null
+  inquirySubmittedAt?: string | null
+  inquiryCountry?: string | null
+  inquiryCity?: string | null
+  inquiryRegion?: string | null
+  inquiryIpAddress?: string | null
 }

@@ -50,7 +50,11 @@ export const EMAIL_TEMPLATE_METADATA: Record<EmailTemplateKey, { displayName: st
   },
   STAFF_NEW_ACCESS_INQUIRY: {
     displayName: "Staff New Access Inquiry",
-    subject: "New Fotocorp access inquiry submitted",
+    subject: "You have a new customer access inquiry",
+  },
+  STAFF_NEW_CONTRIBUTOR_APPLICATION: {
+    displayName: "Staff New Contributor Application",
+    subject: "You have a new contributor application inquiry",
   },
 }
 
@@ -236,33 +240,28 @@ function bodyLines(
   }
 
   if (templateKey === "STAFF_NEW_ACCESS_INQUIRY") {
-    const applicantName = data.inquiryApplicantName?.trim() || "Not available"
-    const companyName = data.inquiryCompanyName?.trim() || "Not available"
-    const applicantEmail = data.inquiryApplicantEmail?.trim() || "Not available"
-    const reviewUrl = data.staffInquiryReviewUrl?.trim() || loginUrl
-    const detailLines = [
-      `Name: ${applicantName}`,
-      `Company: ${companyName}`,
-      `Email: ${applicantEmail}`,
-    ]
+    const detailLines = buildStaffAccessInquiryDetailLines(data)
     const intro = [
       `Hello ${greetingName},`,
-      "A new user has submitted an access inquiry on Fotocorp.",
+      "You have a new customer access inquiry on Fotocorp.",
     ]
-    const textLines = [
-      ...intro,
-      "",
-      ...detailLines,
-      "",
-      `Review inquiry: ${reviewUrl}`,
-    ]
-
     return {
       introLines: intro,
-      textLines,
+      textLines: [...intro, "", ...detailLines],
       credentialLines: detailLines,
-      ctaLabel: "Review inquiry",
-      ctaUrl: reviewUrl,
+    }
+  }
+
+  if (templateKey === "STAFF_NEW_CONTRIBUTOR_APPLICATION") {
+    const detailLines = buildStaffContributorApplicationDetailLines(data)
+    const intro = [
+      `Hello ${greetingName},`,
+      "You have a new contributor application inquiry on Fotocorp.",
+    ]
+    return {
+      introLines: intro,
+      textLines: [...intro, "", ...detailLines],
+      credentialLines: detailLines,
     }
   }
 
@@ -298,18 +297,81 @@ function bodyLines(
     }
   }
 
-  return {
-    introLines: [
-      `Hello ${greetingName},`,
-      "Thank you for your interest in contributing to Fotocorp.",
-      "After reviewing your contributor application, we are unable to approve access at this time.",
-    ],
-    textLines: [
-      `Hello ${greetingName},`,
-      "Thank you for your interest in contributing to Fotocorp.",
-      "After reviewing your contributor application, we are unable to approve access at this time.",
-    ],
+  if (templateKey === "CONTRIBUTOR_APPLICATION_REJECTED") {
+    return {
+      introLines: [
+        `Hello ${greetingName},`,
+        "Thank you for your interest in contributing to Fotocorp.",
+        "After reviewing your contributor application, we are unable to approve access at this time.",
+      ],
+      textLines: [
+        `Hello ${greetingName},`,
+        "Thank you for your interest in contributing to Fotocorp.",
+        "After reviewing your contributor application, we are unable to approve access at this time.",
+      ],
+    }
   }
+
+  const _exhaustive: never = templateKey
+  void _exhaustive
+  throw new Error(`Unhandled email template: ${String(templateKey)}`)
+}
+
+function staffField(label: string, value: string | null | undefined): string {
+  const trimmed = value?.trim()
+  return `${label}: ${trimmed || "Not available"}`
+}
+
+function buildStaffAccessInquiryDetailLines(data: EmailTemplateData): string[] {
+  const lines = [
+    staffField("Name", data.inquiryApplicantName),
+    staffField("Username", data.inquiryUsername),
+    staffField("Company", data.inquiryCompanyName),
+    staffField("Company type", data.inquiryCompanyType),
+    staffField("Job title", data.inquiryJobTitle),
+    staffField("Email", data.inquiryApplicantEmail),
+    staffField("Phone", data.inquiryPhone),
+  ]
+
+  const interestLines = data.inquiryInterestLines ?? []
+  if (interestLines.length) {
+    for (const interest of interestLines) {
+      const parts: string[] = []
+      if (interest.quantityRange?.trim()) parts.push(`quantity ${interest.quantityRange.trim()}`)
+      if (interest.qualityPreference?.trim()) parts.push(`quality ${interest.qualityPreference.trim()}`)
+      lines.push(
+        parts.length
+          ? `${interest.assetLabel}: ${parts.join(" · ")}`
+          : `${interest.assetLabel}: selected`,
+      )
+    }
+  } else {
+    lines.push(staffField("Interested asset types", null))
+  }
+
+  lines.push(
+    staffField("Submitted at", data.inquirySubmittedAt),
+    staffField("Country", data.inquiryCountry),
+    staffField("City", data.inquiryCity),
+    staffField("Region", data.inquiryRegion),
+    staffField("IP", data.inquiryIpAddress),
+  )
+  return lines
+}
+
+function buildStaffContributorApplicationDetailLines(data: EmailTemplateData): string[] {
+  return [
+    staffField("Name", data.inquiryApplicantName),
+    staffField("Proposed username", data.inquiryProposedUsername),
+    staffField("Email", data.inquiryApplicantEmail),
+    staffField("Phone", data.inquiryPhone),
+    staffField("Application notes", data.inquiryApplicationNotes),
+    staffField("Submitted at", data.inquirySubmittedAt),
+    staffField("Country", data.inquiryCountry),
+    staffField("City", data.inquiryCity),
+    staffField("Region", data.inquiryRegion),
+    staffField("IP", data.inquiryIpAddress),
+  ]
 }
 
 function formatEntitlementTextLine(line: EntitlementEmailLine): string {

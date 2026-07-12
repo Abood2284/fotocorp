@@ -6,7 +6,8 @@ import type { AppRequestVariables } from "../../../db"
 import { createHttpDb } from "../../../db"
 import { submitContributorApplication } from "../../../lib/access-inquiries/contributor-application"
 import { getRequestAuditContext } from "../../../lib/request-audit-context"
-import { safeSendAccessInquiryEmail } from "../../../lib/email/email-service"
+import { safeSendAccessInquiryEmail, safeSendStaffInquiryEmail } from "../../../lib/email/email-service"
+import { buildStaffContributorApplicationEmailData } from "../../../lib/email/staff-inquiry-email-data"
 import { AppError } from "../../../lib/errors"
 import { json } from "../../../lib/http"
 import { methodNotAllowed } from "../../../lib/route-errors"
@@ -65,6 +66,22 @@ publicContributorApplicationRoutes.post(
         relatedEntityId: result.inquiryId,
       })
     }
+
+    await safeSendStaffInquiryEmail(db, c.env, {
+      templateKey: "STAFF_NEW_CONTRIBUTOR_APPLICATION",
+      relatedEntity: { type: "customer_access_inquiry", id: result.inquiryId },
+      data: buildStaffContributorApplicationEmailData({
+        firstName: body.firstName,
+        lastName: body.lastName,
+        proposedUsername: body.proposedUsername,
+        email: body.email || null,
+        phoneCountryCode: body.phoneCountryCode ?? null,
+        phoneNumber: body.phoneNumber ?? null,
+        applicationNotes: body.applicationNotes ?? null,
+        requestAudit,
+        submittedAt: result.createdAt,
+      }),
+    })
 
     return json({
       ok: true as const,
