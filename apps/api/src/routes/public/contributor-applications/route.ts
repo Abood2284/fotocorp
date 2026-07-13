@@ -16,9 +16,9 @@ const submitBodySchema = z.object({
   firstName: z.string().trim().min(1).max(120),
   lastName: z.string().trim().min(1).max(120),
   proposedUsername: z.string().trim().min(3).max(30),
-  email: z.union([z.string().trim().email().max(320), z.literal("")]).optional(),
-  phoneCountryCode: z.string().trim().max(8).optional(),
-  phoneNumber: z.string().trim().max(32).optional(),
+  email: z.string().trim().email().max(320),
+  phoneCountryCode: z.string().trim().min(1).max(8),
+  phoneNumber: z.string().trim().min(1).max(32),
   applicationNotes: z.string().trim().max(4000).optional(),
 })
 
@@ -42,30 +42,21 @@ publicContributorApplicationRoutes.post(
       firstName: body.firstName,
       lastName: body.lastName,
       proposedUsername: body.proposedUsername,
-      email: body.email || null,
-      phoneCountryCode: body.phoneCountryCode ?? null,
-      phoneNumber: body.phoneNumber ?? null,
+      email: body.email,
+      phoneCountryCode: body.phoneCountryCode,
+      phoneNumber: body.phoneNumber,
       applicationNotes: body.applicationNotes ?? null,
       requestAudit,
     })
-    if (body.email) {
-      await safeSendAccessInquiryEmail(db, c.env, {
-        templateKey: "CONTRIBUTOR_APPLICATION_RECEIVED",
-        recipient: {
-          email: body.email,
-          firstName: body.firstName,
-          displayName: `${body.firstName} ${body.lastName}`.trim(),
-        },
-        relatedEntity: { type: "customer_access_inquiry", id: result.inquiryId },
-      })
-    } else {
-      console.info("email_delivery_skipped", {
-        reason: "recipient_email_missing",
-        templateKey: "CONTRIBUTOR_APPLICATION_RECEIVED",
-        relatedEntityType: "customer_access_inquiry",
-        relatedEntityId: result.inquiryId,
-      })
-    }
+    await safeSendAccessInquiryEmail(db, c.env, {
+      templateKey: "CONTRIBUTOR_APPLICATION_RECEIVED",
+      recipient: {
+        email: body.email,
+        firstName: body.firstName,
+        displayName: `${body.firstName} ${body.lastName}`.trim(),
+      },
+      relatedEntity: { type: "customer_access_inquiry", id: result.inquiryId },
+    })
 
     await safeSendStaffInquiryEmail(db, c.env, {
       templateKey: "STAFF_NEW_CONTRIBUTOR_APPLICATION",
@@ -74,9 +65,9 @@ publicContributorApplicationRoutes.post(
         firstName: body.firstName,
         lastName: body.lastName,
         proposedUsername: body.proposedUsername,
-        email: body.email || null,
-        phoneCountryCode: body.phoneCountryCode ?? null,
-        phoneNumber: body.phoneNumber ?? null,
+        email: body.email,
+        phoneCountryCode: body.phoneCountryCode,
+        phoneNumber: body.phoneNumber,
         applicationNotes: body.applicationNotes ?? null,
         requestAudit,
         submittedAt: result.createdAt,

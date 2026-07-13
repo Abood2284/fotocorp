@@ -1,17 +1,25 @@
 import Link from "next/link"
 
 export const metadata = {
-  title: "Access pending — Fotocorp",
+  title: "We've Received Your Request — Fotocorp",
 }
 
 export default function AccessPendingPage() {
   return (
     <main className="mx-auto max-w-lg px-5 py-16">
-      <h1 className="font-serif text-2xl font-semibold text-foreground">Thanks — we have your request</h1>
-      <p className="mt-4 text-muted-foreground">
-        We received your registration. Our team will email you at your company address after we review what you need.
-        You can browse the catalog in the meantime. Sign in once we approve your access.
-      </p>
+      <h1 className="font-serif text-2xl font-semibold text-foreground">
+        We&apos;ve Received Your Request
+      </h1>
+      <div className="mt-4 space-y-4 text-muted-foreground">
+        <p>
+          Thank you for registering with Fotocorp. Your request is currently under review. We&apos;ll contact you
+          once the review is complete.
+        </p>
+        <p>
+          In the meantime, you&apos;re welcome to explore our image collections. Once your registration and
+          subscription have been approved, you can sign in to your account and download licensed content.
+        </p>
+      </div>
       <div className="mt-8 flex flex-col gap-3 sm:flex-row">
         <Link
           href="/"

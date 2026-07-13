@@ -2,9 +2,9 @@ export interface SubmitContributorApplicationInput {
   firstName: string
   lastName: string
   proposedUsername: string
-  email?: string
-  phoneCountryCode?: string
-  phoneNumber?: string
+  email: string
+  phoneCountryCode: string
+  phoneNumber: string
   applicationNotes?: string
 }
 

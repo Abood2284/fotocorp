@@ -50,7 +50,7 @@ export function ForgotPasswordForm() {
   return (
     <AuthFormShell
       title="Forgot password"
-      description="Enter the email on your Fotocorp account. We will send reset instructions if an account exists."
+      description="Enter the email address associated with your Fotocorp account. If an account exists for that email address, we'll send you instructions to reset your password."
     >
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div className="space-y-2">

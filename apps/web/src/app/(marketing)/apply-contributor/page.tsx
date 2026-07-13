@@ -1,27 +1,23 @@
-import Link from "next/link"
-
 import { ContributorApplicationForm } from "@/components/marketing/contributor-application-form"
 
 export const metadata = {
-  title: "Apply as a contributor — Fotocorp",
+  title: "Contributor Submission Form — Fotocorp",
 }
 
 export default function ApplyContributorPage() {
   return (
     <main className="mx-auto max-w-2xl px-5 py-16">
       <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-        Apply as a contributor
+        Contributor Submission Form
       </h1>
+      <p className="mt-4 text-sm leading-relaxed text-muted-foreground sm:text-base">
+        We appreciate your interest in Fotocorp and joining the contributor network. We work with
+        photographers, illustrators, cartoonists, and visual content creators. To be considered for
+        representation, please complete the form below.
+      </p>
       <div className="mt-10">
         <ContributorApplicationForm />
       </div>
-      <p className="mt-8 text-sm text-muted-foreground">
-        Already have credentials?{" "}
-        <Link href="/sign-in" className="font-medium text-primary hover:underline">
-          Sign in to the contributor portal
-        </Link>
-        .
-      </p>
     </main>
   )
 }

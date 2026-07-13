@@ -201,7 +201,7 @@ function HeaderShell({
             onCloseCancel={cancelCloseDropdown}
           />
           <BrowseNavTrigger
-            label="Video"
+            label="Pap Videos"
             active={false}
             expanded={openDropdown === "video"}
             onOpen={() => openBrowseDropdown("video")}
@@ -253,8 +253,10 @@ function HeaderShell({
         <BrowseDropdownPanel onMouseEnter={cancelCloseDropdown} onMouseLeave={scheduleCloseDropdown}>
           <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
             <h2 className="font-heading text-lg font-normal text-foreground">Editorial</h2>
-            <p className="mt-1 max-w-md text-sm text-muted-foreground">
-              Licensed news photography across entertainment, sports, fashion, and archive coverage.
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Rights-managed, pan-India publication-ready news photography covering entertainment, sports, fashion,
+              and archival imagery, delivering authentic editorial content from celebrity appearances, sporting
+              events, runway shows, and archive collections for media and publishing worldwide
             </p>
             <ul className="mt-4 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
               {EDITORIAL_LINKS.map((link) => (
@@ -275,8 +277,12 @@ function HeaderShell({
       {openDropdown === "video" && (
         <BrowseDropdownPanel onMouseEnter={cancelCloseDropdown} onMouseLeave={scheduleCloseDropdown}>
           <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
-            <h2 className="font-heading text-lg font-normal text-foreground">Video</h2>
-            <p className="mt-1 max-w-md text-sm text-muted-foreground">Video licensing is coming soon.</p>
+            <h2 className="font-heading text-lg font-normal text-foreground">Pap Videos</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Ready-for-broadcast high-quality paparazzi videos and editorial moving images capturing celebrities,
+              public figures, premieres, events, red carpet appearances, viral moments for social media and global
+              digital publishing
+            </p>
           </div>
         </BrowseDropdownPanel>
       )}
@@ -286,10 +292,9 @@ function HeaderShell({
           <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
             <h2 className="font-heading text-lg font-normal text-foreground">Caricature</h2>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Welcome to India&apos;s first online platform for cartoons and caricatures. If a picture can say a thousand
-              words, a cartoon can tell the entire story. From individual politicians and business tycoons to public
-              parodies and animated illustrations, the works of the country&apos;s finest artists, representing uniquely
-              Indian expressions, are just a click away.
+              India&apos;s finest online platform for cartoons, caricatures and illustrations. From individual
+              politicians and business tycoons to celebrity figures and public parodies, here are works of the
+              country&apos;s leading artists, representing uniquely Indian expressions
             </p>
             <ul className="mt-4 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
               <li>
@@ -309,7 +314,11 @@ function HeaderShell({
         <BrowseDropdownPanel onMouseEnter={cancelCloseDropdown} onMouseLeave={scheduleCloseDropdown}>
           <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
             <h2 className="font-heading text-lg font-normal text-foreground">Royalty Free</h2>
-            <p className="mt-1 max-w-md text-sm text-muted-foreground">Royalty free licensing is coming soon.</p>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Royalty-free stock images featuring business, lifestyle, travel, nature, technology, and creative
+              concepts, providing versatile, high-quality visuals for commercial, advertising, editorial, marketing,
+              creative-use and digital projects
+            </p>
           </div>
         </BrowseDropdownPanel>
       )}
@@ -459,7 +468,7 @@ function MobileBrowseNav({
         </div>
         <div className="grid gap-1">
           <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
-            Video — Coming soon
+            Pap Videos — Coming soon
           </span>
           <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
             Royalty Free — Coming soon

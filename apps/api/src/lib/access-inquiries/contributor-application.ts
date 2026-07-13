@@ -85,12 +85,18 @@ export async function submitContributorApplication(db: DrizzleClient, input: Sub
   }
 
   const emailRaw = input.email?.trim() ?? ""
-  const email = emailRaw && !isPlaceholderEmail(emailRaw) ? emailRaw.toLowerCase() : null
+  if (!emailRaw || isPlaceholderEmail(emailRaw)) {
+    throw new AppError(400, "EMAIL_REQUIRED", "Email is required.")
+  }
+  const email = emailRaw.toLowerCase()
 
-  const phone =
-    input.phoneCountryCode && input.phoneNumber
-      ? normalizePhoneClaim(input.phoneCountryCode, input.phoneNumber)
-      : null
+  if (!input.phoneCountryCode?.trim() || !input.phoneNumber?.trim()) {
+    throw new AppError(400, "PHONE_REQUIRED", "Country code and mobile number are required.")
+  }
+  const phone = normalizePhoneClaim(input.phoneCountryCode, input.phoneNumber)
+  if (!phone) {
+    throw new AppError(400, "PHONE_INVALID", "Enter a valid country code and mobile number.")
+  }
 
   const displayName = `${firstName} ${lastName}`.trim()
 

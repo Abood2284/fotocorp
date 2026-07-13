@@ -33,6 +33,14 @@ export function ContributorApplicationForm() {
       setError("Choose a username with 3–30 lowercase letters, numbers, dots, or underscores.")
       return
     }
+    if (!email) {
+      setError("Email is required.")
+      return
+    }
+    if (!phoneCountryCode || !phoneNumber) {
+      setError("Country code and mobile number are required.")
+      return
+    }
 
     setSaving(true)
     try {
@@ -40,9 +48,9 @@ export function ContributorApplicationForm() {
         firstName,
         lastName,
         proposedUsername,
-        email: email || undefined,
-        phoneCountryCode: phoneCountryCode || undefined,
-        phoneNumber: phoneNumber || undefined,
+        email,
+        phoneCountryCode,
+        phoneNumber,
         applicationNotes: applicationNotes || undefined,
       })
       setSubmitted(true)
@@ -57,9 +65,9 @@ export function ContributorApplicationForm() {
   if (submitted) {
     return (
       <div className="rounded-lg border border-border bg-muted/30 p-6">
-        <h2 className="font-serif text-xl font-semibold text-foreground">Application received</h2>
+        <h2 className="font-serif text-xl font-semibold text-foreground">Submission Received</h2>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          Thank you. Our team will review your contributor application and email you when your portal access is ready.
+          Your submission has been received. Our Editorial team will review your portfolio and contact you if it aligns with our requirements.
         </p>
         <Link href="/" className="mt-6 inline-flex text-sm font-medium text-primary hover:underline">
           Back to home
@@ -104,10 +112,11 @@ export function ContributorApplicationForm() {
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-foreground">Email (optional)</span>
+        <span className="font-medium text-foreground">Email</span>
         <input
           name="email"
           type="email"
+          required
           autoComplete="email"
           className="h-11 rounded-none border border-input bg-background px-3"
         />
@@ -118,15 +127,17 @@ export function ContributorApplicationForm() {
           <span className="font-medium text-foreground">Country code</span>
           <input
             name="phoneCountryCode"
+            required
             inputMode="numeric"
             placeholder="91"
             className="h-11 rounded-none border border-input bg-background px-3"
           />
         </label>
         <label className="flex flex-col gap-1.5 text-sm">
-          <span className="font-medium text-foreground">Mobile number (optional)</span>
+          <span className="font-medium text-foreground">Mobile number</span>
           <input
             name="phoneNumber"
+            required
             inputMode="tel"
             autoComplete="tel-national"
             className="h-11 rounded-none border border-input bg-background px-3"
@@ -140,7 +151,7 @@ export function ContributorApplicationForm() {
           name="applicationNotes"
           rows={4}
           className="rounded-none border border-input bg-background px-3 py-2"
-          placeholder="Portfolio links, specialties, or how you work with Fotocorp."
+          placeholder="Portfolio links, specialties."
         />
       </label>
 

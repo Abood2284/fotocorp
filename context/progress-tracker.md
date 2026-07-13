@@ -23,6 +23,22 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Services page copy:** `/services` updated with six offerings (Archive Licensing, Archival Research, Editorial Assignments, Illustrations/Cartoons, Paparazzi Video, Royalty-Free), licensing CTA, and Access & Licensing Process steps; enterprise line is intro description, not the display headline.
+
+- **Register choice cards:** Sign-up choice now lists Subscriber then Contributor with updated titles/descriptions (browse/license/download vs editorial submission).
+
+- **Access-pending copy:** Post-registration `/account/access-pending` now uses “We've Received Your Request” with review + explore-collections messaging.
+
+- **Register company type options:** Removed Corporation/Business and Government/Education/Non-profit groups from sign-up company type select; renamed Creative Agency → Advertising Agency.
+
+- **Contact page copy:** `/contact` headline is **Contact Us**; form intro updated; Headquarters moved above Directories with Primrose Chambers address + WhatsApp `+91 7666686655`; Directories now Archive Desk (`archive@`), Licensing & Sales (`subscription@`), and For Contributor (`fotodesk@`).
+
+- **About page copy:** Replaced `/about` marketing copy (headline, founding story, Best in Business stats, AAA+ Culture) without changing layout/UI structure.
+
+- **Header browse nav copy:** Renamed Video → **Pap Videos**; updated Editorial / Pap Videos / Caricature / Royalty Free hover-panel descriptions to product marketing copy.
+
+- **Contributor apply form copy + required contact fields:** `/apply-contributor` heading is now **Contributor Submission Form** with interest/network description; email and mobile (with country code) are required on the form, client API types, public submit schema, and service validation.
+
 - **Staff users table + detail:** `/staff/users` table shows User (name, email, `@username`), Company, Job title, and Used/Allocated (`used/limit`); row click opens `/staff/users/[authUserId]`. Detail page includes access/subscription management, registration profile, downloads list with from/to filters, cursor pagination, and PDF export. API: `GET /api/v1/internal/admin/users/:authUserId/downloads`; user list/search now includes `username`.
 
 - **Publish pipeline original metadata:** Added `@fotocorp/original-image-metadata` (Sharp compute + shared SQL upsert). `ImagePublishProcessor` and `media:process-image-publish-jobs` scan the canonical original buffer during publish and upsert `image_assets_metadata` atomically with go-live (non-blocking on extraction failure). Scanner refactored to shared module; added `--retry-failed` for ACTIVE assets with failed scans. Backfill: `media:scan-original-metadata --write --only-missing` and `--retry-failed`.

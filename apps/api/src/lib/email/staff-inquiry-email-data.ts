@@ -18,7 +18,7 @@ const QUALITY_LABELS: Record<string, string> = {
 }
 
 const COMPANY_TYPE_LABELS: Record<string, string> = {
-  agency: "Agency",
+  agency: "Advertising agency",
   brand: "Brand",
   broadcaster: "Broadcaster",
   education: "Education",

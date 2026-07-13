@@ -41,43 +41,10 @@ const COMPANY_TYPE_GROUPS: SelectGroup[] = [
   {
     label: "Agencies",
     options: [
-      { label: "Creative Agency", value: "agency" },
+      { label: "Advertising Agency", value: "agency" },
       { label: "Media Agency", value: "media" },
       { label: "PR Agency", value: "agency" },
       { label: "Photo Agency", value: "photo_agency" },
-    ],
-  },
-  {
-    label: "Corporation / Business",
-    options: [
-      { label: "Automotive & Other Vehicles", value: "brand" },
-      { label: "Business & Consumer Services", value: "brand" },
-      { label: "Consumer Goods & Manufacturing", value: "brand" },
-      { label: "Energy", value: "brand" },
-      { label: "Entertainment & Art Services", value: "brand" },
-      { label: "Fashion & Clothing", value: "brand" },
-      { label: "Financial Services", value: "brand" },
-      { label: "Food & Beverages", value: "brand" },
-      { label: "Gaming & eSports", value: "brand" },
-      { label: "Healthcare & Pharmaceuticals", value: "brand" },
-      { label: "Industrial Manufacturing", value: "brand" },
-      { label: "Property Management & Development", value: "brand" },
-      { label: "Retail", value: "brand" },
-      { label: "Software & Services", value: "brand" },
-      { label: "Technology Hardware & Equipment", value: "brand" },
-      { label: "Telecommunication Services", value: "brand" },
-      { label: "Transport & Logistics", value: "brand" },
-      { label: "Travel & Accommodation", value: "brand" },
-      { label: "Utilities", value: "brand" },
-      { label: "Unclassified Establishment", value: "other" },
-    ],
-  },
-  {
-    label: "Government, Education, Non-profit",
-    options: [
-      { label: "Education", value: "education" },
-      { label: "Government", value: "government" },
-      { label: "Non-profit or Cultural Institution", value: "non_profit" },
     ],
   },
   {
@@ -617,12 +584,12 @@ export function SplitAuthPage() {
 
           <div className="mb-6">
             <h1 className="text-2xl font-semibold text-white">
-              {activeTab === "sign-in" ? "Welcome back" : "Create access request"}
+              {activeTab === "sign-in" ? "Welcome back" : "Create an Access Request"}
             </h1>
             <p className="mt-1.5 text-sm text-white/60!">
               {activeTab === "sign-in"
                 ? "Access India\u2019s editorial photo archive."
-                : "Apply as a contributor or request buyer access."}
+                : "Complete the form below to request subscription access or apply to become a Fotocorp contributor."}
             </p>
           </div>
 
@@ -675,26 +642,26 @@ export function SplitAuthPage() {
             </form>
           ) : registerView === "choice" ? (
             <div className="space-y-4">
-              <Link href="/apply-contributor" className={registerChoiceCardClassName}>
-                <span className="block text-base font-semibold text-white">
-                  I want to contribute photos
-                </span>
-                <span className="mt-1 block text-sm text-white/55">
-                  Apply as Contributor →
-                </span>
-              </Link>
               <button
                 type="button"
                 onClick={() => setRegisterView("client-form")}
                 className={registerChoiceCardClassName}
               >
                 <span className="block text-base font-semibold text-white">
-                  I want to license/download photos
+                  Register as a Subscriber
                 </span>
                 <span className="mt-1 block text-sm text-white/55">
-                  Request Client Access →
+                  Request access to browse, license, and download images.
                 </span>
               </button>
+              <Link href="/apply-contributor" className={registerChoiceCardClassName}>
+                <span className="block text-base font-semibold text-white">
+                  Register as a Contributor
+                </span>
+                <span className="mt-1 block text-sm text-white/55">
+                  Apply to submit your editorial photography and content for consideration.
+                </span>
+              </Link>
             </div>
           ) : (
             <>

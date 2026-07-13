@@ -3,7 +3,8 @@ import { ArrowRight } from "lucide-react"
 
 export const metadata = {
   title: "About — Fotocorp",
-  description: "A focused archive for editorial and commercial image discovery. Learn about Fotocorp's mission, technology, and collection.",
+  description:
+    "Founded in 2004 by award-winning photojournalist Shailesh Mule, Fotocorp is India's premier visual content agency with 1 million+ pan-India editorial images, paparazzi videos, caricatures, and royalty-free stock.",
 }
 
 export default function AboutPage() {
@@ -16,7 +17,7 @@ export default function AboutPage() {
 
       {/* Main Display Headline */}
       <h1 className="fc-display-lg mt-3 max-w-4xl text-black font-normal leading-[1.1] tracking-tight">
-        A living record of history, preserved in high-resolution detail.
+        A million images that tell the story in high resolution.
       </h1>
 
       {/* Editorial Byline/Metadata */}
@@ -31,30 +32,28 @@ export default function AboutPage() {
         {/* Story Columns */}
         <div className="lg:col-span-2 space-y-8">
           <p className="fc-body-serif-lg text-black font-normal leading-[1.5] tracking-wide">
-            Fotocorp operates as a premium editorial and commercial image archive, serving as the trusted repository for a legacy catalog of over one million high-resolution photographs. Our collection captures the cultural, political, sporting, and social milestones of our time, documenting historic moments with visual authenticity and rigorous cataloging standards.
+            Founded by award-winning photojournalist Shailesh Mule on World Photography Day in 2004, the
+            Mumbai-based agency has an unmatched collection of 1 million+ pan-India editorial images.
+            Fotocorp&apos;s visual content represents the entire news spectrum – from Bollywood and Business,
+            to Politics, Personalities, Sports, Fashion…and much more.
           </p>
 
           <div className="border-t border-[#e0e0e0] pt-8">
-            <h2 className="fc-display-sm text-black font-normal mb-4">
-              Preserving the Legacy
-            </h2>
-            <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed mb-4">
-              Every image in our catalog is preserved with its original metadata and legacy identifiers. Values like the <strong className="text-black font-bold font-sans">Fotokey</strong> and <strong className="text-black font-bold font-sans">ImageCode</strong> remain first-class business identifiers in our system, ensuring that historic catalogs and research logs map accurately to our modernized digital storefront.
-            </p>
             <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed">
-              We leverage cloud-scale storage architectures via Cloudflare R2 to store our master originals. In public search grids, users browse lightweight, watermarked previews generated deterministically. Clean originals are only accessible through secure, server-side entitlement checks, maintaining file security without compromising on visitor discovery.
+              Fotocorp offers current as well as exclusive and rare archive images through subscription and
+              licensing. Trusted by leading media organizations worldwide, our images appear across newspapers,
+              magazines, broadcast networks, and digital platforms. Today, Fotocorp is counted as India&apos;s
+              premier &amp; leading visual content creator with a nationwide network, supplying high-quality
+              images to media houses and clients globally.
             </p>
           </div>
 
           <div className="border-t border-[#e0e0e0] pt-8">
-            <h2 className="fc-display-sm text-black font-normal mb-4">
-              Licensing and Access
-            </h2>
-            <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed mb-4">
-              Our licensing model is strictly entitlement-based. Verified subscribers gain access to high-quality originals mapped directly to their account parameters. Non-subscribers can browse watermarked cards and thumbnails, save collections to their local <Link href="/fotobox" className="link-inline-blue">Fotobox</Link>, and request access via our dedicated inquiry workflows.
-            </p>
             <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed">
-              For teams needing comprehensive editorial or creative coverage, we offer customized download quotas and size capabilities, ensuring frictionless workflows for media outlets, publishers, and creative agencies globally.
+              Expanding beyond editorial photography, we now offer exclusive paparazzi videos and images,
+              creative caricatures, and premium royalty-free stock images, making our platform a comprehensive
+              visual content destination. We also take up commissioned editorial, commercial and event
+              assignments across India and around the world.
             </p>
           </div>
         </div>
@@ -64,20 +63,24 @@ export default function AboutPage() {
           {/* Section: The Numbers */}
           <div>
             <h3 className="fc-display-xs text-black mb-6">
-              Archive Scope
+              Best in Business
             </h3>
             <div className="space-y-6">
               <div className="border-b border-[#e0e0e0] pb-4">
-                <span className="fc-display-md block text-black font-normal font-serif">1,000,000+</span>
-                <span className="fc-body-sans-sm text-[#757575] mt-1 block">Preserved high-resolution images</span>
+                <span className="fc-display-md block text-black font-normal font-serif">10,00,000+</span>
+                <span className="fc-body-sans-sm text-[#757575] mt-1 block">High Resolution Images</span>
               </div>
               <div className="border-b border-[#e0e0e0] pb-4">
-                <span className="fc-display-md block text-black font-normal font-serif">2.0 TB</span>
-                <span className="fc-body-sans-sm text-[#757575] mt-1 block">Active secure object storage</span>
+                <span className="fc-display-md block text-black font-normal font-serif">22+</span>
+                <span className="fc-body-sans-sm text-[#757575] mt-1 block">Years in Business</span>
               </div>
               <div className="border-b border-[#e0e0e0] pb-4">
-                <span className="fc-display-md block text-black font-normal font-serif">100+</span>
-                <span className="fc-body-sans-sm text-[#757575] mt-1 block">Professional press photographers</span>
+                <span className="fc-display-md block text-black font-normal font-serif">200+</span>
+                <span className="fc-body-sans-sm text-[#757575] mt-1 block">Clients across India &amp; Globally</span>
+              </div>
+              <div className="border-b border-[#e0e0e0] pb-4">
+                <span className="fc-display-md block text-black font-normal font-serif">100%</span>
+                <span className="fc-body-sans-sm text-[#757575] mt-1 block">Delivering Excellence</span>
               </div>
             </div>
           </div>
@@ -105,25 +108,29 @@ export default function AboutPage() {
       {/* Bottom Full-width Section: Editorial Standards */}
       <div className="border-t border-[#e0e0e0] mt-16 pt-12">
         <h3 className="fc-display-xs text-black mb-8">
-          Editorial Framework
+          The AAA+ Culture
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="border-r border-[#e0e0e0] pr-8 last:border-r-0">
             <h4 className="fc-body-sans-strong text-black font-bold mb-2">Authenticity</h4>
             <p className="fc-body-serif-md text-[#1a1a1a] text-sm leading-relaxed">
-              We never manipulate or alter our editorial photo journalism. Every image represents a true and accurate documentation of the scene.
+              We provide original and unaltered images and videos with metadata, capture details, location
+              timestamps, and photographer credits.
             </p>
           </div>
           <div className="border-r border-[#e0e0e0] pr-8 last:border-r-0">
-            <h4 className="fc-body-sans-strong text-black font-bold mb-2">Preservation</h4>
+            <h4 className="fc-body-sans-strong text-black font-bold mb-2">Availability</h4>
             <p className="fc-body-serif-md text-[#1a1a1a] text-sm leading-relaxed">
-              Metadata, capture details, location timestamps, and photographer credits are permanently bound to the asset during ingestion.
+              Subscribers benefit from our comprehensive storage architecture, which delivers exclusive
+              availability via optimized and dedicated servers.
             </p>
           </div>
           <div>
-            <h4 className="fc-body-sans-strong text-black font-bold mb-2">Availability</h4>
+            <h4 className="fc-body-sans-strong text-black font-bold mb-2">Accessibility</h4>
             <p className="fc-body-serif-md text-[#1a1a1a] text-sm leading-relaxed">
-              Subscribers benefit from our redundant storage architecture, delivering original access via optimized delivery servers.
+              Verified subscribers gain access to high-quality originals mapped directly to their account
+              parameters. Non-subscribers can browse watermarked thumbnails and request access via our inquiry
+              workflows.
             </p>
           </div>
         </div>
