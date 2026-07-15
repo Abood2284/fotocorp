@@ -41,6 +41,7 @@ describe("staff-route-access", () => {
     assert.equal(staffRoleCanAccessPath("SUPER_ADMIN", "/staff/catalog"), true)
     assert.equal(staffRoleCanAccessPath("SUPER_ADMIN", "/staff/audit"), true)
     assert.equal(staffRoleCanAccessPath("SUPER_ADMIN", "/staff/team-performance"), true)
+    assert.equal(staffRoleCanAccessPath("SUPER_ADMIN", "/staff/team-performance/30d94c5c-4d65-483f-b8b6-dcd246827a77"), true)
   })
 
   it("non-super-admin roles cannot access audit or team performance", () => {
@@ -48,6 +49,10 @@ describe("staff-route-access", () => {
     assert.equal(staffRoleCanAccessPath("SUPPORT", "/staff/audit"), false)
     assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/audit"), false)
     assert.equal(staffRoleCanAccessPath("CAPTION_WRITER", "/staff/team-performance"), false)
+    assert.equal(
+      staffRoleCanAccessPath("CAPTION_WRITER", "/staff/team-performance/30d94c5c-4d65-483f-b8b6-dcd246827a77"),
+      false,
+    )
   })
 
   it("CAPTION_WRITER is workspace-only", () => {

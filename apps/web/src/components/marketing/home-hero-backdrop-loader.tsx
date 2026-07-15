@@ -11,8 +11,12 @@ export function HomeHeroBackdropLoader() {
   const heroQuery = useQuery({
     queryKey: ["homepage", "hero-set"],
     queryFn: fetchPublicHomepageHeroSet,
-    staleTime: 5 * 60 * 1000,
-    refetchOnMount: false,
+    // Previous stable client cache — kept for easy revert
+    // staleTime: 5 * 60 * 1000,
+    // refetchOnMount: false,
+    // Trial: allow a fresh shuffle on remount / hard refresh
+    staleTime: 0,
+    refetchOnMount: "always",
   })
 
   const items = useMemo(

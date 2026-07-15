@@ -15,8 +15,11 @@ type PublicReadQueryClient = {
   execute(query: SQL): Promise<unknown>
 }
 
-export const PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL =
-  "public, max-age=0, s-maxage=30, stale-while-revalidate=60"
+// Previous stable cache (edge could stick a fixed set for ~30s) — kept for easy revert
+// export const PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL =
+//   "public, max-age=0, s-maxage=30, stale-while-revalidate=60"
+// Trial: no edge stickiness so each refresh can observe a new shuffle from the pool
+export const PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL = "private, no-store"
 
 export interface PublicHomepageHeroSetItemDto {
   slot: number
@@ -56,9 +59,14 @@ export async function getPublicHomepageHeroSet(
     return emptyHeroSetResponse()
   }
 
-  const selected = rows
-    .slice(0, PUBLIC_HOMEPAGE_HERO_DISPLAY_COUNT)
-    .map((row) => mapPoolRowToItem(row, cdn))
+  // Previous stable selection (fixed first 9 by pool position) — kept for easy revert
+  // const selected = rows
+  //   .slice(0, PUBLIC_HOMEPAGE_HERO_DISPLAY_COUNT)
+  //   .map((row) => mapPoolRowToItem(row, cdn))
+
+  // Trial: shuffle the curated pool of 25, then take 9 for this request
+  const items = rows.map((row) => mapPoolRowToItem(row, cdn))
+  const selected = shuffleArray(items).slice(0, PUBLIC_HOMEPAGE_HERO_DISPLAY_COUNT)
 
   return {
     setKey: "curated_pool",
@@ -129,6 +137,17 @@ function resolveTitle(row: {
     || row.fotokey?.trim()
     || "Fotocorp image"
   )
+}
+
+function shuffleArray<T>(items: T[]): T[] {
+  const copy = [...items]
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1))
+    const current = copy[index]!
+    copy[index] = copy[swapIndex]!
+    copy[swapIndex] = current
+  }
+  return copy
 }
 
 async function executeRows<T>(db: PublicReadQueryClient, query: SQL): Promise<T[]> {

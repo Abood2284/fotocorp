@@ -8,8 +8,18 @@ import { createHttpDb } from "../../../db"
 import { AppError } from "../../../lib/errors"
 import { methodNotAllowed } from "../../../lib/route-errors"
 import { STAFF_SESSION_COOKIE, requireStaffSession } from "../auth/service"
-import { getStaffProductivity } from "./service"
-import { staffProductivityQuerySchema } from "./validators"
+import {
+  exportStaffProductivityActivityCsv,
+  getStaffProductivity,
+  getStaffProductivityDetail,
+  listStaffProductivityActivity,
+} from "./service"
+import {
+  staffProductivityActivityQuerySchema,
+  staffProductivityExportQuerySchema,
+  staffProductivityMemberParamSchema,
+  staffProductivityQuerySchema,
+} from "./validators"
 
 const STAFF_PRODUCTIVITY_ADMIN_ROLES = new Set(["SUPER_ADMIN"])
 
@@ -41,4 +51,54 @@ staffProductivityRoutes.get(
   },
 )
 
+staffProductivityRoutes.get(
+  "/api/v1/staff/productivity/:staffMemberId",
+  zValidator("param", staffProductivityMemberParamSchema),
+  zValidator("query", staffProductivityQuerySchema),
+  async (c) => {
+    const { db } = await requireStaffProductivityAdmin(c)
+    const { staffMemberId } = c.req.valid("param")
+    const query = c.req.valid("query")
+    const result = await getStaffProductivityDetail(db, staffMemberId, query)
+    return c.json({ ok: true, ...result })
+  },
+)
+
+staffProductivityRoutes.get(
+  "/api/v1/staff/productivity/:staffMemberId/activity",
+  zValidator("param", staffProductivityMemberParamSchema),
+  zValidator("query", staffProductivityActivityQuerySchema),
+  async (c) => {
+    const { db } = await requireStaffProductivityAdmin(c)
+    const { staffMemberId } = c.req.valid("param")
+    const query = c.req.valid("query")
+    const result = await listStaffProductivityActivity(db, staffMemberId, query)
+    return c.json({ ok: true, ...result })
+  },
+)
+
+staffProductivityRoutes.get(
+  "/api/v1/staff/productivity/:staffMemberId/export",
+  zValidator("param", staffProductivityMemberParamSchema),
+  zValidator("query", staffProductivityExportQuerySchema),
+  async (c) => {
+    const { db } = await requireStaffProductivityAdmin(c)
+    const { staffMemberId } = c.req.valid("param")
+    const query = c.req.valid("query")
+    const csv = await exportStaffProductivityActivityCsv(db, staffMemberId, query)
+    const filename = `staff-productivity-${staffMemberId.slice(0, 8)}.csv`
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "private, no-store",
+      },
+    })
+  },
+)
+
 staffProductivityRoutes.all("/api/v1/staff/productivity", () => methodNotAllowed())
+staffProductivityRoutes.all("/api/v1/staff/productivity/:staffMemberId", () => methodNotAllowed())
+staffProductivityRoutes.all("/api/v1/staff/productivity/:staffMemberId/activity", () => methodNotAllowed())
+staffProductivityRoutes.all("/api/v1/staff/productivity/:staffMemberId/export", () => methodNotAllowed())

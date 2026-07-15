@@ -39,7 +39,7 @@ export function HeroBackdropStrip({ items }: HeroBackdropStripProps) {
       aria-hidden="true"
     >
       <div
-        className="absolute inset-0 flex items-stretch justify-center opacity-[0.48] sm:opacity-[0.44] md:opacity-[0.40]"
+        className="absolute inset-0 flex items-stretch justify-center opacity-[0.38] sm:opacity-[0.34] md:opacity-[0.30]"
         style={{
           maskImage:
             "linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%), linear-gradient(180deg, transparent 0%, black 3%, black 97%, transparent 100%)",

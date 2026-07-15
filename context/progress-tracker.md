@@ -23,6 +23,12 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Staff team performance detail (PR-C):** Staff row opens `/staff/team-performance/[staffMemberId]` with field charts (line/pie/bar), paginated activity log (changed fields + asset links), and CSV export. API: `GET /api/v1/staff/productivity/:staffMemberId`, `/activity`, `/export`. List rows link through with date range preserved. **Fix:** activity query no longer joins `image_assets` via `id::text` (seq-scanned 737k rows / ~11s); labels are batch-fetched by UUID after the page is selected.
+
+- **Staff team performance truth layer (PR-A):** Productivity API now uses **unique assets touched** as primary KPI, with save counts + per-field breakdown (caption / who-is-in-picture / keywords / headline / description), `activityByDay`, and metric definitions. Staff upload-wizard metadata saves write `asset_admin_audit_logs` (actor from BFF headers). List UI columns/tooltips + 1d/7d/30d presets updated. Akbar Jul 1–15 reconciliation: caption-only was 64/86 all-time; who-in-pic ~332 unique assets. Next: staff detail page (charts + audit log + CSV).
+
+- **Homepage hero shuffle trial (reversible):** Restored per-request shuffle of 9 from the curated 25-image pool in `getPublicHomepageHeroSet`; commented (not deleted) the fixed first-9-by-position path, 5-min React Query cache, BFF 300s revalidate, and `s-maxage=30` Cache-Control. Trial uses `private, no-store` + `staleTime: 0` / `refetchOnMount: "always"` so hard refreshes can observe a new set. Pending product greenlight to keep or revert.
+
 - **Services page copy:** `/services` updated with six offerings (Archive Licensing, Archival Research, Editorial Assignments, Illustrations/Cartoons, Paparazzi Video, Royalty-Free), licensing CTA, and Access & Licensing Process steps; enterprise line is intro description, not the display headline.
 
 - **Register choice cards:** Sign-up choice now lists Subscriber then Contributor with updated titles/descriptions (browse/license/download vs editorial submission).

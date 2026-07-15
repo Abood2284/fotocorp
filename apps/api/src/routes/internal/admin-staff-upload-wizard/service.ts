@@ -1,5 +1,11 @@
 import { sql, type SQL } from "drizzle-orm";
 import type { DrizzleClient } from "../../../db";
+import { ASSET_AUDIT_ACTION } from "../../../lib/audit/actions";
+import {
+  buildFieldDeltas,
+  insertAssetAdminAuditLog,
+  type AssetAdminAuditActor,
+} from "../../../lib/audit/asset-admin-audit-log";
 import { AppError } from "../../../lib/errors";
 import { json } from "../../../lib/http";
 import { schedulePublicEventFeedSync } from "../../../lib/assets/public-event-feed-projection";
@@ -186,8 +192,49 @@ export async function patchStaffUploadWizardMetadataService(
   batchId: string,
   imageAssetId: string,
   body: PatchUploadAssetMetadataBody,
+  actor: AssetAdminAuditActor,
 ): Promise<Response> {
-  return json(await staffDelegatePatchPhotographerUploadAssetMetadata(db, batchId, imageAssetId, body));
+  const beforeRows = await executeRows<{
+    who_is_in_picture: string | null;
+    caption: string | null;
+    keywords: string | null;
+  }>(
+    db,
+    sql`
+      select who_is_in_picture, caption, keywords
+      from image_assets
+      where id = ${imageAssetId}::uuid
+      limit 1
+    `,
+  );
+  const beforeRow = beforeRows[0];
+  const result = await staffDelegatePatchPhotographerUploadAssetMetadata(db, batchId, imageAssetId, body);
+
+  if (result.ok && actor.authUserId && beforeRow) {
+    const { before, after } = buildFieldDeltas(
+      {
+        who_is_in_picture: beforeRow.who_is_in_picture ?? null,
+        caption: beforeRow.caption ?? null,
+        keywords: beforeRow.keywords ?? null,
+      },
+      {
+        who_is_in_picture: result.whoIsInPicture,
+        caption: result.caption,
+        keywords: result.keywords,
+      },
+    );
+    if (Object.keys(after).length > 0) {
+      await insertAssetAdminAuditLog(db, {
+        assetId: imageAssetId,
+        action: ASSET_AUDIT_ACTION.metadataUpdated,
+        actor,
+        before,
+        after,
+      }).catch(() => undefined);
+    }
+  }
+
+  return json(result);
 }
 
 

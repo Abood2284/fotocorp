@@ -5,6 +5,7 @@ import { createHttpDb, type AppRequestVariables } from "../../../db";
 import { AppError } from "../../../lib/errors";
 import { methodNotAllowed } from "../../../lib/route-errors";
 import { internalAuthMiddleware } from "../../../middleware/internalAuth";
+import { actorFromRequest } from "../admin/service";
 import {
   completeStaffUploadWizardFileService,
   createStaffUploadWizardBatchService,
@@ -116,7 +117,13 @@ internalAdminStaffUploadWizardRoutes.patch(
   async (c) => {
     const database = db(c.env);
     const { batchId, imageAssetId } = c.req.valid("param");
-    return await patchStaffUploadWizardMetadataService(database, batchId, imageAssetId, c.req.valid("json"));
+    return await patchStaffUploadWizardMetadataService(
+      database,
+      batchId,
+      imageAssetId,
+      c.req.valid("json"),
+      actorFromRequest(c.req.raw),
+    );
   },
 );
 

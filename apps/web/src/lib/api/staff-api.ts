@@ -354,10 +354,18 @@ export async function getStaffAuditLogs(
   })
 }
 
+export interface StaffProductivityFieldSaves {
+  caption: number
+  whoIsInPicture: number
+  keywords: number
+  headline: number
+  description: number
+}
+
 export interface StaffProductivitySummary {
-  captionsEdited: number
-  uniqueAssetsCaptioned: number
-  metadataEdits: number
+  uniqueAssetsTouched: number
+  saves: number
+  fieldSaves: StaffProductivityFieldSaves
   uploadsApproved: number
   uploadsRejected: number
   activeStaffCount: number
@@ -369,12 +377,28 @@ export interface StaffProductivityMember {
   username: string | null
   role: string
   status: string
-  captionsEdited: number
-  uniqueAssetsCaptioned: number
-  metadataEdits: number
+  uniqueAssetsTouched: number
+  saves: number
+  fieldSaves: StaffProductivityFieldSaves
+  uniqueAssetsByField: StaffProductivityFieldSaves
   uploadsApproved: number
   uploadsRejected: number
   lastActivityAt: string | null
+}
+
+export interface StaffProductivityActivityDay {
+  date: string
+  uniqueAssetsTouched: number
+  saves: number
+  fieldSaves: StaffProductivityFieldSaves
+}
+
+export interface StaffProductivityDefinitions {
+  uniqueAssetsTouched: string
+  saves: string
+  fieldSaves: string
+  uniqueAssetsByField: string
+  reliableFrom: string
 }
 
 export async function getStaffProductivity(
@@ -392,10 +416,84 @@ export async function getStaffProductivity(
     ok: true
     summary: StaffProductivitySummary
     members: StaffProductivityMember[]
+    activityByDay: StaffProductivityActivityDay[]
+    definitions: StaffProductivityDefinitions
   }>(`/productivity${query}`, {
     method: "GET",
     cookieHeader: options.cookieHeader,
   })
+}
+
+export interface StaffProductivityActivityItem {
+  id: string
+  source: "asset" | "staff"
+  createdAt: string
+  action: string
+  assetId: string | null
+  assetLabel: string | null
+  changedFields: string[]
+  summary: string
+  entityHref: string | null
+}
+
+export async function getStaffProductivityDetail(
+  staffMemberId: string,
+  options: {
+    cookieHeader?: string
+    from?: string
+    to?: string
+  } = {},
+) {
+  const params = new URLSearchParams()
+  if (options.from) params.set("from", options.from)
+  if (options.to) params.set("to", options.to)
+  const query = params.toString() ? `?${params.toString()}` : ""
+  return staffJson<{
+    ok: true
+    member: StaffProductivityMember
+    activityByDay: StaffProductivityActivityDay[]
+    definitions: StaffProductivityDefinitions
+  }>(`/productivity/${encodeURIComponent(staffMemberId)}${query}`, {
+    method: "GET",
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function getStaffProductivityActivity(
+  staffMemberId: string,
+  options: {
+    cookieHeader?: string
+    from?: string
+    to?: string
+    limit?: number
+    cursor?: string
+  } = {},
+) {
+  const params = new URLSearchParams()
+  if (options.from) params.set("from", options.from)
+  if (options.to) params.set("to", options.to)
+  if (options.limit) params.set("limit", String(options.limit))
+  if (options.cursor) params.set("cursor", options.cursor)
+  const query = params.toString() ? `?${params.toString()}` : ""
+  return staffJson<{
+    ok: true
+    items: StaffProductivityActivityItem[]
+    nextCursor: string | null
+  }>(`/productivity/${encodeURIComponent(staffMemberId)}/activity${query}`, {
+    method: "GET",
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export function buildStaffProductivityExportHref(
+  staffMemberId: string,
+  options: { from?: string; to?: string } = {},
+) {
+  const params = new URLSearchParams()
+  if (options.from) params.set("from", options.from)
+  if (options.to) params.set("to", options.to)
+  const query = params.toString() ? `?${params.toString()}` : ""
+  return `/api/staff/productivity/${encodeURIComponent(staffMemberId)}/export${query}`
 }
 
 export async function patchStaffMemberAccount(

@@ -32,8 +32,11 @@ const PUBLIC_SEARCH_CACHE_CONTROL =
   "public, max-age=30, s-maxage=120, stale-while-revalidate=300"
 const PUBLIC_ROYALTY_FREE_FEATURED_CACHE_CONTROL =
   "public, max-age=86400, s-maxage=2592000, stale-while-revalidate=604800"
-const PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL =
-  "public, max-age=0, s-maxage=30, stale-while-revalidate=60"
+// Previous stable cache — kept for easy revert
+// const PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL =
+//   "public, max-age=0, s-maxage=30, stale-while-revalidate=60"
+// Trial: match API no-store so shuffled sets are not edge-stuck
+const PUBLIC_HOMEPAGE_HERO_SET_CACHE_CONTROL = "private, no-store"
 const PUBLIC_ASSET_DETAIL_CACHE_CONTROL =
   "public, max-age=300, s-maxage=2592000, stale-while-revalidate=604800"
 
@@ -108,7 +111,10 @@ async function handlePublicProxy(
       : isEventCategoryBrowse
         ? 86_400
       : isHomepageHeroSet
-        ? 300
+        // Previous stable BFF upstream cache (5 min) — kept for easy revert
+        // ? 300
+        // Trial: no-store so each refresh can get a newly shuffled set
+        ? undefined
       : isRoyaltyFreeFeatured
         ? 86_400
       : isAssetFilters
