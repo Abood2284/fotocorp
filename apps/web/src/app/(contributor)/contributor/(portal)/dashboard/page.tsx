@@ -171,7 +171,14 @@ export default async function ContributorDashboardPage() {
                           </p>
                           <p className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                             <Calendar size={12} />
-                            <span>{row.eventName ?? "Event TBD"}</span>
+                            <span>
+                              {row.assetType === "CARICATURE"
+                                ? row.categoryName ?? "Caricature"
+                                : row.eventName ?? "Event TBD"}
+                            </span>
+                            {row.assetType === "CARICATURE" ? (
+                              <Badge variant="outline">Caricature</Badge>
+                            ) : null}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">

@@ -195,7 +195,7 @@ export function StaffCaricaturesClient({
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col gap-4 lg:flex-row">
       <section className="flex w-full flex-col gap-4 lg:w-[min(420px,100%)]">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_min(320px,100%)] lg:items-start">
+        <div className="space-y-3">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Caricatures</h1>
             <p className="mt-1 text-sm text-muted-foreground">

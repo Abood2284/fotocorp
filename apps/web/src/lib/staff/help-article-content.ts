@@ -1,5 +1,5 @@
-import DOMPurify from "isomorphic-dompurify"
 import { marked } from "marked"
+import sanitizeHtml from "sanitize-html"
 
 marked.setOptions({ gfm: true, breaks: true })
 
@@ -84,12 +84,22 @@ const HELP_ARTICLE_ALLOWED_ATTR = [
   "data-help-video",
 ]
 
+const HELP_ARTICLE_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: HELP_ARTICLE_ALLOWED_TAGS,
+  allowedAttributes: {
+    "*": HELP_ARTICLE_ALLOWED_ATTR,
+  },
+  allowedSchemes: ["http", "https", "mailto"],
+  allowedSchemesByTag: {
+    img: ["http", "https"],
+    video: ["http", "https"],
+    source: ["http", "https"],
+  },
+  allowProtocolRelative: false,
+}
+
 export function sanitizeHelpArticleHtml(html: string) {
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: HELP_ARTICLE_ALLOWED_TAGS,
-    ALLOWED_ATTR: HELP_ARTICLE_ALLOWED_ATTR,
-    ALLOW_DATA_ATTR: true,
-  })
+  return sanitizeHtml(html, HELP_ARTICLE_SANITIZE_OPTIONS)
 }
 
 export function normalizeHelpArticleHtmlForSave(html: string) {

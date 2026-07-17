@@ -23,6 +23,12 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Contributor caricature ownership + uploads list:** Caricatures were invisible on contributor dashboard metrics and `/contributor/uploads` because they live in `caricature_assets` (not `image_assets`) with no contributor FK. Added `created_by_contributor_id` (`0062_caricature_contributor_ownership`), wired upload-shell/create paths (contributor + staff) to set ownership, ownership-scoped contributor caricature routes + `GET /api/v1/contributor/caricatures` list, analytics summary now unions editorial + caricature uploads, and `/contributor/uploads` shows caricature rows (status/category/credit) plus editorial batches. Credit-matched backfill for prior non-staff uploads.
+
+- **Staff caricatures header layout:** Page intro no longer shares a 2-column grid with contextual help inside the ~420px list sidebar (description was wrapping one word per line). Title/description stack full-width; help panel sits below.
+
+- **Staff Help Center Worker 500 fix:** Replaced `isomorphic-dompurify` (pulls in `jsdom`, which reads `/browser/default-stylesheet.css` from disk) with Workers-safe `sanitize-html` in `apps/web/src/lib/staff/help-article-content.ts`. Production Cloudflare Worker was failing on `GET /staff/help` because the help listing imported `help-form` → `help-article-content` and evaluated jsdom at module load. Tests: `apps/web/test/help-article-content.test.ts`.
+
 - **Staff team performance detail (PR-C):** Staff row opens `/staff/team-performance/[staffMemberId]` with field charts (line/pie/bar), paginated activity log (changed fields + asset links), and CSV export. API: `GET /api/v1/staff/productivity/:staffMemberId`, `/activity`, `/export`. List rows link through with date range preserved. **Fix:** activity query no longer joins `image_assets` via `id::text` (seq-scanned 737k rows / ~11s); labels are batch-fetched by UUID after the page is selected.
 
 - **Staff team performance truth layer (PR-A):** Productivity API now uses **unique assets touched** as primary KPI, with save counts + per-field breakdown (caption / who-is-in-picture / keywords / headline / description), `activityByDay`, and metric definitions. Staff upload-wizard metadata saves write `asset_admin_audit_logs` (actor from BFF headers). List UI columns/tooltips + 1d/7d/30d presets updated. Akbar Jul 1–15 reconciliation: caption-only was 64/86 all-time; who-in-pic ~332 unique assets. Next: staff detail page (charts + audit log + CSV).

@@ -364,6 +364,7 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
         file: row.file,
         credit: caricatureDefaultCredit,
         existingAssetId: caricatureAssetId,
+        contributorId: targetContributorId,
         onProgress: setCaricatureUploadProgress,
       })
       setCaricatureAssetId(result.assetId)
@@ -382,6 +383,7 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
     caricatureDefaultCredit,
     caricatureAssetId,
     markStepComplete,
+    targetContributorId,
   ])
 
   const saveCaricatureMetadata = useCallback(

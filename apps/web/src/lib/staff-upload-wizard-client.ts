@@ -235,7 +235,11 @@ export async function staffWizardUpdateCaricatureAsset(assetId: string, payload:
   })
 }
 
-export async function createStaffCaricatureUploadShell(payload: { credit: string; fileName?: string }) {
+export async function createStaffCaricatureUploadShell(payload: {
+  credit: string
+  fileName?: string
+  contributorId?: string
+}) {
   return staffWizardJson<CaricatureAssetRecord>("/caricatures/upload-shell", {
     method: "POST",
     body: JSON.stringify(payload),

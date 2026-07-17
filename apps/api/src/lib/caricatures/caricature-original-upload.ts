@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm"
+import { and, asc, eq, isNull, sql } from "drizzle-orm"
 
 import type { DrizzleClient } from "../../db"
 import { caricatureAssets } from "../../db/schema/caricature-assets"
@@ -27,6 +27,7 @@ import { createCaricatureOriginalPresignedPutUrl } from "../r2-presigned-put"
 export interface CaricatureUploadShellInput {
   credit: string
   fileName?: string
+  contributorId?: string | null
 }
 
 export interface CaricatureOriginalPresignInput {
@@ -70,6 +71,11 @@ export async function createCaricatureUploadShell(
   const categoryId = await resolveDefaultCaricatureCategoryId(db)
   const headline = headlineFromUploadFileName(input.fileName)
   const now = new Date()
+  const contributorId = input.contributorId?.trim() || null
+
+  if (contributorId) {
+    await assertContributorExists(db, contributorId)
+  }
 
   const [created] = await db
     .insert(caricatureAssets)
@@ -88,6 +94,7 @@ export async function createCaricatureUploadShell(
       publishedAt: now,
       status: "DRAFT",
       visibility: "PRIVATE",
+      createdByContributorId: contributorId,
       createdByStaffId: actorStaffId,
       updatedByStaffId: actorStaffId,
     })
@@ -290,4 +297,17 @@ function normalizeOptionalChecksum(value: string | null | undefined): string | n
   if (!trimmed) return null
   if (trimmed.length > 128) return null
   return trimmed
+}
+
+async function assertContributorExists(db: DrizzleClient, contributorId: string) {
+  const rows = await db.execute(sql`
+    select id::text as id
+    from contributors
+    where id = ${contributorId}::uuid
+    limit 1
+  `)
+  const list = Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []
+  if (!list[0]) {
+    throw new AppError(404, "CONTRIBUTOR_NOT_FOUND", "Contributor was not found.")
+  }
 }

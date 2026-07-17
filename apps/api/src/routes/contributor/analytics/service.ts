@@ -30,10 +30,12 @@ interface TopImageRow {
 
 interface RecentUploadRow {
   image_asset_id: string;
+  asset_type: string;
   legacy_image_code: string | null;
   who_is_in_picture: string | null;
   headline: string | null;
   event_name: string | null;
+  category_name: string | null;
   status: string;
   visibility: string;
   created_at: Date | string;
@@ -46,30 +48,55 @@ export async function getPhotographerAnalyticsSummary(db: DrizzleClient, session
     executeRows<SummaryRow>(
       db,
       sql`
+        with editorial as (
+          select
+            ia.created_at,
+            ia.status,
+            ia.visibility
+          from image_assets ia
+          where ia.contributor_id = ${photographerId}::uuid
+        ),
+        caricatures as (
+          select
+            ca.created_at,
+            ca.status,
+            ca.visibility
+          from caricature_assets ca
+          where ca.created_by_contributor_id = ${photographerId}::uuid
+            and ca.deleted_at is null
+        ),
+        combined as (
+          select * from editorial
+          union all
+          select * from caricatures
+        )
         select
           count(*)::int as total_uploads,
-          count(*) filter (where ia.created_at >= date_trunc('week', current_timestamp))::int as uploads_this_week,
-          count(*) filter (where ia.created_at >= date_trunc('month', current_timestamp))::int as uploads_this_month,
+          count(*) filter (where created_at >= date_trunc('week', current_timestamp))::int as uploads_this_week,
+          count(*) filter (where created_at >= date_trunc('month', current_timestamp))::int as uploads_this_month,
           count(*) filter (
-            where (ia.status = 'SUBMITTED'
-              or ia.visibility = 'PRIVATE'
-              or ia.status in ('DRAFT', 'UNKNOWN'))
-              and ia.created_at >= date_trunc('week', current_timestamp)
+            where (
+              status in ('SUBMITTED', 'DRAFT', 'UNKNOWN', 'PENDING_REVIEW')
+              or (visibility = 'PRIVATE' and status not in ('REJECTED', 'PUBLISHED'))
+            )
+              and created_at >= date_trunc('week', current_timestamp)
           )::int as submissions_this_week,
           count(*) filter (
-            where (ia.status = 'SUBMITTED'
-              or ia.visibility = 'PRIVATE'
-              or ia.status in ('DRAFT', 'UNKNOWN'))
-              and ia.created_at >= date_trunc('month', current_timestamp)
+            where (
+              status in ('SUBMITTED', 'DRAFT', 'UNKNOWN', 'PENDING_REVIEW')
+              or (visibility = 'PRIVATE' and status not in ('REJECTED', 'PUBLISHED'))
+            )
+              and created_at >= date_trunc('month', current_timestamp)
           )::int as submissions_this_month,
           count(*) filter (
-            where ia.status = 'SUBMITTED'
-              or ia.visibility = 'PRIVATE'
-              or ia.status in ('DRAFT', 'UNKNOWN')
+            where status in ('SUBMITTED', 'DRAFT', 'UNKNOWN', 'PENDING_REVIEW')
+              or (visibility = 'PRIVATE' and status not in ('REJECTED', 'PUBLISHED'))
           )::int as submitted_images,
-          count(*) filter (where ia.status = 'ACTIVE' and ia.visibility = 'PUBLIC')::int as approved_images
-        from image_assets ia
-        where ia.contributor_id = ${photographerId}::uuid
+          count(*) filter (
+            where (status = 'ACTIVE' and visibility = 'PUBLIC')
+              or status = 'PUBLISHED'
+          )::int as approved_images
+        from combined
       `,
     ),
     executeRows<DownloadSummaryRow>(
@@ -116,19 +143,41 @@ export async function getPhotographerAnalyticsSummary(db: DrizzleClient, session
     executeRows<RecentUploadRow>(
       db,
       sql`
-        select
-          ia.id as image_asset_id,
-          ia.legacy_image_code,
-          ia.who_is_in_picture,
-          ia.headline,
-          pe.name as event_name,
-          ia.status,
-          ia.visibility,
-          ia.created_at
-        from image_assets ia
-        left join photo_events pe on pe.id = ia.event_id
-        where ia.contributor_id = ${photographerId}::uuid
-        order by ia.created_at desc, ia.id desc
+        (
+          select
+            ia.id as image_asset_id,
+            'IMAGE'::text as asset_type,
+            ia.legacy_image_code,
+            ia.who_is_in_picture,
+            ia.headline,
+            pe.name as event_name,
+            null::text as category_name,
+            ia.status,
+            ia.visibility,
+            ia.created_at
+          from image_assets ia
+          left join photo_events pe on pe.id = ia.event_id
+          where ia.contributor_id = ${photographerId}::uuid
+        )
+        union all
+        (
+          select
+            ca.id as image_asset_id,
+            'CARICATURE'::text as asset_type,
+            null::text as legacy_image_code,
+            null::text as who_is_in_picture,
+            ca.headline,
+            null::text as event_name,
+            cc.name as category_name,
+            ca.status,
+            ca.visibility,
+            ca.created_at
+          from caricature_assets ca
+          join caricature_categories cc on cc.id = ca.category_id
+          where ca.created_by_contributor_id = ${photographerId}::uuid
+            and ca.deleted_at is null
+        )
+        order by created_at desc, image_asset_id desc
         limit 5
       `,
     ),
@@ -162,10 +211,12 @@ export async function getPhotographerAnalyticsSummary(db: DrizzleClient, session
     })),
     recentUploads: recentRows.map((row) => ({
       imageAssetId: row.image_asset_id,
+      assetType: row.asset_type === "CARICATURE" ? ("CARICATURE" as const) : ("IMAGE" as const),
       legacyImageCode: row.legacy_image_code,
       whoIsInPicture: row.who_is_in_picture,
       headline: row.headline,
       eventName: row.event_name,
+      categoryName: row.category_name,
       status: row.status,
       visibility: row.visibility,
       createdAt: toIso(row.created_at),

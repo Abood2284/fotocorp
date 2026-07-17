@@ -129,13 +129,83 @@ export async function getAdminCaricatureAssetById(
   return detail
 }
 
+export async function listContributorCaricatureAssets(
+  db: DrizzleClient,
+  contributorId: string,
+  filters: { status?: string; limit: number; offset: number },
+): Promise<{ items: AdminCaricatureAssetListItem[]; total: number; limit: number; offset: number }> {
+  const conditions = [
+    isNull(caricatureAssets.deletedAt),
+    eq(caricatureAssets.createdByContributorId, contributorId),
+  ]
+
+  if (filters.status) {
+    conditions.push(eq(caricatureAssets.status, filters.status.trim().toUpperCase()))
+  }
+
+  const whereClause = and(...conditions)
+
+  const rows = await db
+    .select({
+      asset: caricatureAssets,
+      categoryName: caricatureCategories.name,
+    })
+    .from(caricatureAssets)
+    .innerJoin(caricatureCategories, eq(caricatureAssets.categoryId, caricatureCategories.id))
+    .where(whereClause)
+    .orderBy(sql`${caricatureAssets.createdAt} DESC`, sql`${caricatureAssets.id} DESC`)
+    .limit(filters.limit)
+    .offset(filters.offset)
+
+  const countQuery = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(caricatureAssets)
+    .where(whereClause)
+
+  return {
+    items: rows.map(({ asset, categoryName }) => mapListItem(asset, categoryName)),
+    total: Number(countQuery[0]?.count ?? 0),
+    limit: filters.limit,
+    offset: filters.offset,
+  }
+}
+
+export async function requireContributorOwnedCaricature(
+  db: DrizzleClient,
+  assetId: string,
+  contributorId: string,
+  options?: { allowPortalAdmin?: boolean },
+): Promise<AdminCaricatureAssetDetail> {
+  const detail = await getAdminCaricatureAssetById(db, assetId)
+  if (!detail) {
+    throw new AppError(404, "CARICATURE_NOT_FOUND", "Caricature not found.")
+  }
+
+  const ownerRows = await db
+    .select({ createdByContributorId: caricatureAssets.createdByContributorId })
+    .from(caricatureAssets)
+    .where(and(eq(caricatureAssets.id, assetId), isNull(caricatureAssets.deletedAt)))
+    .limit(1)
+
+  const ownerId = ownerRows[0]?.createdByContributorId ?? null
+  if (ownerId === contributorId) return detail
+  if (options?.allowPortalAdmin && ownerId) return detail
+
+  throw new AppError(404, "CARICATURE_NOT_FOUND", "Caricature not found.")
+}
+
 export async function createAdminCaricatureAsset(
   db: DrizzleClient,
   input: CaricatureMetadataInput,
   actorStaffId: string | null,
+  options?: { contributorId?: string | null },
 ): Promise<AdminCaricatureAssetDetail> {
   const metadata = normalizeCaricatureMetadataInput(input, { hasOriginalFile: false })
   await assertActiveCategory(db, metadata.categoryId)
+  const contributorId = options?.contributorId?.trim() || null
+  if (contributorId) {
+    await assertContributorIdExists(db, contributorId)
+  }
 
   const [created] = await db
     .insert(caricatureAssets)
@@ -154,6 +224,7 @@ export async function createAdminCaricatureAsset(
       publishedAt: metadata.publishedAt,
       status: metadata.status,
       visibility: metadata.status === "PUBLISHED" ? "PUBLIC" : "PRIVATE",
+      createdByContributorId: contributorId,
       createdByStaffId: actorStaffId,
       updatedByStaffId: actorStaffId,
       publishedByStaffId: metadata.status === "PUBLISHED" ? actorStaffId : null,
@@ -246,6 +317,19 @@ async function assertActiveCategory(db: DrizzleClient, categoryId: string) {
   }
   if (!category.isActive) {
     throw new AppError(400, "CARICATURE_CATEGORY_INACTIVE", "Category is inactive.")
+  }
+}
+
+async function assertContributorIdExists(db: DrizzleClient, contributorId: string) {
+  const rows = await db.execute(sql`
+    select id::text as id
+    from contributors
+    where id = ${contributorId}::uuid
+    limit 1
+  `)
+  const list = Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []
+  if (!list[0]) {
+    throw new AppError(404, "CONTRIBUTOR_NOT_FOUND", "Contributor was not found.")
   }
 }
 

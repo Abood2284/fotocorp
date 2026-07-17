@@ -95,10 +95,12 @@ export interface ContributorDownloadsResponse {
 
 export interface ContributorRecentUpload {
   imageAssetId: string
+  assetType?: "IMAGE" | "CARICATURE"
   legacyImageCode: string | null
   whoIsInPicture: string | null
   headline: string | null
   eventName: string | null
+  categoryName?: string | null
   status: string
   visibility: string
   createdAt: string
@@ -578,12 +580,50 @@ export async function updateContributorCaricatureAsset(
 }
 
 export async function createContributorCaricatureUploadShell(
-  payload: { credit: string; fileName?: string },
+  payload: { credit: string; fileName?: string; contributorId?: string },
   options: ContributorRequestOptions = {},
 ) {
   return contributorJson<CaricatureAssetRecord>("/caricatures/upload-shell", {
     method: "POST",
     body: payload,
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export interface ContributorCaricatureListItem {
+  id: string
+  headline: string
+  credit: string
+  categoryId: string
+  categoryName: string
+  language: string
+  status: string
+  hasVisibleText: boolean
+  hasOriginalFile: boolean
+  publishedAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ContributorCaricaturesListResponse {
+  ok: true
+  items: ContributorCaricatureListItem[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export async function getContributorCaricatures(
+  query: { status?: string; limit?: number; offset?: number } = {},
+  options: ContributorRequestOptions = {},
+) {
+  const params = new URLSearchParams()
+  if (query.status) params.set("status", query.status)
+  if (query.limit != null) params.set("limit", String(query.limit))
+  if (query.offset != null) params.set("offset", String(query.offset))
+  const suffix = params.toString() ? `?${params.toString()}` : ""
+  return contributorJson<ContributorCaricaturesListResponse>(`/caricatures${suffix}`, {
+    method: "GET",
     cookieHeader: options.cookieHeader,
   })
 }

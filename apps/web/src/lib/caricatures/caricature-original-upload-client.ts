@@ -27,6 +27,7 @@ export interface CaricatureOriginalUploadInput {
   file: File
   credit: string
   existingAssetId?: string | null
+  contributorId?: string
   onProgress?: (percent0to100: number) => void
 }
 
@@ -45,6 +46,7 @@ export async function uploadCaricatureOriginalViaStaffWizard(
       const shell = await createStaffCaricatureUploadShell({
         credit: input.credit,
         fileName: input.file.name,
+        contributorId: input.contributorId,
       })
       return shell.id
     },
@@ -70,6 +72,7 @@ export async function uploadCaricatureOriginalViaContributorApi(
       const shell = await createContributorCaricatureUploadShell({
         credit: input.credit,
         fileName: input.file.name,
+        contributorId: input.contributorId,
       })
       return shell.id
     },

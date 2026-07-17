@@ -35,6 +35,7 @@ export const adminCaricatureAssetMetadataSchema = z.object({
 export const caricatureUploadShellSchema = z.object({
   credit: z.string().trim().min(1).max(500),
   fileName: z.string().trim().max(500).optional(),
+  contributorId: z.string().uuid().optional(),
 })
 
 export const caricatureOriginalPresignSchema = z.object({

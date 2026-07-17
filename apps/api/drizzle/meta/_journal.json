@@ -435,6 +435,13 @@
       "when": 1782479500000,
       "tag": "0061_help_contextual_links",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1782601000000,
+      "tag": "0062_caricature_contributor_ownership",
+      "breakpoints": true
     }
   ]
 }

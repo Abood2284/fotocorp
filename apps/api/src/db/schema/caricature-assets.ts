@@ -13,6 +13,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { caricatureCategories } from "./caricature-categories";
+import { contributors } from "./contributors";
 import { staffMembers } from "./staff-members";
 
 export const CARICATURE_LANGUAGES = [
@@ -64,6 +65,9 @@ export const caricatureAssets = pgTable(
     width: integer("width"),
     height: integer("height"),
     checksum: text("checksum"),
+    createdByContributorId: uuid("created_by_contributor_id").references(() => contributors.id, {
+      onDelete: "set null",
+    }),
     createdByStaffId: uuid("created_by_staff_id").references((): AnyPgColumn => staffMembers.id, {
       onDelete: "set null",
     }),
@@ -92,6 +96,7 @@ export const caricatureAssets = pgTable(
       .on(table.slug)
       .where(sql`${table.slug} is not null`),
     index("caricature_assets_category_id_idx").on(table.categoryId),
+    index("caricature_assets_created_by_contributor_id_idx").on(table.createdByContributorId),
     index("caricature_assets_status_visibility_idx").on(table.status, table.visibility),
     index("caricature_assets_language_idx").on(table.language),
     index("caricature_assets_has_visible_text_idx").on(table.hasVisibleText),

@@ -3,15 +3,19 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { getContributorEvents, getContributorUploadBatches } from "@/lib/api/contributor-api"
+import {
+  getContributorCaricatures,
+  getContributorEvents,
+  getContributorUploadBatches,
+} from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
-import { CloudUpload } from "lucide-react";
+import { CloudUpload } from "lucide-react"
 
 export const metadata = {
   title: "Upload batches",
 }
 
-const FILTER_LINKS: { label: string; status?: string }[] = [
+const BATCH_FILTER_LINKS: { label: string; status?: string }[] = [
   { label: "All" },
   { label: "Open", status: "OPEN" },
   { label: "Submitted", status: "SUBMITTED" },
@@ -19,14 +23,30 @@ const FILTER_LINKS: { label: string; status?: string }[] = [
   { label: "Failed", status: "FAILED" },
 ]
 
+const CARICATURE_FILTER_LINKS: { label: string; status?: string }[] = [
+  { label: "All" },
+  { label: "Draft", status: "DRAFT" },
+  { label: "In review", status: "PENDING_REVIEW" },
+  { label: "Published", status: "PUBLISHED" },
+  { label: "Rejected", status: "REJECTED" },
+]
+
 function shortBatchRef(id: string) {
   return id.replace(/-/g, "").slice(0, 8).toUpperCase()
+}
+
+function formatStatusLabel(status: string) {
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
 }
 
 export default async function ContributorUploadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ status?: string; caricatureStatus?: string }>
 }) {
   await requireContributorPasswordReady()
   const params = await searchParams
@@ -36,13 +56,29 @@ export default async function ContributorUploadsPage({
       ? raw
       : undefined
 
+  const caricatureRaw = params.caricatureStatus?.toUpperCase()
+  const caricatureStatus =
+    caricatureRaw === "DRAFT" ||
+    caricatureRaw === "PENDING_REVIEW" ||
+    caricatureRaw === "PUBLISHED" ||
+    caricatureRaw === "REJECTED"
+      ? caricatureRaw
+      : undefined
+
   const cookieHeader = await getContributorCookieHeader()
-  const [batchData, eventsData] = await Promise.all([
+  const [batchData, eventsData, caricatureData] = await Promise.all([
     getContributorUploadBatches({ status, limit: 50, offset: 0 }, { cookieHeader }),
     getContributorEvents({ scope: "available", limit: 100 }, { cookieHeader }).catch(() => ({
       ok: true as const,
       events: [],
       pagination: { limit: 0, offset: 0, total: 0 },
+    })),
+    getContributorCaricatures({ status: caricatureStatus, limit: 50, offset: 0 }, { cookieHeader }).catch(() => ({
+      ok: true as const,
+      items: [],
+      total: 0,
+      limit: 50,
+      offset: 0,
     })),
   ])
 
@@ -58,17 +94,97 @@ export default async function ContributorUploadsPage({
             Uploads
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Bulk uploads for an event. Fotocorp reviews and publishes selected images — your files stay private until then.
+            Editorial batches and caricature submissions. Fotocorp reviews and publishes selected assets — your files stay
+            private until then.
           </p>
         </div>
         <Button asChild>
-          <Link href="/contributor/uploads/new">New upload batch</Link>
+          <Link href="/contributor/uploads/new">New upload</Link>
         </Button>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Caricatures</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+            {CARICATURE_FILTER_LINKS.map((f) => {
+              const href = f.status
+                ? `/contributor/uploads?caricatureStatus=${f.status}${status ? `&status=${status}` : ""}`
+                : status
+                  ? `/contributor/uploads?status=${status}`
+                  : "/contributor/uploads"
+              const active = (f.status ?? "") === (caricatureStatus ?? "")
+              return (
+                <Link
+                  key={f.label}
+                  href={href}
+                  className={cn(
+                    "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                    active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {f.label}
+                </Link>
+              )
+            })}
+          </div>
+
+          {caricatureData.items.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
+              No caricature uploads yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="pb-2 pr-3 font-medium">Headline</th>
+                    <th className="pb-2 pr-3 font-medium">Category</th>
+                    <th className="pb-2 pr-3 font-medium">Status</th>
+                    <th className="pb-2 pr-3 font-medium">Credit</th>
+                    <th className="pb-2 pr-3 font-medium">Original</th>
+                    <th className="pb-2 font-medium">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {caricatureData.items.map((item) => (
+                    <tr key={item.id} className="text-foreground">
+                      <td className="py-3 pr-3 font-medium">{item.headline.trim() || "Untitled caricature"}</td>
+                      <td className="py-3 pr-3 text-muted-foreground">{item.categoryName}</td>
+                      <td className="py-3 pr-3">
+                        <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
+                          {formatStatusLabel(item.status)}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-3 text-muted-foreground">{item.credit}</td>
+                      <td className="py-3 pr-3 text-muted-foreground">
+                        {item.hasOriginalFile ? "Uploaded" : "Missing"}
+                      </td>
+                      <td className="py-3 text-muted-foreground tabular-nums">
+                        {new Date(item.createdAt).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="flex flex-wrap gap-2 border-b border-border pb-3">
-        {FILTER_LINKS.map((f) => {
-          const href = f.status ? `/contributor/uploads?status=${f.status}` : "/contributor/uploads"
+        {BATCH_FILTER_LINKS.map((f) => {
+          const href = f.status
+            ? `/contributor/uploads?status=${f.status}${caricatureStatus ? `&caricatureStatus=${caricatureStatus}` : ""}`
+            : caricatureStatus
+              ? `/contributor/uploads?caricatureStatus=${caricatureStatus}`
+              : "/contributor/uploads"
           const active = (f.status ?? "") === (status ?? "")
           return (
             <Link
@@ -87,12 +203,12 @@ export default async function ContributorUploadsPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Your batches</CardTitle>
+          <CardTitle>Editorial batches</CardTitle>
         </CardHeader>
         <CardContent>
           {batchData.batches.length === 0 ? (
             <div className="rounded-md border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
-              No upload batches yet.
+              No editorial upload batches yet.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -146,7 +262,10 @@ export default async function ContributorUploadsPage({
                               Continue editing
                             </Link>
                           ) : null}
-                          <Link href={`/contributor/uploads/${b.id}`} className="font-medium text-muted-foreground hover:text-foreground hover:underline">
+                          <Link
+                            href={`/contributor/uploads/${b.id}`}
+                            className="font-medium text-muted-foreground hover:text-foreground hover:underline"
+                          >
                             View
                           </Link>
                         </div>

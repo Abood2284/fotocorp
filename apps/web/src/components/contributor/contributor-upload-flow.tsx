@@ -324,6 +324,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
         file: row.file,
         credit: caricatureDefaultCredit,
         existingAssetId: caricatureAssetId,
+        contributorId: targetContributorId || initialSession.contributor.id,
         onProgress: setCaricatureUploadProgress,
       })
       setCaricatureAssetId(result.assetId)
@@ -336,7 +337,7 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
     } finally {
       setCaricatureUploadBusy(false)
     }
-  }, [tracked, caricatureUploadBusy, caricatureDefaultCredit, caricatureAssetId, markStepComplete])
+  }, [tracked, caricatureUploadBusy, caricatureDefaultCredit, caricatureAssetId, markStepComplete, targetContributorId, initialSession.contributor.id])
 
   const saveCaricatureMetadata = useCallback(
     async (payload: Parameters<typeof createContributorCaricatureAsset>[0]) => {
