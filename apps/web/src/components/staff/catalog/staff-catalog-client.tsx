@@ -346,16 +346,7 @@ export function StaffCatalogClient({ initialResponse, filters, filtersDeferred =
                 />
               }>Event</Th>
               <Th filterControl={
-                <HeaderSelectFilter 
-                  query={queryParams} 
-                  name="sort" 
-                  options={[
-                    { value: "newest", label: "Newest" },
-                    { value: "oldest", label: "Oldest" },
-                    { value: "imageDateDesc", label: "Image date newest" },
-                    { value: "recentlyUpdated", label: "Recently updated" }
-                  ]} 
-                />
+                <HeaderYearFilter query={queryParams} />
               }>Updated</Th>
             </tr>
           </thead>
@@ -585,6 +576,44 @@ function HeaderSelectFilter({ query, name, options }: { query: URLSearchParams; 
   )
 }
 
+function HeaderYearFilter({ query }: { query: URLSearchParams }) {
+  const year = query.get("year") ?? ""
+  const yearOptions = buildCatalogUploadYearOptions()
+
+  return (
+    <details className="relative">
+      <summary className="inline-flex cursor-pointer list-none items-center rounded p-1 hover:bg-muted/50">
+        <Filter size={14} />
+      </summary>
+      <form method="get" className="absolute right-0 z-20 mt-1 w-56 rounded-md border border-border bg-card p-2 shadow-xl">
+        <PreserveQuery query={query} omit={["year", "cursor"]} />
+        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Upload year
+        </label>
+        <select name="year" defaultValue={year} className="mb-2 h-8 w-full rounded border border-border bg-background px-2 text-xs">
+          <option value="">All years</option>
+          {yearOptions.map((optionYear) => (
+            <option key={optionYear} value={String(optionYear)}>{optionYear}</option>
+          ))}
+        </select>
+        <button type="submit" className="w-full rounded bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
+          Apply
+        </button>
+      </form>
+    </details>
+  )
+}
+
+function buildCatalogUploadYearOptions() {
+  const currentYear = new Date().getFullYear()
+  const earliestYear = 1990
+  const years: number[] = []
+  for (let year = currentYear; year >= earliestYear; year -= 1) {
+    years.push(year)
+  }
+  return years
+}
+
 function ActiveFilterChips({ query, filters }: { query: URLSearchParams; filters: AdminCatalogFilters }) {
   const chips = buildCatalogFilterChips(query, filters)
 
@@ -642,6 +671,11 @@ function buildCatalogFilterChips(query: URLSearchParams, filters: AdminCatalogFi
       label: "Event",
       value: resolveEventLabel(eventId, filters.events),
     })
+  }
+
+  const year = query.get("year")
+  if (year) {
+    chips.push({ key: "year", label: "Upload year", value: year })
   }
 
   const sort = query.get("sort")

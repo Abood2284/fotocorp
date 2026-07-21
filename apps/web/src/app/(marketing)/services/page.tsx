@@ -14,14 +14,7 @@ export default function ServicesPage() {
         Services
       </h1>
 
-      {/* Editorial Byline/Metadata */}
-      <div className="fc-byline mt-6 flex flex-wrap items-center gap-x-3 text-xs uppercase tracking-wider text-[#757575] border-b border-[#e0e0e0] pb-6 mb-12">
-        <span className="font-bold font-serif italic text-black">Licensing Desk</span>
-        <span className="text-[#e0e0e0] font-sans">|</span>
-        <time className="font-sans">Updated July 13, 2026</time>
-      </div>
-
-      <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed mb-12 max-w-3xl">
+      <p className="fc-body-serif-md mt-12 text-[#1a1a1a] leading-relaxed mb-12 max-w-3xl">
         Enterprise licensing, archival research, and editorial image services tailored to your needs.
       </p>
 

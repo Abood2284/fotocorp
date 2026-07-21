@@ -52,6 +52,8 @@ interface AdminAssetQuery {
   noEvent?: boolean;
   noCategory?: boolean;
   contributorUploads?: boolean;
+  /** Calendar year of asset upload (`uploaded_at`, else `created_at`), e.g. 2019. */
+  year?: number;
   cursor?: string;
   limit: number;
   sort: AdminSort;
@@ -676,6 +678,7 @@ function parseAdminAssetQuery(params: URLSearchParams): AdminAssetQuery {
   const noEvent = parseOptionalBoolean(params.get("noEvent"), "noEvent");
   const noCategory = parseOptionalBoolean(params.get("noCategory"), "noCategory");
   const contributorUploads = parseOptionalBoolean(params.get("contributorUploads"), "contributorUploads");
+  const year = parseYear(params.get("year"));
   const cursor = normalizeOptional(params.get("cursor"));
   const limit = parseLimit(params.get("limit"));
   const sort = parseSort(params.get("sort"));
@@ -696,6 +699,7 @@ function parseAdminAssetQuery(params: URLSearchParams): AdminAssetQuery {
     noEvent,
     noCategory,
     contributorUploads,
+    year,
     cursor,
     limit,
     sort,
@@ -765,6 +769,17 @@ function buildWhere(query: AdminAssetQuery): SQL[] {
   if (query.noEvent) where.push(sql`a.event_id is null`);
   if (query.noCategory) where.push(sql`a.category_id is null`);
   if (query.contributorUploads) where.push(sql`a.source = 'CONTRIBUTOR_UPLOAD'`);
+  if (query.year !== undefined) {
+    // Legacy archive years live on uploaded_at (original upload), not created_at
+    // (Neon row insert / import time). Fall back to created_at for newer rows
+    // that never received a legacy uploaded_at.
+    const yearStart = `${query.year}-01-01T00:00:00.000Z`;
+    const yearEnd = `${query.year + 1}-01-01T00:00:00.000Z`;
+    where.push(sql`
+      coalesce(a.uploaded_at, a.created_at) >= ${yearStart}::timestamptz
+      and coalesce(a.uploaded_at, a.created_at) < ${yearEnd}::timestamptz
+    `);
+  }
 
   if (query.cursor) {
     where.push(cursorPredicate(decodeCursor(query.cursor), query.sort));
@@ -1139,6 +1154,16 @@ function parseLimit(value: string | null) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
     throw new AppError(400, "INVALID_LIMIT", "Limit must be an integer between 1 and 100.");
+  }
+  return parsed;
+}
+
+function parseYear(value: string | null) {
+  const normalized = normalizeOptional(value);
+  if (!normalized) return undefined;
+  const parsed = Number(normalized);
+  if (!Number.isInteger(parsed) || parsed < 1900 || parsed > 2100) {
+    throw new AppError(400, "INVALID_YEAR", "Year filter is invalid.");
   }
   return parsed;
 }

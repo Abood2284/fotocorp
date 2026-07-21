@@ -20,15 +20,8 @@ export default function AboutPage() {
         A million images that tell the story in high resolution.
       </h1>
 
-      {/* Editorial Byline/Metadata */}
-      <div className="fc-byline mt-6 flex flex-wrap items-center gap-x-3 text-xs uppercase tracking-wider text-[#757575] border-b border-[#e0e0e0] pb-6 mb-12">
-        <span className="font-bold font-serif italic text-black">By the Editorial Board</span>
-        <span className="text-[#e0e0e0] font-sans">|</span>
-        <time className="font-sans">Published May 28, 2026</time>
-      </div>
-
       {/* Grid Layout for Story and Sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-16">
+      <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-16">
         {/* Story Columns */}
         <div className="lg:col-span-2 space-y-8">
           <p className="fc-body-serif-lg text-black font-normal leading-[1.5] tracking-wide">

@@ -35,15 +35,8 @@ export default function ContactPage() {
         Contact Us
       </h1>
 
-      {/* Editorial Byline/Metadata */}
-      <div className="fc-byline mt-6 flex flex-wrap items-center gap-x-3 text-xs uppercase tracking-wider text-[#757575] border-b border-[#e0e0e0] pb-6 mb-12">
-        <span className="font-bold font-serif italic text-black">Inquiry Desk</span>
-        <span className="text-[#e0e0e0] font-sans">|</span>
-        <time className="font-sans">Updated July 13, 2026</time>
-      </div>
-
       {/* Grid Layout for Form and Sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-16">
+      <div className="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-16">
         {/* Contact Form Column */}
         <div className="lg:col-span-2 space-y-6">
           <p className="fc-body-serif-md text-[#1a1a1a] leading-relaxed mb-6">
@@ -59,7 +52,7 @@ export default function ContactPage() {
           {/* Headquarters — above Directories */}
           <div className="space-y-2">
             <span className="fc-body-sans-strong block uppercase tracking-wider text-sm font-bold text-black">
-              Headquarters
+              Mumbai Office
             </span>
             <div className="space-y-2 text-sm font-sans text-[#757575]">
               <div className="flex items-start gap-2">
@@ -77,6 +70,12 @@ export default function ContactPage() {
                   className="link-inline-blue font-sans"
                 >
                   +91 7666686655
+                </a>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail size={14} className="shrink-0 text-[#757575]" />
+                <a href="mailto:contact@fotocorp.com" className="link-inline-blue font-sans">
+                  contact@fotocorp.com
                 </a>
               </div>
             </div>

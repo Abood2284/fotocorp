@@ -23,6 +23,12 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Staff catalog upload-year filter:** `/staff/catalog` Updated-column filter is **Upload year** only (`?year=2019`). Filters on `coalesce(uploaded_at, created_at)` — legacy archive years are on `uploaded_at`, not Neon `created_at` (import time). Active chip: Upload year.
+
+- **Marketing page bylines removed:** Dropped editorial byline/date metadata (`By the Editorial Board`, desk labels, published/updated dates) from `/about`, `/services`, and `/contact`.
+
+- **Contact sidebar label + email:** Renamed Headquarters → **Mumbai Office** on `/contact`; added `contact@fotocorp.com` under address + WhatsApp.
+
 - **Contributor caricature ownership + uploads list:** Caricatures were invisible on contributor dashboard metrics and `/contributor/uploads` because they live in `caricature_assets` (not `image_assets`) with no contributor FK. Added `created_by_contributor_id` (`0062_caricature_contributor_ownership`), wired upload-shell/create paths (contributor + staff) to set ownership, ownership-scoped contributor caricature routes + `GET /api/v1/contributor/caricatures` list, analytics summary now unions editorial + caricature uploads, and `/contributor/uploads` shows caricature rows (status/category/credit) plus editorial batches. Credit-matched backfill for prior non-staff uploads.
 
 - **Staff caricatures header layout:** Page intro no longer shares a 2-column grid with contextual help inside the ~420px list sidebar (description was wrapping one word per line). Title/description stack full-width; help panel sits below.

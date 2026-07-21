@@ -10,6 +10,11 @@ describe("staff catalog list helpers", () => {
     assert.equal(hasActiveCatalogFilters(query), true)
   })
 
+  it("treats upload year filter as active catalog filtering", () => {
+    const query = new URLSearchParams({ year: "2019", limit: "50" })
+    assert.equal(hasActiveCatalogFilters(query), true)
+  })
+
   it("ignores pagination-only query params", () => {
     const query = new URLSearchParams({ limit: "50", sort: "newest" })
     assert.equal(hasActiveCatalogFilters(query), false)
