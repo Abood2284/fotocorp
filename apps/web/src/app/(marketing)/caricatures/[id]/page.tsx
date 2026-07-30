@@ -129,7 +129,7 @@ export default async function CaricatureDetailPage({ params, searchParams }: Car
               ) : null}
             </header>
 
-            <CaricatureProtectedPreview preview={preview} alt={headline} />
+            <CaricatureProtectedPreview assetId={id} preview={preview} alt={headline} />
           </section>
 
           <aside className="flex flex-col gap-5 bg-surface-stone px-4 py-5 sm:px-5 lg:px-6 lg:py-6">

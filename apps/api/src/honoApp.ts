@@ -21,6 +21,7 @@ import { internalAdminStaffUploadWizardRoutes } from "./routes/internal/admin-st
 import { internalAdminHomepageHeroPoolRoutes } from "./routes/internal/admin-homepage-hero-pool/route";
 import { internalAdminCaricatureCategoriesRoutes } from "./routes/internal/admin-caricature-categories/route";
 import { internalAdminCaricatureAssetsRoutes } from "./routes/internal/admin-caricature-assets/route";
+import { internalCaricatureClearPreviewRoutes } from "./routes/internal/caricature-clear-preview/route";
 import { internalDownloadRoutes } from "./routes/internal/downloads/route";
 import { fotoboxRoutes } from "./routes/internal/fotobox/route";
 import { legacyFixtureRoutes } from "./routes/legacy/fixture-routes";
@@ -106,6 +107,7 @@ honoApp.route("/", internalAdminStaffUploadWizardRoutes);
 honoApp.route("/", internalAdminHomepageHeroPoolRoutes);
 honoApp.route("/", internalAdminCaricatureCategoriesRoutes);
 honoApp.route("/", internalAdminCaricatureAssetsRoutes);
+honoApp.route("/", internalCaricatureClearPreviewRoutes);
 honoApp.route("/", publicCatalogRoutes);
 honoApp.route("/", publicContributorApplicationRoutes);
 honoApp.route("/", publicHomepageRoutes);

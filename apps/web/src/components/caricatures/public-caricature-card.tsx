@@ -1,6 +1,8 @@
+"use client"
+
 import Link from "next/link"
 
-import { PreviewImage } from "@/components/assets/preview-image"
+import { ProgressiveCaricaturePreviewImage } from "@/components/caricatures/progressive-caricature-preview-image"
 import {
   buildCaricatureCardSubjectPreview,
   formatPublicCaricaturePublishedDate,
@@ -39,18 +41,14 @@ export function PublicCaricatureCard({ item, priority = false, className }: Publ
         className,
       )}
     >
-      {item.preview ? (
-        <PreviewImage
-          src={item.preview.url}
-          alt={item.headline}
-          className="h-full w-full object-contain transition-transform duration-700 group-hover:scale-105"
-          loading={priority ? "eager" : "lazy"}
-        />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
-          Preview is being prepared.
-        </div>
-      )}
+      <ProgressiveCaricaturePreviewImage
+        assetId={item.id}
+        blurredUrl={item.preview?.url ?? null}
+        alt={item.headline}
+        className="h-full w-full"
+        imageClassName="h-full w-full object-contain transition-transform duration-700 group-hover:scale-105"
+        loading={priority ? "eager" : "lazy"}
+      />
 
       {/* Top-left: category */}
       {item.categoryName && (

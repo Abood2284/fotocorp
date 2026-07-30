@@ -6,6 +6,7 @@ import { useMemo } from "react"
 
 import { Button } from "@/components/ui/button"
 import { buildStaffCaricatureReviewHref } from "@/lib/caricatures/caricature-public-display"
+import { useCaricatureClearAccess } from "@/lib/caricatures/use-caricature-clear-access"
 import { buildSignInHref } from "@/lib/auth-sign-in-gateway"
 import { getStaffCaricatureOriginalUrl } from "@/lib/search/caricature-search"
 import { useSharedAuthSession } from "@/lib/use-shared-auth-session"
@@ -24,17 +25,19 @@ interface CaricatureDetailActionsProps {
 }
 
 export function CaricatureDetailActions({ assetId, detailHref, className }: CaricatureDetailActionsProps) {
-  const { data: session, isPending } = useSharedAuthSession()
+  const { data: session, isPending: isSessionPending } = useSharedAuthSession()
+  const { hasClearAccess, isPending: isAccessPending } = useCaricatureClearAccess()
+  const isPending = isSessionPending || isAccessPending
 
   const accessState = useMemo((): CaricatureDetailAccessState => {
     if (session?.kind === "staff") return "staff"
     if (session?.kind === "user") {
-      // TODO(caricature-download): Replace with API-backed caricature entitlement check
-      // when `/api/caricatures/:id/download/check` (or equivalent) is available.
-      return "signed-in-no-entitlement"
+      // Clear browse access uses ACTIVE CARICATURE entitlement.
+      // Download original remains disabled until the dedicated download endpoint ships.
+      return hasClearAccess ? "entitled" : "signed-in-no-entitlement"
     }
     return "logged-out"
-  }, [session])
+  }, [hasClearAccess, session])
 
   const signInHref = buildSignInHref({ callbackUrl: detailHref })
   const requestAccessHref = "/request-access"

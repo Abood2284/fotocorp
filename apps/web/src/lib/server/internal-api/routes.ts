@@ -153,6 +153,9 @@ export const internalApiRoutes = {
 
   adminCaricatureOriginal: (assetId: string) =>
     `/api/v1/internal/admin/caricature-assets/${encodeURIComponent(assetId)}/original`,
+
+  caricatureClearPreview: (assetId: string) =>
+    `/api/v1/internal/caricatures/${encodeURIComponent(assetId)}/clear-preview`,
 } as const
 
 export function withQuery(path: string, params: URLSearchParams) {

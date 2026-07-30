@@ -9,6 +9,10 @@
 - [Resend + Google Workspace email integration](../../docs/integrations/email-resend-google-workspace.md) — access-flow transactional email sender, reply handling, env vars, delivery logs, and manual test steps.
 - [Hyperdrive rollout](../../docs/infrastructure/hyperdrive-rollout.md) — two-path Hyperdrive rollout rules, PR-1 core binding scope, and cached public-read guardrails.
 
+## Incremental update (2026-07-30)
+
+- **Caricature clear browse for entitled users:** Anonymous public caricature feeds/search still return blurred CDN derivatives only. Subscribers with an **ACTIVE** `CARICATURE` entitlement (and staff) load clear originals via web BFF `GET /api/account/caricature-access` + `GET /api/media/caricatures/:assetId/clear-preview` → internal `GET /api/v1/internal/caricatures/:assetId/clear-preview` (`x-auth-user-id` or `x-admin-auth-user-id`). Subscriber path requires `PUBLISHED`/`PUBLIC` and does not decrement download quota. `PublicCaricatureCard` and detail preview swap to the clear URL when access is granted. Dedicated caricature download endpoint remains TODO.
+
 ## Incremental update (2026-06-26)
 
 - **Catalog incomplete upload delete:** `DELETE /api/v1/internal/admin/assets/:assetId` hard-deletes orphan contributor staging uploads only (no Fotokey, `staging/` storage key, no linked `ASSET_CREATED` upload item). Enforces existing `assertAssetCanBeHardDeleted` guard. Staff catalog sidebar shows **Delete upload** beside **Reject / Archive** when `canDeleteIncompleteUpload` is true on the asset payload.

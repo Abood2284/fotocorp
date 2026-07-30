@@ -91,21 +91,7 @@ export function StaffUserDetailPanel({ user }: StaffUserDetailPanelProps) {
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-6">
         <section className="rounded-lg border border-border bg-card p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Profile</h2>
-          <dl className="mt-4 space-y-3 text-sm">
-            <Row label="Display name" value={user.displayName || "—"} />
-            <Row label="Email" value={user.email} />
-            <Row label="Username" value={user.username ? `@${user.username}` : "—"} />
-            <Row label="Credits used" value={formatQuota(user.downloadQuotaUsed, user.downloadQuotaLimit)} />
-            <Row
-              label="Created"
-              value={user.createdAt ? new Date(user.createdAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }) : "—"}
-            />
-          </dl>
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-5">
-          <details open className="group">
+          <details className="group">
             <summary className="mb-3 flex cursor-pointer items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-muted-foreground list-none">
               <ChevronRight size={12} className="transition-transform group-open:rotate-90" />
               Registration
@@ -297,11 +283,6 @@ function subscriptionVariant(
     default:
       return "outline"
   }
-}
-
-function formatQuota(used: number, limit: number | null) {
-  if (limit === null) return String(used)
-  return `${used}/${limit}`
 }
 
 function toDateInput(iso: string): string {
