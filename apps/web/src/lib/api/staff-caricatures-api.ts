@@ -1,7 +1,9 @@
 import "server-only"
 
 import { getStaffInternalAdminActorHeaders } from "@/lib/staff-session"
+import type { CaricatureAssetMetadataPayload } from "@/lib/caricatures/caricature-upload-metadata"
 import type {
+  StaffCaricatureDeleteResponse,
   StaffCaricatureDetail,
   StaffCaricatureListResponse,
 } from "@/lib/api/staff-caricatures-types"
@@ -36,6 +38,26 @@ export async function listStaffCaricatures(params: {
 export async function getStaffCaricatureDetail(assetId: string): Promise<StaffCaricatureDetail> {
   return internalApiJson<StaffCaricatureDetail>({
     path: internalApiRoutes.adminCaricatureAsset(assetId),
+    headers: await getStaffInternalAdminActorHeaders(),
+  })
+}
+
+export async function updateStaffCaricature(
+  assetId: string,
+  payload: CaricatureAssetMetadataPayload,
+): Promise<StaffCaricatureDetail> {
+  return internalApiJson<StaffCaricatureDetail>({
+    path: internalApiRoutes.adminCaricatureAsset(assetId),
+    method: "PATCH",
+    body: payload,
+    headers: await getStaffInternalAdminActorHeaders(),
+  })
+}
+
+export async function deleteStaffCaricature(assetId: string): Promise<StaffCaricatureDeleteResponse> {
+  return internalApiJson<StaffCaricatureDeleteResponse>({
+    path: internalApiRoutes.adminCaricatureAsset(assetId),
+    method: "DELETE",
     headers: await getStaffInternalAdminActorHeaders(),
   })
 }

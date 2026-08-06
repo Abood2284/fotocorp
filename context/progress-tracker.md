@@ -23,6 +23,10 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Staff caricatures review ops:** Default filter is **All**. Draft/Pending review show an **Edit** form for metadata (headline, description, credit, category, language, tags, status). Published items show **Delete** (soft-delete + Typesense removal). Fixed All filter URL (`?status=all`). Internal `DELETE /api/v1/internal/admin/caricature-assets/:assetId`; BFF `PATCH|DELETE /api/staff/caricatures/:assetId`.
+
+- **Staff caricatures All filter:** Selecting Status → All now keeps `?status=all` in the URL. Previously the param was dropped, so the page fell back to default `PENDING_REVIEW` and looked empty even though Draft/Published items existed.
+
 - **Staff user detail panel UX:** Removed the redundant Profile section from `/staff/users/[authUserId]`; Registration is collapsed by default.
 
 - **Caricature clear browse (entitled users):** Logged-in subscribers with an ACTIVE `CARICATURE` entitlement (and staff) see clear originals on homepage/search/detail instead of blurred public derivatives. Probe: `GET /api/account/caricature-access`; stream: `GET /api/media/caricatures/:id/clear-preview` → `GET /api/v1/internal/caricatures/:id/clear-preview`. Anonymous users still get blurred CDN previews only; clear browse does not consume download quota. Formal caricature download endpoint still pending. **UX:** cards keep the blurred CDN image visible and only overlay the clear original after it finishes loading (no blur → blank → clear flash).

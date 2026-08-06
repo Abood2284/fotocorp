@@ -1,23 +1,36 @@
 "use client"
 
-import { CheckCircle, ImageOff, Loader2, XCircle } from "lucide-react"
+import { CheckCircle, ImageOff, Loader2, Pencil, Trash2, XCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 
 import { StaffCaricatureMetadataDisplay } from "@/components/staff/caricatures/staff-caricature-metadata-display"
+import { StaffCaricatureMetadataEditForm } from "@/components/staff/caricatures/staff-caricature-metadata-edit-form"
 import { ContextualHelpPanelClient } from "@/components/staff/help/contextual-help-panel-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { StaffCaricatureDetail, StaffCaricatureListItem, StaffCaricatureListResponse } from "@/lib/api/staff-caricatures-types"
+import type {
+  StaffCaricatureDetail,
+  StaffCaricatureListItem,
+  StaffCaricatureListResponse,
+} from "@/lib/api/staff-caricatures-types"
 import {
   approveStaffCaricatureClient,
+  deleteStaffCaricatureClient,
   fetchStaffCaricatureDetail,
   rejectStaffCaricatureClient,
+  updateStaffCaricatureClient,
 } from "@/lib/api/staff-caricatures-client"
+import type {
+  CaricatureAssetMetadataPayload,
+  CaricatureCategoryOption,
+} from "@/lib/caricatures/caricature-upload-metadata"
 import { getStaffCaricatureOriginalUrl } from "@/lib/search/caricature-search"
+import { staffWizardListCaricatureCategories } from "@/lib/staff-upload-wizard-client"
 
 type ReviewAction = "approved" | "rejected"
+type ActionBusy = "approve" | "reject" | "save" | "delete" | null
 
 interface StaffCaricaturesClientProps {
   initialResponse: StaffCaricatureListResponse
@@ -38,11 +51,14 @@ export function StaffCaricaturesClient({
   const [statusFilter, setStatusFilter] = useState(currentStatus)
   const [query, setQuery] = useState(currentQuery)
   const [statusMessage, setStatusMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null)
-  const [actionBusy, setActionBusy] = useState<"approve" | "reject" | null>(null)
+  const [actionBusy, setActionBusy] = useState<ActionBusy>(null)
   const [detail, setDetail] = useState<StaffCaricatureDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [reviewActionById, setReviewActionById] = useState<Record<string, ReviewAction>>({})
+  const [isEditing, setIsEditing] = useState(false)
+  const [categories, setCategories] = useState<CaricatureCategoryOption[]>([])
+  const [categoriesLoading, setCategoriesLoading] = useState(false)
 
   useEffect(() => {
     setItems(initialResponse.items)
@@ -58,6 +74,16 @@ export function StaffCaricaturesClient({
       return next
     })
   }, [initialResponse])
+
+  useEffect(() => {
+    setStatusFilter(currentStatus)
+    setQuery(currentQuery)
+  }, [currentQuery, currentStatus])
+
+  useEffect(() => {
+    setIsEditing(false)
+    setStatusMessage(null)
+  }, [selectedId])
 
   const selected = useMemo(
     () => items.find((item) => item.id === selectedId) ?? null,
@@ -114,6 +140,19 @@ export function StaffCaricaturesClient({
     return () => window.clearInterval(timer)
   }, [detail?.previewGenerationStatus, detail?.status, loadDetail, reviewActionById, router, selectedId, startTransition])
 
+  const ensureCategoriesLoaded = useCallback(async () => {
+    if (categories.length > 0 || categoriesLoading) return
+    setCategoriesLoading(true)
+    try {
+      const response = await staffWizardListCaricatureCategories()
+      setCategories(response.categories)
+    } catch {
+      setCategories([])
+    } finally {
+      setCategoriesLoading(false)
+    }
+  }, [categories.length, categoriesLoading])
+
   const applyLocalListAfterReview = useCallback((assetId: string, action: ReviewAction) => {
     setReviewActionById((current) => ({ ...current, [assetId]: action }))
 
@@ -140,7 +179,8 @@ export function StaffCaricaturesClient({
 
   const applyFilters = useCallback(() => {
     const params = new URLSearchParams()
-    if (statusFilter && statusFilter !== "all") params.set("status", statusFilter)
+    // Keep `status=all` in the URL so the page does not fall back to a narrower default.
+    if (statusFilter) params.set("status", statusFilter)
     if (query.trim()) params.set("q", query.trim())
     startTransition(() => {
       router.push(`/staff/caricatures?${params.toString()}`)
@@ -189,8 +229,86 @@ export function StaffCaricaturesClient({
     }
   }
 
+  async function handleStartEdit() {
+    setStatusMessage(null)
+    setIsEditing(true)
+    await ensureCategoriesLoaded()
+  }
+
+  async function handleSaveEdit(payload: CaricatureAssetMetadataPayload) {
+    if (!selectedId || actionBusy) return
+    setActionBusy("save")
+    setStatusMessage(null)
+    try {
+      const updated = await updateStaffCaricatureClient(selectedId, payload)
+      setDetail(updated)
+      setItems((current) =>
+        current.map((item) =>
+          item.id === selectedId
+            ? {
+                ...item,
+                headline: updated.headline,
+                credit: updated.credit,
+                categoryId: updated.categoryId,
+                categoryName: updated.categoryName,
+                language: updated.language,
+                status: updated.status,
+                hasVisibleText: updated.hasVisibleText,
+                hasOriginalFile: updated.hasOriginalFile,
+                publishedAt: updated.publishedAt,
+                updatedAt: updated.updatedAt,
+              }
+            : item,
+        ),
+      )
+      setIsEditing(false)
+      setStatusMessage({ kind: "ok", text: "Submission details saved." })
+      startTransition(() => router.refresh())
+    } catch (error) {
+      setStatusMessage({
+        kind: "error",
+        text: error instanceof Error ? error.message : "Could not save caricature.",
+      })
+      throw error
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
+  async function handleDelete() {
+    if (!selectedId || actionBusy) return
+    const confirmed = window.confirm(
+      "Delete this published caricature? It will be removed from staff lists and public search.",
+    )
+    if (!confirmed) return
+
+    setActionBusy("delete")
+    setStatusMessage(null)
+    try {
+      await deleteStaffCaricatureClient(selectedId)
+      setItems((current) => {
+        const next = current.filter((item) => item.id !== selectedId)
+        setSelectedId(next[0]?.id ?? null)
+        return next
+      })
+      setTotal((count) => Math.max(0, count - 1))
+      setDetail(null)
+      setStatusMessage({ kind: "ok", text: "Published caricature deleted." })
+      startTransition(() => router.refresh())
+    } catch (error) {
+      setStatusMessage({
+        kind: "error",
+        text: error instanceof Error ? error.message : "Could not delete caricature.",
+      })
+    } finally {
+      setActionBusy(null)
+    }
+  }
+
   const selectedReviewAction = selectedId ? reviewActionById[selectedId] : undefined
   const canReview = canReviewCaricature(selected, detail, selectedReviewAction)
+  const canEdit = canEditCaricature(selected, detail, selectedReviewAction)
+  const canDelete = canDeleteCaricature(selected, detail)
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col gap-4 lg:flex-row">
@@ -206,7 +324,7 @@ export function StaffCaricaturesClient({
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[160px] flex-1">
+          <div className="min-w-40 flex-1">
             <label htmlFor="caricature-status-filter" className="text-xs font-medium text-muted-foreground">
               Status
             </label>
@@ -216,11 +334,11 @@ export function StaffCaricaturesClient({
               onChange={(event) => setStatusFilter(event.target.value)}
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             >
+              <option value="all">All</option>
               <option value="PENDING_REVIEW">Pending review</option>
               <option value="DRAFT">Draft</option>
               <option value="PUBLISHED">Published</option>
               <option value="REJECTED">Rejected</option>
-              <option value="all">All</option>
             </select>
           </div>
           <div className="min-w-[180px] flex-[2]">
@@ -292,10 +410,19 @@ export function StaffCaricaturesClient({
             detailError={detailError}
             displayStatus={resolveCaricatureDisplayStatus(selected, detail, selectedReviewAction)}
             canReview={Boolean(canReview)}
+            canEdit={Boolean(canEdit)}
+            canDelete={Boolean(canDelete)}
+            isEditing={isEditing}
+            categories={categories}
+            categoriesLoading={categoriesLoading}
             actionBusy={actionBusy}
             statusMessage={statusMessage}
             onApprove={handleApprove}
             onReject={handleReject}
+            onStartEdit={handleStartEdit}
+            onCancelEdit={() => setIsEditing(false)}
+            onSaveEdit={handleSaveEdit}
+            onDelete={handleDelete}
           />
         )}
       </section>
@@ -310,10 +437,19 @@ function CaricatureReviewPanel({
   detailError,
   displayStatus,
   canReview,
+  canEdit,
+  canDelete,
+  isEditing,
+  categories,
+  categoriesLoading,
   actionBusy,
   statusMessage,
   onApprove,
   onReject,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onDelete,
 }: {
   summary: StaffCaricatureListResponse["items"][number]
   detail: StaffCaricatureDetail | null
@@ -321,10 +457,19 @@ function CaricatureReviewPanel({
   detailError: string | null
   displayStatus: string
   canReview: boolean
-  actionBusy: "approve" | "reject" | null
+  canEdit: boolean
+  canDelete: boolean
+  isEditing: boolean
+  categories: CaricatureCategoryOption[]
+  categoriesLoading: boolean
+  actionBusy: ActionBusy
   statusMessage: { kind: "ok" | "error"; text: string } | null
   onApprove: () => void
   onReject: () => void
+  onStartEdit: () => void
+  onCancelEdit: () => void
+  onSaveEdit: (payload: CaricatureAssetMetadataPayload) => Promise<void>
+  onDelete: () => void
 }) {
   const headline = detail?.headline.trim() || summary.headline
   const credit = detail?.credit.trim() || summary.credit
@@ -350,37 +495,67 @@ function CaricatureReviewPanel({
         <p className="text-sm text-destructive">Original file is missing. Approval is blocked until upload completes.</p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={onApprove} disabled={!canReview || actionBusy !== null}>
-          {actionBusy === "approve" ? (
+      {!isEditing ? (
+        <div className="flex flex-wrap gap-2">
+          {canReview ? (
             <>
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              Approving…
+              <Button type="button" onClick={onApprove} disabled={actionBusy !== null}>
+                {actionBusy === "approve" ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Approving…
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 size-4" />
+                    Approve & publish
+                  </>
+                )}
+              </Button>
+              <Button type="button" variant="outline" onClick={onReject} disabled={actionBusy !== null}>
+                {actionBusy === "reject" ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Rejecting…
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="mr-2 size-4" />
+                    Reject
+                  </>
+                )}
+              </Button>
             </>
-          ) : (
-            <>
-              <CheckCircle className="mr-2 size-4" />
-              Approve & publish
-            </>
-          )}
-        </Button>
-        <Button type="button" variant="outline" onClick={onReject} disabled={!canReview || actionBusy !== null}>
-          {actionBusy === "reject" ? (
-            <>
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              Rejecting…
-            </>
-          ) : (
-            <>
-              <XCircle className="mr-2 size-4" />
-              Reject
-            </>
-          )}
-        </Button>
-        <Button type="button" variant="ghost" asChild>
-          <Link href="/staff/contributor-uploads/new?assetType=CARICATURE">Upload new caricature</Link>
-        </Button>
-      </div>
+          ) : null}
+
+          {canEdit ? (
+            <Button type="button" variant="secondary" onClick={onStartEdit} disabled={actionBusy !== null || detailLoading || !detail}>
+              <Pencil className="mr-2 size-4" />
+              Edit
+            </Button>
+          ) : null}
+
+          {canDelete ? (
+            <Button type="button" variant="destructive" onClick={onDelete} disabled={actionBusy !== null}>
+              {actionBusy === "delete" ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 size-4" />
+                  Delete
+                </>
+              )}
+            </Button>
+          ) : null}
+
+          <Button type="button" variant="ghost" asChild>
+            <Link href="/staff/contributor-uploads/new?assetType=CARICATURE">Upload new caricature</Link>
+          </Button>
+        </div>
+      ) : null}
 
       {statusMessage ? (
         <p className={`text-sm ${statusMessage.kind === "ok" ? "text-emerald-700" : "text-destructive"}`}>
@@ -397,7 +572,18 @@ function CaricatureReviewPanel({
 
       {detailError ? <p className="text-sm text-destructive">{detailError}</p> : null}
 
-      {detail ? <StaffCaricatureMetadataDisplay detail={detail} /> : null}
+      {detail && isEditing ? (
+        <StaffCaricatureMetadataEditForm
+          detail={detail}
+          categories={categories}
+          categoriesLoading={categoriesLoading}
+          saveBusy={actionBusy === "save"}
+          onCancel={onCancelEdit}
+          onSave={onSaveEdit}
+        />
+      ) : null}
+
+      {detail && !isEditing ? <StaffCaricatureMetadataDisplay detail={detail} /> : null}
     </div>
   )
 }
@@ -455,4 +641,25 @@ function canReviewCaricature(
   if (status !== "PENDING_REVIEW" && status !== "DRAFT") return false
   if (isCaricaturePublishProcessing(detail)) return false
   return true
+}
+
+function canEditCaricature(
+  summary: StaffCaricatureListItem | null,
+  detail: StaffCaricatureDetail | null,
+  reviewAction?: ReviewAction,
+): boolean {
+  if (!summary) return false
+  if (reviewAction === "approved") return false
+  if (isCaricaturePublishProcessing(detail, reviewAction)) return false
+  const status = detail?.status ?? summary.status
+  return status === "DRAFT" || status === "PENDING_REVIEW"
+}
+
+function canDeleteCaricature(
+  summary: StaffCaricatureListItem | null,
+  detail: StaffCaricatureDetail | null,
+): boolean {
+  if (!summary) return false
+  const status = detail?.status ?? summary.status
+  return status === "PUBLISHED"
 }

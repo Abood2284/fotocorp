@@ -1,8 +1,10 @@
 import type {
   StaffCaricatureApproveResponse,
+  StaffCaricatureDeleteResponse,
   StaffCaricatureDetail,
   StaffCaricatureRejectResponse,
 } from "@/lib/api/staff-caricatures-types"
+import type { CaricatureAssetMetadataPayload } from "@/lib/caricatures/caricature-upload-metadata"
 
 export class StaffCaricaturesClientError extends Error {
   constructor(
@@ -52,6 +54,23 @@ async function staffCaricaturesJson<T>(path: string, init?: RequestInit): Promis
 
 export function fetchStaffCaricatureDetail(assetId: string): Promise<StaffCaricatureDetail> {
   return staffCaricaturesJson<StaffCaricatureDetail>(`/${encodeURIComponent(assetId)}`)
+}
+
+export function updateStaffCaricatureClient(
+  assetId: string,
+  payload: CaricatureAssetMetadataPayload,
+): Promise<StaffCaricatureDetail> {
+  return staffCaricaturesJson<StaffCaricatureDetail>(`/${encodeURIComponent(assetId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteStaffCaricatureClient(assetId: string): Promise<StaffCaricatureDeleteResponse> {
+  return staffCaricaturesJson<StaffCaricatureDeleteResponse>(`/${encodeURIComponent(assetId)}`, {
+    method: "DELETE",
+  })
 }
 
 export function approveStaffCaricatureClient(assetId: string): Promise<StaffCaricatureApproveResponse> {

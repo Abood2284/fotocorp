@@ -4,6 +4,7 @@ import { AppError } from "../../../lib/errors"
 import { json } from "../../../lib/http"
 import {
   createAdminCaricatureAsset,
+  deleteAdminCaricatureAsset,
   getAdminCaricatureAssetById,
   listAdminCaricatureAssets,
   updateAdminCaricatureAsset,
@@ -77,6 +78,23 @@ export async function updateAdminCaricatureAssetService(
     }
   }
 
+  return json(result)
+}
+
+export async function deleteAdminCaricatureAssetService(
+  env: Env,
+  assetId: string,
+  actorStaffId: string | null,
+  executionCtx?: ExecutionContext,
+) {
+  const database = db(env)
+  const result = await deleteAdminCaricatureAsset(database, assetId, actorStaffId)
+  const syncPromise = scheduleTypesenseSyncForCaricature(database, env, assetId)
+  if (executionCtx) {
+    executionCtx.waitUntil(syncPromise)
+  } else {
+    await syncPromise
+  }
   return json(result)
 }
 

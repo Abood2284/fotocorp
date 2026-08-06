@@ -239,6 +239,47 @@ export async function createAdminCaricatureAsset(
   return detail
 }
 
+export async function deleteAdminCaricatureAsset(
+  db: DrizzleClient,
+  assetId: string,
+  actorStaffId: string | null,
+): Promise<{ ok: true; assetId: string }> {
+  const existing = await db
+    .select({
+      id: caricatureAssets.id,
+      status: caricatureAssets.status,
+    })
+    .from(caricatureAssets)
+    .where(and(eq(caricatureAssets.id, assetId), isNull(caricatureAssets.deletedAt)))
+    .limit(1)
+
+  const row = existing[0]
+  if (!row) {
+    throw new AppError(404, "CARICATURE_NOT_FOUND", "Caricature not found.")
+  }
+
+  if (row.status !== "PUBLISHED") {
+    throw new AppError(
+      409,
+      "CARICATURE_DELETE_REQUIRES_PUBLISHED",
+      "Only published caricatures can be deleted from this action.",
+    )
+  }
+
+  const now = new Date()
+  await db
+    .update(caricatureAssets)
+    .set({
+      deletedAt: now,
+      visibility: "PRIVATE",
+      updatedAt: now,
+      updatedByStaffId: actorStaffId,
+    })
+    .where(eq(caricatureAssets.id, assetId))
+
+  return { ok: true, assetId }
+}
+
 export async function updateAdminCaricatureAsset(
   db: DrizzleClient,
   assetId: string,

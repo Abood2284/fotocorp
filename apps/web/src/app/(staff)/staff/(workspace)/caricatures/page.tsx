@@ -14,7 +14,7 @@ export const metadata = {
 
 export default async function StaffCaricaturesPage({ searchParams }: StaffCaricaturesPageProps) {
   const params = await searchParams
-  const status = typeof params.status === "string" && params.status.trim() ? params.status.trim() : "PENDING_REVIEW"
+  const status = typeof params.status === "string" && params.status.trim() ? params.status.trim() : "all"
   const q = typeof params.q === "string" ? params.q.trim() : ""
 
   let response = null

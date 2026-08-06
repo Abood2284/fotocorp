@@ -10,6 +10,7 @@ import {
   completeCaricatureOriginalUploadService,
   createAdminCaricatureAssetService,
   createCaricatureUploadShellService,
+  deleteAdminCaricatureAssetService,
   getAdminCaricatureAssetByIdService,
   getAdminCaricatureOriginalService,
   listAdminCaricatureAssetsService,
@@ -84,6 +85,16 @@ internalAdminCaricatureAssetsRoutes.patch(
     const payload = c.req.valid("json")
     const actorStaffId = actorStaffIdFromRequest(c.req.raw)
     return await updateAdminCaricatureAssetService(c.env, assetId, payload, actorStaffId, c.executionCtx)
+  },
+)
+
+internalAdminCaricatureAssetsRoutes.delete(
+  `${base}/:assetId`,
+  zValidator("param", adminCaricatureAssetParamSchema),
+  async (c) => {
+    const { assetId } = c.req.valid("param")
+    const actorStaffId = actorStaffIdFromRequest(c.req.raw)
+    return await deleteAdminCaricatureAssetService(c.env, assetId, actorStaffId, c.executionCtx)
   },
 )
 

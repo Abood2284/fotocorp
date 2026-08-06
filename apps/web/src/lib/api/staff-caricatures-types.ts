@@ -43,3 +43,8 @@ export interface StaffCaricatureRejectResponse {
   ok: true
   assetId: string
 }
+
+export interface StaffCaricatureDeleteResponse {
+  ok: true
+  assetId: string
+}
