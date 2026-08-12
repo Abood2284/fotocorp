@@ -176,7 +176,13 @@ export async function getStaffAccessInquiryDetail(inquiryId: string, options: { 
     companyEmailDomain: string | null
     emailValidationDecision: string | null
     subscriberAccess: { isSubscriber: boolean; subscriptionStatus: string }
-    contributorProfile: { id: string; displayName: string | null; status: string | null; email: string | null } | null
+    contributorProfile: {
+      id: string
+      displayName: string | null
+      status: string | null
+      email: string | null
+      allowedUploadTypes: Array<"EDITORIAL" | "CARICATURE">
+    } | null
     pendingClaims: Array<{ claimType: string; normalizedValue: string; status: string }>
     entitlements: Record<string, unknown>[]
   }>(`/access-inquiries/${encodeURIComponent(inquiryId)}`, { method: "GET", cookieHeader: options.cookieHeader })
@@ -184,7 +190,7 @@ export async function getStaffAccessInquiryDetail(inquiryId: string, options: { 
 
 export async function postStaffApproveContributorApplication(
   inquiryId: string,
-  body: { username?: string },
+  body: { username?: string; allowedUploadTypes: Array<"EDITORIAL" | "CARICATURE"> },
   options: { cookieHeader?: string } = {},
 ) {
   return staffJson<{
@@ -195,6 +201,27 @@ export async function postStaffApproveContributorApplication(
     inquiryId: string
   }>(`/access-inquiries/${encodeURIComponent(inquiryId)}/approve-contributor`, {
     method: "POST",
+    body,
+    cookieHeader: options.cookieHeader,
+  })
+}
+
+export async function patchStaffContributorAllowedUploadTypes(
+  inquiryId: string,
+  body: { allowedUploadTypes: Array<"EDITORIAL" | "CARICATURE"> },
+  options: { cookieHeader?: string } = {},
+) {
+  return staffJson<{
+    ok: true
+    contributorProfile: {
+      id: string
+      displayName: string | null
+      status: string | null
+      email: string | null
+      allowedUploadTypes: Array<"EDITORIAL" | "CARICATURE">
+    }
+  }>(`/access-inquiries/${encodeURIComponent(inquiryId)}/contributor-allowed-upload-types`, {
+    method: "PATCH",
     body,
     cookieHeader: options.cookieHeader,
   })

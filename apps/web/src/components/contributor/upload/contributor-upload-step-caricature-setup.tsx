@@ -3,7 +3,6 @@
 import { ContributorUploadStepCard } from "@/components/contributor/upload/contributor-upload-layout"
 import { uploadFieldLabelClass, uploadSelectClass } from "@/components/contributor/upload/contributor-upload-field-styles"
 import type { ContributorAuthResponse } from "@/lib/api/contributor-api"
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 interface ContributorUploadStepCaricatureSetupProps {
@@ -14,8 +13,6 @@ interface ContributorUploadStepCaricatureSetupProps {
   contributors: Array<{ id: string; displayName: string }>
   targetContributorId: string
   onTargetContributorIdChange: (value: string) => void
-  onContinue: () => void
-  continueDisabled?: boolean
 }
 
 export function ContributorUploadStepCaricatureSetup({
@@ -26,8 +23,6 @@ export function ContributorUploadStepCaricatureSetup({
   contributors,
   targetContributorId,
   onTargetContributorIdChange,
-  onContinue,
-  continueDisabled = false,
 }: ContributorUploadStepCaricatureSetupProps) {
   const contributorOptions = staffMode
     ? contributors
@@ -72,12 +67,6 @@ export function ContributorUploadStepCaricatureSetup({
             </option>
           ))}
         </select>
-      </div>
-
-      <div className="mt-6">
-        <Button type="button" className="w-full" disabled={!active || continueDisabled} onClick={onContinue}>
-          Continue to upload
-        </Button>
       </div>
     </ContributorUploadStepCard>
   )

@@ -6,6 +6,7 @@ import {
   normalizeAccessInterestAssetType,
 } from "../../../lib/access/access-interest-asset-types";
 import { approveContributorApplication } from "../../../lib/access-inquiries/contributor-application";
+import { parseRequiredAllowedUploadTypes } from "../../../lib/contributors/allowed-upload-types";
 import { PUBLIC_ROYALTY_FREE_CATEGORY_NAME } from "../../../lib/assets/public-assets";
 import { AppError } from "../../../lib/errors";
 import { qualityRank } from "../../../lib/subscriber-download-quality";
@@ -94,6 +95,7 @@ export async function getAccessInquiryDetail(db: DrizzleClient, inquiryId: strin
       contributorDisplayName: contributors.displayName,
       contributorStatus: contributors.status,
       contributorEmail: contributors.email,
+      contributorAllowedUploadTypes: contributors.allowedUploadTypes,
     })
     .from(customerAccessInquiries)
     .leftJoin(users, eq(customerAccessInquiries.userId, users.id))
@@ -151,6 +153,7 @@ export async function getAccessInquiryDetail(db: DrizzleClient, inquiryId: strin
           displayName: row.contributorDisplayName,
           status: row.contributorStatus,
           email: row.contributorEmail,
+          allowedUploadTypes: row.contributorAllowedUploadTypes ?? ["EDITORIAL"],
         }
       : null,
     pendingClaims,
@@ -162,9 +165,58 @@ export async function approveContributorApplicationInquiry(
   db: DrizzleClient,
   databaseUrl: string,
   inquiryId: string,
-  input: { username?: string | null },
+  input: { username?: string | null; allowedUploadTypes: Array<"EDITORIAL" | "CARICATURE"> },
 ) {
   return approveContributorApplication(db, databaseUrl, inquiryId, input);
+}
+
+export async function updateContributorAllowedUploadTypesForInquiry(
+  db: DrizzleClient,
+  inquiryId: string,
+  allowedUploadTypesInput: unknown,
+) {
+  const rows = await db
+    .select({
+      inquiryType: customerAccessInquiries.inquiryType,
+      contributorId: customerAccessInquiries.contributorId,
+    })
+    .from(customerAccessInquiries)
+    .where(eq(customerAccessInquiries.id, inquiryId))
+    .limit(1)
+
+  const inquiry = rows[0]
+  if (!inquiry) throw new AppError(404, "INQUIRY_NOT_FOUND", "Access inquiry was not found.")
+  if (inquiry.inquiryType !== "CONTRIBUTOR_APPLICATION") {
+    throw new AppError(400, "INQUIRY_TYPE_INVALID", "This inquiry is not a contributor application.")
+  }
+  if (!inquiry.contributorId) {
+    throw new AppError(400, "CONTRIBUTOR_MISSING", "Contributor application is missing a profile link.")
+  }
+
+  const allowedUploadTypes = parseRequiredAllowedUploadTypes(allowedUploadTypesInput)
+
+  const updated = await db
+    .update(contributors)
+    .set({ allowedUploadTypes, updatedAt: sql`now()` })
+    .where(eq(contributors.id, inquiry.contributorId))
+    .returning({
+      id: contributors.id,
+      displayName: contributors.displayName,
+      status: contributors.status,
+      email: contributors.email,
+      allowedUploadTypes: contributors.allowedUploadTypes,
+    })
+
+  const profile = updated[0]
+  if (!profile) throw new AppError(404, "CONTRIBUTOR_NOT_FOUND", "Contributor was not found.")
+
+  return {
+    id: profile.id,
+    displayName: profile.displayName,
+    status: profile.status,
+    email: profile.email,
+    allowedUploadTypes: profile.allowedUploadTypes ?? ["EDITORIAL"],
+  }
 }
 
 function buildDraftEntitlementInsertRow(

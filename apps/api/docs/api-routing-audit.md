@@ -374,7 +374,9 @@ Next recommended migration group:
 | Method | Path | Notes |
 | --- | --- | --- |
 | `GET` | `/api/v1/staff/access-inquiries` | Staff session; roles `SUPER_ADMIN`, `SUPPORT`, `FINANCE`. Query: `type`, `status`. |
-| `GET` | `/api/v1/staff/access-inquiries/:inquiryId` | Detail + `subscriberAccess` + linked entitlement rows + `submissionAudit` (raw IP SUPER_ADMIN-only; inquiry object strips raw submission columns). |
+| `GET` | `/api/v1/staff/access-inquiries/:inquiryId` | Detail + `subscriberAccess` + linked entitlement rows + `submissionAudit` (raw IP SUPER_ADMIN-only; inquiry object strips raw submission columns). Contributor apps include `contributorProfile.allowedUploadTypes`. |
+| `POST` | `/api/v1/staff/access-inquiries/:inquiryId/approve-contributor` | Activates contributor + credentials; body requires `allowedUploadTypes` (`EDITORIAL` / `CARICATURE`, multi) defaulting to Editorial; writes `contributors.allowed_upload_types`. |
+| `PATCH` | `/api/v1/staff/access-inquiries/:inquiryId/contributor-allowed-upload-types` | Updates `contributors.allowed_upload_types` for the linked contributor after/before approval. |
 | `POST` | `/api/v1/staff/access-inquiries/:inquiryId/close` | **PENDING** / **IN_REVIEW** → **CLOSED** (deny without granting access). Optional `staffNotes`. |
 | `POST` | `/api/v1/staff/access-inquiries/:inquiryId/entitlement-draft` | Non-destructive: creates missing **DRAFT** rows per inquiry asset type; never overwrites existing rows. |
 | `POST` | `/api/v1/staff/access-inquiries/:inquiryId/activate-entitlements` | **DRAFT** → **ACTIVE** for all or selected draft rows (`entitlementIds` optional); validates caps on selection; sends consolidated approval email. |

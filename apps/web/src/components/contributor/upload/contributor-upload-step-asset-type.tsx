@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 interface ContributorUploadStepAssetTypeProps {
   active: boolean
   selectedType: UploadBatchAssetType
+  allowedTypes: ReadonlyArray<UploadBatchAssetType>
   hint?: string
   onSelect: (assetType: UploadBatchAssetType) => void
 }
@@ -15,9 +16,12 @@ interface ContributorUploadStepAssetTypeProps {
 export function ContributorUploadStepAssetType({
   active,
   selectedType,
+  allowedTypes,
   hint,
   onSelect,
 }: ContributorUploadStepAssetTypeProps) {
+  const allowedSet = new Set(allowedTypes)
+
   return (
     <ContributorUploadStepCard active={active} className="mx-auto max-w-lg">
       <div>
@@ -28,7 +32,8 @@ export function ContributorUploadStepAssetType({
       </div>
       <div className="mt-5 grid gap-3">
         {UPLOAD_ASSET_TYPE_OPTIONS.map((option) => {
-          if (option.enabled) {
+          const isAllowed = allowedSet.has(option.value)
+          if (option.enabled && isAllowed) {
             const isSelected = selectedType === option.value
             return (
               <button
@@ -49,17 +54,21 @@ export function ContributorUploadStepAssetType({
             )
           }
 
-          return (
-            <div
-              key={option.value}
-              className="rounded-xl border border-border bg-muted/20 px-4 py-3 opacity-60"
-              aria-disabled
-            >
-              <p className="text-sm font-medium text-muted-foreground">{option.label}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{option.description}</p>
-              <p className="mt-2 text-xs font-medium text-muted-foreground">Coming soon</p>
-            </div>
-          )
+          if (!option.enabled) {
+            return (
+              <div
+                key={option.value}
+                className="rounded-xl border border-border bg-muted/20 px-4 py-3 opacity-60"
+                aria-disabled
+              >
+                <p className="text-sm font-medium text-muted-foreground">{option.label}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{option.description}</p>
+                <p className="mt-2 text-xs font-medium text-muted-foreground">Coming soon</p>
+              </div>
+            )
+          }
+
+          return null
         })}
       </div>
     </ContributorUploadStepCard>

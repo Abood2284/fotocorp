@@ -6,6 +6,7 @@ import { z } from "zod"
 import type { Env } from "../../../appTypes"
 import { createHttpDb, type AppRequestVariables } from "../../../db"
 import { AppError } from "../../../lib/errors"
+import { assertContributorAllowsUploadType } from "../../../lib/contributors/allowed-upload-types"
 import { json } from "../../../lib/http"
 import { methodNotAllowed } from "../../../lib/route-errors"
 import { listCaricatureCategories } from "../../../lib/caricatures/caricature-categories"
@@ -75,6 +76,7 @@ contributorCaricatureRoutes.post(
   async (c) => {
     const database = db(c.env)
     const session = await requirePhotographerSession(database, getCookie(c, CONTRIBUTOR_SESSION_COOKIE))
+    assertContributorAllowsUploadType(session.contributor.allowedUploadTypes, "CARICATURE")
     const payload = c.req.valid("json")
     const contributorId = resolveContributorOwnerId(session, payload.contributorId)
     const created = await createCaricatureUploadShell(database, { ...payload, contributorId }, null)
@@ -90,6 +92,7 @@ contributorCaricatureRoutes.post(
   async (c) => {
     const database = db(c.env)
     const session = await requirePhotographerSession(database, getCookie(c, CONTRIBUTOR_SESSION_COOKIE))
+    assertContributorAllowsUploadType(session.contributor.allowedUploadTypes, "CARICATURE")
     const payload = c.req.valid("json")
     const created = await createAdminCaricatureAsset(database, payload, null, {
       contributorId: session.contributor.id,

@@ -23,6 +23,14 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Contributor allowed upload types:** `contributors.allowed_upload_types` (`EDITORIAL` / `CARICATURE`, multi; migration `0063` + backfill — `jamesmanalody@gmail.com` → Caricature, all others Editorial). Staff assign on contributor application detail (required on approve, editable after). Session/`me` returns types; contributor upload wizard skips asset-type step when only one type; uploads dashboard shows only allowed sections; upload APIs reject disallowed types. Events page shows My events only (Available events removed). Staff upload wizard unchanged.
+
+- **Sidebar profile placement:** Staff and contributor portal sidebars now show the signed-in profile directly below the Fotocorp logo (instead of pinned to the bottom), with menus opening downward.
+
+- **Caricature “depicted subjects” label:** Upload + staff edit forms now say **Visible subjects in the caricature**, with an alert-icon hover tip explaining people/places/orgs/symbols/topics (comma-separated).
+
+- **Caricature upload duplicate CTA:** Setup step no longer renders its own “Continue to upload” button; only the right-panel action remains (matches editorial wizard layout).
+
 - **Staff caricatures review ops:** Default filter is **All**. Draft/Pending review show an **Edit** form for metadata (headline, description, credit, category, language, tags, status). Published items show **Delete** (soft-delete + Typesense removal). Fixed All filter URL (`?status=all`). Internal `DELETE /api/v1/internal/admin/caricature-assets/:assetId`; BFF `PATCH|DELETE /api/staff/caricatures/:assetId`.
 
 - **Staff caricatures All filter:** Selecting Status → All now keeps `?status=all` in the URL. Previously the param was dropped, so the page fell back to default `PENDING_REVIEW` and looked empty even though Draft/Published items existed.

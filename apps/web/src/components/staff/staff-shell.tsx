@@ -3,7 +3,7 @@
 import Link, { useLinkStatus } from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { ChevronUp, ChevronLeft, ChevronRight, LayoutDashboard, Loader2, LogOut } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, LayoutDashboard, Loader2, LogOut } from "lucide-react"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { buildSignInHref } from "@/lib/auth-sign-in-gateway"
 import { cn } from "@/lib/utils"
@@ -70,6 +70,8 @@ function Sidebar({
         </button>
       </div>
 
+      <StaffProfileMenu staff={staff} collapsed={collapsed} />
+
       <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Staff navigation">
         {navItems.map(({ label, href, icon: Icon }) => {
           const isActive = pathname === href || pathname.startsWith(`${href}/`)
@@ -86,8 +88,6 @@ function Sidebar({
           )
         })}
       </nav>
-
-      <StaffProfileMenu staff={staff} collapsed={collapsed} />
     </aside>
   )
 }
@@ -123,13 +123,13 @@ function StaffProfileMenu({ staff, collapsed }: { staff: StaffShellStaff, collap
   const displayLabel = staff.displayName.trim() || staff.username
 
   return (
-    <div className="relative shrink-0 border-t border-staff-200 p-3" ref={rootRef}>
+    <div className="relative shrink-0 border-b border-staff-200 p-3" ref={rootRef}>
       {open ? (
         <div
           role="menu"
           className={cn(
-            "absolute bottom-full z-50 mb-2 overflow-hidden rounded-lg border border-staff-200 bg-white py-1 shadow-lg shadow-black/5",
-            collapsed ? "left-14 w-56" : "left-3 right-3"
+            "absolute z-50 overflow-hidden rounded-lg border border-staff-200 bg-white py-1 shadow-lg shadow-black/5",
+            collapsed ? "left-full top-0 ml-2 w-56" : "left-3 right-3 top-full mt-2",
           )}
         >
           <div className="border-b border-staff-100 px-4 py-3">
@@ -179,7 +179,7 @@ function StaffProfileMenu({ staff, collapsed }: { staff: StaffShellStaff, collap
               <span className="block truncate text-sm font-medium text-staff-950">{displayLabel}</span>
               <span className="block truncate text-xs text-staff-500">{formatStaffRole(staff.role)}</span>
             </span>
-            <ChevronUp
+            <ChevronDown
               className={cn("h-4 w-4 shrink-0 text-staff-500 transition-transform duration-200", open && "rotate-180")}
               aria-hidden
             />

@@ -6,9 +6,11 @@ import { cn } from "@/lib/utils"
 import {
   getContributorCaricatures,
   getContributorEvents,
+  getContributorMe,
   getContributorUploadBatches,
 } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
+import { normalizeContributorUploadTypes } from "@/lib/contributors/allowed-upload-types"
 import { CloudUpload } from "lucide-react"
 
 export const metadata = {
@@ -66,23 +68,54 @@ export default async function ContributorUploadsPage({
       : undefined
 
   const cookieHeader = await getContributorCookieHeader()
+  const session = await getContributorMe({ cookieHeader })
+  const allowedUploadTypes = normalizeContributorUploadTypes(session.contributor.allowedUploadTypes)
+  const canEditorial = allowedUploadTypes.includes("EDITORIAL")
+  const canCaricature = allowedUploadTypes.includes("CARICATURE")
+
   const [batchData, eventsData, caricatureData] = await Promise.all([
-    getContributorUploadBatches({ status, limit: 50, offset: 0 }, { cookieHeader }),
-    getContributorEvents({ scope: "available", limit: 100 }, { cookieHeader }).catch(() => ({
-      ok: true as const,
-      events: [],
-      pagination: { limit: 0, offset: 0, total: 0 },
-    })),
-    getContributorCaricatures({ status: caricatureStatus, limit: 50, offset: 0 }, { cookieHeader }).catch(() => ({
-      ok: true as const,
-      items: [],
-      total: 0,
-      limit: 50,
-      offset: 0,
-    })),
+    canEditorial
+      ? getContributorUploadBatches({ status, limit: 50, offset: 0 }, { cookieHeader })
+      : Promise.resolve({
+          ok: true as const,
+          batches: [],
+          pagination: { limit: 0, offset: 0, total: 0 },
+        }),
+    canEditorial
+      ? getContributorEvents({ scope: "available", limit: 100 }, { cookieHeader }).catch(() => ({
+          ok: true as const,
+          events: [],
+          pagination: { limit: 0, offset: 0, total: 0 },
+        }))
+      : Promise.resolve({
+          ok: true as const,
+          events: [],
+          pagination: { limit: 0, offset: 0, total: 0 },
+        }),
+    canCaricature
+      ? getContributorCaricatures({ status: caricatureStatus, limit: 50, offset: 0 }, { cookieHeader }).catch(() => ({
+          ok: true as const,
+          items: [],
+          total: 0,
+          limit: 50,
+          offset: 0,
+        }))
+      : Promise.resolve({
+          ok: true as const,
+          items: [],
+          total: 0,
+          limit: 50,
+          offset: 0,
+        }),
   ])
 
   const eventNameById = new Map(eventsData.events.map((e) => [e.id, e.name]))
+  const introCopy =
+    canEditorial && canCaricature
+      ? "Editorial batches and caricature submissions. Fotocorp reviews and publishes selected assets — your files stay private until then."
+      : canCaricature
+        ? "Caricature submissions. Fotocorp reviews and publishes selected assets — your files stay private until then."
+        : "Editorial batches. Fotocorp reviews and publishes selected assets — your files stay private until then."
 
   return (
     <div className="space-y-8">
@@ -93,29 +126,100 @@ export default async function ContributorUploadsPage({
             <CloudUpload className="text-muted-foreground" size={32} />
             Uploads
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Editorial batches and caricature submissions. Fotocorp reviews and publishes selected assets — your files stay
-            private until then.
-          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{introCopy}</p>
         </div>
         <Button asChild>
           <Link href="/contributor/uploads/new">New upload</Link>
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Caricatures</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {canCaricature ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Caricatures</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+              {CARICATURE_FILTER_LINKS.map((f) => {
+                const href = f.status
+                  ? `/contributor/uploads?caricatureStatus=${f.status}${status && canEditorial ? `&status=${status}` : ""}`
+                  : status && canEditorial
+                    ? `/contributor/uploads?status=${status}`
+                    : "/contributor/uploads"
+                const active = (f.status ?? "") === (caricatureStatus ?? "")
+                return (
+                  <Link
+                    key={f.label}
+                    href={href}
+                    className={cn(
+                      "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                      active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                    )}
+                  >
+                    {f.label}
+                  </Link>
+                )
+              })}
+            </div>
+
+            {caricatureData.items.length === 0 ? (
+              <div className="rounded-md border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
+                No caricature uploads yet.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-muted-foreground">
+                      <th className="pb-2 pr-3 font-medium">Headline</th>
+                      <th className="pb-2 pr-3 font-medium">Category</th>
+                      <th className="pb-2 pr-3 font-medium">Status</th>
+                      <th className="pb-2 pr-3 font-medium">Credit</th>
+                      <th className="pb-2 pr-3 font-medium">Original</th>
+                      <th className="pb-2 font-medium">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {caricatureData.items.map((item) => (
+                      <tr key={item.id} className="text-foreground">
+                        <td className="py-3 pr-3 font-medium">{item.headline.trim() || "Untitled caricature"}</td>
+                        <td className="py-3 pr-3 text-muted-foreground">{item.categoryName}</td>
+                        <td className="py-3 pr-3">
+                          <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
+                            {formatStatusLabel(item.status)}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-3 text-muted-foreground">{item.credit}</td>
+                        <td className="py-3 pr-3 text-muted-foreground">
+                          {item.hasOriginalFile ? "Uploaded" : "Missing"}
+                        </td>
+                        <td className="py-3 text-muted-foreground tabular-nums">
+                          {new Date(item.createdAt).toLocaleString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canEditorial ? (
+        <>
           <div className="flex flex-wrap gap-2 border-b border-border pb-3">
-            {CARICATURE_FILTER_LINKS.map((f) => {
+            {BATCH_FILTER_LINKS.map((f) => {
               const href = f.status
-                ? `/contributor/uploads?caricatureStatus=${f.status}${status ? `&status=${status}` : ""}`
-                : status
-                  ? `/contributor/uploads?status=${status}`
+                ? `/contributor/uploads?status=${f.status}${caricatureStatus && canCaricature ? `&caricatureStatus=${caricatureStatus}` : ""}`
+                : caricatureStatus && canCaricature
+                  ? `/contributor/uploads?caricatureStatus=${caricatureStatus}`
                   : "/contributor/uploads"
-              const active = (f.status ?? "") === (caricatureStatus ?? "")
+              const active = (f.status ?? "") === (status ?? "")
               return (
                 <Link
                   key={f.label}
@@ -131,153 +235,85 @@ export default async function ContributorUploadsPage({
             })}
           </div>
 
-          {caricatureData.items.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
-              No caricature uploads yet.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-muted-foreground">
-                    <th className="pb-2 pr-3 font-medium">Headline</th>
-                    <th className="pb-2 pr-3 font-medium">Category</th>
-                    <th className="pb-2 pr-3 font-medium">Status</th>
-                    <th className="pb-2 pr-3 font-medium">Credit</th>
-                    <th className="pb-2 pr-3 font-medium">Original</th>
-                    <th className="pb-2 font-medium">Created</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {caricatureData.items.map((item) => (
-                    <tr key={item.id} className="text-foreground">
-                      <td className="py-3 pr-3 font-medium">{item.headline.trim() || "Untitled caricature"}</td>
-                      <td className="py-3 pr-3 text-muted-foreground">{item.categoryName}</td>
-                      <td className="py-3 pr-3">
-                        <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
-                          {formatStatusLabel(item.status)}
-                        </span>
-                      </td>
-                      <td className="py-3 pr-3 text-muted-foreground">{item.credit}</td>
-                      <td className="py-3 pr-3 text-muted-foreground">
-                        {item.hasOriginalFile ? "Uploaded" : "Missing"}
-                      </td>
-                      <td className="py-3 text-muted-foreground tabular-nums">
-                        {new Date(item.createdAt).toLocaleString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="flex flex-wrap gap-2 border-b border-border pb-3">
-        {BATCH_FILTER_LINKS.map((f) => {
-          const href = f.status
-            ? `/contributor/uploads?status=${f.status}${caricatureStatus ? `&caricatureStatus=${caricatureStatus}` : ""}`
-            : caricatureStatus
-              ? `/contributor/uploads?caricatureStatus=${caricatureStatus}`
-              : "/contributor/uploads"
-          const active = (f.status ?? "") === (status ?? "")
-          return (
-            <Link
-              key={f.label}
-              href={href}
-              className={cn(
-                "rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-              )}
-            >
-              {f.label}
-            </Link>
-          )
-        })}
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Editorial batches</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {batchData.batches.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
-              No editorial upload batches yet.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-muted-foreground">
-                    <th className="pb-2 pr-3 font-medium">Batch</th>
-                    <th className="pb-2 pr-3 font-medium">Event</th>
-                    <th className="pb-2 pr-3 font-medium">Status</th>
-                    <th className="pb-2 pr-3 font-medium tabular-nums">Files</th>
-                    <th className="pb-2 pr-3 font-medium">Created</th>
-                    <th className="pb-2 pr-3 font-medium">Submitted</th>
-                    <th className="pb-2 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {batchData.batches.map((b) => (
-                    <tr key={b.id} className="text-foreground">
-                      <td className="py-3 pr-3 font-mono text-xs">{shortBatchRef(b.id)}</td>
-                      <td className="py-3 pr-3">{eventNameById.get(b.eventId) ?? "—"}</td>
-                      <td className="py-3 pr-3">
-                        <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">{b.status}</span>
-                      </td>
-                      <td className="py-3 pr-3 tabular-nums text-muted-foreground">
-                        {b.uploadedFiles}/{b.totalFiles}
-                        {b.failedFiles > 0 ? ` (${b.failedFiles} failed)` : ""}
-                      </td>
-                      <td className="py-3 pr-3 text-muted-foreground tabular-nums">
-                        {new Date(b.createdAt).toLocaleString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="py-3 pr-3 text-muted-foreground tabular-nums">
-                        {b.submittedAt
-                          ? new Date(b.submittedAt).toLocaleString(undefined, {
+          <Card>
+            <CardHeader>
+              <CardTitle>Editorial batches</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {batchData.batches.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border bg-background p-8 text-center text-sm text-muted-foreground">
+                  No editorial upload batches yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground">
+                        <th className="pb-2 pr-3 font-medium">Batch</th>
+                        <th className="pb-2 pr-3 font-medium">Event</th>
+                        <th className="pb-2 pr-3 font-medium">Status</th>
+                        <th className="pb-2 pr-3 font-medium tabular-nums">Files</th>
+                        <th className="pb-2 pr-3 font-medium">Created</th>
+                        <th className="pb-2 pr-3 font-medium">Submitted</th>
+                        <th className="pb-2 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {batchData.batches.map((b) => (
+                        <tr key={b.id} className="text-foreground">
+                          <td className="py-3 pr-3 font-mono text-xs">{shortBatchRef(b.id)}</td>
+                          <td className="py-3 pr-3">{eventNameById.get(b.eventId) ?? "—"}</td>
+                          <td className="py-3 pr-3">
+                            <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">{b.status}</span>
+                          </td>
+                          <td className="py-3 pr-3 tabular-nums text-muted-foreground">
+                            {b.uploadedFiles}/{b.totalFiles}
+                            {b.failedFiles > 0 ? ` (${b.failedFiles} failed)` : ""}
+                          </td>
+                          <td className="py-3 pr-3 text-muted-foreground tabular-nums">
+                            {new Date(b.createdAt).toLocaleString(undefined, {
                               month: "short",
                               day: "numeric",
                               year: "numeric",
-                            })
-                          : "—"}
-                      </td>
-                      <td className="py-3">
-                        <div className="flex flex-wrap items-center gap-3">
-                          {b.status === "OPEN" ? (
-                            <Link
-                              href={`/contributor/uploads/new?batchId=${encodeURIComponent(b.id)}`}
-                              className="font-medium text-primary hover:underline"
-                            >
-                              Continue editing
-                            </Link>
-                          ) : null}
-                          <Link
-                            href={`/contributor/uploads/${b.id}`}
-                            className="font-medium text-muted-foreground hover:text-foreground hover:underline"
-                          >
-                            View
-                          </Link>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                            })}
+                          </td>
+                          <td className="py-3 pr-3 text-muted-foreground tabular-nums">
+                            {b.submittedAt
+                              ? new Date(b.submittedAt).toLocaleString(undefined, {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : "—"}
+                          </td>
+                          <td className="py-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                              {b.status === "OPEN" ? (
+                                <Link
+                                  href={`/contributor/uploads/new?batchId=${encodeURIComponent(b.id)}`}
+                                  className="font-medium text-primary hover:underline"
+                                >
+                                  Continue editing
+                                </Link>
+                              ) : null}
+                              <Link
+                                href={`/contributor/uploads/${b.id}`}
+                                className="font-medium text-muted-foreground hover:text-foreground hover:underline"
+                              >
+                                View
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
     </div>
   )
 }

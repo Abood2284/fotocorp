@@ -51,6 +51,7 @@ export interface ContributorSessionResult {
     displayName: string
     email: string | null
     status: string
+    allowedUploadTypes: Array<"EDITORIAL" | "CARICATURE">
   }
 }
 
@@ -191,6 +192,7 @@ function toContributorSessionResult(contributor: {
   displayName: string
   email: string | null
   status: string
+  allowedUploadTypes: Array<"EDITORIAL" | "CARICATURE">
   username: string
   mustResetPassword: boolean
   portalRole: string
@@ -211,6 +213,7 @@ function toContributorSessionResult(contributor: {
       displayName: contributor.displayName,
       email: contributor.email,
       status: contributor.status,
+      allowedUploadTypes: contributor.allowedUploadTypes,
     },
   }
 }

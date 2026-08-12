@@ -1,5 +1,6 @@
 "use client"
 
+import { CircleAlert } from "lucide-react"
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -232,12 +233,18 @@ export function StaffCaricatureMetadataEditForm({
             />
           </div>
           <div className="space-y-1.5">
-            <FieldLabel required>Depicted subjects (comma-separated)</FieldLabel>
+            <FieldLabel
+              required
+              help="List who or what appears in the drawing — people, places, organizations, symbols, or topics. Separate entries with commas."
+            >
+              Visible subjects in the caricature
+            </FieldLabel>
             <textarea
               name="depictedSubjects"
               defaultValue={defaults.depictedSubjects}
               required
               rows={2}
+              placeholder="e.g. Narendra Modi, Parliament, election"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             />
           </div>
@@ -256,11 +263,28 @@ export function StaffCaricatureMetadataEditForm({
   )
 }
 
-function FieldLabel({ children, required = false }: { children: ReactNode; required?: boolean }) {
+function FieldLabel({
+  children,
+  required = false,
+  help,
+}: {
+  children: ReactNode
+  required?: boolean
+  help?: string
+}) {
   return (
-    <span className="text-xs font-medium text-muted-foreground">
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
       {children}
       {required ? <span className="text-destructive"> *</span> : null}
+      {help ? (
+        <span
+          className="inline-flex text-muted-foreground/80 hover:text-foreground"
+          title={help}
+          aria-label={help}
+        >
+          <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        </span>
+      ) : null}
     </span>
   )
 }

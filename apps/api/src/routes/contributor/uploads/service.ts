@@ -13,6 +13,7 @@ import {
   verifyContributorStagingObjectExists,
 } from "../../../lib/r2-contributor-uploads";
 import { assertContributorHasPortalCredential } from "../../../lib/auth/contributor-portal-access";
+import { assertContributorAllowsBatchAssetType } from "../../../lib/contributors/allowed-upload-types";
 import { createContributorStagingPresignedPutUrl } from "../../../lib/r2-presigned-put";
 import type { ContributorSessionResult } from "../auth/service";
 import type {
@@ -77,6 +78,8 @@ export async function createPhotographerUploadBatch(
   session: ContributorSessionResult,
   body: CreateUploadBatchBody,
 ) {
+  assertContributorAllowsBatchAssetType(session.contributor.allowedUploadTypes, body.assetType)
+
   const eventRows = await executeRows<EventCheckRow>(
     db,
     sql`

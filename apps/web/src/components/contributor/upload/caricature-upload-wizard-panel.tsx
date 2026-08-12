@@ -103,8 +103,6 @@ export function CaricatureUploadWizardPanel({
               contributors={contributors}
               targetContributorId={targetContributorId}
               onTargetContributorIdChange={onTargetContributorIdChange}
-              onContinue={onSetupContinue}
-              continueDisabled={setupDisabled}
             />
           ) : null}
           {currentStep === 3 ? (

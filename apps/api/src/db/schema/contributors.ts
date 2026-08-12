@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { bigint, check, index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 
 export const CONTRIBUTOR_SOURCES = ["LEGACY_IMPORT", "MANUAL", "APPLICATION"] as const;
+export const CONTRIBUTOR_UPLOAD_TYPES = ["EDITORIAL", "CARICATURE"] as const;
 
 export const contributors = pgTable(
   "contributors",
@@ -22,6 +23,10 @@ export const contributors = pgTable(
     postalCode: text("postal_code"),
     status: text("status").default("UNKNOWN").notNull(),
     source: text("source").default("LEGACY_IMPORT").notNull(),
+    allowedUploadTypes: text("allowed_upload_types")
+      .array()
+      .notNull()
+      .default(sql`ARRAY['EDITORIAL']::text[]`),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -30,6 +35,13 @@ export const contributors = pgTable(
     check(
       "contributors_source_check",
       sql`${table.source} in ('LEGACY_IMPORT', 'MANUAL', 'APPLICATION')`,
+    ),
+    check(
+      "contributors_allowed_upload_types_check",
+      sql`
+        cardinality(${table.allowedUploadTypes}) >= 1
+        and ${table.allowedUploadTypes} <@ array['EDITORIAL','CARICATURE']::text[]
+      `,
     ),
     uniqueIndex("contributors_legacy_photographer_id_unique_idx")
       .on(table.legacyPhotographerId)

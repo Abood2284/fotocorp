@@ -1,10 +1,10 @@
 import Link from "next/link"
 
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 import { getContributorEvents } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
-import { CalendarDays, Pencil } from "lucide-react";
+import { CalendarDays, Pencil } from "lucide-react"
+
 export const metadata = {
   title: "Contributor Events",
 }
@@ -24,14 +24,13 @@ function cityLocation(event: { city: string | null; location: string | null }) {
 export default async function ContributorEventsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ scope?: string; q?: string }>
+  searchParams: Promise<{ q?: string }>
 }) {
   await requireContributorPasswordReady()
   const params = await searchParams
-  const scope = params.scope === "available" ? "available" : "mine"
   const q = params.q?.trim() || undefined
   const cookieHeader = await getContributorCookieHeader()
-  const data = await getContributorEvents({ scope, q, limit: 24, offset: 0 }, { cookieHeader })
+  const data = await getContributorEvents({ scope: "mine", q, limit: 24, offset: 0 }, { cookieHeader })
 
   return (
     <div className="space-y-8">
@@ -40,10 +39,10 @@ export default async function ContributorEventsPage({
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contributor portal</p>
           <h1 className="mt-2 flex items-center gap-2 text-3xl font-semibold tracking-tight text-foreground">
             <CalendarDays className="text-muted-foreground" size={32} />
-            Events
+            My events
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create an event for your upload batch. Available events include legacy and shared events you can attach later.
+            Create and manage events for your editorial upload batches.
           </p>
         </div>
         <Button asChild>
@@ -51,31 +50,7 @@ export default async function ContributorEventsPage({
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-border pb-3">
-        <Link
-          href={q ? `/contributor/events?scope=mine&q=${encodeURIComponent(q)}` : "/contributor/events?scope=mine"}
-          className={cn(
-            "rounded-full px-4 py-2 text-sm font-medium transition-colors",
-            scope === "mine" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-          )}
-        >
-          My events
-        </Link>
-        <Link
-          href={
-            q ? `/contributor/events?scope=available&q=${encodeURIComponent(q)}` : "/contributor/events?scope=available"
-          }
-          className={cn(
-            "rounded-full px-4 py-2 text-sm font-medium transition-colors",
-            scope === "available" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-          )}
-        >
-          Available events
-        </Link>
-      </div>
-
       <form method="get" className="flex max-w-md flex-col gap-2 sm:flex-row sm:items-end">
-        <input type="hidden" name="scope" value={scope} />
         <label className="flex-1 text-sm">
           <span className="mb-1 block text-muted-foreground">Search</span>
           <input
@@ -107,7 +82,7 @@ export default async function ContributorEventsPage({
             {data.events.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                  No events match this view.
+                  No events yet. Create one from a new upload.
                 </td>
               </tr>
             ) : (
@@ -141,7 +116,7 @@ export default async function ContributorEventsPage({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Showing {data.events.length} of {data.pagination.total} {scope === "mine" ? "in My events" : "active events"}.
+        Showing {data.events.length} of {data.pagination.total} in My events.
       </p>
     </div>
   )

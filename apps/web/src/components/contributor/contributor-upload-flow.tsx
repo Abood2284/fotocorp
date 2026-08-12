@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   MAX_FILES_PER_PREPARE,
   UPLOAD_CONCURRENCY,
-  UPLOAD_STEPS,
   type TrackedFile,
   type UploadBatchAssetType,
   type UploadWizardStep,
@@ -65,9 +64,20 @@ import {
   uploadStepsForAssetType,
   uploadWizardAssetTypeHint,
 } from "@/lib/upload-wizard-caricature"
+import {
+  allowedBatchAssetTypesFromUploadTypes,
+  normalizeContributorUploadTypes,
+} from "@/lib/contributors/allowed-upload-types"
 
 function portalRoleOf(session: ContributorAuthResponse) {
   return session.account.portalRole ?? "STANDARD"
+}
+
+function initialAssetTypeForSession(session: ContributorAuthResponse): UploadBatchAssetType {
+  const allowed = allowedBatchAssetTypesFromUploadTypes(
+    normalizeContributorUploadTypes(session.contributor.allowedUploadTypes),
+  )
+  return allowed[0] ?? "IMAGE"
 }
 
 export function ContributorUploadFlow({ initialSession }: { initialSession: ContributorAuthResponse }) {
@@ -76,9 +86,22 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
   const searchParams = useSearchParams()
   const resumeBatchId = searchParams.get("batchId")
   const { toast } = useToastNotify()
-  const [currentStep, setCurrentStep] = useState<UploadWizardStep>(1)
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(() => new Set())
-  const [batchAssetType, setBatchAssetType] = useState<UploadBatchAssetType>("IMAGE")
+  const allowedUploadTypes = useMemo(
+    () => normalizeContributorUploadTypes(initialSession.contributor.allowedUploadTypes),
+    [initialSession.contributor.allowedUploadTypes],
+  )
+  const allowedBatchAssetTypes = useMemo(
+    () => allowedBatchAssetTypesFromUploadTypes(allowedUploadTypes),
+    [allowedUploadTypes],
+  )
+  const showAssetTypeStep = allowedBatchAssetTypes.length > 1
+  const [currentStep, setCurrentStep] = useState<UploadWizardStep>(() => (showAssetTypeStep ? 1 : 2))
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(
+    () => (showAssetTypeStep || resumeBatchId ? new Set() : new Set([1])),
+  )
+  const [batchAssetType, setBatchAssetType] = useState<UploadBatchAssetType>(() =>
+    initialAssetTypeForSession(initialSession),
+  )
 
   const [eventId, setEventId] = useState("")
   const [batchEventName, setBatchEventName] = useState("")
@@ -109,7 +132,11 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
   const [caricatureUploadProgress, setCaricatureUploadProgress] = useState<number | null>(null)
 
   const isCaricature = isCaricatureUpload(batchAssetType)
-  const wizardSteps = useMemo(() => [...uploadStepsForAssetType(batchAssetType)], [batchAssetType])
+  const wizardSteps = useMemo(() => {
+    const steps = [...uploadStepsForAssetType(batchAssetType)]
+    if (showAssetTypeStep) return steps
+    return steps.filter((step) => step.id !== 1)
+  }, [batchAssetType, showAssetTypeStep])
 
   const trackedRef = useRef(tracked)
   trackedRef.current = tracked
@@ -735,10 +762,11 @@ export function ContributorUploadFlow({ initialSession }: { initialSession: Cont
           submitError={submitError}
           onDismissSubmitError={() => setSubmitError(null)}
         />
-      ) : !resuming && currentStep === 1 ? (
+      ) : !resuming && showAssetTypeStep && currentStep === 1 ? (
         <ContributorUploadStepAssetType
           active
           selectedType={batchAssetType}
+          allowedTypes={allowedBatchAssetTypes}
           hint={uploadWizardAssetTypeHint(batchAssetType)}
           onSelect={handleAssetTypeSelect}
         />

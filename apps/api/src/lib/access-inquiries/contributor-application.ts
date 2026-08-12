@@ -8,6 +8,10 @@ import {
   hashPhotographerPortalPassword,
 } from "../auth/contributor-password"
 import { AppError } from "../errors"
+import {
+  parseRequiredAllowedUploadTypes,
+  type ContributorUploadType,
+} from "../contributors/allowed-upload-types"
 import { buildCustomerAccessInquirySubmissionAuditFields } from "./submission-audit-fields"
 import type { RequestAuditContext } from "../request-audit-context"
 
@@ -26,6 +30,7 @@ export interface SubmitContributorApplicationInput {
 
 export interface ApproveContributorApplicationInput {
   username?: string | null
+  allowedUploadTypes: ContributorUploadType[]
 }
 
 function normalizePhoneClaim(countryCode: string, phoneNumber: string): string | null {
@@ -212,6 +217,7 @@ export async function approveContributorApplication(
     throw new AppError(409, "CREDENTIAL_EXISTS", "This contributor already has portal credentials.")
   }
 
+  const allowedUploadTypes = parseRequiredAllowedUploadTypes(input.allowedUploadTypes)
   const temporaryPassword = generatePhotographerPortalTemporaryPassword()
   const passwordHash = await hashPhotographerPortalPassword(temporaryPassword)
 
@@ -220,7 +226,11 @@ export async function approveContributorApplication(
     await writeDb.db.transaction(async (tx) => {
       await tx
         .update(contributors)
-        .set({ status: "ACTIVE", updatedAt: sql`now()` })
+        .set({
+          status: "ACTIVE",
+          allowedUploadTypes,
+          updatedAt: sql`now()`,
+        })
         .where(eq(contributors.id, contributorId))
 
       await tx.insert(authCredentials).values({

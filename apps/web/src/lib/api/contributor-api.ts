@@ -18,6 +18,7 @@ export interface ContributorSummary {
   displayName: string
   email: string | null
   status: string
+  allowedUploadTypes: Array<"EDITORIAL" | "CARICATURE">
 }
 
 export interface ContributorAuthResponse {

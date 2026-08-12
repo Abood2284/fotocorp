@@ -442,6 +442,13 @@
       "when": 1782601000000,
       "tag": "0062_caricature_contributor_ownership",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1782602000000,
+      "tag": "0063_contributor_allowed_upload_types",
+      "breakpoints": true
     }
   ]
 }

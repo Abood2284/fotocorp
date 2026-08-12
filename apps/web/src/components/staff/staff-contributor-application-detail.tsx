@@ -1,9 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import {
   getStaffAccessInquiryDetail,
+  patchStaffContributorAllowedUploadTypes,
   postStaffApproveContributorApplication,
   StaffApiError,
 } from "@/lib/api/staff-api"
@@ -12,8 +13,12 @@ import { AccessInquiryCloseButton } from "@/components/staff/access-inquiry-clos
 import { AccessInquiryGuidancePanel } from "@/components/staff/access-inquiry-guidance-panel"
 import { InquiryStatusBadge } from "@/components/staff/inquiry-status-badge"
 import { SubmissionAuditSection } from "@/components/staff/submission-audit-section"
-import { formatInquiryStatus } from "@/lib/staff/access-inquiry-labels"
 import { getContributorApplicationDetailGuidance } from "@/lib/staff/access-inquiry-guidance"
+import {
+  CONTRIBUTOR_UPLOAD_TYPE_OPTIONS,
+  normalizeContributorUploadTypes,
+  type ContributorUploadType,
+} from "@/lib/contributors/allowed-upload-types"
 
 interface StaffContributorApplicationDetailProps {
   inquiryId: string
@@ -23,6 +28,9 @@ interface StaffContributorApplicationDetailProps {
 export function StaffContributorApplicationDetail({ inquiryId, initial }: StaffContributorApplicationDetailProps) {
   const [detail, setDetail] = useState(initial)
   const [usernameOverride, setUsernameOverride] = useState("")
+  const [allowedUploadTypes, setAllowedUploadTypes] = useState<ContributorUploadType[]>(() =>
+    normalizeContributorUploadTypes(initial.contributorProfile?.allowedUploadTypes),
+  )
   const [approvedCredentials, setApprovedCredentials] = useState<{ username: string; temporaryPassword: string } | null>(
     null,
   )
@@ -33,6 +41,7 @@ export function StaffContributorApplicationDetail({ inquiryId, initial }: StaffC
   const refetchDetail = useCallback(async () => {
     const next = await getStaffAccessInquiryDetail(inquiryId)
     setDetail(next)
+    setAllowedUploadTypes(normalizeContributorUploadTypes(next.contributorProfile?.allowedUploadTypes))
   }, [inquiryId])
 
   const inquiry = detail.inquiry as {
@@ -46,15 +55,38 @@ export function StaffContributorApplicationDetail({ inquiryId, initial }: StaffC
 
   const status = String(inquiry.status ?? "")
   const canApprove = status !== "CONTRIBUTOR_APPROVED" && status !== "CLOSED"
+  const canEditUploadTypes = Boolean(detail.contributorProfile)
   const guidance = getContributorApplicationDetailGuidance({ inquiryStatus: status })
+  const uploadTypeSummary = useMemo(
+    () =>
+      allowedUploadTypes
+        .map((value) => CONTRIBUTOR_UPLOAD_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value)
+        .join(", "),
+    [allowedUploadTypes],
+  )
+
+  function toggleUploadType(value: ContributorUploadType) {
+    setAllowedUploadTypes((prev) => {
+      if (prev.includes(value)) {
+        if (prev.length === 1) return prev
+        return prev.filter((entry) => entry !== value)
+      }
+      return normalizeContributorUploadTypes([...prev, value])
+    })
+  }
 
   async function handleApprove() {
     setNotice("")
     setError("")
+    if (allowedUploadTypes.length === 0) {
+      setError("Select at least one upload type.")
+      return
+    }
     setSaving(true)
     try {
       const result = await postStaffApproveContributorApplication(inquiryId, {
         username: usernameOverride.trim() || undefined,
+        allowedUploadTypes,
       })
       setApprovedCredentials({ username: result.username, temporaryPassword: result.temporaryPassword })
       setNotice("Contributor approved. Copy the temporary password now — it is shown only once.")
@@ -62,6 +94,30 @@ export function StaffContributorApplicationDetail({ inquiryId, initial }: StaffC
     } catch (caught) {
       if (caught instanceof StaffApiError) setError(caught.message)
       else setError("Approval failed.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSaveUploadTypes() {
+    setNotice("")
+    setError("")
+    if (allowedUploadTypes.length === 0) {
+      setError("Select at least one upload type.")
+      return
+    }
+    setSaving(true)
+    try {
+      const result = await patchStaffContributorAllowedUploadTypes(inquiryId, { allowedUploadTypes })
+      setDetail((prev) => ({
+        ...prev,
+        contributorProfile: result.contributorProfile,
+      }))
+      setAllowedUploadTypes(normalizeContributorUploadTypes(result.contributorProfile.allowedUploadTypes))
+      setNotice("Upload access updated.")
+    } catch (caught) {
+      if (caught instanceof StaffApiError) setError(caught.message)
+      else setError("Could not update upload access.")
     } finally {
       setSaving(false)
     }
@@ -112,6 +168,10 @@ export function StaffContributorApplicationDetail({ inquiryId, initial }: StaffC
             <dt className="text-muted-foreground">Contributor profile</dt>
             <dd>{detail.contributorProfile?.status ?? "—"}</dd>
           </div>
+          <div>
+            <dt className="text-muted-foreground">Upload access</dt>
+            <dd className="font-medium text-foreground">{uploadTypeSummary || "—"}</dd>
+          </div>
         </dl>
         {inquiry.applicationNotes ? (
           <p className="mt-4 text-sm leading-relaxed text-foreground">{inquiry.applicationNotes}</p>
@@ -133,6 +193,45 @@ export function StaffContributorApplicationDetail({ inquiryId, initial }: StaffC
         </section>
       ) : null}
 
+      {canEditUploadTypes ? (
+        <section className="rounded-lg border border-border bg-card p-4 space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">Upload access</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Choose what this contributor may upload. Required before approval; editable anytime after.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {CONTRIBUTOR_UPLOAD_TYPE_OPTIONS.map((option) => {
+              const checked = allowedUploadTypes.includes(option.value)
+              return (
+                <label
+                  key={option.value}
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-background px-3 py-3"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={checked}
+                    onChange={() => toggleUploadType(option.value)}
+                    disabled={saving}
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-foreground">{option.label}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{option.description}</span>
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+          {!canApprove ? (
+            <Button type="button" variant="secondary" disabled={saving} onClick={() => void handleSaveUploadTypes()}>
+              Save upload access
+            </Button>
+          ) : null}
+        </section>
+      ) : null}
+
       {canApprove ? (
         <section className="rounded-lg border border-border bg-card p-4 space-y-4">
           <h3 className="text-sm font-semibold text-foreground">Approve application</h3>
@@ -148,7 +247,7 @@ export function StaffContributorApplicationDetail({ inquiryId, initial }: StaffC
               className="h-10 rounded-md border border-input bg-background px-3"
             />
           </label>
-          <Button type="button" disabled={saving} onClick={() => void handleApprove()}>
+          <Button type="button" disabled={saving || allowedUploadTypes.length === 0} onClick={() => void handleApprove()}>
             Approve and issue credentials
           </Button>
         </section>

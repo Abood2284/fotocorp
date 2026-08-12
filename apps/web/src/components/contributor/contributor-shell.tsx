@@ -113,7 +113,7 @@ function UserMenu({
       {open ? (
         <div
           role="menu"
-          className="absolute bottom-full left-3 right-3 z-50 mb-1 rounded-xl border border-border bg-card py-2 shadow-lg"
+          className="absolute left-3 right-3 top-full z-50 mt-1 rounded-xl border border-border bg-card py-2 shadow-lg"
         >
           <div className="border-b border-border px-4 py-3">
             <p className="truncate font-medium text-foreground">{session.contributor.displayName}</p>
@@ -171,14 +171,12 @@ function DesktopSidebar({
         </span>
       </div>
 
-      {/* Nav */}
-      <div className="flex-1 overflow-y-auto py-4">
-        <SidebarNav pathname={pathname} />
+      <div className="shrink-0 border-b border-border p-3">
+        <UserMenu session={session} onLogout={onLogout} />
       </div>
 
-      {/* User */}
-      <div className="border-t border-border p-3">
-        <UserMenu session={session} onLogout={onLogout} />
+      <div className="flex-1 overflow-y-auto py-4">
+        <SidebarNav pathname={pathname} />
       </div>
     </aside>
   )
@@ -233,12 +231,12 @@ function MobileSidebar({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-4">
-          <SidebarNav pathname={pathname} onLinkClick={onClose} />
+        <div className="shrink-0 border-b border-border p-3">
+          <UserMenu session={session} onLogout={onLogout} />
         </div>
 
-        <div className="border-t border-border p-3">
-          <UserMenu session={session} onLogout={onLogout} />
+        <div className="flex-1 overflow-y-auto py-4">
+          <SidebarNav pathname={pathname} onLinkClick={onClose} />
         </div>
       </aside>
     </>

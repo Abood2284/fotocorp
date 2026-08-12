@@ -27,6 +27,7 @@ import {
   patchSubscriberEntitlement,
   suspendSubscriberEntitlement,
   closeAccessInquiry,
+  updateContributorAllowedUploadTypesForInquiry,
   updateInquiryNotes,
 } from "./service";
 import {
@@ -80,6 +81,14 @@ const closeInquiryBody = z.object({
 
 const approveContributorBody = z.object({
   username: z.string().trim().min(3).max(30).optional(),
+  allowedUploadTypes: z
+    .array(z.enum(["EDITORIAL", "CARICATURE"]))
+    .min(1)
+    .default(["EDITORIAL"]),
+});
+
+const contributorAllowedUploadTypesBody = z.object({
+  allowedUploadTypes: z.array(z.enum(["EDITORIAL", "CARICATURE"])).min(1),
 });
 
 function serializeEntitlement(e: {
@@ -195,7 +204,10 @@ staffAccessInquiryRoutes.post(
     const { db } = await requireAccessInquiryStaff(c);
     const { inquiryId } = c.req.valid("param");
     const body = c.req.valid("json");
-    const result = await approveContributorApplicationInquiry(db, c.env.DATABASE_URL!, inquiryId, { username: body.username ?? null });
+    const result = await approveContributorApplicationInquiry(db, c.env.DATABASE_URL!, inquiryId, {
+      username: body.username ?? null,
+      allowedUploadTypes: body.allowedUploadTypes,
+    });
     await sendInquiryStatusEmail(c.env, db, inquiryId, "CONTRIBUTOR_APPLICATION_APPROVED_WITH_CREDENTIALS", {
       contributorUsername: result.username,
       temporaryPassword: result.temporaryPassword,
@@ -223,6 +235,26 @@ staffAccessInquiryRoutes.patch(
     return json({
       ok: true as const,
       inquiry: serializeStaffInquiryMutationResponse(inquiry),
+    });
+  },
+);
+
+staffAccessInquiryRoutes.patch(
+  "/api/v1/staff/access-inquiries/:inquiryId/contributor-allowed-upload-types",
+  zValidator("param", inquiryIdParam),
+  zValidator("json", contributorAllowedUploadTypesBody),
+  async (c) => {
+    const { db } = await requireAccessInquiryStaff(c);
+    const { inquiryId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const contributorProfile = await updateContributorAllowedUploadTypesForInquiry(
+      db,
+      inquiryId,
+      body.allowedUploadTypes,
+    );
+    return json({
+      ok: true as const,
+      contributorProfile,
     });
   },
 );

@@ -12,6 +12,7 @@ import {
 } from "../../lib/auth/contributor-password"
 import { assertPlatformUserMaySignIn } from "../../lib/access/platform-user-access"
 import { AppError } from "../../lib/errors"
+import { normalizeAllowedUploadTypes } from "../../lib/contributors/allowed-upload-types"
 import { createPlatformUser } from "../../lib/users/platform-user"
 import type { RequestAuditContext } from "../../lib/request-audit-context"
 import type { ValidatedRegistrationProfile } from "../auth/services/fotocorp-registration-profile"
@@ -69,6 +70,7 @@ export interface PlatformContributorPayload {
   displayName: string
   email: string | null
   status: string
+  allowedUploadTypes: Array<"EDITORIAL" | "CARICATURE">
   username: string
   mustResetPassword: boolean
   portalRole: string
@@ -464,8 +466,9 @@ async function loadContributorPayload(
     display_name: string
     email: string | null
     status: string
+    allowed_upload_types: string[] | null
   }>(db, sql`
-    select id, legacy_photographer_id::text, display_name, email, status
+    select id, legacy_photographer_id::text, display_name, email, status, allowed_upload_types
     from contributors where id = ${credential.owner_id}::uuid limit 1
   `)
 
@@ -478,6 +481,7 @@ async function loadContributorPayload(
     displayName: row.display_name,
     email: row.email,
     status: row.status,
+    allowedUploadTypes: normalizeAllowedUploadTypes(row.allowed_upload_types),
     username: credential.login_identifier,
     mustResetPassword: credential.must_reset_password,
     portalRole: "STANDARD",

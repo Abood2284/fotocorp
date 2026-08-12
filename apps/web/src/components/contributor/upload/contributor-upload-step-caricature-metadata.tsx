@@ -1,5 +1,6 @@
 "use client"
 
+import { CircleAlert } from "lucide-react"
 import { useMemo, useState, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -262,13 +263,19 @@ export function ContributorUploadStepCaricatureMetadata({
               />
             </div>
             <div className="space-y-1.5">
-              <CaricatureFieldLabel required>Depicted subjects (comma-separated)</CaricatureFieldLabel>
+              <CaricatureFieldLabel
+                required
+                help="List who or what appears in the drawing — people, places, organizations, symbols, or topics. Separate entries with commas."
+              >
+                Visible subjects in the caricature
+              </CaricatureFieldLabel>
               <textarea
                 name="depictedSubjects"
                 defaultValue={formDefaults.depictedSubjects}
                 required
                 rows={2}
                 disabled={!active}
+                placeholder="e.g. Narendra Modi, Parliament, election"
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
               />
             </div>
@@ -288,14 +295,25 @@ export function ContributorUploadStepCaricatureMetadata({
 function CaricatureFieldLabel({
   children,
   required = false,
+  help,
 }: {
   children: ReactNode
   required?: boolean
+  help?: string
 }) {
   return (
-    <span className="text-xs font-medium text-muted-foreground">
+    <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
       {children}
       {required ? <span className="text-destructive"> *</span> : null}
+      {help ? (
+        <span
+          className="inline-flex text-muted-foreground/80 hover:text-foreground"
+          title={help}
+          aria-label={help}
+        >
+          <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        </span>
+      ) : null}
     </span>
   )
 }
