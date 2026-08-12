@@ -255,25 +255,24 @@ export function AssetDetailActions({
                   className="h-4 w-4 shrink-0 accent-foreground disabled:cursor-not-allowed"
                 />
                 <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                  <span className="text-sm text-foreground">{option.label}</span>
+                  <span className="text-sm font-medium text-foreground">{option.label}</span>
                   {statusLabel ? (
-                    <span className="shrink-0 text-sm text-muted-foreground">{statusLabel}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{statusLabel}</span>
+                  ) : option.dimensions ? (
+                    <span className="min-w-0 truncate text-right text-xs tabular-nums text-muted-foreground">
+                      {option.dimensions}
+                    </span>
                   ) : null}
                 </span>
               </label>
-              {selected && (option.dimensions || option.description) ? (
+              {selected && option.description ? (
                 <div
                   className={cn(
                     "border-t border-border/80 bg-muted/30 px-4 py-2.5 pl-11 text-xs leading-relaxed text-muted-foreground",
                     isSelectable && "bg-muted/40",
                   )}
                 >
-                  {option.dimensions ? (
-                    <p className="font-medium text-foreground/80">{option.dimensions}</p>
-                  ) : null}
-                  {option.description ? (
-                    <p className={option.dimensions ? "mt-1" : undefined}>{option.description}</p>
-                  ) : null}
+                  <p>{option.description}</p>
                 </div>
               ) : null}
             </div>

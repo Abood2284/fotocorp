@@ -64,7 +64,7 @@ pnpm --dir apps/api run media:scan-original-metadata -- --dry-run --limit 10
 
 Reads `image_assets.original_storage_key` from the R2 originals bucket, extracts Sharp metadata, and logs the `image_assets_metadata` row that would be written.
 
-**Publish pipeline:** New FOTOCORP approvals populate `image_assets_metadata` automatically in `apps/jobs` (`ImagePublishProcessor`) when publish completes. The scanner remains the backfill/repair tool for legacy imports and failed rows.
+**Publish pipeline:** New FOTOCORP approvals populate `image_assets_metadata` automatically in `apps/jobs` (`ImagePublishProcessor`) when publish completes. The jobs Docker image must include `@fotocorp/original-image-metadata` (see `apps/jobs/Dockerfile`). The scanner remains the backfill/repair tool for legacy imports, failed rows, and any publishes that completed before that package was shipped in the image.
 
 **Backfill after deploy:**
 

@@ -23,6 +23,10 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Download size metadata accuracy + jobs Docker fix:** Size rows only show dimensions/DPI when `image_assets_metadata` has been scanned (no “Up to …” placeholders). Root cause for missing new-asset scans: `apps/jobs/Dockerfile` omitted `@fotocorp/original-image-metadata`, so VPS publish completes without writing metadata. Dockerfile now copies that workspace package. Backfill still needed for ~1.6k unscanned public FOTOCORP assets (`media:scan-original-metadata --write --only-missing`).
+
+- **Asset detail download size metadata:** Low/Medium/High rows now always show dimensions + DPI (scaled WxH from scanned `image_assets_metadata` when available; Low/Medium still show supported caps `1,200 px / 72 dpi` and `2,400 px / 300 dpi` when unscanned). Dimensions sit on each size row; usage blurb stays under the selected option.
+
 - **Staff upload flow type fix:** `STAFF_DUMMY_SESSION` now includes required `allowedUploadTypes` (`EDITORIAL` + `CARICATURE`) so it satisfies `ContributorSummary` after the contributor upload-types change.
 
 - **Contributor allowed upload types:** `contributors.allowed_upload_types` (`EDITORIAL` / `CARICATURE`, multi; migration `0063` + backfill — `jamesmanalody@gmail.com` → Caricature, all others Editorial). Staff assign on contributor application detail (required on approve, editable after). Session/`me` returns types; contributor upload wizard skips asset-type step when only one type; uploads dashboard shows only allowed sections; upload APIs reject disallowed types. Events page shows My events only (Available events removed). Staff upload wizard unchanged.

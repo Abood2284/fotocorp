@@ -22,11 +22,13 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches patches
 COPY packages/media-preview/package.json packages/media-preview/package.json
+COPY packages/original-image-metadata/package.json packages/original-image-metadata/package.json
 COPY apps/jobs/package.json apps/jobs/package.json
 
 RUN pnpm install --frozen-lockfile --filter @fotocorp/jobs...
 
 COPY packages/media-preview packages/media-preview
+COPY packages/original-image-metadata packages/original-image-metadata
 
 COPY apps/jobs apps/jobs
 

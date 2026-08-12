@@ -15,17 +15,29 @@ const SIZE_OPTION_DESCRIPTIONS: Record<AssetSizeOption["id"], string> = {
 export function buildPublicAssetSizeOptions(
   technicalMetadata: PublicAssetTechnicalMetadata | null | undefined,
 ): AssetSizeOption[] {
-  const longEdge = technicalMetadata?.originalLongEdge ?? null
   const displayWidth = technicalMetadata?.displayWidth ?? null
   const displayHeight = technicalMetadata?.displayHeight ?? null
+  const longEdge = technicalMetadata?.originalLongEdge
+    ?? (displayWidth !== null && displayHeight !== null
+      ? Math.max(displayWidth, displayHeight)
+      : null)
   const originalDpi = technicalMetadata?.originalDpi ?? null
   const originalMegapixels = technicalMetadata?.originalMegapixels ?? null
+  const hasScannedDimensions = displayWidth !== null && displayHeight !== null && longEdge !== null
 
   return [
     {
       id: "web",
       label: "Low",
-      dimensions: formatLowDimensions(longEdge),
+      dimensions: hasScannedDimensions
+        ? formatScaledTierDimensions({
+            displayWidth,
+            displayHeight,
+            longEdge,
+            maxLongEdge: LOW_MAX_LONG_EDGE,
+            dpi: LOW_OUTPUT_DPI,
+          })
+        : null,
       description: SIZE_OPTION_DESCRIPTIONS.web,
       selectable: true,
       downloadAvailable: true,
@@ -33,7 +45,15 @@ export function buildPublicAssetSizeOptions(
     {
       id: "medium",
       label: "Medium",
-      dimensions: formatMediumDimensions(longEdge),
+      dimensions: hasScannedDimensions
+        ? formatScaledTierDimensions({
+            displayWidth,
+            displayHeight,
+            longEdge,
+            maxLongEdge: MEDIUM_MAX_LONG_EDGE,
+            dpi: MEDIUM_OUTPUT_DPI,
+          })
+        : null,
       description: SIZE_OPTION_DESCRIPTIONS.medium,
       selectable: true,
       downloadAvailable: true,
@@ -55,19 +75,19 @@ export function buildPublicAssetSizeOptions(
   ]
 }
 
-function formatLowDimensions(longEdge: number | null): string | null {
-  if (longEdge === null) return null
-  return joinDetailSegments([
-    `${Math.min(LOW_MAX_LONG_EDGE, longEdge).toLocaleString()} px max edge`,
-    `${LOW_OUTPUT_DPI} dpi`,
-  ])
-}
+function formatScaledTierDimensions(input: {
+  displayWidth: number
+  displayHeight: number
+  longEdge: number
+  maxLongEdge: number
+  dpi: number
+}): string | null {
+  const scaled = scaleToMaxLongEdge(input.displayWidth, input.displayHeight, input.maxLongEdge, input.longEdge)
+  if (!scaled) return null
 
-function formatMediumDimensions(longEdge: number | null): string | null {
-  if (longEdge === null) return null
   return joinDetailSegments([
-    `${Math.min(MEDIUM_MAX_LONG_EDGE, longEdge).toLocaleString()} px max edge`,
-    `${MEDIUM_OUTPUT_DPI} dpi`,
+    `${scaled.width.toLocaleString()} × ${scaled.height.toLocaleString()} px`,
+    `${input.dpi} dpi`,
   ])
 }
 
@@ -85,7 +105,7 @@ function formatHighDimensions(input: {
       `${input.displayWidth.toLocaleString()} × ${input.displayHeight.toLocaleString()} px`,
     )
   } else if (input.longEdge !== null) {
-    segments.push(`${input.longEdge.toLocaleString()} px max edge`)
+    segments.push(`${input.longEdge.toLocaleString()} px long edge`)
   }
 
   if (input.originalDpi !== null) {
@@ -96,6 +116,22 @@ function formatHighDimensions(input: {
   if (megapixelsLabel) segments.push(megapixelsLabel)
 
   return joinDetailSegments(segments)
+}
+
+function scaleToMaxLongEdge(
+  width: number,
+  height: number,
+  maxLongEdge: number,
+  longEdge: number,
+): { width: number; height: number } | null {
+  if (width <= 0 || height <= 0 || longEdge <= 0) return null
+
+  const targetLongEdge = Math.min(maxLongEdge, longEdge)
+  const scale = targetLongEdge / longEdge
+  const scaledWidth = Math.max(1, Math.round(width * scale))
+  const scaledHeight = Math.max(1, Math.round(height * scale))
+
+  return { width: scaledWidth, height: scaledHeight }
 }
 
 function formatMegapixelsLabel(value: string | null): string | null {
