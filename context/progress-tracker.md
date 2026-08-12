@@ -23,6 +23,8 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Staff upload flow type fix:** `STAFF_DUMMY_SESSION` now includes required `allowedUploadTypes` (`EDITORIAL` + `CARICATURE`) so it satisfies `ContributorSummary` after the contributor upload-types change.
+
 - **Contributor allowed upload types:** `contributors.allowed_upload_types` (`EDITORIAL` / `CARICATURE`, multi; migration `0063` + backfill — `jamesmanalody@gmail.com` → Caricature, all others Editorial). Staff assign on contributor application detail (required on approve, editable after). Session/`me` returns types; contributor upload wizard skips asset-type step when only one type; uploads dashboard shows only allowed sections; upload APIs reject disallowed types. Events page shows My events only (Available events removed). Staff upload wizard unchanged.
 
 - **Sidebar profile placement:** Staff and contributor portal sidebars now show the signed-in profile directly below the Fotocorp logo (instead of pinned to the bottom), with menus opening downward.

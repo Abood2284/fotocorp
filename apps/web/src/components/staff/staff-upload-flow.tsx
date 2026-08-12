@@ -86,6 +86,7 @@ const STAFF_DUMMY_SESSION = {
     displayName: "Staff",
     email: null,
     status: "ACTIVE",
+    allowedUploadTypes: ["EDITORIAL", "CARICATURE"],
   },
 } satisfies ContributorAuthResponse
 
@@ -812,6 +813,7 @@ export function StaffUploadFlow({ existingEvent }: StaffUploadFlowProps) {
         <ContributorUploadStepAssetType
           active
           selectedType={batchAssetType}
+          allowedTypes={["IMAGE", "CARICATURE"]}
           hint={uploadWizardAssetTypeHint(batchAssetType)}
           onSelect={handleAssetTypeSelect}
         />
