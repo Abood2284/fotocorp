@@ -23,6 +23,7 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Homepage 22nd anniversary banner:** Added a compact black-and-white advertisement strip above the homepage hero for Fotocorp's 19 August 2026 anniversary, with an endless horizontal ticker (disabled for reduced-motion users), subscriptions from ₹5,000/month, and a fixed `subscription@fotocorp.com` CTA that prefills a structured subscription inquiry subject and body.
 - **Download size metadata accuracy + jobs Docker fix:** Size rows only show dimensions/DPI when `image_assets_metadata` has been scanned (no “Up to …” placeholders). Root cause for missing new-asset scans: `apps/jobs/Dockerfile` omitted `@fotocorp/original-image-metadata`, so VPS publish completes without writing metadata. Dockerfile now copies that workspace package. Backfill still needed for ~1.6k unscanned public FOTOCORP assets (`media:scan-original-metadata --write --only-missing`).
 
 - **Asset detail download size metadata:** Low/Medium/High rows now always show dimensions + DPI (scaled WxH from scanned `image_assets_metadata` when available; Low/Medium still show supported caps `1,200 px / 72 dpi` and `2,400 px / 300 dpi` when unscanned). Dimensions sit on each size row; usage blurb stays under the selected option.
