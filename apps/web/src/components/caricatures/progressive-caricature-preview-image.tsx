@@ -3,8 +3,12 @@
 import { useEffect, useState } from "react"
 
 import { PreviewImage } from "@/components/assets/preview-image"
-import { buildCaricatureClearPreviewUrl } from "@/lib/caricatures/caricature-clear-access-shared"
+import {
+  buildCaricatureClearPreviewUrl,
+  canShowCaricatureClearPreview,
+} from "@/lib/caricatures/caricature-clear-access-shared"
 import { useCaricatureClearAccess } from "@/lib/caricatures/use-caricature-clear-access"
+import { useSharedAuthSession } from "@/lib/use-shared-auth-session"
 import { cn } from "@/lib/utils"
 
 interface ProgressiveCaricaturePreviewImageProps {
@@ -32,8 +36,14 @@ export function ProgressiveCaricaturePreviewImage({
   imageClassName,
   loading = "lazy",
 }: ProgressiveCaricaturePreviewImageProps) {
-  const { hasClearAccess } = useCaricatureClearAccess()
-  const clearUrl = hasClearAccess ? buildCaricatureClearPreviewUrl(assetId) : null
+  const { data: session } = useSharedAuthSession()
+  const isContributor = session?.kind === "contributor"
+  const { hasClearAccess, ownedAssetIds } = useCaricatureClearAccess()
+  const canShowClear = canShowCaricatureClearPreview(
+    { hasClearAccess, ownedAssetIds, isContributor },
+    assetId,
+  )
+  const clearUrl = canShowClear ? buildCaricatureClearPreviewUrl(assetId) : null
   const [clearReady, setClearReady] = useState(false)
 
   useEffect(() => {

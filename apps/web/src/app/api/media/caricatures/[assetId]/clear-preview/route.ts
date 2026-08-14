@@ -1,5 +1,8 @@
 import { getCurrentAuthUser } from "@/lib/app-user"
-import { resolveSubscriberHasCaricatureClearAccess } from "@/lib/caricatures/caricature-clear-access"
+import {
+  getOptionalContributorClearPreviewIdentity,
+  resolveSubscriberHasCaricatureClearAccess,
+} from "@/lib/caricatures/caricature-clear-access"
 import { internalApiFetch, internalApiRoutes } from "@/lib/server/internal-api"
 import {
   getOptionalStaffSession,
@@ -27,8 +30,9 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const staff = await getOptionalStaffSession()
   const authUser = staff ? null : await getCurrentAuthUser()
+  const contributor = staff || authUser ? null : await getOptionalContributorClearPreviewIdentity()
 
-  if (!staff && !authUser) {
+  if (!staff && !authUser && !contributor) {
     return Response.json(
       { error: { code: "AUTH_REQUIRED", message: "Authentication is required." } },
       { status: 401, headers: SAFE_HEADERS },
@@ -45,9 +49,19 @@ export async function GET(_request: Request, context: RouteContext) {
     }
   }
 
-  const actorHeaders = staff
-    ? await getStaffInternalAdminActorHeaders()
-    : { "x-auth-user-id": authUser!.id }
+  let actorHeaders: HeadersInit
+  if (staff) {
+    actorHeaders = await getStaffInternalAdminActorHeaders()
+  } else if (authUser) {
+    actorHeaders = { "x-auth-user-id": authUser.id }
+  } else if (contributor) {
+    actorHeaders = { "x-contributor-id": contributor.id }
+  } else {
+    return Response.json(
+      { error: { code: "AUTH_REQUIRED", message: "Authentication is required." } },
+      { status: 401, headers: SAFE_HEADERS },
+    )
+  }
 
   const upstream = await internalApiFetch({
     path: internalApiRoutes.caricatureClearPreview(assetId),

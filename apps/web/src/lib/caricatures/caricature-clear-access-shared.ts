@@ -5,6 +5,12 @@ export interface CaricatureEntitlementLike {
   validUntil: Date | null
 }
 
+export interface CaricatureClearAccessState {
+  hasClearAccess: boolean
+  ownedAssetIds: string[]
+  isContributor: boolean
+}
+
 export function isCaricatureEntitlementCurrentlyValid(
   row: Pick<CaricatureEntitlementLike, "status" | "validFrom" | "validUntil">,
   now = new Date(),
@@ -27,4 +33,30 @@ export function hasActiveCaricatureEntitlement(
 
 export function buildCaricatureClearPreviewUrl(assetId: string): string {
   return `/api/media/caricatures/${encodeURIComponent(assetId)}/clear-preview`
+}
+
+export function canShowCaricatureClearPreview(
+  access: Pick<CaricatureClearAccessState, "hasClearAccess" | "ownedAssetIds" | "isContributor">,
+  assetId: string,
+): boolean {
+  if (access.hasClearAccess) return true
+  if (access.isContributor) return true
+  return access.ownedAssetIds.includes(assetId)
+}
+
+export function parseCaricatureClearAccessPayload(data: unknown): CaricatureClearAccessState {
+  if (!data || typeof data !== "object") {
+    return { hasClearAccess: false, ownedAssetIds: [], isContributor: false }
+  }
+
+  const record = data as { hasClearAccess?: unknown; ownedAssetIds?: unknown; isContributor?: unknown }
+  const ownedAssetIds = Array.isArray(record.ownedAssetIds)
+    ? record.ownedAssetIds.filter((id): id is string => typeof id === "string" && id.length > 0)
+    : []
+
+  return {
+    hasClearAccess: record.hasClearAccess === true,
+    ownedAssetIds,
+    isContributor: record.isContributor === true,
+  }
 }

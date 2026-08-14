@@ -11,7 +11,7 @@
 
 ## Incremental update (2026-07-30)
 
-- **Caricature clear browse for entitled users:** Anonymous public caricature feeds/search still return blurred CDN derivatives only. Subscribers with an **ACTIVE** `CARICATURE` entitlement (and staff) load clear originals via web BFF `GET /api/account/caricature-access` + `GET /api/media/caricatures/:assetId/clear-preview` → internal `GET /api/v1/internal/caricatures/:assetId/clear-preview` (`x-auth-user-id` or `x-admin-auth-user-id`). Subscriber path requires `PUBLISHED`/`PUBLIC` and does not decrement download quota. `PublicCaricatureCard` and detail preview swap to the clear URL when access is granted. Dedicated caricature download endpoint remains TODO.
+- **Caricature clear browse for entitled users and owning contributors:** Anonymous public caricature feeds/search still return blurred CDN derivatives only. Subscribers with an **ACTIVE** `CARICATURE` entitlement (and staff) load clear originals for all published caricatures. Signed-in contributors load clear originals only for assets they uploaded (`created_by_contributor_id`). Probe: web BFF `GET /api/account/caricature-access` (`hasClearAccess` + `ownedAssetIds`). Stream: `GET /api/media/caricatures/:assetId/clear-preview` → internal `GET /api/v1/internal/caricatures/:assetId/clear-preview` (`x-auth-user-id`, `x-admin-auth-user-id`, or `x-contributor-id`). Subscriber path requires `PUBLISHED`/`PUBLIC`; contributor path requires ownership + `PUBLISHED`/`PUBLIC`; neither decrements download quota. `PublicCaricatureCard` and detail preview swap to the clear URL only for globally entitled viewers or owned assets. Dedicated caricature download endpoint remains TODO.
 
 ## Incremental update (2026-06-26)
 

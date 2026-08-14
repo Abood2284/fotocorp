@@ -8,7 +8,7 @@ Update this file after every meaningful implementation change.
 
 ## Current Goal
 
-- **Homepage Caricature latest feed:** `GET /api/v1/public/caricatures/latest` (BFF `/api/public/caricatures/latest`) powers the homepage Caricature tab and header nav Latest link (`/?tab=caricature#homepage-categories`). Public read DB, cursor pagination on `published_at`, blurred preview URLs for anonymous users; entitled CARICATURE subscribers/staff load clear originals via `/api/media/caricatures/:id/clear-preview`; cache purge on caricature publish sync.
+- **Homepage Caricature latest feed:** `GET /api/v1/public/caricatures/latest` (BFF `/api/public/caricatures/latest`) powers the homepage Caricature tab and header nav Latest link (`/?tab=caricature#homepage-categories`). Public read DB, cursor pagination on `published_at`, blurred preview URLs for anonymous users; entitled CARICATURE subscribers/staff load all clear originals via `/api/media/caricatures/:id/clear-preview`; signed-in contributors load clear originals only for caricatures they uploaded; cache purge on caricature publish sync.
 
 - **Homepage Hero curation:** Staff `/staff/homepage-hero` curates exactly 25 public-ready images in `public_homepage_hero_pool_items`; `GET /api/v1/public/homepage/hero-set` shuffles 9 from that pool on each request (no refresh job required).
 
@@ -22,6 +22,8 @@ Update this file after every meaningful implementation change.
 - Staff ops UX **PR-D:** P7 contributor apply/approve manual smoke when ready.
 
 ## Completed (recent)
+
+- **Contributor caricature owner clear browse:** Signed-in caricature uploaders see their own published assets unblurred on homepage/search/detail; other caricatures stay blurred. Clear preview uses the same `/api/v1/auth/session` contributor identity as the header (not contributor `/me`), and the client attempts the clear original whenever `session.kind === "contributor"` — the internal stream still enforces `created_by_contributor_id` + `PUBLISHED`/`PUBLIC`. Detail actions no longer show “Sign in to download” to a signed-in contributor.
 
 - **Homepage 22nd anniversary banner:** Added a compact black-and-white advertisement strip above the homepage hero for Fotocorp's 19 August 2026 anniversary, with an endless horizontal ticker (disabled for reduced-motion users), subscriptions from ₹5,000/month, and a fixed `subscription@fotocorp.com` CTA that prefills a structured subscription inquiry subject and body.
 - **Download size metadata accuracy + jobs Docker fix:** Size rows only show dimensions/DPI when `image_assets_metadata` has been scanned (no “Up to …” placeholders). Root cause for missing new-asset scans: `apps/jobs/Dockerfile` omitted `@fotocorp/original-image-metadata`, so VPS publish completes without writing metadata. Dockerfile now copies that workspace package. Backfill still needed for ~1.6k unscanned public FOTOCORP assets (`media:scan-original-metadata --write --only-missing`).
@@ -44,7 +46,7 @@ Update this file after every meaningful implementation change.
 
 - **Staff user detail panel UX:** Removed the redundant Profile section from `/staff/users/[authUserId]`; Registration is collapsed by default.
 
-- **Caricature clear browse (entitled users):** Logged-in subscribers with an ACTIVE `CARICATURE` entitlement (and staff) see clear originals on homepage/search/detail instead of blurred public derivatives. Probe: `GET /api/account/caricature-access`; stream: `GET /api/media/caricatures/:id/clear-preview` → `GET /api/v1/internal/caricatures/:id/clear-preview`. Anonymous users still get blurred CDN previews only; clear browse does not consume download quota. Formal caricature download endpoint still pending. **UX:** cards keep the blurred CDN image visible and only overlay the clear original after it finishes loading (no blur → blank → clear flash).
+- **Caricature clear browse (entitled users):** Logged-in subscribers with an ACTIVE `CARICATURE` entitlement (and staff) see clear originals on homepage/search/detail instead of blurred public derivatives. Probe: `GET /api/account/caricature-access`; stream: `GET /api/media/caricatures/:id/clear-preview` → `GET /api/v1/internal/caricatures/:id/clear-preview`. Anonymous users still get blurred CDN previews only; signed-in contributors see clear originals only for caricatures they uploaded. Clear browse does not consume download quota. Formal caricature download endpoint still pending. **UX:** cards keep the blurred CDN image visible and only overlay the clear original after it finishes loading (no blur → blank → clear flash).
 
 - **Staff catalog upload-year filter:** `/staff/catalog` Updated-column filter is **Upload year** only (`?year=2019`). Filters on `coalesce(uploaded_at, created_at)` — legacy archive years are on `uploaded_at`, not Neon `created_at` (import time). Active chip: Upload year.
 

@@ -17,6 +17,7 @@ export type CaricatureDetailAccessState =
   | "signed-in-no-entitlement"
   | "entitled"
   | "staff"
+  | "contributor"
 
 interface CaricatureDetailActionsProps {
   assetId: string
@@ -31,6 +32,7 @@ export function CaricatureDetailActions({ assetId, detailHref, className }: Cari
 
   const accessState = useMemo((): CaricatureDetailAccessState => {
     if (session?.kind === "staff") return "staff"
+    if (session?.kind === "contributor") return "contributor"
     if (session?.kind === "user") {
       // Clear browse access uses ACTIVE CARICATURE entitlement.
       // Download original remains disabled until the dedicated download endpoint ships.
@@ -111,6 +113,12 @@ export function CaricatureDetailActions({ assetId, detailHref, className }: Cari
             </Link>
           </Button>
         </>
+      ) : null}
+
+      {accessState === "contributor" ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Original downloads are available to licensed subscribers.
+        </p>
       ) : null}
 
       {accessState === "signed-in-no-entitlement" ? (
