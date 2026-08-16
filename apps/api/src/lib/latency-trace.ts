@@ -19,7 +19,7 @@ export interface LatencyTraceLog {
     dbMs: number
     rowCount: number
     queryName: string
-    windowDays?: number
+    windowDays?: number | null
     limit?: number
     hasCursor?: boolean
   }

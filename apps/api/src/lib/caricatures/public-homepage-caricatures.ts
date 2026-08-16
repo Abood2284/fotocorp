@@ -40,7 +40,7 @@ export interface PublicLatestCaricaturesQueryInput {
 }
 
 interface PublicLatestCaricaturesQuery {
-  windowDays: number
+  windowDays: number | null
   limit: number
   cursor: LatestCaricaturesCursor | null
 }
@@ -71,13 +71,12 @@ export interface PublicLatestCaricaturesDbTrace {
   rowCount: number
   queryName: "public_latest_caricatures"
   sourceTable: "caricature_assets"
-  windowDays: number
+  windowDays: number | null
   limit: number
   hasCursor: boolean
 }
 
-const DEFAULT_WINDOW_DAYS = 30
-const DEFAULT_CARICATURE_LIMIT = 15
+const DEFAULT_CARICATURE_LIMIT = 25
 const MAX_CARICATURE_LIMIT = 50
 const MAX_WINDOW_DAYS = 365
 
@@ -137,6 +136,7 @@ export function buildLatestCaricaturesResponse(
 
 function buildLatestCaricaturesSql(query: PublicLatestCaricaturesQuery): SQL {
   const pageSize = query.limit + 1
+  const windowWhere = caricatureWindowWhere(query.windowDays)
   const cursorWhere = query.cursor ? caricatureCursorWhere(query.cursor) : sql``
 
   return sql`
@@ -164,11 +164,16 @@ function buildLatestCaricaturesSql(query: PublicLatestCaricaturesQuery): SQL {
     where ca.status = 'PUBLISHED'
       and ca.visibility = 'PUBLIC'
       and ca.deleted_at is null
-      and ca.published_at >= now() - (${query.windowDays}::int * interval '1 day')
+      ${windowWhere}
       ${cursorWhere}
     order by ca.published_at desc, ca.id desc
     limit ${pageSize}
   `
+}
+
+function caricatureWindowWhere(windowDays: number | null): SQL {
+  if (windowDays == null) return sql``
+  return sql`and ca.published_at >= now() - (${windowDays}::int * interval '1 day')`
 }
 
 function caricatureCursorWhere(cursor: LatestCaricaturesCursor): SQL {
@@ -201,8 +206,8 @@ function mapCaricatureRow(row: HomepageCaricatureRow): PublicHomepageCaricatureD
   }
 }
 
-function parseWindowDays(value: string | null): number {
-  if (!value) return DEFAULT_WINDOW_DAYS
+function parseWindowDays(value: string | null): number | null {
+  if (!value) return null
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_WINDOW_DAYS) {
     throw new AppError(400, "INVALID_WINDOW_DAYS", `windowDays must be an integer between 1 and ${MAX_WINDOW_DAYS}.`)

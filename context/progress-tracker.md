@@ -8,7 +8,7 @@ Update this file after every meaningful implementation change.
 
 ## Current Goal
 
-- **Homepage Caricature latest feed:** `GET /api/v1/public/caricatures/latest` (BFF `/api/public/caricatures/latest`) powers the homepage Caricature tab and header nav Latest link (`/?tab=caricature#homepage-categories`). Public read DB, cursor pagination on `published_at`, blurred preview URLs for anonymous users; entitled CARICATURE subscribers/staff load all clear originals via `/api/media/caricatures/:id/clear-preview`; signed-in contributors load clear originals only for caricatures they uploaded; cache purge on caricature publish sync.
+- **Homepage Caricature catalog feed:** `GET /api/v1/public/caricatures/latest` (BFF `/api/public/caricatures/latest`) powers the homepage Caricature tab and header nav Show all link (`/?tab=caricature#homepage-categories`). Lists all `PUBLISHED`/`PUBLIC` caricatures (no 30-day editorial window) with cursor pagination, 25 per page, and Load more until exhausted. Blurred preview URLs for anonymous users; entitled CARICATURE subscribers/staff load all clear originals via `/api/media/caricatures/:id/clear-preview`; signed-in contributors load clear originals only for caricatures they uploaded; cache purge on caricature publish sync.
 
 - **Homepage Hero curation:** Staff `/staff/homepage-hero` curates exactly 25 public-ready images in `public_homepage_hero_pool_items`; `GET /api/v1/public/homepage/hero-set` shuffles 9 from that pool on each request (no refresh job required).
 
@@ -22,6 +22,26 @@ Update this file after every meaningful implementation change.
 - Staff ops UX **PR-D:** P7 contributor apply/approve manual smoke when ready.
 
 ## Completed (recent)
+
+- **Footer legal line:** Public footer copyright now reads “© {year} Fotocorp. All rights reserved.” — dropped “Authentic editorial archive.”
+
+- **Contributor country-code dropdown:** Apply-contributor phone country code is now the same ISO + calling-code select as Register (default `+91`, India/US/UK first). Shared helper: `apps/web/src/lib/phone-calling-codes.ts`.
+
+- **Register job titles:** Sign-up Job Title list drops Freelancer, Owner, Associate Producer, and Clearance Coordinator; adds Editorial coordinator and Photo editor after Editor (& Assistant Editor).
+
+- **Download sign-in link:** Asset detail `AUTH_REQUIRED` download notice now links **sign in** to `/sign-in` with `callbackUrl` back to the asset.
+
+- **Download size usage labels:** Asset detail Low/Medium/High rows now show **Web & Screen**, **Digital & Editorial**, and **Print & publication** on every option instead of a selected-only “Best for print…” blurb.
+
+- **Asset usage tooltip copy:** Editorial “How can I use this image?” help text now allows book/magazine covers in common uses, drops the cover prohibition, and states standard rights for 1 year instead of 15.
+
+- **Homepage Caricature show-all feed:** Homepage Caricature tab no longer applies the editorial 30-day `windowDays` filter. `GET /api/v1/public/caricatures/latest` defaults to the full published catalog (`windowDays` optional), page size 25, keyset cursor, Load more until `hasMore` is false. Tests: `apps/api/test/public-latest-caricatures.test.ts`.
+
+- **Caricature nav label:** Header Caricature dropdown (desktop + mobile) now labels the homepage caricature feed link **Show all** instead of Latest. Destination is unchanged (`/?tab=caricature#homepage-categories`).
+
+- **Latest Events grid gutters:** `PublicEventsGrid` justified `gap` increased from 1px to 8px so homepage/search event tiles match the public asset grid spacing.
+
+- **White auth card:** `/sign-in` glass card is now a white frosted panel (`rgba(255,255,255,0.96)` → `rgba(248,249,250,0.92)`) with near-black text, slate muted copy, light inputs/tabs, and the existing teal CTA. Logo is no longer inverted. Trust layer over the photo stays white. Tokens: `--auth-glass-border`, `--auth-card-fg`, `--auth-card-muted` in `globals.css` + `context/ui-context.md`.
 
 - **Contributor caricature owner clear browse:** Signed-in caricature uploaders see their own published assets unblurred on homepage/search/detail; other caricatures stay blurred. Clear preview uses the same `/api/v1/auth/session` contributor identity as the header (not contributor `/me`), and the client attempts the clear original whenever `session.kind === "contributor"` — the internal stream still enforces `created_by_contributor_id` + `PUBLISHED`/`PUBLIC`. Detail actions no longer show “Sign in to download” to a signed-in contributor.
 

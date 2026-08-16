@@ -19,7 +19,7 @@ const submitBodySchema = z.object({
   email: z.string().trim().email().max(320),
   phoneCountryCode: z.string().trim().min(1).max(8),
   phoneNumber: z.string().trim().min(1).max(32),
-  applicationNotes: z.string().trim().max(4000).optional(),
+  applicationNotes: z.string().trim().min(1).max(4000),
 })
 
 export const publicContributorApplicationRoutes = new Hono<{ Bindings: Env; Variables: AppRequestVariables }>()

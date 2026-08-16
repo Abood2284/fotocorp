@@ -61,11 +61,13 @@
   --radius-lg: 0px;
   --radius-xl: 0px;
 
-  /* Auth glass (sign-in page only) — intentional deviation from the
-     square B&W system. Teal matches the logo mark (#19A8B9 family). */
+  /* Auth glass (sign-in page only) — white frosted card over the
+     photographic background. Teal matches the logo mark (#19A8B9 family). */
   --auth-teal: #00a8b5;
   --auth-teal-deep: #001014;
-  --auth-glass-border: rgba(255, 255, 255, 0.28);
+  --auth-glass-border: rgba(15, 18, 22, 0.12);
+  --auth-card-fg: #0d0f1a;
+  --auth-card-muted: #4b5563;
 }
 
 .contributor-dark-theme {

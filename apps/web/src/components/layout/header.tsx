@@ -302,7 +302,7 @@ function HeaderShell({
                   href={CARICATURE_LATEST_HREF}
                   className="block px-2 py-2 font-sans text-sm font-medium text-foreground transition-colors hover:bg-secondary hover:text-foreground"
                 >
-                  Latest
+                  Show all
                 </Link>
               </li>
             </ul>
@@ -457,7 +457,7 @@ function MobileBrowseNav({
           <h3 className="mb-1 px-3 font-sans text-xs font-semibold uppercase tracking-wider text-foreground">Caricature</h3>
           <div className="grid gap-1">
             <MobileNavLink
-              link={{ label: "Latest", href: CARICATURE_LATEST_HREF }}
+              link={{ label: "Show all", href: CARICATURE_LATEST_HREF }}
               pathname={pathname}
               sortParam={sortParam}
               modeParam={modeParam}

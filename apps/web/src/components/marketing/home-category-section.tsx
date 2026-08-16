@@ -34,10 +34,9 @@ interface HomeCategorySectionProps {
 }
 
 const LATEST_EVENTS_LIMIT = 15
-const LATEST_CARICATURES_LIMIT = 15
+const HOMEPAGE_CARICATURES_LIMIT = 25
 const CATEGORY_BROWSE_EVENTS_LIMIT = 25
 const RECENT_EVENTS_WINDOW_DAYS = 30
-const RECENT_CARICATURES_WINDOW_DAYS = 30
 const ROYALTY_FREE_FEATURED_LIMIT = 50
 const ROYALTY_FREE_FEATURED_STALE_MS = 86_400_000
 
@@ -82,6 +81,21 @@ const CREATIVE_CARDS = [
     link: "/search",
   },
 ]
+
+function homepageCollectionTabClassName(options: {
+  isActive: boolean
+  isDisabled?: boolean
+}) {
+  const { isActive, isDisabled = false } = options
+  if (isDisabled) {
+    return "shrink-0 cursor-not-allowed rounded-none border border-transparent px-3 py-2 text-muted-foreground/50 sm:px-4"
+  }
+  return `shrink-0 cursor-pointer rounded-none border px-3 py-2 transition-colors sm:px-4 ${
+    isActive
+      ? "border-black bg-black text-white"
+      : "border-transparent text-muted-foreground hover:border-black hover:bg-black/5 hover:text-foreground"
+  }`
+}
 
 function mapHomepageEventToPublicEvent(event: PublicHomepageEvent): PublicEvent {
   const displayDate = event.eventDate ?? event.createdAt
@@ -157,10 +171,9 @@ export function HomeCategorySection(_props: HomeCategorySectionProps = {}) {
     refetchOnWindowFocus: false,
   })
   const caricatureQuery = useQuery({
-    queryKey: ["homepage-caricatures", RECENT_CARICATURES_WINDOW_DAYS, LATEST_CARICATURES_LIMIT],
+    queryKey: ["homepage-caricatures", HOMEPAGE_CARICATURES_LIMIT],
     queryFn: () => fetchPublicLatestCaricatures({
-      windowDays: RECENT_CARICATURES_WINDOW_DAYS,
-      limit: LATEST_CARICATURES_LIMIT,
+      limit: HOMEPAGE_CARICATURES_LIMIT,
     }),
     enabled: activeTab === "Caricature",
     staleTime: 60_000,
@@ -253,8 +266,7 @@ export function HomeCategorySection(_props: HomeCategorySectionProps = {}) {
 
     try {
       const response = await fetchPublicLatestCaricatures({
-        windowDays: RECENT_CARICATURES_WINDOW_DAYS,
-        limit: LATEST_CARICATURES_LIMIT,
+        limit: HOMEPAGE_CARICATURES_LIMIT,
         cursor: caricaturePageCursor,
       })
       setCaricaturePageItems((current) => [...current, ...response.items])
@@ -315,36 +327,44 @@ export function HomeCategorySection(_props: HomeCategorySectionProps = {}) {
             ))}
           </div>
 
-          <div className="col-start-1 row-start-1 flex w-full justify-between gap-6 pb-0 font-sans text-xs font-bold uppercase tracking-wider text-foreground sm:gap-8">
+          <div
+            role="tablist"
+            aria-label="Homepage collections"
+            className="col-start-1 row-start-1 flex w-full justify-center gap-3 pb-0 font-sans text-xs font-bold uppercase tracking-wider text-foreground sm:gap-3.5"
+          >
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "Editorial"}
               onClick={() => handleTabClick("Editorial")}
-              className={`shrink-0 pb-1.5 transition-all cursor-pointer ${
-                activeTab === "Editorial"
-                  ? "border-b-2 border-black text-black font-bold"
-                  : "border-b-2 border-transparent text-muted-foreground hover:text-black"
-              }`}
+              className={homepageCollectionTabClassName({ isActive: activeTab === "Editorial" })}
             >
               Editorial
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={false}
               disabled
-              className="shrink-0 cursor-not-allowed border-b-2 border-transparent pb-1.5 text-muted-foreground/50"
+              className={homepageCollectionTabClassName({ isActive: false, isDisabled: true })}
             >
               Video
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "Caricature"}
               onClick={() => handleTabClick("Caricature")}
-              className={`shrink-0 pb-1.5 transition-all cursor-pointer ${
-                activeTab === "Caricature"
-                  ? "border-b-2 border-black text-black font-bold"
-                  : "border-b-2 border-transparent text-muted-foreground hover:text-black"
-              }`}
+              className={homepageCollectionTabClassName({ isActive: activeTab === "Caricature" })}
             >
               Caricature
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={false}
               disabled
-              className="shrink-0 cursor-not-allowed border-b-2 border-transparent pb-1.5 text-muted-foreground/50"
+              className={homepageCollectionTabClassName({ isActive: false, isDisabled: true })}
             >
               Royalty Free
             </button>
@@ -510,7 +530,7 @@ function LatestCaricaturesPanel({
   if (state === "error") {
     return (
       <div className="w-full px-4 py-12 text-center text-sm text-muted-foreground sm:px-6 lg:px-8">
-        Latest caricatures are temporarily unavailable.
+        Caricatures are temporarily unavailable.
       </div>
     )
   }
@@ -522,9 +542,9 @@ function LatestCaricaturesPanel({
   if (items.length === 0) {
     return (
       <div className="mx-auto flex max-w-xl flex-col items-center px-4 py-12 text-center sm:px-6 lg:px-8">
-        <h3 className="font-heading text-2xl font-normal text-foreground">No recent caricatures yet.</h3>
+        <h3 className="font-heading text-2xl font-normal text-foreground">No caricatures yet.</h3>
         <p className="mt-2 text-sm text-muted-foreground">
-          Browse the caricature archive or check back soon for new work.
+          Check back soon for new work from Fotocorp artists.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link

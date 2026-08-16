@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils"
 const MOBILE_CONTAINER_BREAKPOINT = 640
 
 export const EVENTS_JUSTIFIED_OPTIONS: JustifiedRowsOptions = {
-  gap: 1,
+  gap: 8,
   targetRowHeight: 285,
   minRowHeight: 215,
   maxRowHeight: 420,

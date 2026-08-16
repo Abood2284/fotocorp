@@ -182,7 +182,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
 
         <div
           className={cn(
-            "grid gap-7 lg:grid-cols-[minmax(0,1.62fr)_minmax(340px,0.58fr)]",
+            "grid gap-7 lg:grid-cols-[minmax(0,1.62fr)_minmax(0,22rem)] xl:grid-cols-[minmax(0,1.62fr)_minmax(0,24rem)]",
             isLandscape ? "lg:items-start" : "lg:items-stretch",
           )}
         >
@@ -305,7 +305,7 @@ export default async function AssetDetailPage({ params, searchParams }: AssetDet
             ) : null}
           </section>
 
-          <aside id="download-card-section" className="scroll-mt-28">
+          <aside id="download-card-section" className="min-w-0 scroll-mt-28">
             <AssetDetailActions
               assetId={asset.id}
               accessState={accessState}

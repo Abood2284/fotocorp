@@ -72,7 +72,7 @@ export function Footer() {
 
         <div className="mt-10 flex flex-col items-center justify-between gap-4 font-sans text-xs text-neutral-500 md:flex-row md:gap-6">
           <p className="text-center md:text-left">
-            © {new Date().getFullYear()} Fotocorp. All rights reserved. Authentic editorial archive.
+            © {new Date().getFullYear()} Fotocorp. All rights reserved.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 md:justify-end md:gap-6">
             <Link href="/legal/terms" className="transition-colors hover:text-black">

@@ -27,6 +27,9 @@ describe("buildPublicAssetSizeOptions", () => {
     assert.equal(options[0]?.dimensions, "1,200 × 853 px • 72 dpi")
     assert.equal(options[1]?.dimensions, "2,400 × 1,705 px • 300 dpi")
     assert.equal(options[2]?.dimensions, "4,000 × 2,842 px • 300 dpi • 11.4 MP")
+    assert.equal(options[0]?.description, "Web & Screen")
+    assert.equal(options[1]?.description, "Digital & Editorial")
+    assert.equal(options[2]?.description, "Print & publication")
   })
 
   it("caps low and medium edges to the source long edge", () => {

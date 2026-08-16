@@ -60,7 +60,7 @@ export function AssetDetailActions({
 }: AssetDetailActionsProps) {
   const [selectedSize, setSelectedSize] = useState<AssetSizeOption["id"]>("large")
   const [downloadBusy, setDownloadBusy] = useState(false)
-  const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [downloadErrorCode, setDownloadErrorCode] = useState<string | null>(null)
   const [downloadStartedHint, setDownloadStartedHint] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [keywordsOpen, setKeywordsOpen] = useState(false)
@@ -85,7 +85,7 @@ export function AssetDetailActions({
       return
     }
 
-    setDownloadError(null)
+    setDownloadErrorCode(null)
     setDownloadStartedHint(false)
     setDownloadBusy(true)
     const size = selectedOption?.id ?? "large"
@@ -103,8 +103,7 @@ export function AssetDetailActions({
       } | null
 
       if (!response.ok || !data?.ok) {
-        const code = data?.error?.code
-        setDownloadError(messageForSubscriberDownloadErrorCode(code))
+        setDownloadErrorCode(data?.error?.code ?? "INTERNAL_ERROR")
         return
       }
 
@@ -114,7 +113,7 @@ export function AssetDetailActions({
         frame.src = `${downloadHref}?size=${encodeURIComponent(size)}`
       }
     } catch {
-      setDownloadError(messageForSubscriberDownloadErrorCode("INTERNAL_ERROR"))
+      setDownloadErrorCode("INTERNAL_ERROR")
     } finally {
       setDownloadBusy(false)
     }
@@ -210,7 +209,7 @@ export function AssetDetailActions({
   ) : null
 
   return (
-    <section className="relative rounded-none border border-border bg-white p-5 shadow-none sm:p-6">
+    <section className="relative min-w-0 rounded-none border border-border bg-white p-4 shadow-none sm:p-5 lg:p-6">
       <iframe
         ref={downloadFrameRef}
         title="Download"
@@ -220,24 +219,25 @@ export function AssetDetailActions({
       />
 
       <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold tracking-tight text-foreground sm:text-base">
+      <div className="flex min-w-0 items-start gap-2">
+        <h2 className="min-w-0 text-sm font-semibold tracking-tight text-foreground sm:text-base">
           How can I use this image?
         </h2>
         <ImageUsageHelp />
       </div>
 
-      <fieldset className="overflow-hidden rounded-none border border-border bg-background">
+      <fieldset className="min-w-0 overflow-hidden rounded-none border border-border bg-background">
         {sizeOptions.map((option, index) => {
           const selected = option.id === selectedOption?.id
           const isSelectable = option.selectable !== false
           const statusLabel = option.disabledReason ?? null
+          const dimensionsId = `asset-size-${option.id}-dimensions`
 
           return (
             <div key={option.id} className={cn(index > 0 && "border-t border-border")}>
               <label
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 transition-colors",
+                  "flex items-start gap-3 px-3 py-3 transition-colors sm:px-4",
                   isSelectable ? "cursor-pointer" : "cursor-not-allowed",
                   !isSelectable && "opacity-70",
                   selected && isSelectable && "bg-muted/50",
@@ -249,32 +249,31 @@ export function AssetDetailActions({
                   value={option.id}
                   checked={selected}
                   disabled={!isSelectable}
+                  aria-describedby={selected && option.dimensions ? dimensionsId : undefined}
                   onChange={() => {
                     if (isSelectable) setSelectedSize(option.id)
                   }}
-                  className="h-4 w-4 shrink-0 accent-foreground disabled:cursor-not-allowed"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-foreground disabled:cursor-not-allowed"
                 />
-                <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                  <span className="text-sm font-medium text-foreground">{option.label}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-foreground">{option.label}</span>
+                  {option.description ? (
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{option.description}</span>
+                  ) : null}
                   {statusLabel ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">{statusLabel}</span>
-                  ) : option.dimensions ? (
-                    <span className="min-w-0 truncate text-right text-xs tabular-nums text-muted-foreground">
+                    <span className="mt-1.5 block text-xs leading-relaxed text-muted-foreground">
+                      {statusLabel}
+                    </span>
+                  ) : selected && option.dimensions ? (
+                    <span
+                      id={dimensionsId}
+                      className="mt-1.5 block text-xs leading-relaxed break-words tabular-nums text-muted-foreground"
+                    >
                       {option.dimensions}
                     </span>
                   ) : null}
                 </span>
               </label>
-              {selected && option.description ? (
-                <div
-                  className={cn(
-                    "border-t border-border/80 bg-muted/30 px-4 py-2.5 pl-11 text-xs leading-relaxed text-muted-foreground",
-                    isSelectable && "bg-muted/40",
-                  )}
-                >
-                  <p>{option.description}</p>
-                </div>
-              ) : null}
             </div>
           )
         })}
@@ -325,15 +324,15 @@ export function AssetDetailActions({
           </Button>
         )}
 
-        {downloadStartedHint && !downloadError ? (
+        {downloadStartedHint && !downloadErrorCode ? (
           <p className="text-xs leading-relaxed text-muted-foreground" role="status" aria-live="polite">
             {DOWNLOAD_STARTED_HINT}
           </p>
         ) : null}
 
-        {downloadError ? (
+        {downloadErrorCode ? (
           <div className="rounded-none border border-destructive/25 bg-destructive/10 p-3 text-sm leading-6 text-foreground">
-            {downloadError}
+            <DownloadErrorNotice code={downloadErrorCode} assetHref={assetHref} />
           </div>
         ) : null}
       </div>
@@ -389,6 +388,32 @@ export function AssetDetailActions({
 const DOWNLOAD_STARTED_HINT =
   "Your download should start automatically in a few seconds. If it does not, check your browser's downloads or try again."
 
+function DownloadErrorNotice({
+  code,
+  assetHref,
+}: {
+  code: string
+  assetHref: string
+}) {
+  if (code === "AUTH_REQUIRED") {
+    const signInHref = `/sign-in?callbackUrl=${encodeURIComponent(assetHref)}`
+    return (
+      <>
+        Please{" "}
+        <Link
+          href={signInHref}
+          className="font-semibold text-foreground underline underline-offset-4 hover:text-foreground"
+        >
+          sign in
+        </Link>{" "}
+        to download licensed files.
+      </>
+    )
+  }
+
+  return messageForSubscriberDownloadErrorCode(code)
+}
+
 function ImageUsageHelp() {
   const [open, setOpen] = useState(false)
 
@@ -410,18 +435,18 @@ function ImageUsageHelp() {
         >
           <p className="font-semibold text-foreground">Common uses include:</p>
           <p className="mt-1.5">
-            Newspapers, magazines and books (except for covers), editorial broadcasts, documentaries,
-            non-commercial websites, blogs and social media posts illustrating matters of public interest
+            Newspapers, magazines and books, editorial broadcasts; documentaries; non-commercial websites;
+            blogs; and social media posts illustrating matters of public interest.
           </p>
-          <p className="mt-3 font-semibold text-foreground">Can&apos;t be used for:</p>
+          <p className="mt-3 font-semibold text-foreground">Cannot be used for:</p>
           <p className="mt-1.5">
-            Book or magazine covers, commercial, promotional, advertorial, endorsement, advertising, or
-            merchandising purposes in any media (e.g. print, commercial broadcast, film, digital)
+            Commercial, promotional, advertorial, endorsement, advertising, or merchandising purposes in any
+            medium, including print, commercial broadcast, film, and digital media.
           </p>
           <p className="mt-3 font-semibold text-foreground">Standard editorial rights:</p>
           <p className="mt-1.5">
-            Anyone in your organisation can use it an unlimited number of times for up to 15 years, worldwide,
-            with uncapped indemnification.
+            Anyone within your organisation may use the image an unlimited number of times for up to 1 year,
+            worldwide, with uncapped indemnification.
           </p>
           <p className="mt-3 text-foreground/90">Subject to the Content Licence Agreement</p>
         </div>

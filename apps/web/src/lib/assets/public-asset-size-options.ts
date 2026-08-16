@@ -7,9 +7,9 @@ const LOW_OUTPUT_DPI = 72
 const MEDIUM_OUTPUT_DPI = 300
 
 const SIZE_OPTION_DESCRIPTIONS: Record<AssetSizeOption["id"], string> = {
-  web: "Best for web and screen preview",
-  medium: "Best for editorial and digital publishing",
-  large: "Best for print and archive delivery",
+  web: "Web & Screen",
+  medium: "Digital & Editorial",
+  large: "Print & publication",
 }
 
 export function buildPublicAssetSizeOptions(

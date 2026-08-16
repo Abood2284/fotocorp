@@ -1,17 +1,19 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import {
   ContributorApplicationApiError,
   submitContributorApplication,
 } from "@/lib/api/contributor-application-api"
+import { getCallingCodeOptions } from "@/lib/phone-calling-codes"
 import { isValidUsername, normalizeUsername } from "@/lib/username"
 
 export function ContributorApplicationForm() {
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
+  const callingCodes = useMemo(getCallingCodeOptions, [])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -41,6 +43,10 @@ export function ContributorApplicationForm() {
       setError("Country code and mobile number are required.")
       return
     }
+    if (!applicationNotes) {
+      setError("Tell us about your work.")
+      return
+    }
 
     setSaving(true)
     try {
@@ -51,7 +57,7 @@ export function ContributorApplicationForm() {
         email,
         phoneCountryCode,
         phoneNumber,
-        applicationNotes: applicationNotes || undefined,
+        applicationNotes,
       })
       setSubmitted(true)
     } catch (caught) {
@@ -122,16 +128,21 @@ export function ContributorApplicationForm() {
         />
       </label>
 
-      <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
+      <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="font-medium text-foreground">Country code</span>
-          <input
+          <select
             name="phoneCountryCode"
             required
-            inputMode="numeric"
-            placeholder="91"
+            defaultValue="+91"
             className="h-11 rounded-none border border-input bg-background px-3"
-          />
+          >
+            {callingCodes.map((country) => (
+              <option key={`${country.iso2}-${country.callingCode}`} value={country.callingCode}>
+                {country.iso2} {country.callingCode}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="font-medium text-foreground">Mobile number</span>
@@ -146,9 +157,10 @@ export function ContributorApplicationForm() {
       </div>
 
       <label className="flex flex-col gap-1.5 text-sm">
-        <span className="font-medium text-foreground">About your work (optional)</span>
+        <span className="font-medium text-foreground">About your work</span>
         <textarea
           name="applicationNotes"
+          required
           rows={4}
           className="rounded-none border border-input bg-background px-3 py-2"
           placeholder="Portfolio links, specialties."

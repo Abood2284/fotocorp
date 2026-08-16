@@ -6,10 +6,10 @@ import { FotocorpLogoLink } from "@/components/layout/fotocorp-logo-link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { all as allCountries } from "country-codes-list"
 import { platformLogin, platformSignUp } from "@/lib/api/platform-auth-api"
 import { loginStaff, StaffApiError } from "@/lib/api/staff-api"
 import { stripLegacyPersonaFromSignInSearchParams } from "@/lib/auth-sign-in-gateway"
+import { getCallingCodeOptions } from "@/lib/phone-calling-codes"
 import {
   isPlatformAccessPendingReview,
   isPlatformInvalidCredentials,
@@ -77,26 +77,21 @@ const COMPANY_TYPE_GROUPS: SelectGroup[] = [
 
 const JOB_TITLE_GROUPS: SelectGroup[] = [
   {
-    label: "Freelancer",
-    options: [{ label: "Freelancer", value: "Freelancer" }],
-  },
-  {
     label: "Business/General",
     options: [
       { label: "Business Development", value: "Business Development" },
       { label: "Footage Librarian", value: "Footage Librarian" },
-      { label: "Owner", value: "Owner" },
       { label: "Project Manager", value: "Project Manager" },
     ],
   },
   {
     label: "Production",
     options: [
-      { label: "Associate Producer", value: "Associate Producer" },
-      { label: "Clearance Coordinator", value: "Clearance Coordinator" },
       { label: "Creative Director", value: "Creative Director" },
       { label: "Director", value: "Director" },
       { label: "Editor (& Assistant Editor)", value: "Editor (& Assistant Editor)" },
+      { label: "Editorial coordinator", value: "Editorial coordinator" },
+      { label: "Photo editor", value: "Photo editor" },
       { label: "Executive Producer", value: "Executive Producer" },
       { label: "Head of Production", value: "Head of Production" },
       { label: "Post Production Supervisor", value: "Post Production Supervisor" },
@@ -576,24 +571,24 @@ export function SplitAuthPage() {
       {/* Glass auth card — centered on mobile, slightly right of center on desktop */}
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10 lg:justify-end lg:pr-[10vw]">
         <section
-          className="w-full max-w-[460px] rounded-[28px] border border-(--auth-glass-border) p-7 shadow-[0_30px_80px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.28)] backdrop-blur-[22px] backdrop-saturate-[1.35] [background:linear-gradient(145deg,rgba(14,18,22,0.78),rgba(8,10,13,0.62))] scheme-dark sm:min-h-[560px] sm:p-[42px]"
+          className="w-full max-w-[460px] rounded-[28px] border border-(--auth-glass-border) p-7 text-(--auth-card-fg) shadow-[0_24px_64px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-[22px] backdrop-saturate-[1.35] [background:linear-gradient(145deg,rgba(255,255,255,0.96),rgba(248,249,250,0.92))] scheme-light sm:min-h-[560px] sm:p-[42px]"
         >
           <div className="mb-7">
-            <FotocorpLogoLink imageClassName="h-8 brightness-0 invert" priority />
+            <FotocorpLogoLink imageClassName="h-8" priority />
           </div>
 
           <div className="mb-6">
-            <h1 className="text-2xl font-semibold text-white">
+            <h1 className="text-2xl font-semibold text-(--auth-card-fg)">
               {activeTab === "sign-in" ? "Welcome back" : "Create an Access Request"}
             </h1>
-            <p className="mt-1.5 text-sm text-white/60!">
+            <p className="mt-1.5 text-sm text-(--auth-card-muted)!">
               {activeTab === "sign-in"
                 ? "Access India\u2019s editorial photo archive."
                 : "Complete the form below to request subscription access or apply to become a Fotocorp contributor."}
             </p>
           </div>
 
-          <div className="mb-6 flex rounded-full border border-white/14 bg-white/8 p-1">
+          <div className="mb-6 flex rounded-full border border-black/8 bg-black/4 p-1">
             <TabButton active={activeTab === "sign-in"} onClick={() => switchTab("sign-in")}>
               Sign In
             </TabButton>
@@ -623,7 +618,7 @@ export function SplitAuthPage() {
               <div className="flex items-center justify-between gap-4 pt-1">
                 <Link
                   href="/forgot-password"
-                  className="fc-label text-xs text-white/60 underline-offset-4 transition-colors hover:text-white hover:underline"
+                  className="fc-label text-xs text-(--auth-card-muted) underline-offset-4 transition-colors hover:text-(--auth-card-fg) hover:underline"
                 >
                   Forgot password?
                 </Link>
@@ -632,9 +627,9 @@ export function SplitAuthPage() {
               <SubmitButton disabled={isPending}>
                 {isPending ? "Signing In..." : "Sign In"}
               </SubmitButton>
-              <p className="text-center text-sm text-white/55!">
+              <p className="text-center text-sm text-(--auth-card-muted)!">
                 New to Fotocorp?{" "}
-                <Link href="/apply-contributor" className="font-medium text-white underline-offset-4 hover:underline">
+                <Link href="/apply-contributor" className="font-medium text-(--auth-card-fg) underline-offset-4 hover:underline">
                   Apply as a contributor
                 </Link>
               </p>
@@ -647,18 +642,18 @@ export function SplitAuthPage() {
                 onClick={() => setRegisterView("client-form")}
                 className={registerChoiceCardClassName}
               >
-                <span className="block text-base font-semibold text-white">
+                <span className="block text-base font-semibold text-(--auth-card-fg)">
                   Register as a Subscriber
                 </span>
-                <span className="mt-1 block text-sm text-white/55">
+                <span className="mt-1 block text-sm text-(--auth-card-muted)">
                   Request access to browse, license, and download images.
                 </span>
               </button>
               <Link href="/apply-contributor" className={registerChoiceCardClassName}>
-                <span className="block text-base font-semibold text-white">
+                <span className="block text-base font-semibold text-(--auth-card-fg)">
                   Register as a Contributor
                 </span>
-                <span className="mt-1 block text-sm text-white/55">
+                <span className="mt-1 block text-sm text-(--auth-card-muted)">
                   Apply to submit your editorial photography and content for consideration.
                 </span>
               </Link>
@@ -668,7 +663,7 @@ export function SplitAuthPage() {
               <button
                 type="button"
                 onClick={backToRegisterChoice}
-                className="mb-5 text-sm text-white/60 transition-colors hover:text-white"
+                className="mb-5 cursor-pointer text-sm text-(--auth-card-muted) transition-colors hover:text-(--auth-card-fg)"
               >
                 ← Back to options
               </button>
@@ -798,7 +793,7 @@ export function SplitAuthPage() {
                     <div className={registerStep !== 3 ? "hidden" : "space-y-4 pb-2"}>
                       <fieldset
                         data-auth-field="interestedAssetTypes"
-                        className="@container/interest space-y-3 rounded-[14px] border border-white/14 p-4"
+                        className="@container/interest space-y-3 rounded-[14px] border border-black/10 p-4"
                       >
                         <legend className={`${labelClassName} px-0.5`}>Tell us what you need *</legend>
                         <div className="flex flex-col gap-2 text-sm">
@@ -905,14 +900,14 @@ export function SplitAuthPage() {
                         <button
                           type="button"
                           onClick={handlePrevStep}
-                          className="w-full py-1 text-center text-sm text-white/60 transition-colors hover:text-white"
+                          className="w-full cursor-pointer py-1 text-center text-sm text-(--auth-card-muted) transition-colors hover:text-(--auth-card-fg)"
                         >
                           ← Back
                         </button>
                       ) : null}
                     </div>
 
-                    <p className="mt-4 text-center text-xs leading-relaxed text-white!">
+                    <p className="mt-4 text-center text-xs leading-relaxed text-(--auth-card-muted)!">
                       By registering with Fotocorp, you accept our{" "}
                       <Link href="/legal/license" className={registerLegalLinkClassName}>
                         License agreements
@@ -965,14 +960,14 @@ function RegisterStepIndicator({ currentStep }: { currentStep: RegisterStep }) {
                     ? "border-(--auth-teal) bg-(--auth-teal) text-(--auth-teal-deep)"
                     : currentStep === step.n
                       ? "border-(--auth-teal) text-(--auth-teal)"
-                      : "border-white/30 text-white/50"
+                      : "border-black/20 text-(--auth-card-muted)"
                 }`}
               >
                 {currentStep > step.n ? <CheckIcon /> : step.n}
               </div>
               <span
                 className={`text-[10px] uppercase tracking-[0.12em] ${
-                  currentStep === step.n ? "font-semibold text-white" : "text-white/50"
+                  currentStep === step.n ? "font-semibold text-(--auth-card-fg)" : "text-(--auth-card-muted)"
                 }`}
               >
                 {step.label}
@@ -981,7 +976,7 @@ function RegisterStepIndicator({ currentStep }: { currentStep: RegisterStep }) {
             {i < REGISTER_STEPS.length - 1 ? (
               <div
                 className={`mt-3.5 mx-1.5 h-px flex-1 transition-colors ${
-                  currentStep > step.n ? "bg-(--auth-teal)" : "bg-white/15"
+                  currentStep > step.n ? "bg-(--auth-teal)" : "bg-black/12"
                 }`}
               />
             ) : null}
@@ -998,10 +993,10 @@ function TabButton({ active, children, onClick }: { active: boolean; children: s
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex-1 rounded-full px-2 py-2.5 text-center text-sm font-semibold transition-all ${
+      className={`flex-1 cursor-pointer rounded-full px-2 py-2.5 text-center text-sm font-semibold transition-all ${
         active
-          ? "bg-white/16 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_0_18px_rgba(0,168,181,0.28)]"
-          : "text-white/55 hover:text-white/80"
+          ? "bg-white text-(--auth-card-fg) shadow-[0_1px_4px_rgba(15,18,22,0.10)]"
+          : "text-(--auth-card-muted) hover:text-(--auth-card-fg)"
       }`}
     >
       {children}
@@ -1061,7 +1056,7 @@ function TextField({
         onBlur={onBlur}
       />
       {hint ? (
-        <p id={hintId} className="text-xs text-white/50!">
+        <p id={hintId} className="text-xs text-(--auth-card-muted)!">
           {hint}
         </p>
       ) : null}
@@ -1127,7 +1122,7 @@ function SelectField({
 function FieldError({ children, id }: { children?: string; id?: string }) {
   if (!children) return null
   return (
-    <p id={id} role="alert" className="text-xs leading-snug text-red-300!">
+    <p id={id} role="alert" className="text-xs leading-snug text-red-700!">
       {children}
     </p>
   )
@@ -1142,8 +1137,8 @@ function FormNotice({
 }) {
   if (!children) return null
   const className = isError
-    ? "border-red-400/40 bg-red-500/15 text-red-200!"
-    : "border-white/20 bg-white/8 text-white/70!"
+    ? "border-red-200 bg-red-50 text-red-800!"
+    : "border-black/10 bg-black/4 text-(--auth-card-muted)!"
   return <p className={`rounded-[14px] border px-4 py-3 text-xs font-medium ${className}`}>{children}</p>
 }
 
@@ -1167,32 +1162,6 @@ function requireField(formData: FormData, errors: FormErrors, name: string, mess
 
 function isBasicEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-}
-
-function getCallingCodeOptions() {
-  const uniqueByIsoAndCode = new Map<string, { iso2: string; name: string; callingCode: string }>()
-
-  for (const country of allCountries()) {
-    if (!country.countryCallingCode) continue
-
-    const option = {
-      iso2: country.countryCode,
-      name: country.countryNameEn,
-      callingCode: `+${country.countryCallingCode}`,
-    }
-    const key = `${option.iso2}-${option.callingCode}`
-    if (!uniqueByIsoAndCode.has(key)) uniqueByIsoAndCode.set(key, option)
-  }
-
-  return Array.from(uniqueByIsoAndCode.values())
-    .sort((a, b) => {
-      const priority = priorityScore(a.iso2) - priorityScore(b.iso2)
-      return priority || a.name.localeCompare(b.name)
-    })
-}
-
-function priorityScore(iso2: string) {
-  return iso2 === "IN" ? 0 : iso2 === "US" ? 1 : iso2 === "GB" ? 2 : 10
 }
 
 function humanizeAuthErrorMessage(error: unknown, mode: AuthTab) {
@@ -1572,40 +1541,40 @@ function getNestedValue(target: unknown, path: string) {
   return cursor
 }
 
-/** Dark-glass select option styling — native dropdown panels render dark. */
-const darkSelectOptionsClassName =
-  "[&_option]:bg-[#0e1216] [&_option]:text-white [&_optgroup]:bg-[#0e1216] [&_optgroup]:text-white"
+/** Light select option styling — native dropdown panels match the white card. */
+const lightSelectOptionsClassName =
+  "[&_option]:bg-white [&_option]:text-(--auth-card-fg) [&_optgroup]:bg-white [&_optgroup]:text-(--auth-card-fg)"
 
 const inputClassName =
-  `h-[52px] w-full min-w-0 rounded-[14px] border border-white/18 bg-white/8 px-4 text-sm text-white shadow-none outline-none transition-[border-color,box-shadow] placeholder:text-white/40 focus:border-[rgba(0,180,190,0.8)] focus:shadow-[0_0_0_4px_rgba(0,180,190,0.12)] focus:ring-0 ${darkSelectOptionsClassName}`
+  `h-[52px] w-full min-w-0 rounded-[14px] border border-black/12 bg-white px-4 text-sm text-(--auth-card-fg) shadow-none outline-none transition-[border-color,box-shadow] placeholder:text-black/35 focus:border-(--auth-teal) focus:shadow-[0_0_0_4px_rgba(0,168,181,0.14)] focus:ring-0 ${lightSelectOptionsClassName}`
 
 const inputErrorClassName =
-  `h-[52px] w-full min-w-0 rounded-[14px] border border-red-400/80 bg-red-500/10 px-4 text-sm text-white shadow-none outline-none transition-[border-color,box-shadow] placeholder:text-white/40 focus:border-red-400 focus:shadow-[0_0_0_4px_rgba(248,113,113,0.15)] focus:ring-0 ${darkSelectOptionsClassName}`
+  `h-[52px] w-full min-w-0 rounded-[14px] border border-red-400 bg-red-50 px-4 text-sm text-(--auth-card-fg) shadow-none outline-none transition-[border-color,box-shadow] placeholder:text-black/35 focus:border-red-500 focus:shadow-[0_0_0_4px_rgba(185,28,28,0.12)] focus:ring-0 ${lightSelectOptionsClassName}`
 
-const labelClassName = "fc-label text-xs uppercase tracking-[0.11em] text-white/70"
+const labelClassName = "fc-label text-xs uppercase tracking-[0.11em] text-(--auth-card-muted)"
 
 const primaryButtonClassName =
-  "h-[54px] w-full rounded-[14px] bg-(--auth-teal) px-5 text-sm font-bold text-(--auth-teal-deep) transition-all hover:-translate-y-px hover:shadow-[0_14px_32px_rgba(0,168,181,0.35)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--auth-teal) disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+  "h-[54px] w-full cursor-pointer rounded-[14px] bg-(--auth-teal) px-5 text-sm font-bold text-(--auth-teal-deep) transition-all hover:-translate-y-px hover:shadow-[0_14px_32px_rgba(0,168,181,0.28)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--auth-teal) disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0 disabled:hover:shadow-none"
 
 const registerChoiceCardClassName =
-  "block w-full rounded-[14px] border border-white/18 bg-white/6 p-5 text-left transition-colors hover:border-[rgba(0,180,190,0.6)] hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--auth-teal)"
+  "block w-full cursor-pointer rounded-[14px] border border-black/10 bg-white p-5 text-left transition-colors hover:border-(--auth-teal) hover:bg-[#f7fbfb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--auth-teal)"
 
 const registerLegalLinkClassName =
-  "font-medium text-[#4db8d8] underline underline-offset-4 transition-colors hover:text-(--auth-teal)"
+  "font-medium text-(--auth-teal) underline underline-offset-4 transition-colors hover:text-(--auth-teal-deep)"
 
 /** Compact labels inside the interest fieldset — fluid size, sentence case, no wrap breaks on asterisk. */
 const interestSubfieldLabelClassName =
-  "fc-label block min-w-0 font-medium leading-snug text-white/80 normal-case tracking-normal text-[clamp(0.6875rem,3.25cqi,0.8125rem)]"
+  "fc-label block min-w-0 font-medium leading-snug text-(--auth-card-fg) normal-case tracking-normal text-[clamp(0.6875rem,3.25cqi,0.8125rem)]"
 
 const interestPreferenceGridClassName =
-  "grid min-w-0 grid-cols-1 gap-3 border-t border-white/14 pt-3 @min-[22rem]/interest:grid-cols-2 @min-[22rem]/interest:gap-4"
+  "grid min-w-0 grid-cols-1 gap-3 border-t border-black/10 pt-3 @min-[22rem]/interest:grid-cols-2 @min-[22rem]/interest:gap-4"
 
 function InterestSubfieldLabel({ text }: { text: string }) {
   return (
     <span className={interestSubfieldLabelClassName}>
       <span className="inline-flex max-w-full min-w-0 flex-wrap items-baseline gap-x-1">
         <span className="min-w-0">{text}</span>
-        <span className="shrink-0 text-red-300" aria-hidden="true">
+        <span className="shrink-0 text-red-600" aria-hidden="true">
           *
         </span>
       </span>

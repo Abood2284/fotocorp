@@ -5,7 +5,7 @@ export interface SubmitContributorApplicationInput {
   email: string
   phoneCountryCode: string
   phoneNumber: string
-  applicationNotes?: string
+  applicationNotes: string
 }
 
 export class ContributorApplicationApiError extends Error {

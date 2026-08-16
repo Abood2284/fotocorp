@@ -104,13 +104,15 @@ The accent communicates premium licensing, download CTAs, subscription actions, 
 
 ### Auth Glass Exception (sign-in page only)
 
-The `/sign-in` page (`apps/web/src/components/auth/split-auth-page.tsx`) intentionally deviates from the square B&W system: it uses a full-screen photographic background with a dark glass card, rounded geometry (`28px` card, `14px` controls), and a teal accent matching the logo mark (`#19A8B9` family). Scoped tokens in `globals.css`:
+The `/sign-in` page (`apps/web/src/components/auth/split-auth-page.tsx`) intentionally deviates from the square B&W system: it uses a full-screen photographic background with a white frosted glass card, rounded geometry (`28px` card, `14px` controls), and a teal accent matching the logo mark (`#19A8B9` family). Card text, inputs, and chrome use near-black and slate on white so contrast holds over the photo. Scoped tokens in `globals.css`:
 
 | Role | CSS Variable | Value |
 |---|---|---|
 | Auth teal accent | `--auth-teal` | `#00a8b5` |
 | Teal button text | `--auth-teal-deep` | `#001014` |
-| Glass card border | `--auth-glass-border` | `rgba(255, 255, 255, 0.28)` |
+| Glass card border | `--auth-glass-border` | `rgba(15, 18, 22, 0.12)` |
+| Card foreground | `--auth-card-fg` | `#0d0f1a` |
+| Card muted text | `--auth-card-muted` | `#4b5563` |
 
 Do not use these tokens outside the auth surface.
 
@@ -198,9 +200,10 @@ Use the existing classes where they fit:
 ## Components and Surfaces
 
 - **Public asset cards:** image-first, minimal metadata, safe preview URLs, hover/touch actions where appropriate.
+- **Homepage collection tabs:** Editorial / Caricature (and coming-soon Video / Royalty Free) use the same square inverted chip as Editorial sub-filters — selected is black fill / white text; unselected is outlined on hover. Do not revert these to a thin underline; the selected collection must remain obvious.
 - **Search/filter bar:** keyword input, sort, compact filter entry points, active chips, and URL-backed state.
 - **Active filter chips:** clear labels, easy removal, no internal field names.
-- **Asset detail:** headline, caption, event/category, date, photographer, Fotokey/ImageCode, copyright, keywords, gated actions, and related imagery.
+- **Asset detail:** headline, caption, event/category, date, photographer, Fotokey/ImageCode, copyright, keywords, gated actions, and related imagery. Download size rows show Low/Medium/High plus usage labels at all times; pixel/DPI details appear only on the selected size and wrap instead of truncating.
 - **Fotobox:** account grid/list with saved assets, safe previews, empty states, and removal actions.
 - **Download history:** date/year filtering, safe thumbnails, status, size, and clear failure handling.
 - **Admin tables/forms:** denser operational views for asset metadata, publish state, migration health, users, subscriptions, and audit.

@@ -10,9 +10,15 @@ import {
 
 test("parseLatestCaricaturesQuery applies defaults", () => {
   const query = parseLatestCaricaturesQuery({})
-  assert.equal(query.windowDays, 30)
-  assert.equal(query.limit, 15)
+  assert.equal(query.windowDays, null)
+  assert.equal(query.limit, 25)
   assert.equal(query.cursor, null)
+})
+
+test("parseLatestCaricaturesQuery accepts an optional recency window", () => {
+  const query = parseLatestCaricaturesQuery({ windowDays: "30", limit: "25" })
+  assert.equal(query.windowDays, 30)
+  assert.equal(query.limit, 25)
 })
 
 test("parseLatestCaricaturesQuery validates limit and windowDays", () => {
@@ -60,7 +66,7 @@ test("buildLatestCaricaturesResponse maps card metadata fields", () => {
       preview_width: 480,
       preview_height: 640,
     }],
-    parseLatestCaricaturesQuery({ limit: "15" }),
+    parseLatestCaricaturesQuery({ limit: "25" }),
   )
 
   assert.equal(response.items.length, 1)
