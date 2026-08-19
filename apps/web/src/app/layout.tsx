@@ -1,7 +1,10 @@
 import type { Metadata } from "next"
+import Script from "next/script"
 import { AppProviders } from "@/components/providers/app-providers"
 import { monumentGrotesk, playfairDisplay, lora } from "@/lib/font"
 import "./globals.css"
+
+const GA_MEASUREMENT_ID = "G-9M86R56XTW"
 
 const siteTitle = "Fotocorp — India's Premier News Photo Agency"
 const siteDescription =
@@ -41,6 +44,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="antialiased">
         <AppProviders>{children}</AppProviders>
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GA_MEASUREMENT_ID}');
+          `}
+        </Script>
       </body>
     </html>
   )
