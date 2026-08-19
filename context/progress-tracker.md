@@ -23,6 +23,8 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Contributor upload help docs:** Dashboard, uploads, and new-upload pages show a top-right **Need help?** card (same pattern as editorial staff upload). Caricature contributors get *How to upload caricature images*; editorial contributors get the editorial guide. Articles render at `/contributor/help/[slug]` from allowlisted Help Center rows (DRAFT or PUBLISHED — the caricature guide is currently a draft, which staff can open and contributors now can too). API: `GET /api/v1/contributor/help/articles/:slug` and `GET /api/v1/contributor/help/media/:mediaId`. Tests: `apps/api/test/contributor-help.test.ts`, `apps/web/test/contributor-help.test.ts`.
+
 - **Homepage anniversary marquee copy:** Ticker headline is now “22 Years of Capturing India’s Stories”; the “Fotocorp anniversary · 19 Aug 2026” line is removed. Pricing and Contact licensing CTA are unchanged.
 
 - **Footer legal line:** Public footer copyright now reads “© {year} Fotocorp. All rights reserved.” — dropped “Authentic editorial archive.”

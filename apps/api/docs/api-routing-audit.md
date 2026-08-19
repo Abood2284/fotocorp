@@ -9,6 +9,10 @@
 - [Resend + Google Workspace email integration](../../docs/integrations/email-resend-google-workspace.md) — access-flow transactional email sender, reply handling, env vars, delivery logs, and manual test steps.
 - [Hyperdrive rollout](../../docs/infrastructure/hyperdrive-rollout.md) — two-path Hyperdrive rollout rules, PR-1 core binding scope, and cached public-read guardrails.
 
+## Incremental update (2026-08-19)
+
+- **Contributor upload help docs:** Authenticated contributors can read allowlisted Help Center upload guides (`how-to-upload-editorial-images`, `how-to-upload-caricature-images`, plus seed slug `how-to-upload-caricatures`) in DRAFT or PUBLISHED status. Routes: `GET /api/v1/contributor/help/articles/:slug`, `GET /api/v1/contributor/help/media/:mediaId`. Web: `/contributor/help/[slug]`, header **Need help?** cards on `/contributor/dashboard`, `/contributor/uploads`, and `/contributor/uploads/new`. Same-origin media BFF `/api/contributor/help/media/:mediaId`. Staff Help Center remains staff-session-only.
+
 ## Incremental update (2026-07-30)
 
 - **Caricature clear browse for entitled users and owning contributors:** Anonymous public caricature feeds/search still return blurred CDN derivatives only. Subscribers with an **ACTIVE** `CARICATURE` entitlement (and staff) load clear originals for all published caricatures. Signed-in contributors load clear originals only for assets they uploaded (`created_by_contributor_id`). Probe: web BFF `GET /api/account/caricature-access` (`hasClearAccess` + `ownedAssetIds`). Stream: `GET /api/media/caricatures/:assetId/clear-preview` → internal `GET /api/v1/internal/caricatures/:assetId/clear-preview` (`x-auth-user-id`, `x-admin-auth-user-id`, or `x-contributor-id`). Subscriber path requires `PUBLISHED`/`PUBLIC`; contributor path requires ownership + `PUBLISHED`/`PUBLIC`; neither decrements download quota. `PublicCaricatureCard` and detail preview swap to the clear URL only for globally entitled viewers or owned assets. Dedicated caricature download endpoint remains TODO.
@@ -394,8 +398,10 @@ Implementation: `apps/api/src/routes/staff/auth/route.ts`, `apps/api/src/routes/
 | `GET` | `/api/v1/contributor/contributors` | `PORTAL_ADMIN` contributor accounts only; optional `q`, `limit` for photographer search. |
 | `GET` | `/api/v1/contributor/images` | Cursor-paginated images for the signed-in contributor (`limit`, `cursor`). |
 | `GET` | `/api/v1/contributor/images/:imageAssetId/preview/:variant` | Contributor session + asset ownership; streams READY `thumb`/`card`/`detail` preview bytes from previews bucket (not limited to `ACTIVE+PUBLIC`). |
+| `GET` | `/api/v1/contributor/help/articles/:slug` | Contributor session; allowlisted upload guides only (`how-to-upload-editorial-images`, `how-to-upload-caricature-images`, `how-to-upload-caricatures`), DRAFT or PUBLISHED. |
+| `GET` | `/api/v1/contributor/help/media/:mediaId` | Contributor session; READY media belonging to those published allowlisted articles. |
 
-Implementation: `apps/api/src/routes/contributor/catalog/route.ts`, `apps/api/src/routes/contributor/contributors/route.ts`, `apps/api/src/routes/contributor/images/route.ts` (mounted from `apps/api/src/honoApp.ts`). Same-origin web BFF: `apps/web/src/app/api/contributor/[...path]/route.ts` (GET/POST/PATCH).
+Implementation: `apps/api/src/routes/contributor/catalog/route.ts`, `apps/api/src/routes/contributor/contributors/route.ts`, `apps/api/src/routes/contributor/images/route.ts`, `apps/api/src/routes/contributor/help/route.ts` (mounted from `apps/api/src/honoApp.ts`). Same-origin web BFF: `apps/web/src/app/api/contributor/[...path]/route.ts` (GET/POST/PATCH) plus dedicated media BFF `/api/contributor/help/media/:mediaId`.
 
 ## Contributor portal — direct R2 upload batches (PR-16H)
 

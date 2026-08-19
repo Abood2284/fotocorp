@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Suspense } from "react"
 
 import { ContributorUploadFlow } from "@/components/contributor/contributor-upload-flow"
+import { ContributorHelpLinks } from "@/components/contributor/contributor-help-links"
 import { getContributorMe } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
 import { ArrowLeft } from "lucide-react";
@@ -17,15 +18,18 @@ export default async function NewContributorUploadPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <Link
-          href="/contributor/uploads"
-          className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft size={16} />
-          Back to uploads
-        </Link>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">New upload batch</h1>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_min(320px,100%)] lg:items-start">
+        <div>
+          <Link
+            href="/contributor/uploads"
+            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft size={16} />
+            Back to uploads
+          </Link>
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">New upload batch</h1>
+        </div>
+        <ContributorHelpLinks allowedUploadTypes={session.contributor.allowedUploadTypes} />
       </div>
 
       <Suspense

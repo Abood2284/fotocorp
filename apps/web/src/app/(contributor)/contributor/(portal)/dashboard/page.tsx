@@ -2,6 +2,7 @@ import Link from "next/link"
 
 import { getContributorAnalyticsSummary } from "@/lib/api/contributor-api"
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
+import { ContributorHelpLinks } from "@/components/contributor/contributor-help-links"
 import {
   ArrowUpRight,
   BarChart3,
@@ -78,7 +79,7 @@ export default async function ContributorDashboardPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Contributor Dashboard</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
@@ -88,16 +89,19 @@ export default async function ContributorDashboardPage() {
             Portfolio performance, subscriber downloads, and recent activity.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild size="sm">
-            <Link href="/contributor/uploads/new">
-              <CloudUpload className="mr-1.5" size={16} />
-              New upload
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/contributor/uploads">View uploads</Link>
-          </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-end">
+          <ContributorHelpLinks allowedUploadTypes={session.contributor.allowedUploadTypes} />
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm">
+              <Link href="/contributor/uploads/new">
+                <CloudUpload className="mr-1.5" size={16} />
+                New upload
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/contributor/uploads">View uploads</Link>
+            </Button>
+          </div>
         </div>
       </div>
 

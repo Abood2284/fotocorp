@@ -34,6 +34,7 @@ import { photographerImageRoutes } from "./routes/contributor/images/route";
 import { photographerDownloadRoutes } from "./routes/contributor/downloads/route";
 import { photographerUploadRoutes } from "./routes/contributor/uploads/route";
 import { contributorCaricatureRoutes } from "./routes/contributor/caricatures/route";
+import { contributorHelpRoutes } from "./routes/contributor/help/route";
 import { publicCatalogRoutes } from "./routes/public/catalog-routes";
 import { publicContributorApplicationRoutes } from "./routes/public/contributor-applications/route";
 import { publicHomepageRoutes } from "./routes/public/homepage-routes";
@@ -92,6 +93,7 @@ honoApp.route("/", photographerAnalyticsRoutes);
 honoApp.route("/", photographerDownloadRoutes);
 honoApp.route("/", photographerUploadRoutes);
 honoApp.route("/", contributorCaricatureRoutes);
+honoApp.route("/", contributorHelpRoutes);
 
 import { internalAdminEventsRoutes } from "./routes/internal/admin-events/route";
 import { internalSearchTypesenseRoutes } from "./routes/internal/search-typesense/route";

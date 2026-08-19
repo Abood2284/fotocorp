@@ -12,6 +12,7 @@ import {
 import { getContributorCookieHeader, requireContributorPasswordReady } from "@/lib/contributor-session"
 import { normalizeContributorUploadTypes } from "@/lib/contributors/allowed-upload-types"
 import { CloudUpload } from "lucide-react"
+import { ContributorHelpLinks } from "@/components/contributor/contributor-help-links"
 
 export const metadata = {
   title: "Upload batches",
@@ -119,7 +120,7 @@ export default async function ContributorUploadsPage({
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Contributor portal</p>
           <h1 className="mt-2 flex items-center gap-2 text-3xl font-semibold tracking-tight text-foreground">
@@ -128,9 +129,12 @@ export default async function ContributorUploadsPage({
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">{introCopy}</p>
         </div>
-        <Button asChild>
-          <Link href="/contributor/uploads/new">New upload</Link>
-        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-end">
+          <ContributorHelpLinks allowedUploadTypes={allowedUploadTypes} />
+          <Button asChild>
+            <Link href="/contributor/uploads/new">New upload</Link>
+          </Button>
+        </div>
       </div>
 
       {canCaricature ? (

@@ -7,6 +7,7 @@ export interface ContextualHelpLinkItem {
   id: string
   label: string
   description?: string
+  href?: string
   article: {
     slug: string
   }
@@ -44,7 +45,7 @@ export function ContextualHelpLinks({
             {items.map((item) => (
               <li key={item.id}>
                 <Link
-                  href={buildContextualHelpArticleHref(item.article.slug)}
+                  href={item.href ?? buildContextualHelpArticleHref(item.article.slug)}
                   className="text-sm font-medium text-primary hover:underline"
                 >
                   {item.label}

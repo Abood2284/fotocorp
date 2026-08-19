@@ -308,6 +308,32 @@ export async function getContributorMe(options: ContributorRequestOptions = {}) 
   })
 }
 
+export interface ContributorHelpArticle {
+  id: string
+  title: string
+  slug: string
+  summary: string
+  bodyMarkdown: string
+  category: {
+    name: string
+    slug: string
+  }
+  difficulty: string | null
+  estimatedMinutes: number | null
+  publishedAt: string | null
+  updatedAt: string
+}
+
+export async function getContributorHelpArticleBySlug(slug: string, options: ContributorRequestOptions = {}) {
+  return contributorJson<{ ok: true; article: ContributorHelpArticle }>(
+    `/help/articles/${encodeURIComponent(slug)}`,
+    {
+      method: "GET",
+      cookieHeader: options.cookieHeader,
+    },
+  )
+}
+
 export async function changeContributorPassword(currentPassword: string, newPassword: string) {
   return contributorJson<ContributorAuthResponse>("/auth/change-password", {
     method: "POST",

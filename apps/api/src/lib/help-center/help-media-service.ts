@@ -21,6 +21,7 @@ import {
   isArticleVisibleToStaffRole,
   type HelpMediaUploadStatus,
 } from "./constants"
+import { isContributorHelpArticleSlug, isContributorVisibleHelpArticleStatus } from "./contributor-help"
 import {
   buildHelpMediaStorageKey,
   extensionFromHelpMediaFileNameAndMime,
@@ -511,12 +512,57 @@ export async function getHelpMediaDeliveryResponse(
   staff: { id: string; role: string },
   rangeHeader: string | null,
 ): Promise<Response> {
+  const row = await loadHelpMediaRow(db, mediaId)
+  await assertStaffCanAccessHelpMedia(db, row, staff)
+  return streamHelpMediaRow(env, row, rangeHeader)
+}
+
+export async function getContributorHelpMediaDeliveryResponse(
+  db: DrizzleClient,
+  env: Env,
+  mediaId: string,
+  rangeHeader: string | null,
+): Promise<Response> {
+  const row = await loadHelpMediaRow(db, mediaId)
+  await assertContributorCanAccessHelpMedia(db, row)
+  return streamHelpMediaRow(env, row, rangeHeader)
+}
+
+async function loadHelpMediaRow(db: DrizzleClient, mediaId: string) {
   const rows = await db.select().from(helpArticleMedia).where(eq(helpArticleMedia.id, mediaId)).limit(1)
   const row = rows[0]
   if (!row) throw new AppError(404, "HELP_MEDIA_NOT_FOUND", "Help media was not found.")
+  return row
+}
 
-  await assertStaffCanAccessHelpMedia(db, row, staff)
+async function assertContributorCanAccessHelpMedia(
+  db: DrizzleClient,
+  mediaRow: typeof helpArticleMedia.$inferSelect,
+) {
+  const articleRows = await db
+    .select({
+      slug: helpArticles.slug,
+      status: helpArticles.status,
+    })
+    .from(helpArticles)
+    .where(eq(helpArticles.id, mediaRow.articleId))
+    .limit(1)
 
+  const article = articleRows[0]
+  if (!article || !isContributorVisibleHelpArticleStatus(article.status) || !isContributorHelpArticleSlug(article.slug)) {
+    throw new AppError(404, "HELP_MEDIA_NOT_FOUND", "Help media was not found.")
+  }
+
+  if (mediaRow.uploadStatus !== "READY") {
+    throw new AppError(404, "HELP_MEDIA_NOT_FOUND", "Help media was not found.")
+  }
+}
+
+async function streamHelpMediaRow(
+  env: Env,
+  row: typeof helpArticleMedia.$inferSelect,
+  rangeHeader: string | null,
+) {
   const storageKey = row.storageKey?.trim()
   if (!storageKey) throw new AppError(404, "HELP_MEDIA_NOT_FOUND", "Help media was not found.")
 
