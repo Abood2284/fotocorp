@@ -23,6 +23,8 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Homepage anniversary marquee copy:** Ticker headline is now “22 Years of Capturing India’s Stories”; the “Fotocorp anniversary · 19 Aug 2026” line is removed. Pricing and Contact licensing CTA are unchanged.
+
 - **Footer legal line:** Public footer copyright now reads “© {year} Fotocorp. All rights reserved.” — dropped “Authentic editorial archive.”
 
 - **Contributor country-code dropdown:** Apply-contributor phone country code is now the same ISO + calling-code select as Register (default `+91`, India/US/UK first). Shared helper: `apps/web/src/lib/phone-calling-codes.ts`.

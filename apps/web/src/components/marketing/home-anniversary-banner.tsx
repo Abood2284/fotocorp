@@ -48,15 +48,12 @@ function AnniversaryMarqueeItem({ isDuplicate = false }: AnniversaryMarqueeItemP
     >
       <div>
         {isDuplicate ? (
-          <div className={titleClassName}>Celebrating 22 years of documenting India</div>
+          <div className={titleClassName}>22 Years of Capturing India’s Stories</div>
         ) : (
           <h2 id="fotocorp-anniversary-title" className={titleClassName}>
-            Celebrating 22 years of documenting India
+            22 Years of Capturing India’s Stories
           </h2>
         )}
-        <div className="mt-0.5 whitespace-nowrap font-sans text-[8px] font-semibold uppercase tracking-[0.16em] text-white/55">
-          Fotocorp anniversary · 19 Aug 2026
-        </div>
       </div>
 
       <span aria-hidden className="h-8 w-px shrink-0 bg-white/20" />
