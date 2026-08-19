@@ -23,6 +23,8 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Contentsquare UX Analytics:** Root layout `<head>` now loads `https://t.contentsquare.net/uxa/3c3516e8b89cf.js` site-wide.
+
 - **Google Analytics (GA4):** Root layout `apps/web/src/app/layout.tsx` loads gtag `G-9M86R56XTW` with Next.js `Script` (`afterInteractive`) so all public, account, staff, and contributor pages are tracked.
 
 - **Contributor upload help docs:** Dashboard, uploads, and new-upload pages show a top-right **Need help?** card (same pattern as editorial staff upload). Caricature contributors get *How to upload caricature images*; editorial contributors get the editorial guide. Articles render at `/contributor/help/[slug]` from allowlisted Help Center rows (DRAFT or PUBLISHED — the caricature guide is currently a draft, which staff can open and contributors now can too). API: `GET /api/v1/contributor/help/articles/:slug` and `GET /api/v1/contributor/help/media/:mediaId`. Tests: `apps/api/test/contributor-help.test.ts`, `apps/web/test/contributor-help.test.ts`.

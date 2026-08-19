@@ -41,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <head>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <script async src="https://t.contentsquare.net/uxa/3c3516e8b89cf.js" />
       </head>
       <body className="antialiased">
         <AppProviders>{children}</AppProviders>
