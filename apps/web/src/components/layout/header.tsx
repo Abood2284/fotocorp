@@ -15,9 +15,10 @@ import {
   getSessionSubtitle,
   type AccountLink,
 } from "@/components/layout/header-account-links"
+import { SUBSCRIPTION_MAILTO } from "@/lib/subscription-inquiry-mailto"
 import { SHARED_AUTH_SESSION_QUERY_KEY, useSharedAuthSession } from "@/lib/use-shared-auth-session"
 import { cn } from "@/lib/utils"
-import { ChevronDown, LogOut, Menu, X } from "lucide-react"
+import { ChevronDown, LogOut, Mail, Menu, X } from "lucide-react"
 
 /** Editorial masthead: white canvas with a subtle hairline and soft backdrop. */
 const HEADER_SHELL_CLASS =
@@ -283,6 +284,7 @@ function HeaderShell({
               public figures, premieres, events, red carpet appearances, viral moments for social media and global
               digital publishing
             </p>
+            <ContactLicensingButton className="mt-4" />
           </div>
         </BrowseDropdownPanel>
       )}
@@ -319,6 +321,7 @@ function HeaderShell({
               concepts, providing versatile, high-quality visuals for commercial, advertising, editorial, marketing,
               creative-use and digital projects
             </p>
+            <ContactLicensingButton className="mt-4" />
           </div>
         </BrowseDropdownPanel>
       )}
@@ -355,6 +358,15 @@ function HeaderShell({
         </nav>
       </div>
     </header>
+  )
+}
+
+function ContactLicensingButton({ className }: { className?: string }) {
+  return (
+    <a href={SUBSCRIPTION_MAILTO} className={cn(PRIMARY_BTN_CLASS, className)}>
+      <Mail aria-hidden className="size-3.5" strokeWidth={1.75} />
+      Contact licensing
+    </a>
   )
 }
 
@@ -466,13 +478,19 @@ function MobileBrowseNav({
             />
           </div>
         </div>
-        <div className="grid gap-1">
-          <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
-            Pap Videos — Coming soon
-          </span>
-          <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
-            Royalty Free — Coming soon
-          </span>
+        <div className="grid gap-3">
+          <div className="grid gap-2">
+            <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
+              Pap Videos — Coming soon
+            </span>
+            <ContactLicensingButton className="w-full" />
+          </div>
+          <div className="grid gap-2">
+            <span className="border-l-2 border-transparent px-3 py-2 font-sans text-xs font-medium text-muted-foreground/50">
+              Royalty Free — Coming soon
+            </span>
+            <ContactLicensingButton className="w-full" />
+          </div>
         </div>
       </div>
     </section>

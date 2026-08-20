@@ -23,6 +23,8 @@ Update this file after every meaningful implementation change.
 
 ## Completed (recent)
 
+- **Header licensing CTA:** Pap Videos and Royalty Free dropdowns (desktop + mobile) now include a **Contact licensing** button that opens the same prefilled `subscription@fotocorp.com` mailto as the homepage anniversary banner.
+
 - **Contentsquare UX Analytics:** Root layout `<head>` now loads `https://t.contentsquare.net/uxa/3c3516e8b89cf.js` site-wide.
 
 - **Google Analytics (GA4):** Root layout `apps/web/src/app/layout.tsx` loads gtag `G-9M86R56XTW` with Next.js `Script` (`afterInteractive`) so all public, account, staff, and contributor pages are tracked.
